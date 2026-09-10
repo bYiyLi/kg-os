@@ -1,17 +1,16 @@
 # KG OS 设计
 
-本文是 KG OS 当前技术架构与数据设计的真源。产品定义见 [README](../README.md)；[会话交接](../HANDOFF.md)只记录接续位置与工作规则，不另立设计结论。
+本文是 KG OS 当前技术架构与数据设计的真源。产品定义见 [README](../README.md)，协作规则见 [AGENTS](../AGENTS.md)。
 
 ## 设计状态导航
 
 | 状态 | 范围与入口 |
 | --- | --- |
-| 已确认 | [技术架构](#已确认技术架构)、[图内核边界](#图内核扩展原则)、[统一图](#统一图与能力边界)、[Ontology Schema](#ontology-schema)的字段、JSON 格式、绑定、约束叠加与变更规则 |
-| 暂定 | `properties` 的约束规范采用 JSON Schema Draft 2020-12；不因示例采用该规范而升级为最终选型 |
-| 待设计 | [后续能力合同](#待设计能力合同)，不回退已经确认的本体基础规则 |
-| 待实现 | [工程实现待办](#工程实现待办)，不等于产品语义尚未确定 |
+| 已确认 | [目标架构](#目标架构)、[Lithograph 边界](#lithograph-边界)、[Knowledge Base](#knowledge-base)、[Ontology](#ontology)、[Definition](#definition)、[版本模型](#版本模型) |
+| 待设计 | [待设计合同](#待设计合同)，包括语义元数据物理编码、Schema element 稳定引用、Definition 公共格式与删除语义 |
+| 待实现 | [工程实现待办](#工程实现待办)；实际实现依赖 Lithograph 对应公开能力已经可用 |
 
-**已确认不等于已实现；未实现不等于未设计。** 实现、验证、提交和推送状态以当前仓库与实际命令结果为准。
+**已确认不等于已实现；未实现不等于未设计。** Lithograph 的当前实现状态只以 Lithograph 仓库为准，不在 KG OS 复制第二份 Phase 状态。
 
 ## 核心理念：一切皆可被定义
 
@@ -26,6 +25,7 @@ KG OS 不替调用方定义世界，而是提供**定义世界并操作这个世
 - Kernel 不预定义具体领域的本体、节点、关系或知识语义。
 - 调用方负责定义自己的领域模型和语义。
 - KG OS 的确定性能力应作用于明确的定义，而不是依赖 Kernel 内部的隐式领域判断。
+- KG OS 不根据上层业务意图绕过 Lithograph 已生效的 Schema、transaction 或 version contract。
 - 理解、提炼、分类和建模等认知决策仍属于外部 Agent 与 Skill。
 
 ### 这不意味着
@@ -34,208 +34,361 @@ KG OS 不替调用方定义世界，而是提供**定义世界并操作这个世
 - 所有内容必须提前静态定义。
 - 核心理念会自动决定全部机制；具体已确认范围以下文为准。
 
-## 已确认技术架构
+## 目标架构
 
-KG OS 当前确认采用以下上下层技术架构：
+KG OS 是构建在 Lithograph 之上的 AI-first 高级知识库。KG OS 不再维护独立 Graph Engine、Ontology Schema Engine、Search Engine 或 Version Engine；这些底层数据库能力以 Lithograph 的公开合同为准。
 
 ```text
-CLI / SDK / Web / Skill (TypeScript / npm)
-        ↓
-      kgosd (Rust)
-        ↓
-      SQLite
-  ├─ FTS5 + trigram
-  ├─ sqlite-vec
-  └─ KG OS Graph Engine (Rust, based on GraphQLite)
+AI / Agent / Skill / CLI / SDK / Web
+                 │
+                 ▼
+               KG OS
+      ┌──────────────────────┐
+      │ Ontology             │
+      │ Knowledge            │
+      │ Definition view      │
+      │ AI / Human interface │
+      └──────────┬───────────┘
+                 │
+                 ▼
+            Lithograph
+      ┌──────────────────────┐
+      │ Cypher 25            │
+      │ Property Graph       │
+      │ Graph Type / Schema  │
+      │ Constraint / Index   │
+      │ Search               │
+      │ Versioning           │
+      └──────────┬───────────┘
+                 │
+                 ▼
+               SQLite
 ```
 
-| 部分 | 已确认选择与职责 |
+责任边界：
+
+| 层 | 负责 |
 | --- | --- |
-| 本地服务 | Rust 开发 `kgosd`，作为统一访问入口 |
-| 知识库引擎 | Fork GraphQLite，以 Rust 做源码级扩展，承载 KG OS 的图读写与确定性语义 |
-| 数据底座 | SQLite；Rust 层负责集成、查询执行与数据一致性 |
-| 检索基础 | FTS5 + trigram 用于全文／子串检索，sqlite-vec 用于向量检索 |
-| 上层 | TypeScript / npm 开发 SDK、CLI、Web，并提供 Skill 与生态集成 |
+| KG OS | 知识库产品语义、Ontology semantic metadata、Definition 聚合视图、知识管理、AI-facing CLI / Skill、Human-facing Web |
+| Lithograph | Property Graph、Cypher 25、Graph Type / Schema、Constraint、Index、Search、版本化图存储与 Git-like version operations |
+| SQLite | Lithograph 的运行宿主、持久化文件、connection、transaction 与基础数据库机制 |
 
-以上是已确认的技术选择，不表示已经完成 fork、集成或功能实现。
+KG OS 的设计必须建立在 Lithograph **公开能力**之上，而不是 Lithograph 的内部存储实现之上。
 
-## 图内核扩展原则
+## Lithograph 边界
 
-KG OS 图引擎负责执行本体、时序和数据可见域相关能力，但**不自行判断某段图具有何种业务语义**。语义由上层定义，底层按明确规范执行。
+### 只复用公开能力
 
-- GraphQLite 作为 KG OS 图内核的上游基础，而不是不可修改的黑盒依赖。
-- KG OS 可以修改 GraphQLite 的源码和执行路径，以实现自身独有的图语义。
-- 调用方仍使用普通图查询；本体、时序、版本分支和可见域等约束由图引擎根据当前上下文透明执行。
-- 可见域约束必须作用于图遍历过程本身，不能仅在查询结果返回前做末端过滤。
-- 在扩展内部语义的同时，优先保持 SQLite 数据基础和 Cypher 查询兼容性，避免把 KG OS 的内部机制泄漏给上层使用方。
+KG OS 对知识、Ontology 结构、查询、搜索和版本的操作统一通过 Lithograph 公开接口完成。KG OS 不直接读写 `_lithograph_*` 内部对象，也不把 Lithograph 的内部物理结构提升为 KG OS 产品合同。
 
-## 统一图与能力边界
+KG OS 不要求 Lithograph 增加 KG OS 专用语法、Schema 字段或 Annotation。Lithograph 的公开查询与 Schema 语义继续以其冻结的 Cypher 25 compatibility profile 为准；Cypher 25 没有的 Ontology 语义由 KG OS 在上层表达，不修改 Lithograph 方言。
 
-KG OS 的持久化知识统一表示为图，**Schema 本身也作为图数据保存**。底层不预设领域节点、关系或业务属性，也不把本体、普通知识、时序或版本拆成割裂的数据体系。
+### SQLite 只作为 Host
 
-- 节点和关系可以携带调用方需要的属性；KG OS 不预定义领域字段集合。
-- 本体、普通知识、时序、版本等都可以由同一图数据表达。
-- 上层负责声明哪些节点、关系和数据构成某种定义或语义，例如某组图数据构成本体定义。
-- 图引擎不需要主动识别“这是不是本体”或“这是不是时序图”；它只提供可被上层调用的确定性能力。
-- 当上层要求按某组图数据执行本体校验、时序可见域或其它规则时，底层按照对应能力合同执行。
+KG OS 可以为承载 Lithograph 做最小 SQLite host 工作，例如：
 
-因此，KG OS 的原则是：**语义由上层定义，能力由底层执行。**
+- 打开／关闭 database connection；
+- 加载 Lithograph extension；
+- 在需要跨多个 Lithograph operation 保证持久化原子性时建立 caller-owned SQLite transaction。
 
-## Ontology Schema
+KG OS 不使用 SQLite 直接建立第二套知识、Ontology、Search 或 Version 业务表，也不绕过 Lithograph 用 SQL 修改图数据或 Schema。
 
-KG OS 固定本体 Schema 的基础结构，但不预定义调用方的领域标签、字段或业务语义。本体 Schema 是附加在图数据上的确定性约束；图中的 Node / Edge 数据本身仍是真源。
+因此：**KG OS 使用 Lithograph 的数据库能力；SQLite 是 Lithograph 的宿主与事务基础，不是 KG OS 的业务数据接口。**
 
-### Node / Edge 固定字段
+## Knowledge Base
 
-| 字段 | Node Schema | Edge Schema |
-| --- | --- | --- |
-| `kind` | `node` | `edge` |
-| `name` | Schema 名称，匹配节点标签 | Schema 名称，匹配边的标签／类型 |
-| `properties` | 节点属性数据的结构和值约束 | 边属性数据的结构和值约束 |
-| `unique`（可选） | 单字段／联合业务唯一键 | 同样支持单字段／联合业务唯一键 |
-| `title`（可选） | 展示名称 | 展示名称 |
-| `description`（可选） | 说明 | 说明 |
-| `cardinality` | 不适用 | 以下四种关系基数之一 |
-
-`properties` 暂定采用 **JSON Schema Draft 2020-12**，约束对象是 Node / Edge 的属性数据，不替代图结构与图级约束。
-
-### 关系基数
-
-基数始终按照图中 Edge 的 source → target 箭头方向解释：
-
-| `cardinality` | 每个 source 可关联的 target 数量 | 每个 target 可关联的 source 数量 |
-| --- | --- | --- |
-| `one-to-one` | 最多一个 | 最多一个 |
-| `one-to-many` | 不限 | 最多一个 |
-| `many-to-one` | 最多一个 | 不限 |
-| `many-to-many` | 不限 | 不限 |
-
-`one = 0..1`，不要求关系必须存在；“必须存在关系”不属于当前基数约束。
-
-Edge Schema 不重复定义 `from` / `to`。Edge 的 source 和 target 已经由图结构本身表达；Schema 只对现有图结构施加约束，不能建立第二份可能与真实图关系冲突的端点数据。
-
-### Schema 叠加
-
-一个 Node 或 Edge 可以同时适用多个标签 / Schema 定义。此时所有适用 Schema 的约束共同生效：
-
-- 所有 `properties` 约束都必须满足；
-- 所有 `unique` 约束都必须满足；
-- Edge 上所有适用的关系基数约束都必须满足。
-
-Schema 不把图数据切分成彼此隔离的类型空间。一个对象本质上仍是同一个 Node 或 Edge；多个 Schema 只是同时作用于该数据的约束集合。
-
-因此，当前本体 Schema 的原则是：**图结构是真源，Schema 定义数据约束；多个 Schema 以逻辑“且”叠加。**
-
-### Schema 与图绑定
-
-Schema 不建立额外 mapping。Schema 的 `name` 直接对应图上的标签 / 类型名称：
+一个 KG OS Knowledge Base 对应一个由 Lithograph 承载的知识世界。当前确认的核心组成是：
 
 ```text
-图上的 label / type 名称 = Schema name
+Knowledge Base
+├── Ontology
+│   ├── Structure  → Lithograph Schema
+│   └── Semantics  → KG OS graph data
+└── Knowledge Data → Lithograph graph data
 ```
 
-当一个 Node / Edge 同时拥有多个可匹配的标签 / 类型时，对应的多个 Schema 自动同时生效，并继续遵守前述逻辑“且”叠加规则。
+Ontology semantic metadata 与普通 Knowledge 都作为 Lithograph 中的正常 Property Graph 数据保存；Ontology Structure 则由 Lithograph 的 versioned Schema 承载。KG OS 不为这三部分建立彼此独立的数据库、历史或结构真源。
 
-Schema 自身的稳定身份由 `kind + name` 组成。同一个 `kind + name` 同时只能存在一个有效 Schema；因此同名 Node Schema 与 Edge Schema 可以同时存在，但不能存在两份同名 Node Schema 或两份同名 Edge Schema。
+调用方定义领域模型。KG OS Kernel 不预定义 `Person`、`Company`、`works_at` 等领域概念，也不执行理解、分类、提炼或建模决策；这些认知工作仍属于外部 Agent / Skill。
 
-Schema 是可选约束。图中的 Node / Edge 可以在不存在同名 Schema 时存在；一旦创建同名 Schema，该 Schema 就自动作用于所有匹配的数据，不需要额外绑定操作。
+## Ontology
 
-### `unique` 语义
+KG OS Ontology 是一个知识库对“这个世界如何建模，以及这些模型意味着什么”的完整定义。它不是一份独立 Schema 文件，而是两个来源的组合：
 
-`unique` 采用类似 SQLite `UNIQUE` 的业务唯一键语义，并支持单字段与联合唯一键：
+```text
+KG OS Ontology
+├── Structure  → Lithograph Schema
+└── Semantics  → KG OS semantic metadata graph
+```
+
+### Structure：Lithograph 是唯一结构真源
+
+Ontology 的结构部分完全复用 Lithograph 当前公开设计中的 Cypher 25 Graph Type / Schema 能力。具体可表达范围始终以 Lithograph 自己的 Cypher compatibility profile 和公开合同为准。
+
+结构信息包括但不限于：
+
+- Graph Type 与 element type；
+- Node label 与 Relationship type；
+- Property 与 property type；
+- key、unique、existence / `NOT NULL` 及其它 Lithograph 已支持的 current-graph constraints；
+- Lithograph / Cypher 25 原生表达的关系结构。
+
+KG OS 不复制这些信息，不再保存第二份 `type`、`required`、`unique`、`from/to`、`cardinality` 或其它自定义结构约束。只要某项结构语义已经由 Lithograph Schema 表达，KG OS 就从 Lithograph 读取并以它为准。
+
+因此旧设计中的以下能力被替代，不再属于 KG OS 产品合同：
+
+- KG OS 自定义 Ontology Schema JSON；
+- JSON Schema Draft 2020-12 作为 KG OS 领域属性 Schema；
+- KG OS 自定义 `unique` / `cardinality` 约束引擎；
+- Ontology Meta-Schema；
+- 为本体语义修改 GraphQLite 或创建 KG OS 专用 Graph Engine。
+
+### Semantics：KG OS 只补充解释语义
+
+Cypher 25 Graph Type 没有定义面向 AI / 用户的任意自然语言 Schema description。KG OS 因此只为 Lithograph Schema element 补充解释性 semantic metadata，而不扩展 Lithograph。
+
+首个最小语义集合固定为：
+
+| 字段 | 作用 |
+| --- | --- |
+| `title` | 面向 AI / 人的简短显示名称 |
+| `description` | 对 Schema element 含义、用途或边界的自然语言说明 |
+
+例如概念上：
+
+```text
+Person
+  title: 人物
+  description: 表示现实世界中的自然人。
+
+Person.name
+  title: 姓名
+  description: 该人物的规范姓名。
+
+WORKS_AT
+  title: 任职
+  description: 表示一个人在某个组织中的任职关系。
+```
+
+这些 semantic metadata 是 **KG OS 拥有的普通 Property Graph 数据**，通过 Lithograph 正常图写入保存并参与 Lithograph 的版本历史。Lithograph 只负责存储和查询，不理解 `title` / `description` 的 KG OS 产品语义。
+
+KG OS semantic metadata 不允许重复保存 Lithograph 已经拥有的结构信息。增加新的 semantic metadata 字段前必须有当前真实需求；`examples`、`aliases`、`prompt`、`instructions` 等不在当前合同中。
+
+### 自描述目标
+
+AI 获取完整 Ontology 时，应能够同时取得：
+
+```text
+Lithograph Schema
+        +
+KG OS semantic metadata
+        ↓
+完整、可理解的 Ontology
+```
+
+AI 不需要读取 KG OS 源码、外部 Markdown 或另一套 Schema 数据库才能理解当前 Knowledge Base 的模型。结构事实由 Lithograph 提供，解释语义由 KG OS metadata 提供。
+
+## Definition
+
+KG OS 对上提供一个统一的本体定义视图，下文称 **Definition**。Definition 是 API / CLI / Skill / Web 面向上层的逻辑资源，**不是独立持久化模型，也不是新的结构真源**。
+
+### Read
+
+读取 Definition 时，KG OS 动态组合：
+
+```text
+Lithograph Schema state
+        +
+semantic metadata graph
+        ↓
+Definition view
+```
+
+例如上层可以得到概念上类似：
 
 ```json
 {
-  "unique": [
-    ["email"],
-    ["country", "id"]
-  ]
-}
-```
-
-- 每个内层数组定义一组独立的唯一键；只有一个字段时是单字段唯一键，多个字段时是联合唯一键。
-- 一组唯一键中的所有字段都有非 `null` 值时，该组合值必须唯一。
-- 任意字段缺失或为 `null` 时，该对象不参与这一组唯一键的冲突判断。
-- Node 与 Edge 使用相同的 `unique` 规则。
-- 当多个 Schema 同时生效时，其中声明的所有 `unique` 约束都必须满足。
-
-### 固定 JSON 格式
-
-Ontology Schema 使用固定 JSON 格式。Node Schema 的标准形态为：
-
-```json
-{
-  "kind": "node",
   "name": "Person",
   "title": "人物",
-  "description": "一个人物",
+  "description": "表示现实世界中的自然人",
   "properties": {
-    "type": "object",
-    "properties": {
-      "name": { "type": "string" },
-      "email": { "type": ["string", "null"] }
-    },
-    "required": ["name"]
-  },
-  "unique": [
-    ["email"]
-  ]
-}
-```
-
-Edge Schema 的标准形态为：
-
-```json
-{
-  "kind": "edge",
-  "name": "works_at",
-  "title": "任职",
-  "properties": {
-    "type": "object",
-    "properties": {
-      "since": {
-        "type": "string",
-        "format": "date"
-      }
+    "name": {
+      "type": "STRING",
+      "nullable": false,
+      "title": "姓名",
+      "description": "该人物的规范姓名"
     }
-  },
-  "unique": [],
-  "cardinality": "many-to-one"
+  }
 }
 ```
 
-这些 JSON 是 Schema 的固定表达格式，不代表另建一套独立于图的存储。示例中的 `Person`、`works_at` 及其业务字段不是系统预定义的领域模型。
+这里的 `type`、`nullable` 和其它结构约束实时来自 Lithograph；`title` / `description` 来自 KG OS semantic metadata。上例只说明聚合原则，不冻结最终公共 JSON 格式。
 
-KG OS 提供固定的 **Ontology Meta-Schema** 来校验 Ontology Schema 自身是否合法。调用方定义领域 Schema，但不能自行扩展或改变 KG OS 的 Ontology Schema 基础格式。
+### Create / Update
 
-### Schema 强一致
+Definition 的创建或修改必须改变真实知识模型，而不是只改一份配置文档。
 
-已生效 Schema 与当前图数据必须始终保持一致。
+KG OS 将一次上层修改拆分为：
 
-- 新建或修改 Schema 时，必须校验所有受该 Schema 影响的现有 Node / Edge；新建 Schema 也必须检查此前已经存在的同名标签 / 类型数据。
-- 只有全部受影响数据都满足新 Schema 时，Schema 变更才能提交。
-- 任意现有数据不满足新 Schema 时，整个 Schema 变更失败并报错，不允许留下“Schema 已生效但现有数据非法”的状态。
-- 删除 Schema 只移除对应约束，不删除、修改或级联处理原有 Node / Edge 数据。
-- 为 Node / Edge 增加或删除标签 / 类型会改变其适用的 Schema 集合；变更后的数据必须满足全部新适用 Schema，否则该图数据变更失败。
-- 需要进行不兼容 Schema 变更时，应通过迁移逻辑先完成数据适配，再使新 Schema 生效；具体迁移机制后续单独设计。
+```text
+Definition change
+      │
+      ├── structural change
+      │      → Lithograph Schema mutation
+      │
+      └── semantic change
+             → Lithograph graph mutation
+```
 
-因此，普通 Schema 变更不承担兼容迁移职责；**不兼容演进属于迁移能力。**
+- 结构修改必须使用 Lithograph 原生 Schema / Cypher 25 能力；
+- 只修改 `title` / `description` 时只写 semantic metadata graph；
+- 同时包含结构和语义修改时，两部分都必须成功后才把整个 KG OS 操作视为成功。
 
-## 待设计能力合同
+需要跨多个 Lithograph operation 保证整体持久化原子性时，KG OS 在同一 connection 上使用 caller-owned SQLite transaction。SQLite transaction 只承担 transaction boundary，不改变“所有业务数据通过 Lithograph”的边界。
 
-当前先聚焦本体，不展开时序／版本的详细设计。以下范围尚未形成完整公共合同，不影响前文已确认的设计：
+Lithograph 当前设计中每个 mutating Cypher query 有自己的逻辑 Commit 语义。因此 KG OS **不承诺一个 Definition API 调用恰好对应一个 Lithograph Commit**；多步操作的 Commit 粒度遵守 Lithograph 公开执行合同，外层 transaction 负责这些步骤是否整体 durable。
 
-- 统一数据修改与迁移：具体操作接口及不兼容演进流程；Schema 变更不兼容即报错的原则已经确认。
-- 时序／版本：生效范围、分支与合并的详细语义；上下文透明约束图遍历的方向已经确认。
-- 混合检索与查询：图遍历中组合结构化、全文和向量检索的调用与结果合同。
-- 上下层通信：TypeScript 客户端与 `kgosd` 之间的具体协议和公共接口。
+### Delete
+
+Definition 删除必须同时处理 Lithograph Schema 与对应 semantic metadata，但“删除定义时是否以及如何处理已经存在的 Knowledge Data”尚未冻结。该行为会改变数据生命周期合同，列入[待设计合同](#待设计合同)，实现前必须明确，不能从 Schema 删除行为自行推导级联数据删除。
+
+### 操作面
+
+上层最终需要覆盖以下能力族：
+
+- list definitions；
+- get definition；
+- create definition；
+- update definition；
+- delete definition；
+- inspect definition history / diff。
+
+具体 CLI command、SDK method、request / response JSON 与 error contract 尚未冻结；这些接口只能聚合或编排 Lithograph 能力，不能形成第二套 Schema 或 Version 状态。
+
+## 版本模型
+
+KG OS 不为 Ontology 或 Knowledge 再建立一套独立版本系统。Lithograph Commit / Branch 是 Knowledge Base 的唯一版本真源。
+
+原因是同一个 Lithograph Commit 已经可以同时覆盖：
+
+```text
+commit/<id>
+├── Ontology Structure   → versioned Lithograph Schema
+├── Ontology Semantics   → versioned graph data
+└── Knowledge Data       → versioned graph data
+```
+
+因此 KG OS 不引入 `ontologyVersion`、`knowledgeVersion` 或另一套 Commit ID。
+
+KG OS 直接复用 Lithograph 提供的版本能力，包括其公开合同中的：
+
+- Commit / Branch / History；
+- Time-travel；
+- Diff / Patch；
+- Merge / Rebase / Squash；
+- Reset / Revert。
+
+KG OS 可以提供 **Ontology-specific view**，例如只显示某两个 version 之间的 Schema 变化与 semantic metadata 变化，但这个视图只是对 Lithograph history / diff 的过滤和解释，不产生新的历史。
+
+历史 Definition 也必须从目标 Lithograph Snapshot 的 Schema 与同一 Snapshot 的 semantic metadata 动态组合，不能使用当前 metadata 去解释旧 Schema，也不能使用当前 Schema 去解释历史 metadata。
+
+## Knowledge 数据访问
+
+普通 Knowledge 的 CRUD、结构化查询、图遍历、全文／向量搜索以及其它数据库能力都通过 Lithograph 公开接口完成。KG OS 不因为需要更高层知识语义就绕过 Lithograph 存储。
+
+Ontology 负责告诉上层“当前 Knowledge 应按什么模型理解”；真实约束是否成立以及查询 / mutation 的数据库语义由 Lithograph 按其公开 Schema 与 Cypher 合同负责。
+
+## 本次架构替换
+
+当前仓库尚无 KG OS 业务实现，因此本次是设计基线替换，不存在已经发布的 KG OS 数据格式需要兼容迁移。
+
+旧基线：
+
+```text
+KG OS
+→ 自定义 Ontology Schema / JSON Schema / unique / cardinality
+→ 自建 Graph Engine（GraphQLite fork）
+→ SQLite
+```
+
+新基线：
+
+```text
+KG OS
+→ Ontology / Knowledge / Definition
+→ Lithograph public capabilities
+→ SQLite
+```
+
+本次替换不改变 KG OS 的产品核心：AI-first、Graph-first、调用方定义领域模型、Agent 在 Kernel 外部，以及“一切皆可被定义”。改变的是底层责任归属：通用数据库能力回归 Lithograph，KG OS 聚焦知识库语义与交互。
+
+## 关键设计决定
+
+### D1 Lithograph 是 KG OS 的数据库核心
+
+- 决定：KG OS 的图、Schema、Search、Versioning 统一依赖 Lithograph 公开能力。
+- 依据：这些能力已经属于独立通用数据库 Lithograph 的产品边界，KG OS 不应复制实现。
+- 备选：继续维护 KG OS 自建 Graph Engine。
+- 取舍：KG OS 明显简化，但实现进度受 Lithograph 对应公共能力的实际可用性约束。
+
+### D2 Ontology Structure 只有一个真源
+
+- 决定：Ontology Structure 直接使用 Lithograph Schema；KG OS 不保存第二套结构 Schema。
+- 依据：避免结构重复、漂移和双重约束语义。
+- 备选：Lithograph Schema + KG OS JSON Schema 并存。
+- 取舍：KG OS 能表达的结构能力以 Lithograph / Cypher 25 已支持范围为边界；不能自行添加 Lithograph 不支持的结构语义。
+
+### D3 解释语义作为普通图数据
+
+- 决定：`title` / `description` 由 KG OS semantic metadata graph 承载。
+- 依据：Cypher 25 Graph Type 当前没有通用 description annotation；普通图数据可以在不修改 Lithograph 的前提下承载上层语义并自动版本化。
+- 备选：给 Lithograph 增加 KG OS 专用 Schema annotation。
+- 取舍：KG OS 需要维护 Schema element 与 semantic metadata 的稳定关联。
+
+### D4 Definition 是聚合视图，不是存储模型
+
+- 决定：上层统一 CRUD Definition，读取时合并 Lithograph Schema 与 semantic metadata，写入时分派到真实底层能力。
+- 依据：AI / Web 不应该理解两套底层来源，但也不能为了接口方便复制结构真源。
+- 备选：持久化完整 Definition JSON。
+- 取舍：读取和修改需要聚合 / 编排，但消除了 Definition 与真实 Schema 漂移的问题。
+
+### D5 只使用 Lithograph 的版本历史
+
+- 决定：Ontology、semantic metadata 与 Knowledge 共用 Lithograph Commit / Branch。
+- 依据：Schema 和普通 graph data 都已经进入 Lithograph canonical history。
+- 备选：KG OS 单独维护 Ontology version。
+- 取舍：版本身份统一；Ontology-specific history 需要由 KG OS 从统一 history 中筛选解释。
+
+### D6 SQLite 是 Host，不是 KG OS 数据接口
+
+- 决定：KG OS 只为 Lithograph 使用 SQLite connection / extension loading / transaction boundary，不直接维护知识业务表。
+- 依据：避免绕过 Lithograph 的 Schema、版本和数据完整性合同。
+- 备选：KG OS 在同一 SQLite database 中直接维护并查询业务表。
+- 取舍：所有持久化知识能力必须能通过 Lithograph 公共接口完成。
+
+## 待设计合同
+
+以下问题尚未冻结，但不会回退前述架构原则：
+
+1. **Semantic metadata 物理模型**：KG OS-owned label / relationship / property 如何编码，以及如何避免与调用方领域名称冲突。
+2. **Schema element 稳定引用**：semantic metadata 如何稳定指向 Graph Type、element type、Property 等 Lithograph Schema element；必须基于 Lithograph 公开、稳定的 Schema identity / introspection 能力，不依赖 `_lithograph_*`。
+3. **Definition 公共合同**：统一的 kind / identity、读取形态、create/update patch 语义、error model、CLI / SDK / Skill interface。
+4. **Definition 删除语义**：删除结构定义时，对现有 Knowledge Data、semantic metadata 与历史引用的处理边界。
+5. **多步写入映射**：如何把一个 Definition 操作拆成最少的 Lithograph mutation，并在不创造第二套 transaction / commit 语义的前提下报告结果。
+6. **Knowledge API 与 Search**：KG OS 面向 AI 的知识 CRUD、结构化查询、全文／向量／混合检索的聚合合同。
+7. **Human-facing Web**：Ontology / Knowledge / History 的查看、管理和纠正交互。
+
+这些合同应在需要实现对应能力前逐项设计；没有当前需求的扩展字段、抽象层或兼容层不提前加入。
 
 ## 工程实现待办
 
-以下工作是在已确认设计下确定实现方案并验证，不是重新要求用户决定产品方向：
+实现顺序应建立在 Lithograph 对应公开能力真实可用的基础上，具体 readiness 始终从 Lithograph 仓库检查，不在这里复制状态。
 
-- 将 Schema 的固定格式落实为图中的物理编码、名称查找、索引与缓存；Schema 也是图、按名称绑定且不另设 mapping 已确认。
-- 实现 Ontology Meta-Schema、属性校验、`unique`、`cardinality` 与 Schema 变更强一致检查，并建立测试。
-- 检查 GraphQLite 源码，确定改造位置并验证 SQLite 扩展集成、事务和分发方式；选型确认不代替实际验证。
+1. 建立最小 Lithograph host / client 边界，只暴露 KG OS 所需公开能力，不访问内部表。
+2. 设计并实现 semantic metadata 的 Lithograph 图模型与稳定 Schema element binding。
+3. 实现 Definition read aggregation，验证结构字段全部来自 Lithograph、语义字段全部来自 KG OS metadata。
+4. 实现 Definition create / update 编排与跨步骤 transaction rollback。
+5. 实现 Ontology history / diff 的 Lithograph version 过滤视图。
+6. 在 Definition 合同稳定后，再建立 AI-facing CLI / Skill、SDK 与 Human-facing Web。
 
-实现中发现真实语义缺口时，应列出具体输入、不同结果和推荐方案；若要改变已确认决定，应说明冲突证据并取得用户确认，不把整个主题退回“尚未设计”。
+实现、验证、提交和推送必须分别按仓库真实状态报告；设计完成不代表 Lithograph 依赖能力或 KG OS 功能已经实现。
