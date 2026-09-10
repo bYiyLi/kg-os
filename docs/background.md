@@ -57,5 +57,5 @@ Tree 不需要成为独立 Kernel。Tree 可以视为带 Root 和主导航关系
 ## 相关资料
 
 - 当前产品定义：`README.md`
+- 当前技术与数据设计：[design.md](design.md)
 - 行业与技术研究：`docs/research/industry-landscape.md`
-- 当前阶段与下一步：`HANDOFF.md`
