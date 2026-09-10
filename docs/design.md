@@ -6,8 +6,8 @@
 
 | 状态 | 范围与入口 |
 | --- | --- |
-| 已确认 | [目标架构](#目标架构)、[Lithograph 边界](#lithograph-边界)、[Knowledge Base](#knowledge-base)、[Ontology](#ontology)、[Definition](#definition)、[Knowledge 数据访问](#knowledge-数据访问)、[版本模型](#版本模型) |
-| 待设计 | [待设计合同](#待设计合同)，包括 Ontology semantic graph 物理编码、Schema element 稳定引用、Ontology / Knowledge 公共 wire contract 与删除语义 |
+| 已确认 | [目标架构](#目标架构)、[Lithograph 边界](#lithograph-边界)、[Knowledge Base](#knowledge-base)、[Ontology](#ontology)、[Definition](#definition)、[Knowledge 数据访问](#knowledge-数据访问)、[版本模型](#版本模型)，以及 Ontology semantic graph 的内部隔离与 Binding Record / Schema Locator 绑定模型 |
+| 待设计 | [待设计合同](#待设计合同)，包括内部保留标识的具体编码、Ontology / Knowledge 公共 wire contract 与删除语义 |
 | 待实现 | [工程实现待办](#工程实现待办)；实际实现依赖 Lithograph 对应公开能力已经可用 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的当前实现状态只以 Lithograph 仓库为准，不在 KG OS 复制第二份 Phase 状态。
@@ -126,6 +126,8 @@ KG OS Ontology
 ### Structure：Lithograph 是唯一结构真源
 
 Ontology 的结构部分完全复用 Lithograph 当前公开设计中的 Cypher 25 Graph Type / Schema 能力。具体可表达范围始终以 Lithograph 自己的 Cypher compatibility profile 和公开合同为准。
+
+Lithograph Schema 同时可能包含 KG OS 运行自身 semantic graph 所需的 reserved internal element definitions。它们仍由 Lithograph versioned Schema 承载，但属于 KG OS infrastructure implementation，不属于调用方 Ontology Structure。KG OS 对外读取 Ontology Structure 时只投影调用方定义的 Schema element，并排除 KG OS-owned reserved internal Schema element；这只是业务可见性过滤，不建立第二套结构状态。
 
 结构信息包括但不限于：
 
@@ -252,12 +254,81 @@ Domain 保持弱约束：
 
 Domain、`INCLUDES` 与 Schema semantic metadata 和普通 Knowledge 共存在同一个 Lithograph versioned graph 中，但 KG OS 必须能明确区分自身内部 Ontology semantic graph 与调用方 Knowledge：
 
-- 物理编码必须使用 KG OS-owned 的保留标识，避免与调用方定义的 Label / Relationship Type / Property 名称冲突；
-- Knowledge API、普通搜索与知识遍历默认不把 KG OS 内部 Ontology metadata 当作业务 Knowledge 返回；
-- Ontology API 可以读取并组合这些内部图数据；
-- 具体保留 Label / Relationship / Property 编码仍属于[待设计合同](#待设计合同)，不能通过直接访问 `_lithograph_*` 实现隔离。
+- 所有 KG OS Ontology 内部 Node 都必须携带同一个 KG OS-owned reserved internal marker Label；具体字符串编码属于实现常量，不进入公共 wire contract；
+- KG OS 内部 Relationship 只连接 KG OS internal Node，不通过普通 graph edge 直接连接调用方 Knowledge Node；
+- Knowledge `get` / `list` / `expand` / `query` / `mutate` / `execute` 必须由 KG OS 构造 Lithograph execution options，并使用 Lithograph 公开 `graphView` 能力排除 reserved internal marker；调用方不能通过 Knowledge 公共接口覆盖这个内部 Graph View；
+- Ontology semantic graph 的内部读取使用相反的 Graph View，只允许 KG OS internal Node 进入本次 Cypher 的可见 Property Subgraph；
+- 这种隔离必须在 Lithograph Planner / Executor / Search / mutation boundary 生效，不能由 KG OS 对查询结果事后过滤，也不能通过直接访问 `_lithograph_*` 实现；
+- Lithograph `graphView` 不是认证系统，因此拥有底层 Lithograph 原始访问权的主体仍可绕过 KG OS 查看完整 graph；KG OS 只保证其自身公开能力不会泄漏或误改内部 semantic graph。
 
-Definition 本身仍然只是聚合视图，不作为一个新的持久化 Schema 对象。若 Domain 的物理关系需要指向某个 Definition，KG OS 内部只能通过与目标 Lithograph Schema element 稳定绑定的 metadata record 表达；该 binding record 是实现细节，不形成 `OntologyElement`、`SchemaElementMetadata` 等新的公开产品概念。
+KG OS internal graph 使用普通 Lithograph graph data，因此仍受目标 Snapshot 的 Lithograph Schema / Constraint 约束。为了让调用方可以使用 closed / strongly constrained Graph Type，KG OS 必须在**同一份 Lithograph versioned Schema** 中维护自身运行所需的 reserved internal element types / properties；这些内部 Schema element 不是调用方 Ontology Structure，不创建 Binding Record，也不参与 Domain organization；它们不在 KG OS 的 Ontology read view、`list definitions` 或 Ontology search 中返回，也不能通过 KG OS 的普通 Define 能力修改。KG OS 不为它们建立第二套 Schema。若 Lithograph 的公开 Schema 能力无法同时表达调用方结构与这些必要 internal types，则该 KG OS 实现路径视为依赖能力不足，不能退回直接 SQL 或旁路存储。
+
+#### Binding Record 与 Schema Locator
+
+Definition 本身仍然只是聚合视图，不作为新的持久化 Schema 对象。KG OS 在 semantic graph 内使用稳定的 **Binding Record** 保存业务解释与组织关系，再通过 **Schema Locator** 在同一 Snapshot 中确定性定位 Lithograph Schema element：
+
+```text
+Domain
+  │
+  └── INCLUDES
+          ↓
+Definition Binding Record
+  ├── stable internal graph element identity
+  ├── title? / description?
+  └── target Schema Locator
+          ↓
+    Lithograph Schema element
+
+Definition Binding Record
+  │
+  └── property metadata relation
+          ↓
+Property Binding Record
+  ├── stable internal graph element identity
+  ├── title? / description?
+  └── target Schema Locator
+          ↓
+    Lithograph Property
+```
+
+Binding Record 是 KG OS-owned 的内部普通 Node，使用 Lithograph graph element identity 获得跨 Commit 的稳定内部身份；这个 identity 只表示“同一个 KG OS metadata / binding record”，**不冒充 Lithograph Schema element 的永久 identity，也不自动成为公共 `definitionId`**。
+
+Schema Locator 只负责在目标 Snapshot 的 Lithograph Schema 中定位当前结构。当前最小逻辑形式是：
+
+```text
+Node Definition
+→ { kind: node, identifyingLabel }
+
+Relationship Definition
+→ { kind: relationship, identifyingRelationshipType }
+
+Node Property
+→ { owner: Node Definition Locator, propertyName }
+
+Relationship Property
+→ { owner: Relationship Definition Locator, propertyName }
+```
+
+具体字段名与序列化不在内部设计中冻结；实现必须映射到 Lithograph 当时公开的 Graph Type / Schema introspection contract。Schema Locator 不保存 Commit ID，因为 Binding Record 本身已经与 Schema 一起进入同一个 Lithograph Snapshot；读取时始终以目标 Commit 同时解析 Binding Record 和 Schema。
+
+因此 KG OS 明确区分：
+
+```text
+Binding Record identity
+→ KG OS 内部语义对象的连续性
+
+Schema Locator
+→ 某个 Snapshot 中的结构定位
+
+Lithograph Schema
+→ 结构事实的唯一真源
+```
+
+KG OS 不要求 Lithograph 为 Node element type、Relationship element type 或 Property 新增跨版本永久 `SchemaElementId`。如果 Lithograph 未来提供通用稳定 Schema identity，KG OS 可以在新的设计修订中评估是否采用，但当前合同不依赖它。
+
+当调用方通过 KG OS 明确执行 Definition / Property 的 rename 时，KG OS 可以在产品层保持 Binding Record 连续：同一个 caller-owned SQLite transaction 中先按 Lithograph 公开 Schema mutation contract 完成结构变化，再把同一个 Binding Record 的 Schema Locator 更新到新结构地址；Domain `INCLUDES` 等指向 Binding Record 的组织关系不需要重建。Lithograph 是否把底层结构变化表达为原生 rename，或 old element remove + new element add，不改变 KG OS 的 Binding Record 连续性。
+
+如果有人绕过 KG OS 直接修改 Lithograph Schema，导致当前 Snapshot 中某个 Binding Record 的 Schema Locator 无法解析，或解析到与 Binding Record kind 不一致的结构，KG OS 必须把该 Snapshot 判定为 **Ontology consistency error**：不猜测 rename target、不自动迁移 metadata、不静默删除 Binding Record。历史 Snapshot 仍按各自当时的 Binding Record + Schema Locator 正常解析。
 
 ### 自描述目标
 
@@ -302,7 +373,7 @@ Relationship Definition 与 Node Definition 使用同一原则；Relationship �
 ```text
 Lithograph Schema state
         +
-semantic metadata graph
+Definition / Property Binding Records
         ↓
 Definition view
 ```
@@ -421,7 +492,7 @@ KG OS 面向 AI 可以提供完整或局部的业务化 Ontology JSON。这个 J
 这个示例冻结的是**信息责任和聚合原则**，不是最终 wire schema：
 
 - `type`、`nullable`、relationship structure、constraints、indexes 等结构信息只从目标 Lithograph Snapshot 投影；
-- `title` / `description` 与 Domain organization 来自同一 Snapshot 的 KG OS semantic graph；
+- `title` / `description` 来自同一 Snapshot 中解析成功的 Definition / Property Binding Record；Domain organization 通过指向这些 Binding Record 的 `INCLUDES` 关系读取；
 - `from` / `to` 只表示 AI-facing 对 Lithograph Relationship structure 的友好投影，最终形态必须忠实于 Lithograph 公开 Graph Type 模型；
 - 与某 Definition 相关的 Constraint / Index 可以作为便利视图返回，但 canonical ownership 仍属于 Lithograph versioned Schema；
 - `snapshot.commit` 是该 read view 的权威版本身份；`branch` 只是读取上下文，因为 Branch 可以移动；
@@ -446,7 +517,7 @@ Definition change
 ```
 
 - 结构修改必须使用 Lithograph 原生 Schema / Cypher 25 能力；
-- 只修改 `title` / `description` 时只写 semantic metadata graph；
+- 只修改 `title` / `description` 时只更新对应 Binding Record；
 - 同时包含结构和语义修改时，两部分都必须成功后才把整个 KG OS 操作视为成功。
 
 需要跨多个 Lithograph operation 保证整体持久化原子性时，KG OS 在同一 connection 上使用 caller-owned SQLite transaction。SQLite transaction 只承担 transaction boundary，不改变“所有业务数据通过 Lithograph”的边界。
@@ -456,7 +527,8 @@ Lithograph 当前设计中每个 mutating Cypher query 有自己的逻辑 Commit
 AI-facing read view 与 write contract 必须明确分离。完整 Ontology / Definition JSON 主要用于读取和理解，不等同于可整体 `PUT` 回去的持久化对象。写入请求表达“希望改变什么”：
 
 - 修改结构 → Lithograph Schema mutation；
-- 修改 Definition / Property 的 `title` / `description` → semantic graph mutation；
+- 修改 Definition / Property 的 `title` / `description` → Binding Record graph mutation；
+- 显式 rename Definition / Property → Lithograph Schema mutation + 同一 Binding Record 的 Schema Locator 更新；
 - 创建、修改、删除 Domain 或 `includes` → semantic graph mutation；
 - 同一个上层操作涉及多类 mutation 时，按本节 transaction 边界整体判断成功或失败。
 
@@ -555,6 +627,8 @@ History 只提供 Ontology-specific 的历史解释能力：
 - `diff`：比较两个 Lithograph Commit 之间的 Ontology 变化，并可以按 Ontology、Domain 或 Definition 范围过滤。
 
 History 不按对象复制成 `definition history`、`domain history`、`ontology history` 三套接口；target / scope 是同一能力的过滤维度。底层 Commit DAG、Diff、Patch、Merge 等语义仍全部属于 Lithograph。
+
+Binding Record 的稳定 graph element identity 可以作为 KG OS **内部** history continuity anchor。例如一个 Definition 在两个 Snapshot 之间显式 rename 时，History 可以识别为“同一个 Binding Record 的 Schema Locator 发生变化”，而不是仅凭两个名称字符串猜测 rename。该 internal identity 是否以及如何进入公共 History target / response，仍由公共 wire contract 决定。
 
 例如 KG OS 可以把同一个 Lithograph diff 中的 Schema 与 semantic graph 变化解释为：
 
@@ -828,17 +902,17 @@ KG OS
 
 ### D2 Ontology Structure 只有一个真源
 
-- 决定：Ontology Structure 直接使用 Lithograph Schema；KG OS 不保存第二套结构 Schema。
+- 决定：Lithograph Schema 是全部结构状态的唯一真源；KG OS 对外 Ontology Structure 是其中调用方 Schema element 的业务投影，排除 KG OS-owned reserved internal Schema element。KG OS 不保存第二套结构 Schema。
 - 依据：避免结构重复、漂移和双重约束语义。
 - 备选：Lithograph Schema + KG OS JSON Schema 并存。
-- 取舍：KG OS 能表达的结构能力以 Lithograph / Cypher 25 已支持范围为边界；不能自行添加 Lithograph 不支持的结构语义。
+- 取舍：KG OS 能表达的调用方结构能力以 Lithograph / Cypher 25 已支持范围为边界；KG OS 可以在同一 Schema 中维护自身 internal graph 必需的 reserved infrastructure definitions，但不能把这些定义提升为调用方 Ontology 语义，也不能自行添加 Lithograph 不支持的结构语义。
 
 ### D3 Ontology 上层语义作为普通图数据
 
-- 决定：Definition / Property 的 `title` / `description` 以及 Domain / `INCLUDES` 由 KG OS semantic graph 承载。
+- 决定：Definition / Property 的 `title` / `description` 由稳定的 KG OS internal Binding Record 承载；Domain / `INCLUDES` 直接组织这些 Binding Record；Binding Record 通过 Snapshot-scoped Schema Locator 指向同一 Snapshot 的 Lithograph Schema element。全部仍是 Lithograph 中的普通 versioned graph data。
 - 依据：Cypher 25 Graph Type 当前没有通用 description annotation，也不负责 KG OS 业务组织；普通图数据可以在不修改 Lithograph 的前提下承载上层语义并自动版本化。
 - 备选：给 Lithograph 增加 KG OS 专用 Schema annotation。
-- 取舍：KG OS 需要维护 Schema element 与 semantic metadata 的稳定关联，并在普通 Knowledge 访问中隔离自身内部 semantic graph。
+- 取舍：KG OS 需要维护 Binding Record 与 Schema Locator 的一致性，并通过 Lithograph Graph View 在普通 Knowledge 访问中隔离自身 internal graph；内部 graph 同时受完整 Lithograph Schema / Constraint 约束，因此需要同一 Schema 中的 reserved internal element definitions。
 
 ### D4 Definition 是聚合视图，不是存储模型
 
@@ -889,17 +963,23 @@ KG OS
 - 备选：所有操作都要求 AI 写 Cypher；或为 CRUD、Search、Graph Query、Vector Search、Full-text Search、Batch Mutation 分别建立完整公共 API。
 - 取舍：KG OS 需要维护少量稳定快捷合同和 `mutate` batch 编排；同时 `query` 必须具有真实 read-only 边界，`mutate` 的请求级原子性必须由 transaction 编排保证。
 
+### D11 Binding Record 提供语义连续性，Schema Locator 只负责定位
+
+- 决定：KG OS 不要求 Lithograph 提供永久 `SchemaElementId`。Definition / Property semantic metadata 使用有稳定 Lithograph graph element identity 的内部 Binding Record；Binding Record 保存 Snapshot-scoped Schema Locator，Locator 只在目标 Commit 的 Schema 中确定性定位 element type / Property。
+- 依据：KG OS 当前需要的是 metadata、Domain membership 与显式 rename/history 的连续性，而不是把 Lithograph Schema 自身改造成带永久对象 ID 的另一种模型。Binding Record 已经能承担 KG OS 的连续性需求；结构事实仍由 Lithograph Schema 唯一拥有。
+- 备选：以名称字符串直接作为 Definition identity；要求 Lithograph 新增跨版本永久 Schema element identity；在 KG OS 再建立一份独立结构 Schema。
+- 取舍：通过 KG OS 执行的显式 rename 必须原子更新 Lithograph Schema 与 Binding Record Locator；绕过 KG OS 的直接 Schema 修改可能产生 consistency error，KG OS 不做无依据自动修复。
+
 ## 待设计合同
 
 以下问题尚未冻结，但不会回退前述架构原则：
 
-1. **Ontology semantic graph 物理模型**：Definition / Property metadata、Domain、`INCLUDES` 与内部 binding record 如何使用 KG OS-owned label / relationship / property 编码；必须避免与调用方领域名称冲突，并让普通 Knowledge API（包括 `query` / `execute`）确定性排除内部 Ontology metadata。
-2. **Schema element 稳定引用**：semantic metadata 与 Domain→Definition binding 如何稳定指向 Graph Type、element type、Property 等 Lithograph Schema element；必须基于 Lithograph 公开、稳定的 Schema identity / introspection 能力，不以名称字符串冒充稳定 identity，也不依赖 `_lithograph_*`。
-3. **Definition / Ontology 公共 wire contract**：在已确认的 Read / Define / Organize / History 能力边界内，冻结统一 kind / identity、Domain reference、Snapshot context、target / scope、分页、Ontology search、读取形态、渐进式读取、create/update patch 语义、error model 与 CLI / SDK / Skill interface。本文 JSON 示例与能力名只冻结信息责任和逻辑操作，不冻结最终 wire schema 或命令命名。
-4. **Definition 删除语义**：删除结构定义时，对现有 Knowledge Data、semantic metadata 与历史引用的处理边界。
-5. **多步写入映射**：如何把一个 Definition 操作拆成最少的 Lithograph mutation，并在不创造第二套 transaction / commit 语义的前提下报告结果。
-6. **Knowledge 公共 wire contract**：Node / Relationship 的 AI-facing graph view、Definition reference、`get` / `list` / `expand` 参数与分页、read-only `query` 的 request / result、`mutate.operations[]` 与 request-local reference、`execute` 结果、Knowledge `history` / `diff` target / scope、error model 与 CLI / SDK / Skill interface。全文／向量／混合检索不建立第二套合同，继续通过 Cypher 使用 Lithograph 对应能力。
-7. **Human-facing Web**：Ontology / Knowledge / History 的查看、管理和纠正交互。
+1. **Internal physical identifiers**：为 internal marker、Definition Binding、Property Binding、Domain、`INCLUDES` 与 Binding Record 间关系选择具体 KG OS-owned reserved Label / Relationship Type / Property key，并定义 Lithograph Schema 中对应 reserved internal element definitions。具体字符串是实现级持久化编码，不提升为公共 Ontology 概念。
+2. **Definition / Ontology 公共 wire contract**：在已确认的 Read / Define / Organize / History 能力边界内，冻结统一 kind / public identity、Domain reference、Snapshot context、target / scope、分页、Ontology search、读取形态、渐进式读取、create/update/rename patch 语义、consistency error model 与 CLI / SDK / Skill interface。内部 Binding Record element identity 是否暴露、如何暴露必须在这里明确；本文 JSON 示例与能力名只冻结信息责任和逻辑操作，不冻结最终 wire schema 或命令命名。
+3. **Definition 删除语义**：删除结构定义时，对现有 Knowledge Data、Binding Record、Domain membership 与历史引用的处理边界。
+4. **多步写入映射**：如何把一个 Definition create/update/rename/delete 操作拆成最少的 Lithograph Schema / graph mutation，并在不创造第二套 transaction / commit 语义的前提下报告结果。
+5. **Knowledge 公共 wire contract**：Node / Relationship 的 AI-facing graph view、Definition reference、`get` / `list` / `expand` 参数与分页、read-only `query` 的 request / result、`mutate.operations[]` 与 request-local reference、`execute` 结果、Knowledge `history` / `diff` target / scope、error model 与 CLI / SDK / Skill interface。全文／向量／混合检索不建立第二套合同，继续通过 Cypher 使用 Lithograph 对应能力。
+6. **Human-facing Web**：Ontology / Knowledge / History 的查看、管理和纠正交互。
 
 这些合同应在需要实现对应能力前逐项设计；没有当前需求的扩展字段、抽象层或兼容层不提前加入。
 
@@ -908,7 +988,7 @@ KG OS
 实现顺序应建立在 Lithograph 对应公开能力真实可用的基础上，具体 readiness 始终从 Lithograph 仓库检查，不在这里复制状态。
 
 1. 建立最小 Lithograph host / client 边界，只暴露 KG OS 所需公开能力，不访问内部表。
-2. 设计并实现 Ontology semantic graph：Definition / Property metadata、Domain / `INCLUDES`、KG OS 内部隔离与稳定 Schema element binding。
+2. 冻结 reserved internal physical identifiers 后实现 Ontology semantic graph：Definition / Property Binding Record、Domain / `INCLUDES`、同一 Lithograph Schema 中的 internal element definitions，以及基于 Lithograph `graphView` 的 Knowledge/Internal 隔离与 Snapshot-scoped Schema Locator resolution。
 3. 实现 Ontology Read：概览、Domain / Definition 渐进式读取、`list definitions`、Ontology search 与统一 Snapshot context；验证结构字段全部来自 Lithograph，`title` / `description` 与 Domain organization 全部来自 KG OS semantic graph。
 4. 实现 Define / Organize：Definition 与 Domain create / update 编排，Property 随 Definition、`includes` 随 Domain 管理，并完成 read/write contract 分离与跨步骤 transaction rollback。
 5. 实现统一 History / Diff 的 Lithograph version 过滤与业务解释视图，覆盖 Schema semantics 与 Domain organization，不复制对象级 history API。
