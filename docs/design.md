@@ -6,8 +6,8 @@
 
 | 状态 | 范围与入口 |
 | --- | --- |
-| 已确认 | [目标架构](#目标架构)、[Lithograph 边界](#lithograph-边界)、[Knowledge Base](#knowledge-base)、[Ontology](#ontology)、[Definition](#definition)、[Object](#object)、[Knowledge 数据访问](#knowledge-数据访问)、[Graph](#graph)、[Evolution](#evolution)，以及 Ontology semantic graph 的内部隔离、Binding Record / Schema Locator、owner-backed Object Ref、canonical Object text + file-style textual Patch 与 strict base-State mutation 模型 |
-| 待设计 | [待设计合同](#待设计合同)，只包括**不改变已确认产品语义**的剩余合同与交互设计：internal physical identifiers、Object / Evolution / Graph transport 与 serialization、canonical text 逐字段 schema、text Patch framing / escaping、分页 / error encoding、Object target change → Lithograph public mutation 的具体 compiler mapping，以及 Human-facing Web；这些待项不得回退或重新选择已经确认的 Object / Graph / Evolution、owner-backed Object Ref、textual Patch、strict base-State、rename / delete 等语义 |
+| 已确认 | [目标架构](#目标架构)、[Lithograph 边界](#lithograph-边界)、[Knowledge Base](#knowledge-base)、[Ontology](#ontology)、[Definition](#definition)、[Object](#object)、[Knowledge 数据访问](#knowledge-数据访问)、[Graph](#graph)、[Evolution](#evolution)，以及 Ontology semantic graph 的内部隔离、Binding Record / Schema Locator、owner-backed Object Ref、单一 Object Value、canonical YAML editable representation + JSON representation、Git Extended Diff textual Patch 与 strict base-State mutation 模型 |
+| 待设计 | [待设计合同](#待设计合同)，只包括**不改变已确认产品语义**的剩余合同与交互设计：internal physical identifiers、Object / Evolution / Graph transport 与 serialization、各 Object logical schema 与 canonical YAML 逐字段 ordering / rendering、Git patch target 中 Object Ref / alias 的具体序列化、分页 / error encoding、Object target change → Lithograph public mutation 的具体 compiler mapping，以及 Human-facing Web；这些待项不得回退或重新选择已经确认的 Object / Graph / Evolution、owner-backed Object Ref、canonical YAML / JSON representation、Git Extended Diff textual Patch、strict base-State、rename / delete 等语义 |
 | 待实现 | [工程实现待办](#工程实现待办)；实际实现依赖 Lithograph 对应公开能力已经可用 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的当前实现状态只以 Lithograph 仓库为准，不在 KG OS 复制第二份 Phase 状态。
@@ -222,7 +222,7 @@ WORKS_AT.since
 
 字段语义不引入独立的**持久化顶层 Ontology entity**。`Person.name`、`WORKS_AT.since` 等 Property 的 `title` / `description` 在 Definition 中仍作为对应 Property 的业务解释；为了统一 Object read / patch，Property 同时是一个以 owner Definition Ref + property name 定位的**可寻址 child Object projection**。这个 Object 身份不意味着 KG OS 额外持久化一个 Property entity；底层结构仍由 Lithograph Schema 拥有，业务语义仍由 Property Binding Record 承载。
 
-Definition Object 可以为了整体理解包含其 Property 的完整业务化投影；Property Object 则提供针对单个 Property 的小上下文读取与修改。两者是同一底层状态的**重叠投影**，不是两份数据。调用方可以任选父级 Definition section 或 child Property section 表达一次 Property change，但同一个 Object Patch 不允许两个 section 对同一底层 Property state 产生重叠修改；检测到这种 parent / child overlap 时必须 reject，而不是按 section 顺序决定胜负。
+Definition Object 可以为了整体理解包含其 Property 的完整业务化投影；Property Object 则提供针对单个 Property 的小上下文读取与修改。两者是同一底层状态的**重叠投影**，不是两份数据。调用方可以任选父级 Definition entry 或 child Property entry 表达一次 Property change，但同一个 Object Patch 不允许两个 entry 对同一底层 Property state 产生重叠修改；检测到这种 parent / child overlap 时必须 reject，而不是按 entry 顺序决定胜负。
 
 这些 semantic metadata 是 **KG OS 拥有的普通 Property Graph 数据**，通过 Lithograph 正常图写入保存并参与 Lithograph 的版本历史。Lithograph 只负责存储和查询，不理解 `title` / `description` 的 KG OS 产品语义。
 
@@ -529,7 +529,7 @@ Object Patch compiler 只使用 Lithograph **当前公开允许调用方构造 /
 
 KG OS 不把内部编排步骤提升为公共语义。操作成功后必须返回最终 resolved State identity；如果调用方直接寻址修改的 Object 因 rename / restructure 导致底层 identity replacement，还必须返回该 Object 的 Ref transition。Definition-level migration 派生出的海量 Relationship replacement 遵守 Object 章节的批量迁移规则，不承诺逐对 transition。调用方不需要理解 KG OS 最终选择了 canonical patch、Cypher、Schema mutation 或其组合。
 
-AI-facing Object read view 与 Patch contract 必须明确分离。调用方为了理解而临时组合的 Ontology aggregate view 不是 KG OS 顶层资源，也不等同于可整体 `PUT` 回去的持久化对象；单个 Object 的 canonical text 才是 file-style Patch 的稳定 base。Patch 表达“希望目标 Object 变成什么”：
+AI-facing Object read view 与 Patch contract 必须明确分离。调用方为了理解而临时组合的 Ontology aggregate view 不是 KG OS 顶层资源，也不等同于可整体 `PUT` 回去的持久化对象；单个 Object 的 canonical YAML 才是 Git Extended Diff Patch 的稳定 base。Patch 表达“希望目标 Object 变成什么”：
 
 - 修改结构 → Lithograph Schema mutation；
 - 修改 Definition / Property 的 `title` / `description` → Binding Record graph mutation；
@@ -592,15 +592,32 @@ Object Capability
 └── patch
 ```
 
-这些名称描述逻辑能力，不冻结最终 CLI command、SDK method 或 HTTP route。**Object Patch 的交互模型已经冻结为“canonical Object text + file-style textual patch”**；尚未冻结的只是 text patch 的 framing / section marker / escaping，以及承载这些文本的 API / CLI transport envelope。
+这些名称描述逻辑能力，不冻结最终 CLI command、SDK method 或 HTTP route。**Object Patch 的交互模型已经冻结为“canonical YAML + Git Extended Diff textual Patch”**。文本 Patch 语法直接采用普通 two-way `git diff -p` / Git Extended Diff 格式，KG OS 不再定义自己的 section marker、hunk grammar 或 path escaping；尚未冻结的是 Object Ref，或新增对象的 request-local alias + object kind，如何序列化到 Git patch 的 target path，以及承载 patch text、`baseState`、目标 Branch 与结果 metadata 的 API / CLI transport envelope。
 
 `list` 用于按 Object kind / scope 做轻量枚举与分页，只返回定位和必要摘要，不因为某个 scope 下对象很多就展开所有 Object 内容。`search` 用于不知道准确 Ref 时发现相关 Object；Ontology 的 `name` / `title` / `description` 等语义可以进入这一能力，但它不演化成第二套 Search DSL。海量 Knowledge 的条件发现、关系遍历、全文/向量混合检索等复杂任务继续由 Graph `query` 完成。
 
-`read` 接受 State reference + Object Ref，并返回该 Object 的**稳定文本投影**。同一个 immutable State 中，同一个 Object Ref 必须得到确定、可重放的 canonical text：字段顺序、集合排序、缩进、换行、escaping 与 typed value 表达都必须稳定。这个文本只用于理解与编辑，不作为独立持久化数据。Knowledge value 的无损 JSON 表达优先直接复用 Lithograph 公开的 JSON value encoding，不在 KG OS 再建立第二套类型编码。
+### Object Value 与 representation
 
-Object Ref、resolved State、请求时使用的 Branch / Tag 等定位上下文属于 `read` 的 response metadata，**不属于可编辑 canonical text**；因此 `n:123` / `r:456` 等系统分配 identity 不会因为 AI 修改文本而被重新赋值。Definition / Domain / Property 的 identifying name 属于业务结构本身，可以出现在 canonical text 中；修改这些名称表示 rename，并按 Ref transition 语义处理。具体 response envelope 字段名仍待 transport contract 冻结。
+`read` 接受 State reference + Object Ref，先解析出唯一的逻辑 **Object Value**，再按调用方需要序列化。YAML 与 JSON 只是同一 Object Value 的不同 representation，不是两份对象状态、两套 Schema 或第二持久化真源。
 
-Canonical text 遵守 **owner-only projection**：只包含当前 Object 自己拥有的可编辑状态，以及指向其它 Object 的 Ref；不能为了“更易理解”把其它独立 Object 的可变内容复制进当前文本。例如 Knowledge Node 可以包含自己的 Labels / Properties，但不能内联这些 Label 对应 Definition 的 `title` / `description`；Relationship 可以保存 endpoint Ref，但不能内联 endpoint Node 内容；Domain 保存 `includes` Ref，不复制成员 Definition。需要额外语义时由 AI 继续 `read` 对应 Ref。唯一明确的重叠投影是 Definition → Property parent/child 关系，并受 D21 overlap rule 约束。
+v1 确认两种公开 serialization：
+
+```text
+Object Value
+├── application/yaml  → canonical editable representation
+└── application/json  → equivalent structured representation
+```
+
+- **YAML 是唯一 canonical editable representation。** 同一个 immutable State + 同一个 Object Ref 必须由 KG OS renderer 产生确定、可重放的 canonical YAML；字段顺序、集合排序、缩进、多行字符串、escaping 与特殊 typed value 的 canonical rendering 由 Object serialization contract 冻结；
+- **JSON 是同一 Object Value 的等价结构化 representation。** JSON wire 继续复用适用的 Lithograph JSON typed-value encoding，不为 Integer64、Temporal、Point、Vector、UUID 等值再建立第二套类型编码；SDK / Web 可以把 `application/json` payload 解析成语言内 Object / Map，这不构成另一种 wire format；
+- KG OS **不定义自己的 YAML 方言或 YAML 子语言**。调用方提交的 YAML 只要能由标准 YAML parser 解析，并能无歧义映射为目标 Object 的合法 logical value，就可以进入后续 Object schema / type validation；同义但非 canonical 的 YAML 写法不会因为格式不同而被拒绝。无法无歧义映射到 Object Value 的输入以及正常 parser resource limit violation 必须失败，而不是由 KG OS 猜测含义；
+- canonical YAML 是 Git Extended Diff 的唯一文本 base。JSON 可以作为文本或结构化数据读取，但 v1 Object Patch 不以 JSON serialization 作为 diff base，因此 Patch request 不需要额外携带 `yaml | json` patch-format selector；
+- 核心 Object 合同不发明 `representation: {mode, format}` 之类参数。HTTP adapter 使用标准 content negotiation：客户端通过 `Accept: application/yaml` 或 `Accept: application/json` 请求 representation，响应通过对应 `Content-Type` 声明实际媒体类型。CLI / SDK 可以提供 `--format`、`readText`、`readObject` 等便利接口，但它们只是同一 Object Value / serialization contract 的适配，不建立新的数据模型；
+- State、Object Ref、请求时使用的 Branch / Tag 等定位上下文仍属于 read result metadata，不是可编辑 Object Value。具体 HTTP header / response envelope、CLI 输出包装和 SDK method shape 仍由 transport contract 冻结。
+
+因此 `n:123` / `r:456` 等系统分配 identity 不会因为 AI 修改 YAML 而被重新赋值。Definition / Domain / Property 的 identifying name 属于业务结构本身，可以出现在 canonical YAML / JSON Object Value 中；修改这些名称表示 rename，并按 Ref transition 语义处理。
+
+Object Value / canonical YAML 遵守 **owner-only projection**：只包含当前 Object 自己拥有的可编辑状态，以及指向其它 Object 的 Ref；不能为了“更易理解”把其它独立 Object 的可变内容复制进当前 representation。例如 Knowledge Node 可以包含自己的 Labels / Properties，但不能内联这些 Label 对应 Definition 的 `title` / `description`；Relationship 可以保存 endpoint Ref，但不能内联 endpoint Node 内容；Domain 保存 `includes` Ref，不复制成员 Definition。需要额外语义时由 AI 继续 `read` 对应 Ref。唯一明确的重叠投影是 Definition → Property parent/child 关系，并受 D21 overlap rule 约束。
 
 同一原则适用于 Lithograph Schema aggregation：Current Graph Type Object 只投影不能由 child Definition / Property / Constraint / Index Object 独立拥有的 graph-level state；如果为了理解需要展示其 element definitions，只返回 child Object Ref / summary，不复制可编辑 Definition 内容，也不允许通过 Graph Type Patch 间接 add/update/delete Definition。Definition lifecycle 继续由 Definition Object 管理；KG OS compiler 在需要调用 whole-Graph-Type 底层操作时从同一 target Object set 重新合成完整 Lithograph Schema，而不是把底层整体结构原样暴露成第二个公共 mutation target。
 
@@ -608,7 +625,7 @@ Constraint ownership 同样按 Lithograph 真实 Schema model 切分：属于 Gr
 
 Owner-only 不禁止**引用目标自身 rename 引起的派生 Ref rewrite**。如果 Constraint / Index / Domain 等 Object 保存了对 `node:Person` 或某 Property 的逻辑引用，而该被引用 Object 在同一 Patch 中 rename，KG OS 可以自动把这些 locator 重写为目标 Snapshot 的新 Ref，以保持原有引用关系；这类 rewrite 只能改变 locator，不得顺带修改 Constraint / Index 的其它配置或 Domain membership 语义。调用方若在同一 Patch 中还显式修改该 Constraint / Index，其显式变化与派生 locator rewrite 必须在 logical-slot normalization 后不冲突，否则整体 reject。
 
-`patch` 是明确 Object 的统一 mutation 模型。调用方不是提交 JSON Patch、JSON Merge Patch 或 `op/path/value` mutation DSL，而是以 Object `read` 返回的 canonical text 为 base，提交**文件式文本 Patch**。Patch 可以覆盖：
+`patch` 是明确 Object 的统一 mutation 模型。调用方不是提交 JSON Patch、JSON Merge Patch 或 `op/path/value` mutation DSL，而是以 Object `read` 的 canonical YAML 为 base，提交**文件式文本 Patch**。Patch 可以覆盖：
 
 ```text
 Add
@@ -618,19 +635,30 @@ Rename
 Restructure
 ```
 
+Object Patch v1 的 textual syntax 固定采用普通 two-way **Git Extended Diff**，即 `git diff -p` 生成的 patch text 形态；Git `diff-format` 是语法参考，但 KG OS v1 只承诺本文明确列出的可应用 profile，未来 Git 增加的新格式不会自动进入 KG OS 合同：
+
+- 每个 Object target 映射为一个标准 `diff --git a/<target> b/<target>` file entry；这里的 `<target>` 是 Object transport contract 序列化后的 owner-backed Object Ref，或新增 Object 的 request-local alias + object kind target。`a/` / `b/` 是 Git patch 的语法前缀，不是 KG OS 虚拟目录、Object Ref 的组成部分或持久 identity；
+- Update / Restructure 使用标准 `---` / `+++` 与 unified `@@ ... @@` hunks；Add 使用标准 `new file mode 100644`、`--- /dev/null`、`+++ b/<target>`；Delete 使用标准 `deleted file mode 100644`、`--- a/<target>`、`+++ /dev/null`；
+- Rename 使用标准 `diff --git a/<old-target> b/<new-target>` 与 `rename from` / `rename to` extended headers，可以同时包含 unified hunks。`<old-target>` 定位 `baseState` 中已有 Object；`<new-target>` 只表达 rename 后的目标 locator，不改变 D23“Patch 内其它已有对象引用仍按 baseState Ref 解析”的规则；
+- 一个多 Object Patch 直接由多个标准 `diff --git` file entry 组成，不增加 KG OS 自有 Patch wrapper 或 section delimiter；
+- Object target 字符串放入 Git path slot 后，特殊字符的 quoting / escaping 服从 Git patch 的 pathname quoting 规则；KG OS 不再定义第二套 Patch path escaping。Object Ref / alias + object kind target **本身**如何序列化仍由 Object transport contract 冻结；
+- 标准 `similarity index` / `dissimilarity index` / `index <hash>..<hash>` 等 Git metadata 如果出现，只是 Patch framing / advisory metadata，不是 KG OS identity、concurrency guard 或业务状态；`baseState` + target Branch 才是 Object Patch 的权威并发基线；
+- v1 不接受 Git combined diff、copy semantics、binary patch、symlink / submodule、mode-only mutation 或其它没有 Object mutation 语义的 Git patch 形式。Add / Delete 使用的 `100644` 只作为 canonical YAML regular-file framing，不产生权限或文件模式业务状态；
+- KG OS 采用的是成熟 Git patch **文本语法**，不是 Git filesystem / index / blob 模型。Patch parser/application 必须把 file target 映射到 Object Ref，或新增对象的 alias + object kind，再按本文 strict base-State、exact apply、owner-only、overlap、dependency、derived migration 与 all-or-nothing 规则执行；不得直接把 `git apply` 的文件系统行为当成 KG OS mutation semantics。
+
 这五类描述的是统一 Patch 能表达的**变化类别**，不是给所有 Object kind 强行增加相同生命周期。每个 Object 的合法 target change 仍由其真实 owner contract 决定：例如系统分配 Knowledge element identity 不能 rename；current Graph Type 的存在 / 生命周期服从 Lithograph Graph Type 语义；Constraint / Index 是否支持原生 rename 或只能 drop + create 以 Lithograph 公开 Cypher contract 为准。KG OS 可以为已明确设计的 Definition / Property / Domain rename 提供上层语义，但不能仅因为 Patch 有 `Rename` 类别就给其它底层资源发明新数据库语义。
 
-一个 Object Patch 可以同时包含一个或多个 Object section。已有对象的 section 由其 owner-backed Object Ref 定位；新增对象尚无最终 Object Ref，因此使用 request-local alias + object kind 定位该 section。具体 section header 字符串和 escaping 属于待设计 transport framing，但“对 canonical text 做 textual diff / add / delete / rename”这一交互模型已经确认，不得在后续 wire 设计中替换成另一套 JSON mutation language。
+一个 Object Patch 可以同时包含一个或多个 Git patch file entry。已有对象的 entry 通过 old/current target 解码出的 owner-backed Object Ref 定位；新增对象尚无最终 Object Ref，因此继续使用已经确认的 request-local alias + object kind 定位该 entry。Object transport contract 仍需冻结 Object Ref / alias + object kind target 的具体字符串序列化，但不得再创建 KG OS 自有 Patch section header、escaping grammar，也不得在后续 wire 设计中替换成另一套 JSON mutation language。
 
-Object projection 允许为读取便利包含 child Object 内容，但一个 Patch 内的 target change 必须可归一化为**不重叠的底层 logical slots**。例如 Definition section 可以直接修改 `Person.email`，Property section 也可以单独修改同一个 Property；二者不能在同一 Patch 同时触碰该 Property。KG OS 在执行顺序之前先检测这种 overlap，存在重叠即整体拒绝，避免同一个目标因 section 顺序产生不同结果。
+Object projection 允许为读取便利包含 child Object 内容，但一个 Patch 内的 target change 必须可归一化为**不重叠的底层 logical slots**。例如 Definition entry 可以直接修改 `Person.email`，Property entry 也可以单独修改同一个 Property；二者不能在同一 Patch 同时触碰该 Property。KG OS 在执行顺序之前先检测这种 overlap，存在重叠即整体拒绝，避免同一个目标因 entry 顺序产生不同结果。
 
-因为 Object Patch 严格基于 `baseState`，**Patch 中对任何已经存在 Object 的引用都按 baseState Object Ref 解析**。如果同一 Patch 把 `node:Person` rename 为新的 Ref，其他 section 要继续引用“同一个 Definition”时仍使用 base Ref `node:Person`；KG OS 通过本次 rename continuity 把该逻辑引用带到目标 Snapshot。调用方不能依赖尚未产生的 target Ref 在同一 Patch 中重新定位该已有对象。只有本次新建、在 baseState 中不存在的 Object 使用 request-local alias。成功后新的 Ref 只通过 alias mapping / Ref transition 返回。这样多 Object Patch 的引用解析完全由 `baseState + Ref | alias` 决定，不依赖 section 顺序或对未来 Ref 的猜测。
+因为 Object Patch 严格基于 `baseState`，**Patch 中对任何已经存在 Object 的引用都按 baseState Object Ref 解析**。如果同一 Patch 把 `node:Person` rename 为新的 Ref，其他 entry 要继续引用“同一个 Definition”时仍使用 base Ref `node:Person`；KG OS 通过本次 rename continuity 把该逻辑引用带到目标 Snapshot。调用方不能依赖尚未产生的 target Ref 在同一 Patch 中重新定位该已有对象。只有本次新建、在 baseState 中不存在的 Object 使用 request-local alias。成功后新的 Ref 只通过 alias mapping / Ref transition 返回。这样多 Object Patch 的引用解析完全由 `baseState + Ref | alias` 决定，不依赖 entry 顺序或对未来 Ref 的猜测。
 
 Object Patch 以调用方实际读取的 immutable `baseState` 为 patch base、以明确 Branch 为 write target。**v1 使用 strict base-State 语义：执行开始时 target Branch 的当前 head 必须仍等于 `baseState`；如果 Branch 已前进，则整个 Patch 以 stale/conflict 失败，不把基于旧文本生成的 Patch 自动套用到新 State，也不自动 rebase / merge。** 具体错误 code / wire serialization 仍待冻结。
 
-在 base State 校验通过后，KG OS 重新生成对应 Object canonical text，应用 textual Patch 得到目标文本 / target Object set，再执行 Ontology / Knowledge dependency、Schema、Graph View 与其它公开规则校验，最后编排 Lithograph。请求默认 all-or-nothing；任一变化失败都不能留下部分 durable 结果。
+在 base State 校验通过后，KG OS 重新生成对应 Object canonical YAML，精确应用 textual Patch 得到目标 YAML，使用标准 YAML parser 解析为 target Object Value / target Object set，再执行 Object schema / type、Ontology / Knowledge dependency、Schema、Graph View 与其它公开规则校验，最后编排 Lithograph。请求默认 all-or-nothing；任一变化失败都不能留下部分 durable 结果。
 
-对于 Update / Rename / Restructure，KG OS 不把“应用 Patch 后得到的一整份文本”当成 `PUT` 语义，而是比较 base canonical Object 与 patched text，只把调用方**显式改变的 logical slots**作为 target delta。未被 textual Patch 改动的字段只是 context，不会阻止同一请求为了 rename、referential integrity 或 consistency 产生必要的 derived migration。例如 Relationship Definition rename 与某条 Relationship 的 Property update 可以同时存在：该 Relationship section 没有编辑的旧 type 字段不会覆盖 mandatory type migration。反过来，如果调用方显式修改的 slot 与 mandatory derived change 要写同一 slot 且目标不同，则整个 Object Patch 冲突失败，不按 section 顺序覆盖。
+对于 Update / Rename / Restructure，KG OS 不把“应用 Patch 后得到的一整份 YAML”当成 `PUT` 语义，而是比较 base Object Value 与 patched YAML 解析得到的 Object Value，只把调用方**显式改变的 logical slots**作为 target delta。未被 textual Patch 改动的字段只是 context，不会阻止同一请求为了 rename、referential integrity 或 consistency 产生必要的 derived migration。例如 Relationship Definition rename 与某条 Relationship 的 Property update 可以同时存在：该 Relationship entry 没有编辑的旧 type 字段不会覆盖 mandatory type migration。反过来，如果调用方显式修改的 slot 与 mandatory derived change 要写同一 slot 且目标不同，则整个 Object Patch 冲突失败，不按 entry 顺序覆盖。
 
 Textual Patch application 使用**精确 base**，不使用普通文件工具可能提供的 fuzzy hunk matching、自动 offset 猜测或“尽量应用”。Update / Delete / Rename section 的 Object Ref 必须在 `baseState` 中存在；Add 不具有 upsert 语义，planned target 中若最终形成重复 Object Ref / identifying name 则失败。删除一个在 base State 中不存在的 Object 也不是成功 no-op。调用方要修改已有对象必须显式使用其原 Ref，要创建对象必须显式 Add；具体错误 code 仍由 transport contract 冻结。
 
@@ -648,7 +676,7 @@ Object `list` / `search` / `read` 使用统一 State reference semantics。Branc
 
 ### Object 能力边界
 
-- 不建立虚拟文件系统或把“目录路径”作为第二套 Object identity；稳定文本与 file-style Patch 只是 AI 交互方式；
+- 不建立虚拟文件系统或把“目录路径”作为第二套 Object identity；稳定文本与 Git Extended Diff Patch 只是 AI 交互方式；
 - 不建立 Definition / Domain / Property / Node / Relationship 各自完整 CRUD surface；
 - 不为 Graph Type / Constraint / Index 再建立平行 Schema API；它们作为 Lithograph-owned Schema Object projection 进入同一个 Object surface，且不获得 KG OS semantic Binding Record，除非未来出现真实业务语义需求再单独设计；
 - Object 统一的是 **State Snapshot 内 Ontology / Knowledge 对象**的定位与维护；State Data、Branch、Tag、Merge 等版本 sidecar / ref 不是 Snapshot Object，由 Evolution 负责，不为它们再套一层 Object identity；
@@ -828,7 +856,7 @@ OpenAI : Company
 
 Node / Relationship 的技术身份直接使用 Lithograph 公开的稳定 element identity；KG OS 不再创建 `knowledgeId`、`entityId` 或另一套元素身份。业务唯一性仍由调用方定义的 Ontology / Lithograph Schema 负责，不能把数据库 element identity 当成业务唯一键。
 
-Knowledge 的 Property、Label、Relationship Type、端点、类型和查询语义都以 Lithograph 当前 Snapshot 中的真实 graph data 为准。Knowledge Object canonical text 只投影这个 Node / Relationship 自己的 graph state；Label / Relationship Type 本身就是对当前 Ontology Structure 的名称引用，但 KG OS 不把对应 Definition 的 `title` / `description` 等可变语义复制进 Knowledge Object 文本。AI 需要理解这些 Label / Type 时，使用对应 Definition Object Ref 继续读取。具体 Object wire shape 仍由[待设计合同](#待设计合同)冻结。
+Knowledge 的 Property、Label、Relationship Type、端点、类型和查询语义都以 Lithograph 当前 Snapshot 中的真实 graph data 为准。Knowledge Object Value / canonical YAML 只投影这个 Node / Relationship 自己的 graph state；Label / Relationship Type 本身就是对当前 Ontology Structure 的名称引用，但 KG OS 不把对应 Definition 的 `title` / `description` 等可变语义复制进 Knowledge Object representation。AI 需要理解这些 Label / Type 时，使用对应 Definition Object Ref 继续读取。具体 Object wire shape 仍由[待设计合同](#待设计合同)冻结。
 
 ## Graph
 
@@ -951,12 +979,12 @@ KG OS
 - 备选：保留 Ontology Read/Define/Organize/History 与 Knowledge get/list/expand/mutate/history 两套能力；或者所有任务都要求直接写 Cypher。
 - 取舍：公共能力面更小且身份统一；KG OS 需要维护稳定 Object projection / Patch contract，并让 Graph 与 Object 的职责边界清楚。
 
-### D10 Object Patch 是 canonical text 上的统一 textual mutation 模型
+### D10 Object Patch 使用 canonical YAML + Git Extended Diff
 
-- 决定：Object `read` 返回稳定 canonical text；Object `patch` 接收基于该文本生成的 file-style textual Patch，并覆盖 Add / Update / Delete / Rename / Restructure。一个请求可以修改多个明确 Object；已有对象使用 owner-backed Object Ref，新增对象只使用 request-local alias。Patch 对 `baseState` canonical text 精确应用，不 fuzzy match；Add/Update/Delete/Rename 不做隐式 upsert / no-op。KG OS 不使用 JSON Patch、JSON Merge Patch 或 `op/path/value` mutation DSL 作为公共 Object mutation 模型。系统分配的 identity 不能由调用方直接重写，但业务结构变化可以导致底层 replacement / migration，并通过 Ref transition / Evolution diff 暴露结果。
-- 依据：AI 天然擅长读取稳定文本并生成文件式局部 Patch；同一模型可以维护 Definition、Domain、Property、Knowledge Node / Relationship，避免 `mutate`、Ontology CRUD、Domain CRUD 等重复写接口。Lithograph 已有 canonical Patch / Cypher / Schema / transaction 公共能力，KG OS 按目标变化选择最小可用组合，不再发明数据库 mutation engine。
-- 备选：使用 RFC JSON Patch / Merge Patch；使用 operation-oriented JSON mutation DSL；Object Patch 只做 Update 而 Create/Delete/Rename 使用独立 API。
-- 取舍：KG OS 必须维护 canonical text renderer/parser 与 textual Patch application，并把业务 target change 编译成 Lithograph 实际 graph / Schema / Index mutation；text Patch 的具体 framing / escaping 与 transport envelope 仍需冻结，但不能改变已经确认的 textual Patch 模型。
+- 决定：Object `read` 的 editable representation 是稳定 canonical YAML；Object `patch` 接收基于该 YAML 生成的普通 two-way Git Extended Diff（`git diff -p`）Patch，并覆盖 Add / Update / Delete / Rename / Restructure。KG OS 不自定义 Patch section / hunk / pathname-quoting grammar；多 Object 使用多个 `diff --git` entry，新增 / 删除 / rename 复用 Git 标准 extended headers 与 `/dev/null` 语义。一个请求可以修改多个明确 Object；已有对象使用 owner-backed Object Ref，新增对象只使用 request-local alias。Patch 对 `baseState` canonical YAML 精确应用，不 fuzzy match；Add/Update/Delete/Rename 不做隐式 upsert / no-op。KG OS 不使用 JSON Patch、JSON Merge Patch 或 `op/path/value` mutation DSL 作为公共 Object mutation 模型。系统分配的 identity 不能由调用方直接重写，但业务结构变化可以导致底层 replacement / migration，并通过 Ref transition / Evolution diff 暴露结果。
+- 依据：AI 天然擅长读取稳定文本并生成文件式局部 Patch；Git Extended Diff 已经提供成熟、广泛实现的修改、新增、删除、rename、多目标和 pathname quoting 文本语法，没有当前需求要求 KG OS 再发明一套 Patch grammar。同一 Object mutation 模型可以维护 Definition、Domain、Property、Knowledge Node / Relationship，避免 `mutate`、Ontology CRUD、Domain CRUD 等重复写接口。Lithograph 已有 canonical Patch / Cypher / Schema / transaction 公共能力，KG OS 按目标变化选择最小可用组合，不再发明数据库 mutation engine。
+- 备选：自定义 KG OS textual Patch framing；使用 RFC JSON Patch / Merge Patch；使用 operation-oriented JSON mutation DSL；Object Patch 只做 Update 而 Create/Delete/Rename 使用独立 API。
+- 取舍：KG OS 必须维护 canonical YAML renderer、标准 YAML parser，并解析 / 应用本文冻结的 Git Extended Diff profile，再把业务 target change 编译成 Lithograph 实际 graph / Schema / Index mutation；Object Ref / alias target 的具体序列化与 transport envelope 仍需冻结。Git blob hash、file mode、filesystem / index 行为不会成为 KG OS 业务语义，unsupported Git patch form 也不会因为 Git 支持就自动进入 KG OS v1。
 
 ### D11 Binding Record 提供语义连续性，Schema Locator 只负责定位
 
@@ -996,7 +1024,7 @@ KG OS
 ### D16 Object Patch 使用 strict base State
 
 - 决定：Object Patch 必须基于调用方实际读取到的 immutable `baseState`，并显式指定目标 Branch；执行开始时目标 Branch head 必须仍等于 `baseState`，执行期间目标 Branch 再次移动也必须按 Lithograph branch-head compare 失败。KG OS 不把旧文本 Patch 自动套用到新 State，不自动 rebase / merge。
-- 依据：textual Patch 的语义来自调用方看到的 canonical text；在不同 Snapshot 上“尽量应用”会把文件 Patch 模型变成隐式 merge，并产生难以预测的 AI 写入结果。Lithograph 已提供 Branch head compare 与 `BRANCH_HEAD_MOVED` 底层并发保护。
+- 依据：textual Patch 的语义来自调用方看到的 canonical YAML；在不同 Snapshot 上“尽量应用”会把文件 Patch 模型变成隐式 merge，并产生难以预测的 AI 写入结果。Lithograph 已提供 Branch head compare 与 `BRANCH_HEAD_MOVED` 底层并发保护。
 - 备选：即使 Branch 已前进，只要 Lithograph raw patch 的 before condition 仍满足就继续应用；自动 three-way merge / rebase。
 - 取舍：并发写发生后调用方需要重新读取最新 Object 并重新生成 Patch；换取明确、可重复的 mutation base 和更简单的冲突语义。
 
@@ -1031,9 +1059,9 @@ KG OS
 ### D21 重叠 Object projection 不允许同 Patch 双重修改
 
 - 决定：为减少 AI 上下文，Property 可以作为 Definition 的可寻址 child Object，同时 Definition read 可以包含 Property 的完整业务化投影。两者是同一底层 logical state 的不同读取粒度。一个 Object Patch 可以通过父 Definition 或 child Property 修改该 Property，但不能同时通过两个 section 修改同一底层 slot；KG OS 必须在执行前检测并拒绝 overlapping target change。
-- 依据：允许 focused child Object 可以避免为了修改一个字段读取大型 Definition；允许 Definition 聚合读取又能保持模型理解完整。若不定义 overlap 规则，同一 Patch 的结果会依赖 section 顺序，形成隐藏的第二套 mutation precedence。
+- 依据：允许 focused child Object 可以避免为了修改一个字段读取大型 Definition；允许 Definition 聚合读取又能保持模型理解完整。若不定义 overlap 规则，同一 Patch 的结果会依赖 entry 顺序，形成隐藏的第二套 mutation precedence。
 - 备选：Definition 永远不展示完整 Property；Property 永远不能独立 Object；规定 parent 或 child 固定覆盖另一方。
-- 取舍：调用方需要避免在一个 Patch 重复表达同一 Property change；换取读取粒度灵活、底层仍单一真源且 mutation 结果与 section 顺序无关。
+- 取舍：调用方需要避免在一个 Patch 重复表达同一 Property change；换取读取粒度灵活、底层仍单一真源且 mutation 结果与 entry 顺序无关。
 
 ### D22 无有效 Object delta 不创建新 State
 
@@ -1044,17 +1072,17 @@ KG OS
 
 ### D23 Object Patch 内已有对象引用统一按 base State 解析
 
-- 决定：Object Patch 中所有指向 baseState 已存在 Object 的引用，无论出现在 section target 还是另一个 Object 的内容中，都使用并解析 baseState Object Ref。若同一 Patch rename 该 Object，KG OS 依靠已解析的逻辑对象连续性把引用带到目标 Snapshot；同一 Patch 不使用 rename 后尚未产生的新 Ref 重新定位它。本次新建 Object 则使用 request-local alias。
-- 依据：strict base-State textual Patch 来自调用方实际看到的 base canonical text；要求 AI 在同一 Patch 中混用“现在的 Ref”和“未来的 Ref”会增加不可验证的引用时序，并使结果依赖 section 顺序。
+- 决定：Object Patch 中所有指向 baseState 已存在 Object 的引用，无论出现在 entry target 还是另一个 Object 的内容中，都使用并解析 baseState Object Ref。若同一 Patch rename 该 Object，KG OS 依靠已解析的逻辑对象连续性把引用带到目标 Snapshot；同一 Patch 不使用 rename 后尚未产生的新 Ref 重新定位它。本次新建 Object 则使用 request-local alias。
+- 依据：strict base-State textual Patch 来自调用方实际看到的 base canonical YAML；要求 AI 在同一 Patch 中混用“现在的 Ref”和“未来的 Ref”会增加不可验证的引用时序，并使结果依赖 entry 顺序。
 - 备选：允许 old/new Ref 混用并由 KG OS 猜测；要求 rename section 先执行后其它 section 才能使用新 Ref。
 - 取舍：同一 Patch 中引用正在 rename 的已有 Object 时继续写旧 Ref，看起来不是最终展示值；换取所有引用都能在执行前确定解析，target Ref 只作为结果产生。
 
-### D24 Canonical Object text 只投影 owner state
+### D24 Object representation 只投影 owner state
 
-- 决定：Object canonical text 只包含该 Object owner 的可编辑状态与跨 Object Ref，不内联其它独立 Object 的可变内容。Knowledge Node / Relationship 不复制 Definition semantics，Relationship 不复制 endpoint Node content，Domain 不复制成员内容。Definition 为整体模型理解可以包含 child Property projection，这是唯一当前确认的重叠 owner/child view，并服从 D21。
-- 依据：canonical text 同时是 textual Patch 的编辑基线；若把其它 Object 的可变字段内联，AI 会看到同一底层状态出现在多个不相关 Patch target 中，从而重新产生重复 ownership 和冲突写入口。
+- 决定：Object Value 以及它的 YAML / JSON representation 只包含该 Object owner 的可编辑状态与跨 Object Ref，不内联其它独立 Object 的可变内容。Knowledge Node / Relationship 不复制 Definition semantics，Relationship 不复制 endpoint Node content，Domain 不复制成员内容。Definition 为整体模型理解可以包含 child Property projection，这是唯一当前确认的重叠 owner/child view，并服从 D21。
+- 依据：canonical YAML 同时是 textual Patch 的编辑基线；若把其它 Object 的可变字段内联，AI 会看到同一底层状态出现在多个不相关 Patch target 中，从而重新产生重复 ownership 和冲突写入口；JSON representation 也必须与同一 Object Value 保持相同 ownership 边界。
 - 备选：所有 Object read 都尽可能展开关联对象；把展开字段标记 read-only；只在 Patch 时忽略外部字段变化。
-- 取舍：AI 需要额外 `read` 才能获得关联对象的详细语义；换取每个 canonical text 的 ownership 明确、token 可控且 Patch 不会跨对象误写。
+- 取舍：AI 需要额外 `read` 才能获得关联对象的详细语义；换取每个 Object Value 的 ownership 明确、canonical YAML token 可控且 Patch 不会跨对象误写。
 
 ### D25 全部 versioned Ontology Structure 通过 Object 暴露
 
@@ -1072,9 +1100,9 @@ KG OS
 
 ### D27 Graph Type projection 不复制 child Definition mutation ownership
 
-- 决定：Current Graph Type Object 只暴露 graph-level state 和必要的 child Ref / summary；Definition / Property 的可编辑结构不在 Graph Type canonical text 中重复出现，也不能通过 Graph Type Patch 间接修改。若 Lithograph 底层 DDL 需要 whole Graph Type replacement，KG OS compiler 从所有 target schema Objects 合成底层完整 Graph Type。
-- 依据：Object 是 AI-facing ownership projection，不要求一比一复制底层 AST nesting。若 Graph Type 和 Definition 同时拥有完整 element definition，可编辑状态会再次出现两套公共 mutation target，违背 owner-only canonical text。
-- 备选：Graph Type canonical text 完整内联并可编辑所有 element definitions，再用 D21 overlap reject 重叠；取消 Definition Object，只编辑整个 Graph Type。
+- 决定：Current Graph Type Object 只暴露 graph-level state 和必要的 child Ref / summary；Definition / Property 的可编辑结构不在 Graph Type Object Value / canonical YAML 中重复出现，也不能通过 Graph Type Patch 间接修改。若 Lithograph 底层 DDL 需要 whole Graph Type replacement，KG OS compiler 从所有 target schema Objects 合成底层完整 Graph Type。
+- 依据：Object 是 AI-facing ownership projection，不要求一比一复制底层 AST nesting。若 Graph Type 和 Definition 同时拥有完整 element definition，可编辑状态会再次出现两套公共 mutation target，违背 owner-only representation。
+- 备选：Graph Type canonical YAML 完整内联并可编辑所有 element definitions，再用 D21 overlap reject 重叠；取消 Definition Object，只编辑整个 Graph Type。
 - 取舍：Graph Type Object 不一定能原样显示底层完整 DDL AST；换取 Definition 级小上下文修改、唯一 mutation ownership 和大型 Schema 下更低 token 成本。
 
 ### D28 Standalone Constraint / Index 只有一个公共 mutation owner
@@ -1107,10 +1135,10 @@ KG OS
 
 ### D32 Textual Patch 只把 base→patched 差异视为显式 target change
 
-- 决定：Update / Rename / Restructure section 应用 textual Patch 后，KG OS 将 patched text 与 base canonical Object 比较，只把实际变化的 logical slots 作为调用方显式 target delta；未改变字段是 Patch context，不具有“锁定旧值”的 PUT 语义。Mandatory rename migration、locator rewrite 和当前操作所需 consistency change 可以更新这些 untouched slots；若派生变化与显式 delta 同时写同一 slot 且目标不同则 conflict。
+- 决定：Update / Rename / Restructure entry 应用 textual Patch 后，KG OS 将 patched YAML 解析得到的 Object Value 与 base canonical YAML 对应的 Object Value 比较，只把实际变化的 logical slots 作为调用方显式 target delta；未改变字段是 Patch context，不具有“锁定旧值”的 PUT 语义。Mandatory rename migration、locator rewrite 和当前操作所需 consistency change 可以更新这些 untouched slots；若派生变化与显式 delta 同时写同一 slot 且目标不同则 conflict。
 - 依据：文件 Patch 天然表达局部编辑。若把 patch 后整份文本当成 full replacement，任何 Definition rename 都会与同时修改相关 Knowledge Object 的无关字段产生伪冲突，因为它们的 base 文本仍显示旧 label / type / property ref。
-- 备选：Object Patch 等价完整 PUT；要求 AI 在每个受影响 Object section 中手工同步所有派生字段；按 section 顺序最后写入者获胜。
-- 取舍：compiler 必须执行 canonical parse + logical diff，而不能只 parse final text；换取真正的 file-style 局部修改语义、可组合多 Object migration 和确定的冲突检测。
+- 备选：Object Patch 等价完整 PUT；要求 AI 在每个受影响 Object entry 中手工同步所有派生字段；按 entry 顺序最后写入者获胜。
+- 取舍：compiler 必须执行 canonical parse + logical diff，而不能只 parse final text；换取真正的 Git Extended Diff 局部修改语义、可组合多 Object migration 和确定的冲突检测。
 
 ### D33 KG OS v1 只 bootstrap 空 Lithograph Knowledge Base
 
@@ -1119,13 +1147,20 @@ KG OS
 - 备选：首次打开时自动为所有已有 Schema element 创建 Binding；允许没有 Binding 的 Schema 逐步懒迁移；直接把现有 database 一律视为有效 KG OS State。
 - 取舍：已有 Lithograph 数据库不能在 v1 被无配置直接“挂载”为 KG OS，需要未来显式 migration / import 设计；换取 bootstrap 简单、所有公开 KG OS State 从一开始满足当前一致性不变量。
 
+### D34 Object 使用单一 logical value、canonical YAML 与 JSON representation
+
+- 决定：每个 Object 在目标 State 中只有一份逻辑 Object Value。v1 对外支持 `application/yaml` 与 `application/json` 两种 serialization；YAML 是唯一 canonical editable representation 和 Object Patch base，JSON 是同一 Object Value 的等价结构化 representation。KG OS 不定义自己的 YAML 方言：标准 YAML 输入只要能无歧义解析并映射到合法 Object Value 即可接受，后续读取再由 KG OS renderer 规范化为 canonical YAML。HTTP adapter 使用标准 `Accept` / `Content-Type` 做 representation negotiation，不增加 `representation.mode/format` 之类业务字段；SDK 中的 structured Object 只是 JSON / Object Value 的语言内解析结果，不是第三种 wire format。
+- 依据：YAML 对自然语言长文本和 AI 局部编辑更友好，Git Extended Diff 需要唯一稳定文本基线；JSON 则是程序、SDK 与 Web 的成熟结构化交换格式。把二者都映射到同一 Object Value 可以同时满足 AI-first 编辑与普通 API 消费，而不建立两套对象模型或要求 Patch 携带 serializer selector。
+- 备选：只提供 JSON；让 YAML / JSON 都成为 Patch base；自定义 `representation` request object；定义 KG OS-specific YAML subset / dialect。
+- 取舍：KG OS 需要 deterministic canonical YAML renderer，并同时维护 JSON serializer；调用方以非 canonical 标准 YAML 表达同一值时可以写入，但下一次 `read` 会被规范化。HTTP 的具体 route、metadata envelope / header、CLI command 与 SDK method 仍属于 transport contract，不由本决定冻结。
+
 ## 待设计合同
 
 以下问题尚未冻结，但不会回退前述架构原则：
 
 1. **Internal physical identifiers**：为 internal marker、Definition Binding、Property Binding、Domain、`INCLUDES` 与 Binding Record 间关系选择具体 KG OS-owned reserved Label / Relationship Type / Property key，并定义 Lithograph Schema 中对应 reserved internal element definitions。具体字符串是实现级持久化编码，不提升为公共 Ontology 概念。
-2. **Object transport / serialization contract**：冻结 Definition / Property / Domain 以及 Graph Type / Constraint / Index 的 Object Ref 具体字符串序列化、Object kind / scope、`list` / `search` 分页与搜索参数、各类 Object canonical text 的逐字段 schema / ordering、**已经确认的 file-style textual Patch 的 framing / section marker / escaping**、base State / target Branch 的 envelope 字段、request-local alias 的具体表示、baseState Ref / alias 在文本中的转义方式、alias mapping / Ref transition 的有界结果形态、consistency / conflict error serialization 与 CLI / SDK / Skill interface。Knowledge `n:<id>` / `r:<id>` 必须原样复用 Lithograph element identity；Graph Type / Constraint / Index 必须直接映射 Lithograph 公开 schema locator / identity；v1 不暴露 internal Binding Record / Domain Node identity。本项不得重新选择 JSON Patch、Merge Patch 或 operation JSON 来替换已确认的 textual Patch 模型。
-3. **Object Patch 编译合同**：如何从 canonical base + patched text 计算显式 logical delta，把一个或多个 Object target change 与 mandatory derived changes 归一化为不重叠 logical slots，再映射成当前 Lithograph 公开合同允许的最少 canonical patch / Cypher / Schema mutation；哪些变化可以合法使用单次 `patch.apply`，哪些必须使用 caller-owned transaction 编排；如何具体实现 explicit-vs-derived conflict、parent/child overlap detection、Definition rename 的批量 migration、Definition / Property Schema↔Binding 双向一一覆盖、dependency guard、internal semantic cleanup、request all-or-nothing、合法 intermediate State 与最终 State / Ref transition 结果。
+2. **Object transport / serialization contract**：冻结 Definition / Property / Domain 以及 Graph Type / Constraint / Index 的 Object Ref 具体字符串序列化、Object kind / scope、`list` / `search` 分页与搜索参数、各类 Object 的 logical schema、canonical YAML 的逐字段 ordering / rendering 与等价 JSON shape、**已经确认的 Git Extended Diff 中 `<target>` 如何承载 Object Ref，或新增对象的 request-local alias + object kind**、base State / target Branch 的 envelope 字段、alias mapping / Ref transition 的有界结果形态、consistency / conflict error serialization 与 CLI / SDK / Skill interface。YAML / JSON representation 选择和 HTTP `Accept` / `Content-Type` negotiation 已经确认，不再设计自有 representation 参数；Patch 的 `diff --git` / extended header / unified hunk / pathname quoting 语法也不再是待设计项。Knowledge `n:<id>` / `r:<id>` 必须原样复用 Lithograph element identity；Graph Type / Constraint / Index 必须直接映射 Lithograph 公开 schema locator / identity；v1 不暴露 internal Binding Record / Domain Node identity。本项不得重新选择自定义 YAML dialect、JSON Patch、Merge Patch 或 operation JSON 来替换已确认的 representation / Patch 模型。
+3. **Object Patch 编译合同**：如何从 canonical YAML + patched YAML 解析出的 Object Value 计算显式 logical delta，把一个或多个 Object target change 与 mandatory derived changes 归一化为不重叠 logical slots，再映射成当前 Lithograph 公开合同允许的最少 canonical patch / Cypher / Schema mutation；哪些变化可以合法使用单次 `patch.apply`，哪些必须使用 caller-owned transaction 编排；如何具体实现 explicit-vs-derived conflict、parent/child overlap detection、Definition rename 的批量 migration、Definition / Property Schema↔Binding 双向一一覆盖、dependency guard、internal semantic cleanup、request all-or-nothing、合法 intermediate State 与最终 State / Ref transition 结果。
 4. **Graph 公共 wire contract**：冻结 read-only `query` 与 writable `execute` 的 State / Branch / Tag request shape、Cypher parameters、Lithograph value/result encoding、Object Ref 暴露、Graph View isolation、error model 与最终 State result。全文／向量／混合检索不建立第二套合同，继续通过 Cypher 使用 Lithograph 对应能力。
 5. **Evolution 公共 wire contract**：冻结已确认 State / Branch / Tag reference 的具体序列化与 ref resolution error、`overview` 摘要形态、`get` 的 immutable metadata / mutable State Data 分层、Branch / Tag list、`ancestry` root / cursor 与 DAG traversal shape、`history` / `diff` 的 scope / **anchor State + Object Ref** filter / bounded pagination、State Data size/error boundary、`state.create`、Branch / Tag mutation、merge conflict / result 映射、最终 State result 与 CLI / SDK / Skill interface。Raw Lithograph patch、checkout、rebase、squash、reset、revert、gc 当前不进入该公共合同。
 6. **Human-facing Web**：Object / Graph / Evolution 的查看、管理和纠正交互。
@@ -1138,9 +1173,9 @@ KG OS
 
 1. 建立最小 Lithograph host / client 边界，只暴露 KG OS 所需公开能力，不访问内部表；实现 D33 的 empty-database bootstrap boundary，未完成 KG OS-valid bootstrap 前不开放公共业务能力。
 2. 冻结 reserved internal physical identifiers 后实现 Ontology semantic graph：Definition / Property Binding Record、Domain / `INCLUDES`、同一 Lithograph Schema 中的 required internal Schema resources，以及基于 Lithograph `graphView` 的 Knowledge/Internal 隔离、双向 Binding coverage 与 Snapshot-scoped Schema Locator resolution。
-3. 实现统一 Object Ref resolver 与 canonical text projection：Knowledge Node / Relationship 直接复用 Lithograph element identity；Graph Type / Constraint / Index 直接复用 Lithograph public schema locator / identity；Definition / Property / Domain 使用已确认 owner identity / name locator；同一 State + Ref 产生稳定、无损文本，并保持 internal graph 不可见。
+3. 实现统一 Object Ref resolver 与 Object Value projection：Knowledge Node / Relationship 直接复用 Lithograph element identity；Graph Type / Constraint / Index 直接复用 Lithograph public schema locator / identity；Definition / Property / Domain 使用已确认 owner identity / name locator；同一 State + Ref 产生同一 logical Object Value，并可稳定渲染为 canonical YAML 或等价 JSON，同时保持 internal graph 不可见。
 4. 实现 Object `list` / `search` / `read`，支持大集合分页与轻量摘要；复杂 Knowledge discovery 不扩展 Object search，而是交给 Graph Cypher。
-5. 实现 Object Patch compiler：canonical text textual Patch、Add / Update / Delete / Rename / Restructure、多 Object、request-local alias、strict base State / target Branch、direct Ref transition；在 Lithograph 公共合同允许时使用 canonical `patch.apply`，否则以最少公开操作 + caller-owned transaction 编排，并落实 Definition / Property dependency guard、D17 rename migration、Schema↔Binding 一一覆盖、semantic cleanup、合法 intermediate State 与 request all-or-nothing。
+5. 实现 Object Patch compiler：canonical YAML + Git Extended Diff parser/application、标准 YAML parse → Object Value、Add / Update / Delete / Rename / Restructure、多 Object、request-local alias、strict base State / target Branch、direct Ref transition；在 Lithograph 公共合同允许时使用 canonical `patch.apply`，否则以最少公开操作 + caller-owned transaction 编排，并落实 Definition / Property dependency guard、D17 rename migration、Schema↔Binding 一一覆盖、semantic cleanup、合法 intermediate State 与 request all-or-nothing。
 6. 实现 Graph `query` / `execute`：只读查询具有真实只读边界，writable execute 只修改普通 Knowledge graph data；两者固定到统一 State semantics、复用 Lithograph value encoding，并执行 Knowledge/Internal Graph View isolation。
 7. 实现 Evolution 基础 Read：`overview`、State `get`、从明确 root 渐进读取 State DAG 的 `ancestry`、统一 `history`，以及 Branch / Tag list；保持 immutable State 与 mutable State Data / refs 的返回边界。
 8. 实现 Evolution mutation：State create/data、Branch lifecycle、Tag lifecycle 与 whole-Knowledge-Base merge；不暴露 checkout，不复制尚无 KG OS use case 的 Lithograph Version Procedure。
