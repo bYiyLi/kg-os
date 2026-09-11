@@ -215,7 +215,7 @@ Domain
 └── includes → Domain | Definition
 ```
 
-- `name`：Domain 的业务名称；最终 identity / rename wire semantics 由公共合同冻结；
+- `name`：Domain 的业务名称，同时作为当前 Snapshot 中的公共定位名称；Domain rename 会改变公共引用，但内部 Domain Node identity 保持连续；具体 wire serialization 由公共合同冻结；
 - `title` / `description`：面向 AI / 人的可选业务解释；
 - `includes`：Domain 的业务组织关系，可以指向另一个 Domain，也可以指向 Definition。
 
@@ -339,6 +339,39 @@ KG OS 不要求 Lithograph 为 Node element type、Relationship element type 或
 当调用方通过 KG OS 明确执行 Definition / Property 的 rename 时，KG OS 可以在产品层保持 Binding Record 连续：同一个 caller-owned SQLite transaction 中先按 Lithograph 公开 Schema mutation contract 完成结构变化，再把同一个 Binding Record 的 Schema Locator 更新到新结构地址；Domain `INCLUDES` 等指向 Binding Record 的组织关系不需要重建。Lithograph 是否把底层结构变化表达为原生 rename，或 old element remove + new element add，不改变 KG OS 的 Binding Record 连续性。
 
 如果有人绕过 KG OS 直接修改 Lithograph Schema，导致当前 Snapshot 中某个 Binding Record 的 Schema Locator 无法解析，或解析到与 Binding Record kind 不一致的结构，KG OS 必须把该 Snapshot 判定为 **Ontology consistency error**：不猜测 rename target、不自动迁移 metadata、不静默删除 Binding Record。历史 Snapshot 仍按各自当时的 Binding Record + Schema Locator 正常解析。
+
+#### 公共身份与引用
+
+KG OS 不建立一套覆盖所有资源的额外 UUID / Resource ID 体系。公共身份优先复用资源 owner 已经拥有的稳定 identity，或使用当前 Snapshot 中足以确定定位的业务名称：
+
+| 资源 | 公共身份 / 定位依据 |
+| --- | --- |
+| State | Lithograph Commit identity |
+| Branch | Lithograph Branch name |
+| Tag | Lithograph Tag name |
+| Knowledge Node / Relationship | Lithograph element identity |
+| Node Definition | `kind=node` + 当前 Schema identifying name |
+| Relationship Definition | `kind=relationship` + 当前 Relationship Type / Schema identifying name |
+| Property | owner Definition reference + 当前 property name |
+| Domain | 当前 Domain name |
+
+`node:Person`、`relationship:WORKS_AT`、`domain:organization` 这类写法可以作为概念示例，但不冻结最终 CLI / JSON 序列化。
+
+Definition、Property 与 Domain 的**公共引用**用于在一个确定 Snapshot 中定位当前对象，不承担跨版本永久身份。显式 rename 后公共引用随名称变化；KG OS internal Binding Record / Domain Node 的稳定 Lithograph graph element identity 负责跨 Commit 的内部连续性，使 History / Diff 可以把 rename 解释为同一对象的演化，而不是要求调用方持有额外 UUID。
+
+因此：
+
+```text
+public reference
+→ 在目标 Snapshot 中定位对象
+
+internal graph identity
+→ KG OS 内部识别跨 Snapshot 连续性
+```
+
+内部 Binding Record / Domain Node identity 当前不进入 v1 公共 identity。未来只有出现必须跨 rename 长期持有 opaque public identifier 的真实需求时，才重新评估是否暴露稳定公共 ID。
+
+历史对象定位必须同时带有目标 State 语义：同一个 `node:Person` 在不同 State 中可以存在、缺失或已经 rename。概念上等价于 Git 的 `<commit>:<path>`——State 确定 Snapshot，对象 reference 在该 Snapshot 内定位对象；这不要求 KG OS 创建第二套 object-version identity。
 
 ### 自描述目标
 
@@ -591,7 +624,7 @@ Read 负责告诉上层“这个知识世界是怎么定义的”，不修改 On
 - `get definition`：返回由 Lithograph Structure 与 KG OS semantic metadata 组成的完整业务化 Definition；
 - `search ontology`：在 Ontology 范围内查找相关 Domain、Definition、Relationship 与 Property，匹配 `name`、`title`、`description` 等可检索语义；底层搜索能力继续复用 Lithograph，不建立第二套 Search Engine。
 
-Read 的所有能力都接受同一种 **State Context**。逻辑上可以引用一个确定 State，也可以通过 Branch / Tag 引用 State；Branch / Tag 在读取开始时解析并 pin 到底层 immutable Commit。**解析后的 State identity 是返回结果的权威状态身份，Branch / Tag 只是可移动的读取上下文。** State Context 不是独立的 History 操作，具体 wire representation 由公共合同冻结。
+Read 的所有能力使用同一套 **State reference semantics**：调用方可以引用一个确定 State，也可以通过 Branch / Tag 引用 State；Branch / Tag 在读取开始时解析并 pin 到底层 immutable Commit。**解析后的 State identity 是返回结果的权威状态身份，Branch / Tag 只是可移动引用。** KG OS 不为此建立独立的 `State Context` 资源或第二套状态身份；具体 ref serialization 由公共合同冻结。
 
 大型 Ontology 应优先支持渐进式读取：
 
@@ -640,7 +673,7 @@ History 只提供 Ontology-specific 的历史解释能力：
 
 History 不按对象复制成 `definition history`、`domain history`、`ontology history` 三套接口；target / scope 是同一能力的过滤维度。底层 Commit DAG、raw Diff/Patch、Merge 等数据库语义仍全部属于 Lithograph；KG OS 只返回排除了 internal semantic graph 表达细节后的 Ontology 业务视图。
 
-Binding Record 的稳定 graph element identity 可以作为 KG OS **内部** history continuity anchor。例如一个 Definition 在两个 Snapshot 之间显式 rename 时，History 可以识别为“同一个 Binding Record 的 Schema Locator 发生变化”，而不是仅凭两个名称字符串猜测 rename。该 internal identity 是否以及如何进入公共 History target / response，仍由公共 wire contract 决定。
+Binding Record 的稳定 graph element identity 可以作为 KG OS **内部** history continuity anchor。例如一个 Definition 在两个 Snapshot 之间显式 rename 时，History 可以识别为“同一个 Binding Record 的 Schema Locator 发生变化”，而不是仅凭两个名称字符串猜测 rename。v1 History target / response 不暴露该 internal identity；公共结果使用目标 State 与业务 reference 表达对象和变化。
 
 例如 KG OS 可以把同一个 Lithograph diff 中的 Schema 与 semantic graph 变化解释为：
 
@@ -667,7 +700,7 @@ Ontology 公共能力不暴露以下内部或重复接口：
 - Ontology 自己的 State / Branch / Tag / Evolution API；
 - 与 Lithograph 重复的 Schema、Constraint、Index 或 Search Engine。
 
-具体 request / response JSON、patch 表达、分页、搜索参数、identity、CLI / SDK / Skill 命名与 error contract 仍属于[待设计合同](#待设计合同)。公共接口只能聚合或编排 Lithograph 能力，不能形成第二套 Schema、Search、State 或 Evolution 状态。
+具体 request / response JSON、patch 表达、分页、搜索参数、已确认 identity/reference 规则的 wire serialization、CLI / SDK / Skill 命名与 error contract 仍属于[待设计合同](#待设计合同)。公共接口只能聚合或编排 Lithograph 能力，不能形成第二套 Schema、Search、State 或 Evolution 状态。
 
 ## Evolution
 
@@ -719,11 +752,11 @@ Tag
 → 只有显式 move 才改变目标
 ```
 
-KG OS 不把 Lithograph connection-local `checkout` 提升为公共 Evolution 能力。AI / SDK 调用必须显式传递 State Context 或目标 Branch，避免依赖隐藏的 connection state。底层实现可以按 Lithograph 合同管理 connection，但该状态不能成为 KG OS 公共请求语义的一部分。
+KG OS 不把 Lithograph connection-local `checkout` 提升为公共 Evolution 能力。AI / SDK 读取必须显式传递 State / Branch / Tag reference，写入必须显式指定目标 Branch，避免依赖隐藏的 connection state。底层实现可以按 Lithograph 合同管理 connection，但该状态不能成为 KG OS 公共请求语义的一部分。
 
-### State Context
+### State reference
 
-Ontology / Knowledge Read 共享统一 State Context：调用方可以引用确定 State，也可以通过 Branch / Tag 引用；KG OS 在 operation 开始时解析到 immutable State，并在整个 operation 中保持 pinned Snapshot。所有 read response 应返回最终 resolved State identity，使 Branch / Tag 后续移动不会改变已经返回数据的解释。
+Ontology / Knowledge Read 共享同一套 State 引用语义：调用方可以直接引用确定 State，也可以通过 Branch / Tag 引用；KG OS 在 operation 开始时解析到 immutable State，并在整个 operation 中保持 pinned Snapshot。所有 read response 应返回最终 resolved State identity，使 Branch / Tag 后续移动不会改变已经返回数据的解释。这里的 State / Branch / Tag reference 类似 Git ref resolution，不建立独立 `State Context` 对象。
 
 Ontology / Knowledge Write 则必须明确目标 Branch。普通写入继续由 Lithograph 自动产生 Commit，KG OS 不要求调用方执行 `mutate -> commit` 两步。一个 KG OS write 可以因为内部编排产生多个 Lithograph Commit，但成功响应必须返回**最终 State identity**；调用方无需依赖内部 Commit 数量来继续工作。
 
@@ -763,7 +796,7 @@ Evolution Capability
 
 `overview` 只返回适合导航的轻量摘要，例如 default Branch 及其 resolved head，并且不得扫描或展开完整 State DAG。Branch / Tag 的完整枚举分别通过 `branch.list` / `tag.list` 完成；当前没有真实需求要求为了假设中的超大 ref 集合提前冻结另一套分页机制，后续如底层能力和规模约束需要再加入。
 
-`get` 读取一个 resolved State 的 immutable metadata 与当前 State Data。它不自动加载该 Snapshot 的全部 Ontology / Knowledge，也不默认反向枚举所有指向它的 Branch / Tag；真正的数据内容继续通过 `ontology.*` / `knowledge.*` 在同一 State Context 下读取。
+`get` 读取一个 resolved State 的 immutable metadata 与当前 State Data。它不自动加载该 Snapshot 的全部 Ontology / Knowledge，也不默认反向枚举所有指向它的 Branch / Tag；真正的数据内容继续通过 `ontology.*` / `knowledge.*` 使用同一个 resolved State 读取。
 
 `graph` 从调用方指定的 State / Branch / Tag root 开始读取该 root **可达的 ancestry DAG**，每次只返回 bounded slice，并通过 opaque cursor 渐进遍历。它返回轻量 State topology / metadata，默认不展开 State Data，更不加载每个 State 的 Knowledge Snapshot。State 数量很大时不提供“一次返回整个 DAG”的合同；不同 Branch 的独立演进空间通过选择对应 root 分别导航，不为“全库一次聚合所有 roots”增加第二套历史索引。
 
@@ -884,7 +917,7 @@ Knowledge Capability
 
 `query` 执行任意 **read-only Cypher**。它直接使用 Lithograph 的只读执行路径，必须拒绝 graph / schema / version/ref mutation、外部 I/O、connection-state mutation 或其它副作用。全文、向量、结构化条件、图遍历、聚合、排序与混合检索都可以由 AI 在同一个 Cypher 查询中按 Lithograph 当前公开能力自由组合，因此 KG OS 不额外建立 `search knowledge` 能力。
 
-所有 Knowledge Read 都使用统一 State Context。通过 Branch / Tag 读取时必须先解析并 pin 到 immutable State；返回结果带 resolved State identity。KG OS 不建立 `knowledgeVersion`。
+所有 Knowledge Read 都使用上述统一 State reference semantics。通过 Branch / Tag 读取时必须先解析并 pin 到 immutable State；返回结果带 resolved State identity。KG OS 不建立 `knowledgeVersion`。
 
 #### Write：结构化 mutation 与完整可写 Cypher
 
@@ -1061,7 +1094,7 @@ KG OS
 
 ### D9 Ontology 能力按生命周期收敛为四组
 
-- 决定：Ontology 公共能力固定按 Read、Define、Organize、History 四组职责组织；Property 随 Definition 管理，`includes` 随 Domain 管理，State Context 是 Read 的通用上下文而不是独立操作。
+- 决定：Ontology 公共能力固定按 Read、Define、Organize、History 四组职责组织；Property 随 Definition 管理，`includes` 随 Domain 管理；Read 直接复用统一的 State / Branch / Tag reference semantics，不建立额外状态上下文资源。
 - 依据：AI 需要发现、理解、定义、组织和审阅变化，但这些任务不要求为每种 Schema element 或 membership 建立一套重复 CRUD；能力应围绕真实 owner 与 lifecycle 收敛。
 - 备选：按 Domain / Definition / Property / Relationship 分别暴露完整 CRUD，或按 Discover / Understand / History 等用户旅程建立重叠接口族。
 - 取舍：公共能力面更小、更稳定；最终 wire contract 仍需定义统一 target、scope、pagination、search 与 patch 表达。
@@ -1077,7 +1110,7 @@ KG OS
 
 - 决定：KG OS 不要求 Lithograph 提供永久 `SchemaElementId`。Definition / Property semantic metadata 使用有稳定 Lithograph graph element identity 的内部 Binding Record；Binding Record 保存 Snapshot-scoped Schema Locator，Locator 只在目标 Commit 的 Schema 中确定性定位 element type / Property。
 - 依据：KG OS 当前需要的是 metadata、Domain membership 与显式 rename/history 的连续性，而不是把 Lithograph Schema 自身改造成带永久对象 ID 的另一种模型。Binding Record 已经能承担 KG OS 的连续性需求；结构事实仍由 Lithograph Schema 唯一拥有。
-- 备选：以名称字符串直接作为 Definition identity；要求 Lithograph 新增跨版本永久 Schema element identity；在 KG OS 再建立一份独立结构 Schema。
+- 备选：仅以名称字符串同时承担跨版本连续 identity；要求 Lithograph 新增跨版本永久 Schema element identity；在 KG OS 再建立一份独立结构 Schema。
 - 取舍：通过 KG OS 执行的显式 rename 必须原子更新 Lithograph Schema 与 Binding Record Locator；绕过 KG OS 的直接 Schema 修改可能产生 consistency error，KG OS 不做无依据自动修复。
 
 ### D12 Evolution 不镜像 Lithograph Version Procedure
@@ -1087,23 +1120,30 @@ KG OS
 - 备选：一比一包装 Lithograph Version Procedure。
 - 取舍：KG OS 公共能力更小、更稳定；高级数据库版本操作仍可由 Lithograph 提供，未来出现真实 KG OS use case 时再按业务语义提升。
 
-### D13 State Context 显式且所有状态写入返回最终 State
+### D13 State 引用显式且所有状态写入返回最终 State
 
-- 决定：Ontology / Knowledge Read 使用统一 State Context；Branch / Tag 在 operation 开始时解析并 pin 到 immutable State。Ontology / Knowledge Write 显式指定目标 Branch，不暴露 checkout；任何创建新 State 的 KG OS 操作成功后都返回最终 State identity，多步编排不要求调用方理解内部 Commit 数量。
-- 依据：AI 与并发调用不应依赖 connection-local 隐式状态；明确的 resolved State identity 可以保证读取解释稳定，并允许后续 Tag / State Data 操作可靠引用刚产生的状态。
-- 备选：依赖 Lithograph checkout，或仅返回业务 mutation result 不返回 State。
-- 取舍：公共 request/response 多一个统一状态上下文 / 状态结果字段，但显著降低隐式状态与并发歧义。
+- 决定：Ontology / Knowledge Read 直接使用 State / Branch / Tag reference；Branch / Tag 在 operation 开始时解析并 pin 到 immutable State，不再建立独立 `State Context` 抽象。Ontology / Knowledge Write 显式指定目标 Branch，不暴露 checkout；任何创建新 State 的 KG OS 操作成功后都返回最终 State identity，多步编排不要求调用方理解内部 Commit 数量。
+- 依据：Git-style ref 已足以表达“读取哪个 Snapshot / 推进哪个 Branch”，无需再增加一层状态对象；同时 AI 与并发调用不应依赖 connection-local 隐式状态。
+- 备选：建立独立 State Context request object；依赖 Lithograph checkout；或仅返回业务 mutation result 不返回 State。
+- 取舍：公共模型更小；最终 JSON / CLI 中如何序列化 State、Branch、Tag reference 仍需冻结，但不会产生第二套状态身份。
+
+### D14 公共身份优先复用 owner identity 或名称定位
+
+- 决定：KG OS 不建立全局 Resource ID / UUID 体系。State 与 Knowledge element 分别直接复用 Lithograph Commit / element identity；Branch / Tag 使用其名称；Definition 使用 kind + 当前 Schema identifying name；Property 使用 owner Definition reference + property name；Domain 使用当前 name。Definition / Property / Domain 的跨 rename 连续性由 KG OS internal graph identity 维护，不作为 v1 public identity。
+- 依据：这些资源已经有足够的确定性定位信息；额外 UUID 会建立第二套身份映射，却没有当前使用场景需要调用方跨 rename 持有 opaque public identifier。
+- 备选：为 Definition、Property、Domain 统一生成稳定 public UUID；直接暴露 Binding Record / Domain Node 的 Lithograph element identity。
+- 取舍：rename 后公共名称引用会变化，历史读取必须结合目标 State；KG OS History / Diff 仍可依靠内部稳定 identity 识别连续性。若未来出现真实的跨 rename opaque-reference 需求，再通过新的设计修订评估稳定 public ID。
 
 ## 待设计合同
 
 以下问题尚未冻结，但不会回退前述架构原则：
 
 1. **Internal physical identifiers**：为 internal marker、Definition Binding、Property Binding、Domain、`INCLUDES` 与 Binding Record 间关系选择具体 KG OS-owned reserved Label / Relationship Type / Property key，并定义 Lithograph Schema 中对应 reserved internal element definitions。具体字符串是实现级持久化编码，不提升为公共 Ontology 概念。
-2. **Definition / Ontology 公共 wire contract**：在已确认的 Read / Define / Organize / History 能力边界内，冻结统一 kind / public identity、Domain reference、State Context、target / scope、分页、Ontology search、读取形态、渐进式读取、create/update/rename patch 语义、consistency error model、最终 State result 与 CLI / SDK / Skill interface。内部 Binding Record element identity 是否暴露、如何暴露必须在这里明确；本文 JSON 示例与能力名只冻结信息责任和逻辑操作，不冻结最终 wire schema 或命令命名。
+2. **Definition / Ontology 公共 wire contract**：在已确认的 Read / Define / Organize / History 能力边界内，冻结已确认 Definition / Property / Domain reference 与 State / Branch / Tag reference 的具体 wire serialization、target / scope、分页、Ontology search、读取形态、渐进式读取、create/update/rename patch 语义、consistency error model、最终 State result 与 CLI / SDK / Skill interface。v1 不暴露内部 Binding Record / Domain Node identity；本文示例与能力名只冻结信息责任和逻辑操作，不冻结最终 wire schema 或命令命名。
 3. **Definition 删除语义**：删除结构定义时，对现有 Knowledge Data、Binding Record、Domain membership 与历史引用的处理边界。
 4. **多步写入映射**：如何把一个 Definition create/update/rename/delete 操作拆成最少的 Lithograph Schema / graph mutation，并在不创造第二套 transaction / commit 语义的前提下报告最终 State 与业务结果。
-5. **Knowledge 公共 wire contract**：Node / Relationship 的 AI-facing graph view、Definition reference、`get` / `list` / `expand` 参数与分页、统一 State Context、read-only `query` 的 request / result、`mutate.operations[]` 与 request-local reference、`execute` 结果与最终 State、Knowledge `history` / `diff` target / scope、error model 与 CLI / SDK / Skill interface。全文／向量／混合检索不建立第二套合同，继续通过 Cypher 使用 Lithograph 对应能力。
-6. **Evolution 公共 wire contract**：冻结 State identity / State reference 的序列化、`overview` 摘要形态、`get` 的 immutable metadata / mutable State Data 分层、Branch / Tag list、`graph` root / cursor 与 ancestry traversal shape、State Data size/error boundary、`state.create`、Branch / Tag mutation、业务化 `diff`、merge conflict / result 映射、最终 State result 与 CLI / SDK / Skill interface。Raw Lithograph patch、checkout、rebase、squash、reset、revert、gc 当前不进入该公共合同。
+5. **Knowledge 公共 wire contract**：Node / Relationship 的 AI-facing graph view、已确认 Lithograph element identity / Definition reference 的 wire serialization、`get` / `list` / `expand` 参数与分页、State / Branch / Tag reference 的具体请求形态、read-only `query` 的 request / result、`mutate.operations[]` 与 request-local reference、`execute` 结果与最终 State、Knowledge `history` / `diff` target / scope、error model 与 CLI / SDK / Skill interface。全文／向量／混合检索不建立第二套合同，继续通过 Cypher 使用 Lithograph 对应能力。
+6. **Evolution 公共 wire contract**：冻结已确认 State / Branch / Tag reference 的具体序列化与 ref resolution error、`overview` 摘要形态、`get` 的 immutable metadata / mutable State Data 分层、Branch / Tag list、`graph` root / cursor 与 ancestry traversal shape、State Data size/error boundary、`state.create`、Branch / Tag mutation、业务化 `diff`、merge conflict / result 映射、最终 State result 与 CLI / SDK / Skill interface。Raw Lithograph patch、checkout、rebase、squash、reset、revert、gc 当前不进入该公共合同。
 7. **Human-facing Web**：Ontology / Knowledge / Evolution / History 的查看、管理和纠正交互。
 
 这些合同应在需要实现对应能力前逐项设计；没有当前需求的扩展字段、抽象层或兼容层不提前加入。
@@ -1114,7 +1154,7 @@ KG OS
 
 1. 建立最小 Lithograph host / client 边界，只暴露 KG OS 所需公开能力，不访问内部表。
 2. 冻结 reserved internal physical identifiers 后实现 Ontology semantic graph：Definition / Property Binding Record、Domain / `INCLUDES`、同一 Lithograph Schema 中的 internal element definitions，以及基于 Lithograph `graphView` 的 Knowledge/Internal 隔离与 Snapshot-scoped Schema Locator resolution。
-3. 实现 Ontology Read：概览、Domain / Definition 渐进式读取、`list definitions`、Ontology search 与统一 State Context；验证结构字段全部来自 Lithograph，`title` / `description` 与 Domain organization 全部来自 KG OS semantic graph。
+3. 实现 Ontology Read：概览、Domain / Definition 渐进式读取、`list definitions`、Ontology search 与统一 State / Branch / Tag reference semantics；验证结构字段全部来自 Lithograph，`title` / `description` 与 Domain organization 全部来自 KG OS semantic graph。
 4. 实现 Define / Organize：Definition 与 Domain create / update 编排，Property 随 Definition、`includes` 随 Domain 管理，并完成 read/write contract 分离与跨步骤 transaction rollback。
 5. 实现 Evolution 基础 Read：`overview`、State `get`、从明确 root 渐进读取 ancestry DAG 的 `graph`，以及 Branch / Tag list；保持 immutable State 与 mutable State Data / refs 的返回边界。
 6. 实现 Evolution mutation：State create/data、Branch lifecycle、Tag lifecycle 与 whole-Knowledge-Base merge；不暴露 checkout，不复制尚无 KG OS use case 的 Lithograph Version Procedure。
