@@ -6,7 +6,7 @@
 
 | 状态 | 范围与入口 |
 | --- | --- |
-| 已确认 | [目标架构](#目标架构)、[Lithograph 边界](#lithograph-边界)、[Knowledge Base](#knowledge-base)、[Ontology](#ontology)、[Definition](#definition)、[Object](#object)、[Knowledge 数据访问](#knowledge-数据访问)、[Graph](#graph)、[Evolution](#evolution)，以及 Ontology semantic graph 的内部隔离、Binding Record / Schema Locator、owner-backed Object Ref、单一 Object Value、canonical YAML editable representation + JSON representation、Git Extended Diff textual Patch 与 strict base-State mutation 模型 |
+| 已确认 | [目标架构](#目标架构)、[Lithograph 边界](#lithograph-边界)、[Knowledge Base](#knowledge-base)、[Ontology](#ontology)、[Definition](#definition)、[Object](#object)、[Knowledge 数据访问](#knowledge-数据访问)、[Graph](#graph)、[Evolution](#evolution)，以及 Ontology semantic graph 的内部隔离、Binding Record / Schema Locator、owner-backed Object Ref、request-local `new:<kind>:<alias>`、单一 Object Value、canonical YAML editable representation + JSON representation、Git Extended Diff textual Patch、单一 Object mutation surface 与 strict base-State mutation 模型 |
 | 工程剩余 | [剩余依赖与工程合同](#剩余依赖与工程合同)只包括**不需要重新裁决核心产品语义**的依赖与工程设计：Lithograph public Schema projection / locator 依赖、Object Patch logical-slot → Lithograph operation 的实现映射、CLI / SDK / HTTP / Skill adapter mapping，以及 Human-facing Web。Object / Graph / Evolution 的 logical wire、StateRef、ObjectRef、pagination、typed value、error envelope、Patch transport 与 `__kgos_` internal persistence encoding 已在本文冻结；不得再把这些工程剩余项解释成 core model 尚未设计 |
 | 待实现 | [工程实现待办](#工程实现待办)；实际实现依赖 Lithograph 对应公开能力已经可用 |
 
@@ -622,6 +622,8 @@ Object Capability
 
 这些名称描述逻辑能力，不冻结最终 CLI command、SDK method 或 HTTP route。**Object Patch 的交互模型已经冻结为“canonical YAML + Git Extended Diff textual Patch”**。文本 Patch 语法直接采用普通 two-way `git diff -p` / Git Extended Diff 格式，KG OS 不再定义自己的 section marker、hunk grammar 或 path escaping。
 
+KG OS v1 不再增加独立 `save` / `create` / `update` / `replace` / `upsert` 核心 mutation capability。Add / Update / Delete / Rename / Restructure 都由同一个 `patch` 表达；“新增一个 Object”使用 Git new-file entry，“修改已有 Object”使用基于 `baseState` canonical YAML 的 hunk，“删除 / rename”复用 Git 对应 extended headers。这样 `save` 不会再引入“Ref 不存在是否自动 create”“完整 Object 缺失字段是删除还是保留”“更新是否等价 replace / upsert”等第二套写入语义，也不会为多 Object 原子变化再复制 batch / alias / concurrency contract。Adapter 可以提供生成 Patch 的本地 convenience helper，但不能把它提升成具有独立写入语义的第二个公共能力。
+
 `list` 用于按 Object kind / scope 做轻量枚举与分页，只返回定位和必要摘要，不因为某个 scope 下对象很多就展开所有 Object 内容。`search` 用于不知道准确 Ref 时发现相关 Object；Ontology 的 `name` / `title` / `description` 等语义可以进入这一能力，但它不演化成第二套 Search DSL。海量 Knowledge 的条件发现、关系遍历、全文/向量混合检索等复杂任务继续由 Graph `query` 完成。
 
 ### Object Value 与 representation
@@ -662,6 +664,8 @@ Property
 Graph Type / Constraint / Index
   structure                  # 对应 Lithograph public Schema resource projection
 ```
+
+上面的 Object Value shape 描述 `read` 返回和成功 State 中的**正式 logical value**。Request-local `new:<kind>:<alias-component>` 不是新的 Object Value scalar type；它只允许在 Object Patch 输入中替代一个本来要求 Object Ref、但目标是本请求新增 Object 的 Ref-typed slot。成功后的 Relationship `start/end`、Domain `includes` 等位置必须全部解析成正式 Object Ref，canonical `read` 永远不返回 `new:...`。反过来，普通 String / Property value 即使文本恰好以 `new:` 开头，只要该 slot 不是 Object Ref 类型，就按普通 String 处理，不能被 alias resolver 截获。
 
 `structure` **不是 KG OS 自建 Schema AST**。它必须由 Lithograph 的公开 Schema introspection contract 无损投影，并可由 KG OS 编译回 Lithograph 公共 Schema mutation；在 Lithograph 尚未冻结相应 canonical public projection 的部分，KG OS 实现被该公开能力阻塞，而不是由 KG OS 先发明另一套结构模型。
 
@@ -786,6 +790,10 @@ response = {
 
 `baseState` 只接受 immutable `commit/<id>`，不能传 Branch / Tag；`branch` 使用 Lithograph Branch name validation。Patch 中已有 Object target 直接使用 canonical Object Ref；新增 Object target 固定为 `new:<kind>:<alias-component>`，其中 `<kind>` 使用上述 ObjectKind，alias component 使用与 Object Ref 相同的 RFC 3986 component encoding。alias 只在本请求内存在。成功无 effective delta 时 `state == baseState` 且不创建 Commit。
 
+`new:<kind>:<alias-component>` **不是 Git、YAML 或其它外部标准定义的协议，也不是 KG OS Object Ref 的新一种永久类型**。它是 KG OS 在标准 Git pathname slot 上定义的最小 application-level target / reference convention，只解决 Git Extended Diff 与 YAML 本身没有定义的一个问题：同一个多 Object Patch 中，尚未获得最终 owner-backed Ref 的新增 Object 必须能被其它新增 Object 无歧义引用。KG OS 只自定义这一层 Object target mapping；Patch framing / hunk / rename / pathname quoting 继续使用 Git，Object body 使用 YAML 1.2，alias component escaping 使用 RFC 3986，不再为这些已有标准覆盖的部分另造语法。
+
+所有新增 Object 的 Patch target 都统一使用 `new:<kind>:<alias-component>`，即使某个 name-backed Object 的最终 Ref 可以从目标内容推导，也不允许在 Add entry 中直接把“未来 Ref”当作已存在 Object Ref。这样 Add 的定位规则不因 Object kind 改变，也不会出现一部分新增对象按 alias、另一部分靠预测最终 Ref 的双重创建模型。`<kind>` 显式存在是为了在解析 Object body 之前就确定目标 owner / Object schema，并让同名 alias 在不同 kind 下保持可区分；KG OS 不从 YAML 字段组合猜 Object kind。
+
 `author/message` 直接映射为本次操作**实际新建 Commit**的 Lithograph immutable metadata，KG OS 不解释其业务语义。Object Patch 无 effective delta 时没有新 Commit，因此即使 request 带 `author/message` 也不为保存 metadata 单独创建 State；需要显式 empty-delta State 时使用 `state.create`。
 
 同一个 `new:<kind>:<alias-component>` 也用于 patched YAML 中所有“本应填写 Object Ref、但引用本请求新对象”的位置；例如新 Relationship 的 `start/end` 可以引用 `new:knowledge-node:alice`，Domain `includes` 可以引用新 Definition alias。alias decode 后必须是 1..255 UTF-8 bytes，禁止 NUL 与 ASCII control characters；同一 Patch 内 `(kind, alias)` 唯一。alias 永不出现在成功后的 canonical Object Value，执行成功后必须通过 `created` 返回最终 Ref。
@@ -856,6 +864,7 @@ Object `list` / `search` / `read` 使用统一 State reference semantics。Branc
 ### Object 能力边界
 
 - 不建立虚拟文件系统或把“目录路径”作为第二套 Object identity；稳定文本与 Git Extended Diff Patch 只是 AI 交互方式；
+- 不建立与 `patch` 平行的 `save` / `create` / `update` / `replace` / `upsert` 核心写入面；新增、局部更新、删除、rename 与 restructure 都归一到 Object Patch，避免第二套 full-object replace / upsert / batch / concurrency 语义；
 - 不建立 Definition / Domain / Property / Node / Relationship 各自完整 CRUD surface；
 - 不为 Graph Type / Constraint / Index 再建立平行 Schema API；它们作为 Lithograph-owned Schema Object projection 进入同一个 Object surface，且不获得 KG OS semantic Binding Record，除非未来出现真实业务语义需求再单独设计；
 - Object 统一的是 **State Snapshot 内 Ontology / Knowledge 对象**的定位与维护；State Data、Branch、Tag、Merge 等版本 sidecar / ref 不是 Snapshot Object，由 Evolution 负责，不为它们再套一层 Object identity；
@@ -1595,7 +1604,7 @@ KG OS
 
 ### D36 Object Ref 使用 canonical typed string，不建立 Resource ID 层
 
-- 决定：Definition / Property / Domain 使用 `node:`、`relationship:`、`property:...#...`、`domain:` typed string；Knowledge 继续原样 `n:` / `r:`；Schema resource 使用 `graph-type:` / `constraint:` / `index:` + Lithograph public locator。component 使用 RFC 3986 percent-encoding；新增 Patch target 使用 `new:<kind>:<alias>`。
+- 决定：Definition / Property / Domain 使用 `node:`、`relationship:`、`property:...#...`、`domain:` typed string；Knowledge 继续原样 `n:` / `r:`；Schema resource 使用 `graph-type:` / `constraint:` / `index:` + Lithograph public locator。component 使用 RFC 3986 percent-encoding；新增 Patch target 使用 `new:<kind>:<alias>`。`new:...` 是 request-local Patch target / reference token，不属于 ObjectRef grammar，不能在 Patch 请求之外持久保存、查询、历史定位或跨请求复用。
 - 依据：Object Patch Git target、Domain `includes`、History filter 和 CLI/SDK 都需要紧凑可复制地址；typed string 可以在不建立持久 UUID 映射的前提下提供无歧义 kind/locator serialization，并复用标准 component escaping。
 - 备选：每种 Object 使用不同 request shape；统一生成 KG OS UUID；把 JSON reference object 直接编码进 Git pathname。
 - 取舍：名称型 Object rename 会改变 Ref，保持 D14/D19 已确认语义；Schema resource 仍依赖 Lithograph 提供 canonical public locator，KG OS 不填补底层缺口。
@@ -1620,6 +1629,13 @@ KG OS
 - 依据：outer transaction 解决 durability 原子性，不改写 Lithograph 的版本模型。允许 transaction 内先产生 missing Binding / dangling Binding 等 invalid Commit，再因为最终 Commit 合法就视为成功，会让 public History 在 transaction durable 后暴露 KG OS 无法解释的中间 State，并违反 D11/D30/D31。
 - 备选：把 caller-owned transaction 内的 intermediate Commit 永久标成 KG OS-hidden；在 transaction commit 后 squash/rewrite history；直接 SQL 同时修改 Schema 与 internal graph；放宽 KG OS-valid State 不变量。
 - 取舍：部分 Definition / Property create/rename/restructure 在 Lithograph one-Commit mixed mutation 能力可用前不能完整实现；换取 History 始终可解释、不建立第二套隐藏版本层，也不破坏 Lithograph immutable Commit DAG。
+
+### D40 Object mutation 保持单一 Patch surface，新增对象只增加最小 request-local alias 语义
+
+- 决定：KG OS v1 不增加独立 `save` / `create` / `update` / `replace` / `upsert` 核心 mutation capability；Object `patch` 继续统一表达 Add / Update / Delete / Rename / Restructure。所有新增 Object entry 一律使用 `new:<kind>:<alias-component>` 作为 request-local target，同一个 token 可以出现在本 Patch 内其它 Object Ref slot 中；成功后通过 `created` 映射到最终 owner-backed Object Ref，alias 随请求结束失效。`new:...` 明确是 KG OS application semantic，不冒充 Git / YAML 标准，也不是持久 Object identity。
+- 依据：`save` 并不能消除“同一请求中新建 Object 尚无最终 Ref、但需要互相引用”的问题，反而必须重新定义 create-vs-update、full replacement、缺失字段、upsert、batch 与并发基线，形成第二套 mutation contract。Git Extended Diff 已经成熟表达新增、修改、删除、rename 与多 target Patch；YAML 1.2 已经表达 Object Value；两者唯一没有定义的是 KG OS 业务 Object 在最终 Ref 产生前如何被同一 Patch 其它 entry 引用，因此保留一个受限 request-local alias 是当前最小必要自定义语义。
+- 备选：增加 `save(Object)` 并按 Ref 是否存在决定 create/update；分别建立 create/update/delete API；采用完整 JSON:API Atomic Operations 等另一套 mutation protocol；对 name-backed Object 预测未来 Ref、只为系统分配 identity 的 Object 使用 alias。
+- 取舍：公共合同保留一个 KG OS-specific `new:<kind>:<alias>` token，需要 parser / validator / error mapping 明确支持；换取只有一个 Object mutation mental model、所有新增 Object 使用同一定位规则、multi-Object cross-reference 不依赖执行顺序或未来 Ref 猜测，也不引入第二套 CRUD / save / upsert surface。标准覆盖的 Patch/YAML/path escaping 部分仍全部交给 Git、YAML 1.2 与 RFC 3986。
 
 ## 剩余依赖与工程合同
 
