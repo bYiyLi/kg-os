@@ -7,7 +7,7 @@
 | 状态 | 范围与入口 |
 | --- | --- |
 | 已确认 | [目标架构](#目标架构)、[Lithograph 边界](#lithograph-边界)、[Knowledge Base](#knowledge-base)、[Ontology](#ontology)、[Definition](#definition)、[Object](#object)、[Knowledge 数据访问](#knowledge-数据访问)、[Graph](#graph)、[Evolution](#evolution)，以及 Ontology semantic graph 的内部隔离、Binding Record / Schema Locator、owner-backed Object Ref、request-local `new:<kind>:<alias>`、单一 Object Value、canonical YAML editable representation + JSON representation、Git Extended Diff textual Patch、单一 Object mutation surface 与 strict base-State mutation 模型 |
-| 工程剩余 | [剩余依赖与工程合同](#剩余依赖与工程合同)只包括**不需要重新裁决核心产品语义**的依赖与工程设计：Lithograph public Schema projection / locator 依赖、Object Patch logical-slot → Lithograph operation 的实现映射、CLI / SDK / HTTP / Skill adapter mapping，以及 Human-facing Web。Object / Graph / Evolution 的 logical wire、StateRef、ObjectRef、pagination、typed value、error envelope、Patch transport 与 `__kgos_` internal persistence encoding 已在本文冻结；不得再把这些工程剩余项解释成 core model 尚未设计 |
+| 工程剩余 | [剩余依赖与工程合同](#剩余依赖与工程合同)只包括**不需要重新裁决核心产品语义**的工程映射：Lithograph Cypher 25 Schema / `SHOW` surface → `structure` projection、Object Patch logical-slot → explicit transaction 内标准 Cypher mutation 的 compiler mapping、CLI / SDK / HTTP / Skill adapter mapping，以及 Human-facing Web。Object / Graph / Evolution 的 logical wire、StateRef、ObjectRef、pagination、typed value、error envelope、Patch transport、transaction boundary 与 `__kgos_` internal persistence encoding 已在本文冻结；不得再把这些工程剩余项解释成 core model 尚未设计 |
 | 待实现 | [工程实现待办](#工程实现待办)；实际实现依赖 Lithograph 对应公开能力已经可用 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的当前实现状态只以 Lithograph 仓库为准，不在 KG OS 复制第二份 Phase 状态。
@@ -94,9 +94,9 @@ KG OS 可以为承载 Lithograph 做最小 SQLite host 工作，例如：
 
 - 打开／关闭 database connection；
 - 加载 Lithograph extension；
-- 在需要跨多个 Lithograph operation 保证持久化原子性时建立 caller-owned SQLite transaction。
+- 维护 Lithograph Native API 所要求的 connection / autocommit 生命周期，并通过 Lithograph public explicit transaction API 组织需要多个 Cypher execution 的单-State mutation。
 
-KG OS 不使用 SQLite 直接建立第二套知识、Ontology、Search、State 或 Evolution 业务表，也不绕过 Lithograph 用 SQL 修改图数据、Schema 或 version refs。
+KG OS 不把 caller-owned SQLite `BEGIN/COMMIT` 解释为自己的 Object Patch transaction，也不使用 SQLite 直接建立第二套知识、Ontology、Search、State 或 Evolution 业务表；KG OS 不绕过 Lithograph 用 SQL 修改图数据、Schema 或 version refs。
 
 因此：**KG OS 使用 Lithograph 的数据库能力；SQLite 是 Lithograph 的宿主与事务基础，不是 KG OS 的业务数据接口。**
 
@@ -144,9 +144,9 @@ State Data 是对某个 State 的**当前业务注释**，不是该 State Snapsh
 
 KG OS v1 只负责初始化自己创建或明确以**空 Lithograph Root State**交给 KG OS 的 Knowledge Base，不自动接管一个已经包含调用方 graph / Schema history 的任意 Lithograph database。自动 adoption 会要求 KG OS 猜测已有 Schema element 与 semantic Binding / Domain 的业务意图，属于独立的数据导入 / 迁移问题，不是普通启动流程。
 
-Bootstrap 流程是：先执行 Lithograph `lithograph_init()` 得到空图 Root Commit 与 `main`，再通过 Lithograph 公开 mutation 能力建立当前 KG OS 版本要求的 reserved internal Schema resources，使 `main` 最终指向第一个 **KG OS-valid State**。Bootstrap 完成前不开放 Object / Graph / 普通 Evolution mutation；若不能通过 Lithograph 公共能力在不留下 durable inconsistent KG OS State 的前提下完成 reserved resources 建立，则初始化失败，不退回直接 SQL 或内部表写入。
+Bootstrap 流程是：先执行 Lithograph `lithograph_init()` 得到空图 Root Commit 与 `main`，然后以 Root Commit 作为 `expectedHead` 开启一个 Lithograph explicit transaction，在其中通过标准 Cypher 25 建立当前 KG OS 版本要求的 reserved internal Schema resources、internal semantic graph bootstrap data 与当前 bootstrap 真正需要的 Constraint / Index definition，最后一次 `tx_commit` 产生第一个 **KG OS-valid State**。Bootstrap 完成前不开放 Object / Graph / 普通 Evolution mutation；任一 bootstrap query / validation / commit 失败都由 Lithograph explicit transaction 整体 abort，不退回直接 SQL、内部表写入或多个 intermediate Commit。
 
-Lithograph Root Commit 与 bootstrap 过程中不可作为正常 KG OS Snapshot 解释的底层 Commit 仍保留在 immutable DAG；它们属于 pre-KGOS / invalid history，只能按 D31 的 Evolution 诊断规则查看。KG OS 公共业务能力从第一个 KG OS-valid State 开始。未来若需要把已有 Lithograph database 导入 KG OS，必须另行设计显式 adoption / migration contract；v1 不做自动推断。
+因此 v1 正常 bootstrap 不产生 durable intermediate Commit：Lithograph Root Commit 是第一个 KG OS-valid State 之前唯一预期存在的 pre-KGOS / invalid history 节点，只按 D31 的 Evolution 诊断规则查看。KG OS 公共业务能力从 explicit transaction 成功产生的第一个 KG OS-valid State 开始。未来若需要把已有 Lithograph database 导入 KG OS，必须另行设计显式 adoption / migration contract；v1 不做自动推断。
 
 ## Ontology
 
@@ -553,9 +553,11 @@ Definition change
 - 只修改 `title` / `description` 时只更新对应 Binding Record；
 - 同时包含结构和语义修改时，两部分都必须成功后才把整个 KG OS 操作视为成功。
 
-Object Patch compiler 只使用 Lithograph **当前公开允许调用方构造 / 执行的能力**。当目标 graph / Schema / Index change 可以按 Lithograph 公共合同构造成合法 canonical Patch 时，KG OS 可以优先使用 `patch.apply` 以复用其 `before` condition 与单 Commit 原子应用语义；这不是 KG OS 对 Lithograph 的额外能力要求。无法或不适合通过单个 canonical patch 表达时，KG OS 在同一 connection 上使用最少的 Lithograph 公开 operation，并由 caller-owned SQLite transaction 保证请求级整体持久化原子性。SQLite transaction 只承担 transaction boundary，不改变“所有业务数据通过 Lithograph”的边界。
+Object Patch compiler 的正常 mutation path 只使用 Lithograph **标准 Cypher 25 + public explicit transaction**，不把 Lithograph Structural Patch 提升成第二套业务 mutation language。KG OS 先基于 immutable `baseState` 完成 textual Patch exact apply、logical delta、derived migration 与可在写锁外确定的 candidate validation；确认存在有效 target delta 后，以 target Branch 和 `expectedHead = baseState` 调用 Lithograph `tx_begin`，再在同一 transaction 中执行实现该目标所需的最少标准 Cypher graph / Schema / Constraint / Index mutation，最后一次 `tx_commit`。Lithograph 为新 Node / Relationship 分配的最终 identity 可以由后续同 transaction query 直接引用，KG OS 的 request-local alias 只负责把本请求的新 Object 映射到这些最终 owner-backed Ref。
 
-KG OS 不把内部编排步骤提升为公共语义。操作成功后必须返回最终 resolved State identity；如果调用方直接寻址修改的 Object 因 rename / restructure 导致底层 identity replacement，还必须返回该 Object 的 Ref transition。Definition-level migration 派生出的海量 Relationship replacement 遵守 Object 章节的批量迁移规则，不承诺逐对 transition。调用方不需要理解 KG OS 最终选择了 canonical patch、Cypher、Schema mutation 或其组合。
+因此一个成功且非 no-op 的 Object Patch 恰好产生一个新的 Lithograph Commit，也就是一个新的 KG OS State；任一 query、validation 或 commit 失败都不会留下 intermediate State。Lithograph `tx_begin(expectedHead)` 返回的 Branch-head mismatch 映射为 KG OS `STALE_BASE_STATE`。KG OS 不要求 Lithograph 为 Object Patch 增加专用语法，也不直接调用 `_lithograph_*` allocator / internal table。
+
+KG OS 不把内部编排步骤提升为公共语义。操作成功后必须返回最终 resolved State identity；如果调用方直接寻址修改的 Object 因 rename / restructure 导致底层 identity replacement，还必须返回该 Object 的 Ref transition。Definition-level migration 派生出的海量 Relationship replacement 遵守 Object 章节的批量迁移规则，不承诺逐对 transition。调用方不需要理解 KG OS 如何把 logical delta 分解成具体 Cypher graph / Schema / Constraint / Index statements，也不接触底层 explicit transaction handle。
 
 AI-facing Object read view 与 Patch contract 必须明确分离。调用方为了理解而临时组合的 Ontology aggregate view 不是 KG OS 顶层资源，也不等同于可整体 `PUT` 回去的持久化对象；单个 Object 的 canonical YAML 才是 Git Extended Diff Patch 的稳定 base。Patch 表达“希望目标 Object 变成什么”：
 
@@ -667,7 +669,7 @@ Graph Type / Constraint / Index
 
 上面的 Object Value shape 描述 `read` 返回和成功 State 中的**正式 logical value**。Request-local `new:<kind>:<alias-component>` 不是新的 Object Value scalar type；它只允许在 Object Patch 输入中替代一个本来要求 Object Ref、但目标是本请求新增 Object 的 Ref-typed slot。成功后的 Relationship `start/end`、Domain `includes` 等位置必须全部解析成正式 Object Ref，canonical `read` 永远不返回 `new:...`。反过来，普通 String / Property value 即使文本恰好以 `new:` 开头，只要该 slot 不是 Object Ref 类型，就按普通 String 处理，不能被 alias resolver 截获。
 
-`structure` **不是 KG OS 自建 Schema AST**。它必须由 Lithograph 的公开 Schema introspection contract 无损投影，并可由 KG OS 编译回 Lithograph 公共 Schema mutation；在 Lithograph 尚未冻结相应 canonical public projection 的部分，KG OS 实现被该公开能力阻塞，而不是由 KG OS 先发明另一套结构模型。
+`structure` **不是 KG OS 自建 Schema AST**。它由 Lithograph 已确认的 Cypher 25 Schema / current-graph `SHOW` public surface 投影，并由 KG OS projection/compiler 层归一化成 owner-only logical value，再编译回标准 Cypher 25 Schema mutation。精确字段 / row 到 `structure` slot 的映射与 canonical normalization 属于实现合同；如果实现时发现某个 KG OS 已确认 owner state 确实无法通过 Lithograph public surface 读取或修改，这是具体底层能力缺口，而不是允许 KG OS 自建第二套 Schema AST 的理由。
 
 `structure` 仍必须服从 owner-only、single-slot 原则，不能把已经由外层字段或 child Object 拥有的状态再复制一遍：Definition 的 `structure` 不重复自身 identifying `name`，也不内联 child Property state；Property 的 `structure` 不重复 Property `name` / `title` / `description`；Graph Type 的 `structure` 只包含 D27 定义的 graph-level owner state，不内联 Definition / Property / Constraint / Index；Constraint / Index 的 `structure` 只包含自身 Lithograph owner state，并以 public locator / Object Ref 引用其它资源而不是复制其可变内容。KG OS renderer / parser 必须把每个可编辑 logical slot 映射到唯一位置；如果 Lithograph introspection 原始结果有嵌套重复，projection 层负责归一化，而不是原样制造第二个 mutation owner。
 
@@ -794,7 +796,7 @@ response = {
 
 所有新增 Object 的 Patch target 都统一使用 `new:<kind>:<alias-component>`，即使某个 name-backed Object 的最终 Ref 可以从目标内容推导，也不允许在 Add entry 中直接把“未来 Ref”当作已存在 Object Ref。这样 Add 的定位规则不因 Object kind 改变，也不会出现一部分新增对象按 alias、另一部分靠预测最终 Ref 的双重创建模型。`<kind>` 显式存在是为了在解析 Object body 之前就确定目标 owner / Object schema，并让同名 alias 在不同 kind 下保持可区分；KG OS 不从 YAML 字段组合猜 Object kind。
 
-`author/message` 直接映射为本次操作**实际新建 Commit**的 Lithograph immutable metadata，KG OS 不解释其业务语义。Object Patch 无 effective delta 时没有新 Commit，因此即使 request 带 `author/message` 也不为保存 metadata 单独创建 State；需要显式 empty-delta State 时使用 `state.create`。
+`author/message` 直接映射到本次 Object Patch 的 Lithograph `tx_begin` transaction metadata，并最终成为**实际新建 Commit**的 immutable metadata；KG OS 不解释其业务语义。Object Patch 无 effective delta 时不调用 `tx_begin`、没有新 Commit，因此即使 request 带 `author/message` 也不为保存 metadata 单独创建 State；需要显式 empty-delta State 时使用 `state.create`。
 
 同一个 `new:<kind>:<alias-component>` 也用于 patched YAML 中所有“本应填写 Object Ref、但引用本请求新对象”的位置；例如新 Relationship 的 `start/end` 可以引用 `new:knowledge-node:alice`，Domain `includes` 可以引用新 Definition alias。alias decode 后必须是 1..255 UTF-8 bytes，禁止 NUL 与 ASCII control characters；同一 Patch 内 `(kind, alias)` 唯一。alias 永不出现在成功后的 canonical Object Value，执行成功后必须通过 `created` 返回最终 Ref。
 
@@ -841,7 +843,7 @@ Object projection 允许为读取便利包含 child Object 内容，但一个 Pa
 
 因为 Object Patch 严格基于 `baseState`，**Patch 中对任何已经存在 Object 的引用都按 baseState Object Ref 解析**。如果同一 Patch 把 `node:Person` rename 为新的 Ref，其他 entry 要继续引用“同一个 Definition”时仍使用 base Ref `node:Person`；KG OS 通过本次 rename continuity 把该逻辑引用带到目标 Snapshot。调用方不能依赖尚未产生的 target Ref 在同一 Patch 中重新定位该已有对象。只有本次新建、在 baseState 中不存在的 Object 使用 request-local alias。成功后新的 Ref 只通过 alias mapping / Ref transition 返回。这样多 Object Patch 的引用解析完全由 `baseState + Ref | alias` 决定，不依赖 entry 顺序或对未来 Ref 的猜测。
 
-Object Patch 以调用方实际读取的 immutable `baseState` 为 patch base、以明确 Branch 为 write target。**v1 使用 strict base-State 语义：执行开始时 target Branch 的当前 head 必须仍等于 `baseState`；如果 Branch 已前进，则整个 Patch 以 `STALE_BASE_STATE` 失败，不把基于旧文本生成的 Patch 自动套用到新 State，也不自动 rebase / merge。** 执行期间 Lithograph branch-head compare 再发现并发移动时同样映射为 `STALE_BASE_STATE`。
+Object Patch 以调用方实际读取的 immutable `baseState` 为 patch base、以明确 Branch 为 write target。**v1 使用 strict base-State 语义：mutation 开始时 target Branch 的当前 head 必须仍等于 `baseState`；如果 Branch 已前进，则整个 Patch 以 `STALE_BASE_STATE` 失败，不把基于旧文本生成的 Patch 自动套用到新 State，也不自动 rebase / merge。** 对存在有效 target delta 的 Patch，这个并发基线由 Lithograph `tx_begin(expectedHead=baseState)` 在取得 single-writer ownership 后原子检查；成功 begin 后其它 writer 不能在本 transaction 生命周期内移动该 Branch。无 effective delta 的 Patch 不开启 transaction，但仍必须先读取并比较 target Branch head，stale 时同样返回 `STALE_BASE_STATE`。
 
 在 base State 校验通过后，KG OS 重新生成对应 Object canonical YAML，精确应用 textual Patch 得到目标 YAML，使用标准 YAML parser 解析为 target Object Value / target Object set，再执行 Object schema / type、Ontology / Knowledge dependency、Schema、Graph View 与其它公开规则校验，最后编排 Lithograph。请求默认 all-or-nothing；任一变化失败都不能留下部分 durable 结果。
 
@@ -857,7 +859,9 @@ Knowledge Object 删除同样遵守“无隐式数据损失”：删除 Relation
 
 新增 Object 在执行前可能还没有最终 owner-backed Object Ref。一个 Patch 内可以使用 request-local temporary alias 串联本次新建对象；在同一 Patch 中，任何本应填写 Object Ref 的目标位置都可以引用此前或同时声明的新 Object alias，例如新 Relationship 的 endpoint 可以引用本次新建 Node。alias resolution 必须基于整个 Patch 的声明图完成，不能依赖 entry 文本顺序；不存在、重复 `(kind, alias)` 或形成无法解析的 alias reference 时整个 Patch 失败。alias 只存在于请求内部，成功后必须映射到 Lithograph / Schema / Domain 实际产生的 Object Ref，不成为第二套持久身份。
 
-KG OS 的 Object Patch 不是 raw Lithograph Patch。实现只在 Lithograph 公共合同允许构造合法 canonical Patch 且目标变化可以完整映射时使用 `patch.apply`；否则只能使用最少的公开 Cypher / Schema operation 并由 caller-owned SQLite transaction 组合。**caller-owned SQLite transaction 只保证这些 query 的持久化 all-or-nothing，不会把每个 mutating query 已产生的 Lithograph Commit 链折叠成一个 Commit。** 因此 fallback 产生的每一个最终可见 Lithograph Commit 都必须仍是可被 KG OS 正常读取的合法 State；如果某个 target change（典型如新 Definition / Property 需要 Schema element 与 Binding Record 同时出现）必须跨多个 owner 修改，而任何顺序都会产生 missing/dangling Binding 的 intermediate Commit，则现有多-query fallback 不合法，必须等待 Lithograph 提供能在**一个 Commit**中表达该 mixed Snapshot change 的公开能力。任何路径都不能直接修改 `_lithograph_*`，也不能引入 KG OS 自己的 transaction / version 真源。
+KG OS 的 Object Patch 不是 raw Lithograph Structural Patch。非 no-op Object Patch 统一编译为一个 Lithograph explicit transaction：`tx_begin(targetBranch, expectedHead=baseState)` → 标准 Cypher 25 graph / Schema / Constraint / Index mutation → `tx_commit`。所有 mutation 都只形成 transaction-local staged state，成功时恰好产生一个最终 Commit；Definition / Property create、rename / restructure、Binding mutation 与必要 Knowledge migration 因此可以共享同一 State boundary，不再需要允许任何 missing / dangling Binding intermediate Commit。request-local alias 在 transaction 内随着 Cypher create result 解析到正式 Ref，成功响应再返回 `created` mapping / direct Ref transition。
+
+KG OS 不使用 Lithograph Structural Patch 解决普通 Object mutation，不使用 caller-owned SQLite transaction 合并 Commit，也不建立自己的 hidden transaction / version layer。Structural Patch 仍属于 Lithograph 的版本 delta/replay 能力；KG OS 只在 Evolution diff/merge 等底层版本操作确实需要时通过 Lithograph 已有 Version capability 消费其结果，而不把 raw Patch 暴露为 Object wire。
 
 Object `list` / `search` / `read` 使用统一 State reference semantics。Branch / Tag 在读取开始时解析并 pin 到 immutable State，并返回 resolved State identity。Object `patch` 不接受模糊的“当前最新版本”作为文本 base：调用方必须提供明确 immutable `baseState` 与目标 Branch。成功写入返回本文 `patch` response 中的最终 State、`created` 与 `transitions`。对调用方**直接寻址并修改**后发生 identity replacement / rename 的 Object，结果必须返回旧 Ref → 新 Ref transition。Definition-level Relationship Type rename 可能派生出大量 Relationship replacement；这类 derived replacement 不承诺永久的一对一 Ref transition mapping，旧 Relationship Ref 在新 State 中失效，调用方通过 Graph 在新 State 中重新发现 Relationship，新旧集合变化通过 Evolution diff/history 审计。
 
@@ -942,7 +946,7 @@ ResolvedState = commit/<64-lowercase-hex>
 
 Branch / Tag name validation 与 Lithograph 完全一致；KG OS 不做大小写折叠、路径重写或别名。任何接受 StateRef 的 read 都在开始时解析并 pin，返回值中的 `state` 永远使用 ResolvedState，而不是把调用方传入的 Branch / Tag 原样当成已解析 State。
 
-Object Patch / Graph Execute 必须明确目标 Branch。普通写入继续由 Lithograph 自动产生 Commit，KG OS 不要求调用方执行“修改后再手工 commit”的两步流程。KG OS 应优先把一次 Object Patch 编译为 Lithograph 可原子应用的单 Commit change；确实需要多步公开操作时由 caller-owned SQLite transaction 保证请求级 all-or-nothing。成功响应必须返回**最终 State identity**；调用方无需依赖内部 Commit 数量来继续工作。
+Object Patch / Graph Execute 必须明确目标 Branch。Object Patch 使用 Lithograph explicit transaction，把实现同一上层 target change 所需的多条标准 Cypher mutation 合并为恰好一个新 Commit；Graph `execute` 则继续完全服从 Lithograph writable Cypher 自身的 transaction / Commit 语义，不继承 Object Patch 的 one-State guarantee。KG OS 不要求调用方执行“修改后再手工 commit”的两步流程。成功响应必须返回**最终 State identity**；Object Patch 调用方无需理解底层 transaction handle，Graph 调用方也不通过 KG OS 控制底层 Commit boundary。
 
 ### Evolution 能力面
 
@@ -1313,7 +1317,7 @@ STATE_NOT_FOUND
 RESERVED_IDENTIFIER
 ```
 
-Lithograph `VERSION_NOT_FOUND` 在 KG OS 公共语义中映射为 `STATE_NOT_FOUND`；Object Patch 的起始/执行期 head mismatch 映射为 `STALE_BASE_STATE`；Git hunk 无法精确应用到 `baseState` 重新生成的 canonical YAML 时返回 `PATCH_BASE_MISMATCH`，不能 fuzzy/offset apply，也不能误报为 Branch stale；Binding coverage、reserved internal graph/schema 等 KG OS invariants 失败映射为 `CONSISTENCY_ERROR`。HTTP status、CLI exit code 与 SDK exception class 属于 adapter mapping，不改变上述 error code。
+Lithograph `VERSION_NOT_FOUND` 在 KG OS 公共语义中映射为 `STATE_NOT_FOUND`；Object Patch 的 `tx_begin(expectedHead=baseState)` mismatch 或 no-op strict-head check mismatch 映射为 `STALE_BASE_STATE`；Git hunk 无法精确应用到 `baseState` 重新生成的 canonical YAML 时返回 `PATCH_BASE_MISMATCH`，不能 fuzzy/offset apply，也不能误报为 Branch stale；Binding coverage、reserved internal graph/schema 等 KG OS invariants 失败映射为 `CONSISTENCY_ERROR`。HTTP status、CLI exit code 与 SDK exception class 属于 adapter mapping，不改变上述 error code。
 
 Object Patch 的错误归类固定为：
 
@@ -1423,7 +1427,7 @@ KG OS
 ### D10 Object Patch 使用 canonical YAML + Git Extended Diff
 
 - 决定：Object `read` 的 editable representation 是稳定 canonical YAML；Object `patch` 接收基于该 YAML 生成的普通 two-way Git Extended Diff（`git diff -p`）Patch，并覆盖 Add / Update / Delete / Rename / Restructure。KG OS 不自定义 Patch section / hunk / pathname-quoting grammar；多 Object 使用多个 `diff --git` entry，新增 / 删除 / rename 复用 Git 标准 extended headers 与 `/dev/null` 语义。一个请求可以修改多个明确 Object；已有对象使用 owner-backed Object Ref，新增对象只使用 request-local alias。Patch 对 `baseState` canonical YAML 精确应用，不 fuzzy match；Add/Update/Delete/Rename 不做隐式 upsert / no-op。KG OS 不使用 JSON Patch、JSON Merge Patch 或 `op/path/value` mutation DSL 作为公共 Object mutation 模型。系统分配的 identity 不能由调用方直接重写，但业务结构变化可以导致底层 replacement / migration，并通过 Ref transition / Evolution diff 暴露结果。
-- 依据：AI 天然擅长读取稳定文本并生成文件式局部 Patch；Git Extended Diff 已经提供成熟、广泛实现的修改、新增、删除、rename、多目标和 pathname quoting 文本语法，没有当前需求要求 KG OS 再发明一套 Patch grammar。同一 Object mutation 模型可以维护 Definition、Domain、Property、Knowledge Node / Relationship，避免 `mutate`、Ontology CRUD、Domain CRUD 等重复写接口。Lithograph 已有 canonical Patch / Cypher / Schema / transaction 公共能力，KG OS 按目标变化选择最小可用组合，不再发明数据库 mutation engine。
+- 依据：AI 天然擅长读取稳定文本并生成文件式局部 Patch；Git Extended Diff 已经提供成熟、广泛实现的修改、新增、删除、rename、多目标和 pathname quoting 文本语法，没有当前需求要求 KG OS 再发明一套 Patch grammar。同一 Object mutation 模型可以维护 Definition、Domain、Property、Knowledge Node / Relationship，避免 `mutate`、Ontology CRUD、Domain CRUD 等重复写接口。Lithograph 已经把标准 Cypher 25 定义为正常 graph / Schema / Index mutation language，并提供 explicit transaction 作为多 query 单 Commit boundary；KG OS 只负责把业务 Object target change 编译到这条底层路径，不再发明数据库 mutation engine，也不把 Lithograph Structural Patch 扩成第二套 CRUD API。
 - 备选：自定义 KG OS textual Patch framing；使用 RFC JSON Patch / Merge Patch；使用 operation-oriented JSON mutation DSL；Object Patch 只做 Update 而 Create/Delete/Rename 使用独立 API。
 - 取舍：KG OS 必须维护 canonical YAML renderer、标准 YAML parser，并解析 / 应用本文冻结的 Git Extended Diff profile，再把业务 target change 编译成 Lithograph 实际 graph / Schema / Index mutation；Object Ref / alias target 与 logical Patch request/result 已由 D36/D37 冻结，剩余复杂度集中在 logical slot 到 Lithograph public mutation 的实现映射。Git blob hash、file mode、filesystem / index 行为不会成为 KG OS 业务语义，unsupported Git patch form 也不会因为 Git 支持就自动进入 KG OS v1。
 
@@ -1583,10 +1587,10 @@ KG OS
 
 ### D33 KG OS v1 只 bootstrap 空 Lithograph Knowledge Base
 
-- 决定：KG OS v1 只在 Lithograph empty Root State 上 bootstrap 自己需要的 reserved internal Schema resources，并从第一个 KG OS-valid State 开放公共业务能力；不自动 adoption 已经存在调用方 graph / Schema history 的任意 Lithograph database。pre-KGOS Root / bootstrap invalid Commit 只按 D31 诊断可见。
+- 决定：KG OS v1 只在 Lithograph empty Root State 上 bootstrap 自己需要的 reserved internal Schema resources 与 semantic graph 初始状态；bootstrap 必须在一个 Lithograph explicit transaction 中以 Root Commit 为 `expectedHead` 完成，并只产生一个新的 KG OS-valid Commit。KG OS 从该 State 开放公共业务能力；不自动 adoption 已经存在调用方 graph / Schema history 的任意 Lithograph database。正常 v1 bootstrap 不产生 durable intermediate invalid Commit，pre-KGOS Root 只按 D31 诊断可见。
 - 依据：Definition / Property Binding coverage 与 reserved internal Schema 是 KG OS-valid State 的硬不变量；自动接管已有数据库必须决定如何为既有 Schema 生成 Binding、如何解释已有业务语义和历史连续性，这不是启动时可以确定性猜测的事情。
 - 备选：首次打开时自动为所有已有 Schema element 创建 Binding；允许没有 Binding 的 Schema 逐步懒迁移；直接把现有 database 一律视为有效 KG OS State。
-- 取舍：已有 Lithograph 数据库不能在 v1 被无配置直接“挂载”为 KG OS，需要未来显式 migration / import 设计；换取 bootstrap 简单、所有公开 KG OS State 从一开始满足当前一致性不变量。
+- 取舍：已有 Lithograph 数据库不能在 v1 被无配置直接“挂载”为 KG OS，需要未来显式 migration / import 设计；bootstrap 会短暂持有 Lithograph explicit transaction 的 single-writer reservation，但换取所有公开 KG OS State 从第一个 Commit 起满足当前一致性不变量。
 
 ### D34 Object 使用单一 logical value、canonical YAML 与 JSON representation
 
@@ -1623,12 +1627,12 @@ KG OS
 - 备选：每次启动随机前缀；仅依赖隐藏 element ID；把 internal semantics 放 SQLite side table；把具体名字长期留给实现自行选择。
 - 取舍：调用方不能使用 `__kgos_` 开头的 Schema / graph identifier；换取 internal history、Graph View isolation、Schema bootstrap 与 migration 有稳定编码，同时不建立第二套数据库或绕过 Lithograph。
 
-### D39 SQLite request atomicity 不隐藏 Lithograph intermediate State
+### D39 Object Patch 使用 Lithograph explicit transaction 作为单一 State boundary
 
-- 决定：caller-owned SQLite transaction 可以把多个 Lithograph query 的持久化结果一起 commit / rollback，但不能把这些 query 已形成的 immutable Commit chain 当成“不可见内部步骤”。一个 KG OS Object Patch 若需要多个 Lithograph Commit，每个最终进入 DAG 的 intermediate Commit 都必须自身是 KG OS-valid State；如果某个 mixed graph / Schema / Index target change 无法满足该条件，就必须使用能在一个 Lithograph Commit 内表达它的公开能力，否则该操作保持依赖阻塞。
-- 依据：outer transaction 解决 durability 原子性，不改写 Lithograph 的版本模型。允许 transaction 内先产生 missing Binding / dangling Binding 等 invalid Commit，再因为最终 Commit 合法就视为成功，会让 public History 在 transaction durable 后暴露 KG OS 无法解释的中间 State，并违反 D11/D30/D31。
-- 备选：把 caller-owned transaction 内的 intermediate Commit 永久标成 KG OS-hidden；在 transaction commit 后 squash/rewrite history；直接 SQL 同时修改 Schema 与 internal graph；放宽 KG OS-valid State 不变量。
-- 取舍：部分 Definition / Property create/rename/restructure 在 Lithograph one-Commit mixed mutation 能力可用前不能完整实现；换取 History 始终可解释、不建立第二套隐藏版本层，也不破坏 Lithograph immutable Commit DAG。
+- 决定：所有存在有效 target delta 的 Object Patch 都在一个 Lithograph public explicit transaction 中执行。KG OS 在 `tx_begin` 传入 target Branch 与 `expectedHead = baseState`，随后只执行标准 Cypher 25 graph / Schema / Constraint / Index mutation；成功 `tx_commit` 恰好产生一个 Lithograph Commit / KG OS State。任何 query / callback / validation / commit failure 都由 Lithograph fail-closed auto-abort，不留下 intermediate Commit；`BRANCH_HEAD_MOVED` / expected-head mismatch 映射为 `STALE_BASE_STATE`。无有效 target delta 的 Patch 在 strict base check 通过后直接返回 `baseState`，不启动 mutation transaction、不创建 State。
+- 依据：KG OS 的一次 Object Patch 是一个上层 logical mutation unit，Definition / Property 的 Structure、Binding semantic graph 与必要 Knowledge migration 必须在同一个 public State 中共同成立。Lithograph explicit transaction 已把多个标准 Cypher execution 定义为一个 Commit boundary，并在 writer ownership 下提供 `expectedHead` CAS，因此 KG OS 不再需要 raw Structural Patch、caller-owned SQLite transaction 或 hidden intermediate State 来实现这一不变量。
+- 备选：继续让每个底层 query 各自形成 Commit；用 caller-owned SQLite transaction 只做 durability atomicity；让 KG OS 构造 Lithograph Structural Patch 作为第二套 mutation API；事后 squash/rewrite intermediate history；建立 KG OS 自己的 transaction/version layer。
+- 取舍：Object Patch compiler 必须在进入 explicit transaction 前完成尽可能多的 parse / logical planning / conflict validation，并保持 transaction 短小，因为 Lithograph v1 transaction 持有 single-writer reservation；换取一个成功 Object Patch 与一个 KG OS State 一一对应、strict base 无竞态、History 始终可解释，并继续以 Cypher 25 作为唯一正常底层 mutation language。
 
 ### D40 Object mutation 保持单一 Patch surface，新增对象只增加最小 request-local alias 语义
 
@@ -1639,20 +1643,19 @@ KG OS
 
 ## 剩余依赖与工程合同
 
-以下问题属于依赖阻塞、adapter mapping 或实现级持久化/编译设计，**不等于对应产品语义或 logical model 未设计**。判断是否真的出现新设计缺口时，必须先回看该主题所属章节和已确认 Decision；如果 logical state、ownership、identity、lifecycle 与公共 logical wire 已经明确，而只剩底层 projection、字符串常量、adapter carrier 或 operation mapping，则按工程问题处理，不重新向产品层提问。
+以下问题属于实现 readiness、compiler / projection mapping、adapter mapping 或实现级持久化设计，**不等于对应产品语义或 logical model 未设计**。判断是否真的出现新设计缺口时，必须先回看该主题所属章节和已确认 Decision；如果 logical state、ownership、identity、lifecycle 与公共 logical wire 已经明确，而只剩底层 projection、字符串常量、adapter carrier 或 operation mapping，则按工程问题处理，不重新向产品层提问。
 
 | 已确认，不因本节重新打开 | 剩余依赖 / 工程工作 |
 | --- | --- |
-| Object logical state / owner、ObjectRef、canonical YAML / JSON、list/search/read/patch logical wire | Lithograph-owned `structure` inner projection 依赖 Lithograph public Schema introspection / locator |
+| Object logical state / owner、ObjectRef、canonical YAML / JSON、list/search/read/patch logical wire | Lithograph Cypher 25 Schema / current-graph `SHOW` result → owner-only `structure` projection / normalization 与反向 compiler mapping |
 | StateRef、Graph query/execute、Evolution read/mutation、pagination 与公共 error envelope | CLI / SDK / HTTP / Skill 的 adapter-specific route / method / metadata carrier 与 usage docs |
-| Object Patch 的 Git Extended Diff、strict base、logical delta、derived migration、conflict/all-or-nothing 语义 | logical slot 到 Lithograph public Patch / Cypher / Schema operation 的实现映射与测试矩阵 |
+| Object Patch 的 Git Extended Diff、strict base、logical delta、derived migration、conflict/all-or-nothing 语义 | logical slot → explicit transaction 内标准 Cypher 25 mutation 的 statement planning、alias/result capture 与测试矩阵 |
 | internal semantic graph 的职责、隔离、一致性不变量与 `__kgos_` v1 persistence encoding | bootstrap Schema、migration 与 consistency checker 的实现和验证 |
 
-1. **Lithograph Schema projection dependency**：Definition / Property / Graph Type / Constraint / Index 的 `structure` 已确认只投影 Lithograph owner state，但其精确字段 shape 必须建立在 Lithograph public Schema introspection / locator contract 之上。若底层当前实现/设计仍未提供足够稳定的 canonical projection，KG OS 在该点等待 Lithograph，而不是自建第二套 Schema AST。
-2. **Lithograph atomic mixed-Snapshot mutation dependency**：KG OS Definition / Property create、部分 rename / restructure 等操作需要在同一个 KG OS-valid State 中同时改变 Lithograph Schema 与 graph Binding / Knowledge。Lithograph 当前设计的 caller-owned outer transaction 能原子提交多个 query Commit，但不会隐藏或合并这些 Commit；而 canonical `patch.apply` 当前公开设计尚未冻结“调用方构造 AddNode / AddRelationship 时如何为全新 element 分配 identity / 返回 mapping”。在实现依赖这些操作前，Lithograph 必须提供一种**通用数据库能力**：能够通过公开合同在一个 Commit 内原子表达所需 mixed graph + Schema + Index target change，并为新 graph element 安全分配最终 identity（具体由 Lithograph 自己设计，不为 KG OS 特化）。KG OS 不以内部 allocator、预读 next-id、直接 SQL 或 invalid intermediate State 绕过这一依赖。
-3. **Object Patch compiler implementation mapping**：本文已经冻结 parse → exact apply → Object Value → explicit delta → derived migration → logical-slot conflict → candidate validation → Lithograph public mutation 的语义；剩余是各 logical slot 到 Lithograph raw Patch / Cypher / Schema operation 的实现映射与测试矩阵，属于工程设计/实现，不再要求产品层逐项选择。映射时必须显式标记哪些 target change 依赖上一项 one-Commit mixed mutation 能力。
-4. **Adapter contracts**：在实现 AI-facing CLI + Skill、SDK 与 Web adapter 时，把已确认 logical wire 映射成命令、method、HTTP route/header/streaming form，并建立 usage/reference 文档；adapter 不能重新定义能力语义。
-5. **Human-facing Web**：Object / Graph / Evolution 的查看、管理和纠正交互可以在核心能力实现后按真实用户流程设计，不阻塞 Kernel / CLI / SDK 的数据与版本合同。
+1. **Schema projection / compiler mapping**：Definition / Property / Graph Type / Constraint / Index 的 `structure` 已确认只投影 Lithograph owner state。实现使用 Lithograph Cypher 25 Schema 与 current-graph `SHOW` public surface，把返回结果归一化成 owner-only logical slots，并为 editable slot 建立反向 Cypher compiler 与 round-trip tests；这属于 KG OS projection/compiler 工作，不再要求一个额外 KG OS-specific Schema API。若实现证据表明某个已确认 owner state 确实无法由 Lithograph public surface 无损读取/修改，再以具体底层缺口处理，而不是预先发明第二套 Schema AST。
+2. **Object Patch compiler implementation mapping**：本文已经冻结 parse → exact apply → Object Value → explicit delta → derived migration → logical-slot conflict → candidate validation → `tx_begin(expectedHead=baseState)` → 标准 Cypher 25 mutation → `tx_commit` 的语义。剩余是每个 logical slot 的 statement planning、request-local alias 到 Cypher-created identity 的 result capture、Ref transition、错误映射与测试矩阵，属于工程设计/实现，不再要求产品层逐项选择。
+3. **Adapter contracts**：在实现 AI-facing CLI + Skill、SDK 与 Web adapter 时，把已确认 logical wire 映射成命令、method、HTTP route/header/streaming form，并建立 usage/reference 文档；adapter 不能重新定义能力语义。
+4. **Human-facing Web**：Object / Graph / Evolution 的查看、管理和纠正交互可以在核心能力实现后按真实用户流程设计，不阻塞 Kernel / CLI / SDK 的数据与版本合同。
 
 以上剩余项按真实实现依赖解决，不作为继续产品讨论的默认议题。只有实现证据表明现有产品合同无法唯一决定行为，并且不同答案会改变调用方可观察语义时，才升级为新的产品设计决定。
 
@@ -1660,13 +1663,13 @@ KG OS
 
 实现顺序应建立在 Lithograph 对应公开能力真实可用的基础上，具体 readiness 始终从 Lithograph 仓库检查，不在这里复制状态。
 
-其中有两个明确 gate：**Schema-backed Object read/write** 依赖 Lithograph public Schema introspection / canonical locator；**Definition / Property 等需要 Schema + graph 同 State 原子变化的 Object Patch** 还依赖 Lithograph one-Commit mixed-Snapshot mutation + new element identity allocation。gate 未满足时可以继续实现不依赖它的 Host、Domain、Knowledge Object、Graph/Evolution 等部分，但不能把被阻塞的 Schema-backed Object capability 声称为完成。
+设计层已经没有“mixed Schema + graph 必须等待另一套 Lithograph mutation contract”的 gate：该问题由 Lithograph public explicit transaction + `expectedHead` + 标准 Cypher 25 mutation 解决。实现 readiness 仍必须从 Lithograph 仓库确认对应 explicit transaction、Schema / `SHOW` surface 与所需 Cypher mutation 已真实可用；实现未完成时只能报告依赖尚未 ready，不能把它重新表述为 KG OS 产品模型未设计。
 
-1. 建立最小 Lithograph host / client 边界，只暴露 KG OS 所需公开能力，不访问内部表；实现 D33 的 empty-database bootstrap boundary，未完成 KG OS-valid bootstrap 前不开放公共业务能力。
+1. 建立最小 Lithograph host / client 边界，只暴露 KG OS 所需公开能力，不访问内部表；接入 Native explicit transaction lifecycle、`expectedHead` 与结构化错误映射，实现 D33 的 empty-database bootstrap boundary，未完成 KG OS-valid bootstrap 前不开放公共业务能力。
 2. 按本文 `__kgos_` v1 internal physical encoding 实现 Ontology semantic graph：Definition / Property Binding Record、Domain / `INCLUDES`、同一 Lithograph Schema 中的 required internal Schema resources，以及基于 Lithograph `graphView` 的 Knowledge/Internal 隔离、双向 Binding coverage 与 Snapshot-scoped Schema Locator resolution。
-3. 实现统一 Object Ref resolver 与 Object Value projection：按 D36 canonical Ref；先完成 Domain 与 Knowledge Node / Relationship；Lithograph Schema introspection / locator gate 满足后再完成 Graph Type / Constraint / Index 与 Definition / Property 的 `structure` projection。同一 State + Ref 产生同一 logical Object Value，并按 D34 renderer 稳定渲染为 canonical YAML 或等价 JSON，同时保持 internal graph 不可见。
+3. 实现统一 Object Ref resolver 与 Object Value projection：按 D36 canonical Ref；Domain 与 Knowledge Node / Relationship 直接投影 graph state；Graph Type / Constraint / Index 与 Definition / Property 的 `structure` 通过 Lithograph Cypher 25 Schema / current-graph `SHOW` public surface 做 owner-only projection。同一 State + Ref 产生同一 logical Object Value，并按 D34 renderer 稳定渲染为 canonical YAML 或等价 JSON，同时保持 internal graph 不可见。
 4. 实现 Object `list` / `search` / `read`，支持大集合分页与轻量摘要；复杂 Knowledge discovery 不扩展 Object search，而是交给 Graph Cypher。
-5. 实现 Object Patch compiler：canonical YAML + Git Extended Diff parser/application、标准 YAML parse → Object Value、Add / Update / Delete / Rename / Restructure、多 Object、request-local alias、strict base State / target Branch、direct Ref transition。Domain / ordinary Knowledge target change 可以先映射到现有 Lithograph public graph mutation；Definition / Property / mixed Schema+graph target change 必须等 one-Commit mixed-Snapshot mutation gate 满足后再开放。所有路径落实 dependency guard、D17 rename migration、Schema↔Binding 一一覆盖、semantic cleanup、合法 intermediate State 与 request all-or-nothing。
+5. 实现 Object Patch compiler：canonical YAML + Git Extended Diff parser/application、标准 YAML parse → Object Value、Add / Update / Delete / Rename / Restructure、多 Object、request-local alias、strict base State / target Branch、direct Ref transition。先在 `baseState` 上完成 logical planning / conflict / dependency validation；存在有效 target delta 时调用 `tx_begin(targetBranch, expectedHead=baseState)`，在一个 Lithograph explicit transaction 内执行最少标准 Cypher 25 graph / Schema / Constraint / Index mutation，捕获本请求新 element identity 解析 alias，最后一次 `tx_commit`。所有路径落实 D17 rename migration、Schema↔Binding 一一覆盖、semantic cleanup 与 request all-or-nothing；任何失败都不得留下 intermediate State。
 6. 实现 Graph `query` / `execute`：只读查询具有真实只读边界，writable execute 只修改普通 Knowledge graph data；两者固定到统一 State semantics、复用 Lithograph value encoding，并执行 Knowledge/Internal Graph View isolation。
 7. 实现 Evolution 基础 Read：`overview`、State `get`、从明确 root 渐进读取 State DAG 的 `ancestry`、统一 `history`，以及 Branch / Tag list；保持 immutable State 与 mutable State Data / refs 的返回边界。
 8. 实现 Evolution mutation：State create/data、Branch lifecycle、Tag lifecycle 与 whole-Knowledge-Base merge；不暴露 checkout，不复制尚无 KG OS use case 的 Lithograph Version Procedure。
