@@ -16,11 +16,16 @@
 | --- | --- |
 | 已有决定，当前没有冲突 | 沿用并解释，不重新要求用户设计 |
 | 只是缺代码、物理编码或索引 | 作为工程待办给出最小实现方案；本次已授权实现时继续执行，涉及须批准的新设计决定时除外 |
+| 所属章节已明确 logical state / ownership / identity / lifecycle，只剩 transport、serialization、wire encoding 或 compiler mapping | 视为合同编码或工程待办；沿用已确认设计，不把“具体字段名 / 字符串编码 / envelope 尚未冻结”误判为“Object 模型尚未设计”，也不重新询问已确认的逻辑字段、身份或生命周期 |
 | 有具体输入会产生两种不同结果 | 说明分歧、受影响规则和推荐方案，不把整个主题退回未设计 |
 | 用户新决定与旧文档冲突 | 标出具体差异；获准写入时同步受影响规则，不静默改写无关决定 |
 | 只有外部产品有某能力 | 不据此认定 KG OS 缺失，先说明它解决的当前需求 |
 
-评审图模型时，必须同时检查图结构、Schema 字段和执行规则，不能只检查 JSON 字段表。区分“定义所用的图”与“被校验的数据”、Schema 名称与数据身份、业务唯一键与关系数量约束；具体边界见设计文档的“图结构与 Schema 字段”及“关系唯一性的补充边界”。
+读取“剩余依赖与工程合同”时，必须把它与对应主题的已确认 owner 章节一起判断。不得仅因该列表出现 `transport`、`serialization`、`wire`、`physical identifier`、底层 projection 或 `compiler mapping`，就推断该主题的产品语义、Object logical model 或 owner 边界未设计；只有对应 owner 章节本身明确保留 gap，或剩余选择会改变已确认产品合同，才提出新的设计问题。
+
+用户已授权完善设计时，属于 wire shape、字段命名、serialization、pagination、error mapping、internal persistence encoding、adapter mapping 或 compiler mapping 的工程合同，如果能从已确认产品语义、适用标准和当前底层公开合同确定，就直接选择满足当前需求的最简单方案、写入设计真源并验证，不逐项要求用户决定。只有不同可行答案会改变调用方可观察的产品语义、能力边界、数据 ownership、identity/lifecycle 或兼容承诺，并且现有真源与底层证据无法裁决时，才把具体分歧提交用户确认。
+
+评审图模型时，必须同时检查 Lithograph Schema 中的图结构、KG OS 上层语义和实际 Knowledge graph data，不能只检查 JSON/YAML 字段表。区分 Schema identifying name、数据库 element identity、业务唯一键与关系结构/约束；当前边界以设计文档 `Ontology` 下的“Structure：Lithograph 是唯一结构真源”、`Definition` 和“Knowledge 数据访问”章节为准，不沿用已被替换的旧 KG OS `from/to`、`unique`、`cardinality` 自定义字段模型。
 
 用户纠正后，先修正被指出的那一项，再检查它影响的既有规则。助手自行补出的示例、公式、ID 选择和默认行为仍是提案，不能因紧接在用户纠正后就写成已确认设计。反过来，有明确依据的用户决定也不能再次变成提问。
 

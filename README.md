@@ -21,9 +21,9 @@ KG OS 独立于 Noven 或任何具体领域；领域语义由调用方表达。
 
 ## 当前状态
 
-技术架构与 Ontology Schema 基础规则已确认，具体范围见[设计状态导航](docs/design.md#设计状态导航)。项目目前仍只有文档，没有业务实现；设计确认不代表功能已经实现或验证。
+核心技术架构、Ontology / Knowledge 数据边界，以及 Object / Graph / Evolution 的产品语义和 transport-neutral 公共逻辑合同已经确认；剩余项主要是 Lithograph Schema projection 依赖、实现映射和各 adapter / Web 的工程设计，具体范围见[设计状态导航](docs/design.md#设计状态导航)。项目目前仍只有文档，没有业务实现；设计确认不代表功能已经实现或验证。
 
-本 README 承载产品定义；`docs/design.md` 承载当前技术与数据设计，统一区分已确认、暂定、待设计和待实现。协作与评审规则集中在 `AGENTS.md`。其他文档只引用该设计真源，不重复维护一份技术选型或 Schema 规则。
+本 README 承载产品定义；`docs/design.md` 承载当前技术与数据设计，统一区分已确认设计、剩余依赖 / 工程合同与待实现工作。协作与评审规则集中在 `AGENTS.md`。其他文档只引用该设计真源，不重复维护一份技术选型或 Schema 规则。
 
 ## License
 
@@ -40,5 +40,5 @@ KG OS 采用双许可模式：
 
 - [项目协作规范](AGENTS.md)：来源核对、设计评审、授权与验证规则。
 - [背景](docs/background.md)：为什么会有 KG OS，以及方向如何形成。
-- [设计](docs/design.md)：已确认规则、暂定方案、待设计合同与工程实现待办。
+- [设计](docs/design.md)：已确认规则、关键决策、剩余依赖与工程合同、工程实现待办。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。
