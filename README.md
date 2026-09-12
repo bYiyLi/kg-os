@@ -21,7 +21,7 @@ KG OS 独立于 Noven 或任何具体领域；领域语义由调用方表达。
 
 ## 当前状态
 
-KG OS v1 的核心技术架构、Ontology / Knowledge 数据边界，以及 Object / Graph / Evolution 的产品语义、公共逻辑合同和 Object Patch 单-State transaction boundary 已经确认。当前剩余工作主要是 Lithograph 对应能力的实现 readiness、Schema / `SHOW` 到 Object `structure` 的 projection/compiler mapping、Object Patch 到标准 Cypher 25 的 statement planning，以及 CLI / Skill / SDK / HTTP / Web 等 adapter 与交互层工程设计，具体范围见[设计状态导航](docs/design.md#设计状态导航)。项目目前仍只有文档，没有业务实现；设计确认不代表功能已经实现或验证。
+KG OS v1 的核心技术架构、Ontology / Knowledge 数据边界，以及 Object / Graph / Evolution 的产品语义和公共逻辑合同已经确认，其中包括 Object Patch 单-State transaction boundary，以及支持大量冲突分页、渐进 resolution、candidate consistency validation 后再 finalize 的 Evolution Merge Session。当前剩余工作主要是 Lithograph 对应能力的实现 readiness、Schema / `SHOW` 到 Object `structure` 的 projection/compiler mapping、Object Patch 到标准 Cypher 25 的 statement planning、Merge conflict 到公开 Object/Knowledge slot 的 projection，以及 CLI / Skill / SDK / HTTP / Web 等 adapter 与交互层工程设计，具体范围见[设计状态导航](docs/design.md#设计状态导航)。项目目前仍只有文档，没有业务实现；设计确认不代表功能已经实现或验证。
 
 本 README 承载产品定义；`docs/design.md` 承载当前技术与数据设计，统一区分已确认设计、剩余依赖 / 工程合同与待实现工作。协作与评审规则集中在 `AGENTS.md`。其他文档只引用该设计真源，不重复维护一份技术选型或 Schema 规则。
 
