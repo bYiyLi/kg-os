@@ -9,7 +9,7 @@
 | 已确认，不因本节重新打开 | 剩余依赖 / 工程工作 |
 | --- | --- |
 | Object logical state / owner、ObjectRef、canonical YAML / JSON、list/search/read/patch logical wire | Lithograph Cypher 25 Schema / current-graph `SHOW` result → owner-only `structure` projection / normalization 与反向 compiler mapping |
-| StateRef、Graph query/execute、Evolution read/mutation、pagination 与公共 error envelope | CLI / SDK / HTTP / Skill 的 adapter-specific route / method / metadata carrier 与 usage docs |
+| StateRef、Graph query/execute、Evolution read/mutation、pagination、公共 error envelope 与 [`kg` CLI command contract](cli.md) | CLI parser / I/O / NDJSON / exit-code 实现；SDK / HTTP / Skill 的 adapter-specific route / method / metadata carrier 与 usage docs |
 | Object Patch 的 Git Extended Diff、strict base、logical delta、derived migration、conflict/all-or-nothing 语义 | logical slot → explicit transaction 内标准 Cypher 25 mutation 的 statement planning、alias/result capture 与测试矩阵 |
 | internal semantic graph 的职责、隔离、一致性不变量与 `__kgos_` v1 persistence encoding | bootstrap Schema、migration 与 consistency checker 的实现和验证 |
 | Evolution Merge Session、conflict projection、incremental resolution、revision-bound candidate validation / finalize | Lithograph raw logical slot → KG OS `MergeConflict` projection、candidate consistency-check query plan 与 adapter workflow tests |
@@ -18,7 +18,7 @@
 1. **Schema projection / compiler mapping**：Definition / Property / Graph Type / Constraint / Index 的 `structure` 已确认只投影 Lithograph owner state。实现使用 Lithograph Cypher 25 Schema 与 current-graph `SHOW` public surface，把返回结果归一化成 owner-only logical slots，并为 editable slot 建立反向 Cypher compiler 与 round-trip tests；这属于 KG OS projection/compiler 工作，不再要求一个额外 KG OS-specific Schema API。若实现证据表明某个已确认 owner state 确实无法由 Lithograph public surface 无损读取/修改，再以具体底层缺口处理，而不是预先发明第二套 Schema AST。
 2. **Object Patch compiler implementation mapping**：本文已经冻结 parse → exact apply → Object Value → explicit delta → derived migration → logical-slot conflict → candidate validation → `tx_begin(expectedHead=baseState)` → 标准 Cypher 25 mutation → `tx_commit` 的语义。剩余是每个 logical slot 的 statement planning、request-local alias 到 Cypher-created identity 的 result capture、Ref transition、错误映射与测试矩阵，属于工程设计/实现，不再要求产品层逐项选择。
 3. **Merge projection / validation mapping**：Evolution Merge 的 Session lifecycle 已确认；实现只需把 Lithograph conflict logical slot 转换为公开 Object/Knowledge `MergeConflict`，并在 exact session revision 上执行 Binding coverage / reserved internal Schema / graph consistency checker。无法安全映射的 raw/internal conflict 返回 `CONSISTENCY_ERROR`，不把内部 slot 暴露给调用方，也不由 KG OS 猜 resolution。
-4. **Adapter contracts**：在实现 AI-facing CLI + Skill、SDK 与 Web adapter 时，把已确认 logical wire 映射成命令、method、HTTP route/header/streaming form，并建立 usage/reference 文档；adapter 不能重新定义能力语义。
+4. **Adapter contracts**：CLI command / argument / stdout-stderr / input-source contract 已由 [CLI](cli.md) 冻结，剩余是 TypeScript parser、stdin/file、JSON/NDJSON、exit-code 与 daemon transport 实现。Skill、SDK、HTTP 与 Web adapter 仍需把已确认 logical wire 映射成各自 method / route / metadata carrier 并建立 usage/reference 文档；任何 adapter 都不能重新定义能力语义。
 5. **Human-facing Web**：Object / Graph / Evolution 的查看、管理和纠正交互可以在核心能力实现后按真实用户流程设计，不阻塞 Kernel / CLI / SDK 的数据与版本合同。
 6. **`kgosd` runtime / transport mapping**：`kgosd` 本地 daemon、Rust Kernel 与 TypeScript/npm 上层分层已经确认；剩余只是在不改变 logical contract 的前提下确定 client ↔ daemon transport、进程启动/发现/退出、HTTP 或其它本地 carrier、streaming/backpressure 与 package/distribution 细节。上层 client 不获得直接 SQLite / Lithograph 访问路径。
 
@@ -39,6 +39,6 @@
 7. 实现 Evolution 基础 Read：`overview`、State `get`、从明确 root 渐进读取 State DAG 的 `ancestry`、统一 `history`，以及 Branch / Tag list；保持 immutable State 与 mutable State Data / refs 的返回边界。
 8. 实现 Evolution mutation：State create/data、Branch lifecycle、Tag lifecycle，以及 D41 的 whole-Knowledge-Base Merge Session lifecycle。Merge conflict 转成公开 Object/Knowledge slot，支持 bounded page + incremental resolution；unresolved=0 后在同一 session revision 上跑 KG OS consistency checker，再用该 revision finalize。候选不合法时保留 Session、不移动 Branch；不暴露 checkout，也不复制尚无 KG OS use case 的其它 Lithograph Version Procedure。
 9. 实现统一 History / Diff 的 Lithograph version 过滤与业务解释视图，支持 scope / Object Ref filter，覆盖公开 Ontology + Knowledge 并隐藏 internal semantic graph。
-10. 在 Object / Graph / Evolution 公共合同稳定后，确定 client ↔ `kgosd` adapter/runtime mapping，并以 TypeScript / npm 建立 AI-facing CLI / Skill、SDK 与 Human-facing Web；这些上层 surface 只通过 daemon 暴露的公共 transport 使用 Kernel，不直接访问 SQLite / Lithograph。
+10. 按 [CLI](cli.md) 实现 TypeScript / npm `kg`，并确定 client ↔ `kgosd` runtime target / transport mapping；随后建立 Skill、SDK 与 Human-facing Web。`kg` 的 command semantics 不等待 transport 重新设计，所有上层 surface 只通过 daemon 暴露的公共 transport 使用 Kernel，不直接访问 SQLite / Lithograph。
 
 实现、验证、提交和推送必须分别按仓库真实状态报告；设计完成不代表 Lithograph 依赖能力或 KG OS 功能已经实现。

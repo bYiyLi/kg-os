@@ -323,3 +323,10 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 依据：这套分层在 2026-09-08 的已确认技术架构中已经成立；2026-09-10 引入 Lithograph 时，旧 Graph Engine / FTS5 / sqlite-vec 数据库职责被整体替换，但没有后续 decision 否定 daemon 形态或 Rust / TypeScript 分工。恢复这部分可以重新明确 process ownership、数据库访问边界和上层交付生态，同时与 D1/D6/D37 完全兼容。
 - 备选：让每个 CLI / SDK / Web client 直接加载 Lithograph 并打开 Knowledge Base；把全部上层产品面改为 Rust；把 KG OS v1 改为必须部署的远程 server。
 - 取舍：KG OS 需要维护一个本地服务进程以及 client ↔ daemon transport / lifecycle；换取单一数据库 owner、稳定的 Kernel 边界、各上层 adapter 行为一致，以及 TypeScript/npm 生态可以在不绑定 SQLite/Lithograph ABI 的情况下独立演进。
+
+### D43 `kg` CLI 直接映射 Kernel contract，并采用 AI-first JSON / non-interactive 语义
+
+- 决定：v1 CLI executable 固定为 `kg`，产品名称保持 **KG OS**，daemon 名称保持 `kgosd`；canonical command tree 直接映射 `object / graph / evolution`。普通成功结果默认输出单一 JSON document；Object raw body 和 Graph NDJSON streaming 是两个显式例外。CLI 不维护 hidden current Branch / State、auto-pagination、interactive confirm/editor/pager、第二套 CRUD/History command、raw Lithograph/SQLite pass-through 或 command alias。Cypher / Patch / resolution 等 required body 统一支持 inline、file、non-TTY stdin；业务 error 继续使用公共 JSON envelope，exit code 只做粗粒度 execution layer 分类。
+- 依据：AI 是第一使用者，需要确定、可组合、可机器解析、无隐藏交互状态的命令；`kg` 作为高频 binary 比完整产品名更短，同时 CLI、产品和 daemon 的名称职责仍然清楚。把 logical contract 一一映射到 CLI 能避免 CLI 自己重新发明资源、默认 Branch、mutation semantics 或 error model。JSON-first 比维护 human table + machine mode 两套默认结果更稳定；pure canonical YAML 仍通过 `object read --body` 服务 AI / 人类编辑。
+- 备选：human table/text 默认并要求 AI 每次加 `--json`；把 Branch/Tag/Merge 等拍平成顶层快捷命令；CLI 维护 current Branch / checkout；为 create/update/delete 建专用快捷写命令；提供 generic `request` / raw Lithograph escape hatch；大结果默认 auto-page 到 EOF。
+- 取舍：普通人类终端默认看到 JSON，而不是专门 table UI；AI 需要显式追 cursor，Object textual Patch 的最安全流程可能需要先取得 resolved State、再按该 Commit 读取 canonical YAML。换取一个 command spelling、一个业务 contract、bounded context、可重复并发语义和无交互自动化。daemon endpoint / process discovery / Knowledge Base runtime target 仍由 D42 的 runtime mapping 决定，不反向改变 CLI 业务命令。
