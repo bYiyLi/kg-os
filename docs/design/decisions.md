@@ -319,7 +319,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D42 KG OS v1 使用 `kgosd` 本地 daemon 与 Rust / TypeScript 分层
 
-- 决定：KG OS v1 采用本地 daemon 形态，`kgosd` 作为统一访问入口并承载 KG OS Kernel。`kgosd`、Kernel、Lithograph host/client、projection/compiler 与 consistency validation 使用 Rust；SDK、CLI、Web 与 Skill / 生态集成使用 TypeScript / npm。上层 client 不直接打开 SQLite 或绕过 `kgosd` 访问 Lithograph。client ↔ daemon 的具体 transport 继续作为 adapter/runtime 工程合同，不进入 Kernel 产品语义。
+- 决定：KG OS v1 采用本地 daemon 形态，`kgosd` 作为统一访问入口并承载 KG OS Kernel。`kgosd`、Kernel、Lithograph host/client、projection/compiler 与 consistency validation 使用 Rust；SDK、CLI、Web 与 Skill / 生态集成使用 TypeScript / npm。上层 client 不直接打开 SQLite 或绕过 `kgosd` 访问 Lithograph。本决定确认 process boundary；具体本地 transport 后续由 D44 冻结。
 - 依据：这套分层在 2026-09-08 的已确认技术架构中已经成立；2026-09-10 引入 Lithograph 时，旧 Graph Engine / FTS5 / sqlite-vec 数据库职责被整体替换，但没有后续 decision 否定 daemon 形态或 Rust / TypeScript 分工。恢复这部分可以重新明确 process ownership、数据库访问边界和上层交付生态，同时与 D1/D6/D37 完全兼容。
 - 备选：让每个 CLI / SDK / Web client 直接加载 Lithograph 并打开 Knowledge Base；把全部上层产品面改为 Rust；把 KG OS v1 改为必须部署的远程 server。
 - 取舍：KG OS 需要维护一个本地服务进程以及 client ↔ daemon transport / lifecycle；换取单一数据库 owner、稳定的 Kernel 边界、各上层 adapter 行为一致，以及 TypeScript/npm 生态可以在不绑定 SQLite/Lithograph ABI 的情况下独立演进。
@@ -329,4 +329,11 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 决定：v1 CLI executable 固定为 `kg`，产品名称保持 **KG OS**，daemon 名称保持 `kgosd`；canonical command tree 直接映射 `object / graph / evolution`。普通成功结果默认输出单一 JSON document；Object raw body 和 Graph NDJSON streaming 是两个显式例外。CLI 不维护 hidden current Branch / State、auto-pagination、interactive confirm/editor/pager、第二套 CRUD/History command、raw Lithograph/SQLite pass-through 或 command alias。Cypher / Patch / resolution 等 required body 统一支持 inline、file、non-TTY stdin；业务 error 继续使用公共 JSON envelope，exit code 只做粗粒度 execution layer 分类。
 - 依据：AI 是第一使用者，需要确定、可组合、可机器解析、无隐藏交互状态的命令；`kg` 作为高频 binary 比完整产品名更短，同时 CLI、产品和 daemon 的名称职责仍然清楚。把 logical contract 一一映射到 CLI 能避免 CLI 自己重新发明资源、默认 Branch、mutation semantics 或 error model。JSON-first 比维护 human table + machine mode 两套默认结果更稳定；pure canonical YAML 仍通过 `object read --body` 服务 AI / 人类编辑。
 - 备选：human table/text 默认并要求 AI 每次加 `--json`；把 Branch/Tag/Merge 等拍平成顶层快捷命令；CLI 维护 current Branch / checkout；为 create/update/delete 建专用快捷写命令；提供 generic `request` / raw Lithograph escape hatch；大结果默认 auto-page 到 EOF。
-- 取舍：普通人类终端默认看到 JSON，而不是专门 table UI；AI 需要显式追 cursor，Object textual Patch 的最安全流程可能需要先取得 resolved State、再按该 Commit 读取 canonical YAML。换取一个 command spelling、一个业务 contract、bounded context、可重复并发语义和无交互自动化。daemon endpoint / process discovery / Knowledge Base runtime target 仍由 D42 的 runtime mapping 决定，不反向改变 CLI 业务命令。
+- 取舍：普通人类终端默认看到 JSON，而不是专门 table UI；AI 需要显式追 cursor，Object textual Patch 的最安全流程可能需要先取得 resolved State、再按该 Commit 读取 canonical YAML。换取一个 command spelling、一个业务 contract、bounded context、可重复并发语义和无交互自动化。daemon endpoint / home 由 D44 冻结；Knowledge Base target 仍需独立设计，但不能反向改变 CLI 业务命令。
+
+### D44 `kgosd` 使用可配置 HTTP bind 与 `~/.kgosd/` 本地运行目录
+
+- 决定：KG OS v1 的 `kg` / SDK / Web 统一通过 `kgosd` 的 IPv4 HTTP 访问 Kernel；`~/.kgosd/config.toml` 同时支持 `server.host` 与 `server.port`，默认分别为 `127.0.0.1` 与 `4765`。`server.host` 是 IPv4 bind address，可以显式配置 LAN address 或 `0.0.0.0`；端口占用时启动失败，不自动切换随机端口。`kgosd` 同时提供 Web 与 API，使 Browser 使用同 origin。daemon home 固定为 `~/.kgosd/`，职责分为 `config.toml`、`run/daemon.json`、`logs/` 与 `data/`。v1 不定义 token、API key、登录或其它 authentication / authorization；`run/` 不保存 authentication secret。
+- 依据：默认 loopback 满足本机使用；`host` 配置允许用户明确选择其它 bind address，而不需要新增第二套 daemon/runtime 模式。Web 是正式 Human-facing interface，需要稳定的 configured origin；CLI/SDK/Web 共用 HTTP 可以避免 Unix socket、Named Pipe、gRPC 与 Web transport 多套实现。一个明确 daemon home 让配置、当前运行状态、日志和持久 runtime data 有统一可发现位置。用户明确选择 v1 不引入 token/auth。
+- 备选：每次启动随机端口 + runtime descriptor；CLI 使用 Unix Domain Socket、Web 另走 HTTP；gRPC；把配置/运行状态分散到各平台 config/data/run 目录；本地 token authentication。
+- 取舍：固定默认端口可能与其它本地程序冲突，因此支持显式端口配置并在冲突时 fail-fast；显式配置非 loopback host 会把同一个**无认证** Web/API 暴露到对应网络，v1 不因此自动增加认证、TLS 或权限隔离。`0.0.0.0` 是 bind wildcard，不作为 CLI connect host；本机 CLI 对该配置使用 `127.0.0.1`。`data/` 的 Knowledge Base 布局、一个 daemon 管理一个还是多个 Knowledge Base、以及 operator process lifecycle 仍需后续设计，不能从本决定自动推导。

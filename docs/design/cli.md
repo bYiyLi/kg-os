@@ -1,6 +1,6 @@
 # CLI
 
-本文件是 KG OS v1 **AI-facing CLI 命令、参数、输入输出、错误与非交互行为**的设计真源。CLI 只适配已经确认的 [Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。`kgosd` 的 transport、进程发现和 Knowledge Base runtime target 解析继续由 [工程映射](implementation.md) 负责。
+本文件是 KG OS v1 **AI-facing CLI 命令、参数、输入输出、错误与非交互行为**的设计真源。CLI 只适配已经确认的 [Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。`kgosd` 的本地 HTTP endpoint 与 daemon home 由 [本地运行时](runtime.md) 负责。
 
 ## 目标与边界
 
@@ -22,8 +22,9 @@ CLI 遵守以下边界：
 - 不弹交互确认、不自动启动 editor、不进入 REPL、不自动打开 pager；命令参数不足时直接失败；
 - 不自动遍历所有 pagination page；AI / 调用方显式读取 cursor 并决定是否继续，避免一次命令无界扩大上下文；
 - 不提供 `kg request`、raw SQL、raw Lithograph procedure、`_lithograph_*` 或 SQLite pass-through；Graph `query` / `execute` 已是普通 Knowledge graph-data 的完整 Cypher 能力边界；
-- CLI 只通过已经解析出的 `kgosd` service context 使用 Kernel，不直接打开 SQLite database 或加载 Lithograph extension；
-- runtime target 的 endpoint/config/process-discovery 形式不进入本命令合同，也不能改变下面任何业务命令的参数或结果语义。
+- CLI 只通过 `kgosd` 的 HTTP endpoint 使用 Kernel，不直接打开 SQLite database 或加载 Lithograph extension；
+- CLI endpoint 从 `~/.kgosd/config.toml` 的 `server.host` / `server.port`（默认 `127.0.0.1:4765`）确定，不为业务命令增加 `--endpoint` / `--host` / random discovery；
+- v1 本地请求不附带 daemon token、API key 或其它 authentication credential。
 
 v1 不定义命令别名、缩写 namespace 或另一组 flattened commands。`kg branch ...`、`kg query ...` 等都不是 `kg evolution branch ...`、`kg graph query ...` 的第二种 canonical 拼写。
 
@@ -459,17 +460,15 @@ KG OS CLI 不单独维护 human-only 命令树。人类与 AI 使用相同 comma
 
 ## Runtime target 与非目标
 
-每次业务命令 dispatch 前，CLI 必须已经解析出一个可用的 `kgosd` service context。这个 context 负责确定实际 Knowledge Base runtime，但它**不是 StateRef / Branch / ObjectRef**，不能作为业务命令的隐藏 State default。
+每次业务命令 dispatch 时，`kg` 按 [本地运行时](runtime.md) 使用 `~/.kgosd/config.toml` 解析当前 daemon host / port，并连接：
 
-本文件不冻结以下 runtime/operator 细节：
+```text
+http://<host>:<port>
+```
 
-- daemon endpoint URI / local IPC 形式；
-- process auto-start、discovery、shutdown；
-- 一个 daemon 承载一个还是多个 Knowledge Base；
-- Knowledge Base 的文件系统路径 / package layout；
-- `init` / `daemon start|stop|status` / `doctor` 等 operator command 是否以及如何暴露。
+默认 endpoint 是 `http://127.0.0.1:4765`。如果 configured host 是 wildcard `0.0.0.0`，本机 CLI 使用 `127.0.0.1` 作为 connect host；其它具体 host 原样用于连接。CLI 不读取 token，因为 v1 daemon 没有认证；也不因为连接失败而自行启动第二个 daemon、随机换端口或直接打开 SQLite。endpoint 不可用时使用本文既有 exit `3` transport failure。
 
-这些问题属于 `kgosd` runtime / transport mapping；在它们确定前，不能让业务 CLI 直接打开 SQLite 来“临时解决连接问题”。无论未来选择什么 runtime target 方式，本文 Object / Graph / Evolution command tree、参数、stdout/stderr 和 error semantics 都保持不变。
+一个 daemon 最终承载一个还是多个 Knowledge Base、Knowledge Base 如何选择、`init` / `daemon start|stop|status` / `doctor` 等 operator command 的最终形态仍不属于当前业务命令树；这些后续设计不能改变本文 Object / Graph / Evolution command、stdout/stderr 或 error semantics。
 
 ## 兼容性
 

@@ -81,7 +81,7 @@ AI / Agent
 CLI / SDK / Web / Skill
     TypeScript / npm
     │
-    │ client ↔ daemon transport
+    │ loopback HTTP
     ▼
 kgosd
     Rust local daemon
@@ -103,7 +103,7 @@ kgosd
 - **`kgosd` 是 KG OS v1 的本地统一访问入口。** 它承载 KG OS Kernel，并负责打开 Knowledge Base、加载 Lithograph extension、维护所需 connection / transaction lifecycle，以及执行 KG OS 到 Lithograph 的 projection / compiler / consistency orchestration。
 - **Rust 层负责确定性核心。** `kgosd`、Kernel、Lithograph host/client、Object projection / Patch compiler、Evolution projection 与 KG OS consistency validation 使用 Rust 实现；Rust 层不重新实现 Lithograph 已拥有的 Graph Engine、Search Engine、Schema Engine 或 Version Engine。
 - **TypeScript / npm 层负责上层产品面。** SDK、CLI、Web 以及 Skill / 生态集成以 TypeScript / npm 为主要交付形态；它们消费 KG OS 公共 logical contract，不直接打开 SQLite database、加载 Lithograph extension 或依赖 `_lithograph_*` 内部状态。
-- **client ↔ `kgosd` 的具体 transport 不是 Kernel 产品语义。** HTTP route、metadata carrier、streaming form、本地进程发现与其它 transport 细节由 adapter / runtime 工程合同决定，但所有 transport 必须映射到同一 Object / Graph / Evolution logical contract，不能形成第二套行为。
+- **client ↔ `kgosd` 使用 HTTP，默认绑定本机 loopback。** configurable host / port、Web hosting、`~/.kgosd/` 目录与无认证边界由 [本地运行时](runtime.md) 唯一负责；具体 HTTP route / metadata carrier 仍由 adapter mapping 决定，但不能改变 Object / Graph / Evolution logical contract。
 
 这套结构是对早期 KG OS 技术架构中 `CLI / SDK / Web / Skill → kgosd → database` 分层的延续。被后续 Lithograph 架构替换的是原先由 KG OS 自己维护的 GraphQLite / FTS5 / sqlite-vec 数据库实现，不是 `kgosd` 的本地服务职责或 Rust / TypeScript 的上下层边界。
 
