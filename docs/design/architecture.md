@@ -81,7 +81,7 @@ AI / Agent
 CLI / SDK / Web / Skill
     TypeScript / npm
     │
-    │ loopback HTTP
+    │ HTTP
     ▼
 kgosd
     Rust local daemon

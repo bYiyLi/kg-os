@@ -15,8 +15,8 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
 | [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同 |
 | [cli.md](design/cli.md) | `kg` AI-first CLI command tree、参数、stdin/file、JSON/raw body/streaming、错误与 exit code |
-| [runtime.md](design/runtime.md) | `kgosd` configurable HTTP host/port、默认本地 endpoint、Web hosting、`~/.kgosd/` 配置/运行/日志/数据目录 |
-| [decisions.md](design/decisions.md) | D1–D44 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [runtime.md](design/runtime.md) | `kgosd` configurable HTTP host/port、startup config、single-instance lock、daemon lifecycle、Web hosting、`~/.kgosd/` 配置/日志/数据目录 |
+| [decisions.md](design/decisions.md) | D1–D45 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 实现 readiness、projection/compiler/adapter mapping 与工程实现顺序；不得重新定义产品语义 |
 
 ## 设计状态导航
@@ -24,7 +24,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 状态 | 范围与入口 |
 | --- | --- |
 | 已确认 | [架构](design/architecture.md)、[本地运行时](design/runtime.md)、[Ontology](design/ontology.md)、[Object](design/object.md)、[Knowledge / Graph](design/graph.md)、[Evolution](design/evolution.md)、[共享公共合同](design/contracts.md)、[`kg` CLI](design/cli.md)，以及这些规则对应的 [关键设计决定](design/decisions.md) |
-| 工程剩余 | [工程映射与实现待办](design/implementation.md)；只包括 Lithograph readiness、Schema / `SHOW` → `structure` projection、Object Patch → Cypher statement planning、Merge conflict projection / candidate checker、HTTP route/process lifecycle、Knowledge Base target/layout，以及 CLI / SDK / Skill / Web adapter 实现 |
+| 工程剩余 | [工程映射与实现待办](design/implementation.md)；只包括 Lithograph readiness、Schema / `SHOW` → `structure` projection、Object Patch → Cypher statement planning、Merge conflict projection / candidate checker、HTTP route/lifecycle implementation、Knowledge Base target/layout，以及 CLI / SDK / Skill / Web adapter 实现 |
 | 待实现 | [工程实现待办](design/implementation.md#工程实现待办)；实际实现依赖 Lithograph 对应公开能力已经可用 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的当前实现状态只以 Lithograph 仓库为准，不在 KG OS 复制第二份 Phase 状态。

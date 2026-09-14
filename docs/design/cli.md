@@ -23,7 +23,7 @@ CLI 遵守以下边界：
 - 不自动遍历所有 pagination page；AI / 调用方显式读取 cursor 并决定是否继续，避免一次命令无界扩大上下文；
 - 不提供 `kg request`、raw SQL、raw Lithograph procedure、`_lithograph_*` 或 SQLite pass-through；Graph `query` / `execute` 已是普通 Knowledge graph-data 的完整 Cypher 能力边界；
 - CLI 只通过 `kgosd` 的 HTTP endpoint 使用 Kernel，不直接打开 SQLite database 或加载 Lithograph extension；
-- CLI endpoint 从 `~/.kgosd/config.toml` 的 `server.host` / `server.port`（默认 `127.0.0.1:4765`）确定，不为业务命令增加 `--endpoint` / `--host` / random discovery；
+- active daemon endpoint 从 `~/.kgosd/kgosd.lock` 的 active lock owner 定位；`config.toml` 的 `server.host/server.port` 只决定下一次 daemon startup，不为业务命令增加 `--endpoint` / `--host` / random discovery；
 - v1 本地请求不附带 daemon token、API key 或其它 authentication credential。
 
 v1 不定义命令别名、缩写 namespace 或另一组 flattened commands。`kg branch ...`、`kg query ...` 等都不是 `kg evolution branch ...`、`kg graph query ...` 的第二种 canonical 拼写。
@@ -32,6 +32,12 @@ v1 不定义命令别名、缩写 namespace 或另一组 flattened commands。`k
 
 ```text
 kg
+├── daemon
+│   ├── start
+│   ├── status
+│   ├── stop
+│   └── restart
+│
 ├── object
 │   ├── list
 │   ├── search
@@ -143,10 +149,72 @@ v1 exit code 只表达粗粒度执行层级，稳定业务分类始终读取 err
 | ---: | --- |
 | `0` | command 成功，包括 empty result |
 | `1` | daemon 已返回 KG OS / Lithograph public error |
-| `2` | CLI usage、参数、stdin/file/local parse/input error；请求未成功 dispatch |
+| `2` | CLI usage、参数、stdin/file/local parse/input，或 daemon start 的本地 config/spawn/lifecycle error；请求未成功 dispatch |
 | `3` | `kgosd` target / transport 不可用；请求未成功 dispatch |
 
 进程被 shell signal 中断使用平台惯例，不建立 KG OS 业务 exit code。结构化 stdout/stderr 不输出 ANSI escape sequence。
+
+## Daemon CLI
+
+Daemon commands 是本地 operator surface，不是 Object / Graph / Evolution 的第二套业务 API。生命周期语义由 [本地运行时](runtime.md#daemon-lifecycle) 拥有；v1 不提供 `--force`、PID 参数、endpoint override 或 auto-start flag。
+
+### start
+
+```text
+kg daemon start
+```
+
+如果当前实例已经 `running`，命令 idempotent success；否则按 runtime contract 后台启动 `kgosd` 并等待 ready。成功 stdout：
+
+```json
+{"status":"running","endpoint":"http://127.0.0.1:4765"}
+```
+
+配置无效、`kgosd` executable/spawn 失败或 bind conflict 属于本地 lifecycle failure；若已有 lock owner 但其 control endpoint 不可用，按 transport-unavailable 处理。`start` 不修改 `config.toml`。
+
+### status
+
+```text
+kg daemon status
+```
+
+`status` 是观察命令；只要状态本身被成功判定，`stopped` / `starting` / `running` / `stopping` / `unavailable` 都属于成功观察并 exit `0`。stdout 只返回：
+
+```text
+{ "status": "stopped" }
+{ "status": "starting" }
+{ "status": "running", "endpoint": "http://..." }
+{ "status": "stopping", "endpoint": "http://..." }
+{ "status": "unavailable", "endpoint": "http://..." }
+```
+
+`endpoint` 只在 active lock 已经发布 endpoint 时出现。文件存在但 OS lock 没有 active owner 时必须返回 `stopped`，不能使用 stale endpoint。
+
+### stop
+
+```text
+kg daemon stop
+```
+
+通过 active endpoint 请求 graceful shutdown，并等待当前实例退出 / release lock。已经 stopped 时 idempotent success。成功 stdout：
+
+```json
+{"status":"stopped"}
+```
+
+v1 没有 PID kill / `--force` fallback；active owner 存在但 HTTP control 不可用时失败。
+
+### restart
+
+```text
+kg daemon restart
+```
+
+显式执行 stop → start；新的 `kgosd` 重新读取当前 `config.toml`。daemon 已经 stopped 时等价于 start。成功结果与 start 相同：
+
+```json
+{"status":"running","endpoint":"http://127.0.0.1:4765"}
+```
 
 ## Object CLI
 
@@ -460,15 +528,19 @@ KG OS CLI 不单独维护 human-only 命令树。人类与 AI 使用相同 comma
 
 ## Runtime target 与非目标
 
-每次业务命令 dispatch 时，`kg` 按 [本地运行时](runtime.md) 使用 `~/.kgosd/config.toml` 解析当前 daemon host / port，并连接：
+每次业务命令 dispatch 时，`kg` 按 [本地运行时](runtime.md) 解析 `~/.kgosd/kgosd.lock`：只有 OS lock 存在 active owner 时才把其中的 endpoint 视为当前 daemon target。
 
 ```text
-http://<host>:<port>
+active kgosd.lock owner
+        ↓
+published endpoint
+        ↓
+current kgosd
 ```
 
-默认 endpoint 是 `http://127.0.0.1:4765`。如果 configured host 是 wildcard `0.0.0.0`，本机 CLI 使用 `127.0.0.1` 作为 connect host；其它具体 host 原样用于连接。CLI 不读取 token，因为 v1 daemon 没有认证；也不因为连接失败而自行启动第二个 daemon、随机换端口或直接打开 SQLite。endpoint 不可用时使用本文既有 exit `3` transport failure。
+如果没有 active owner，普通业务命令直接使用本文既有 exit `3` transport failure；**不能自动执行 `kg daemon start`**。如果运行中的 daemon 启动后 `config.toml` 被修改，业务命令继续使用 lock 中的 effective endpoint；只有显式 `kg daemon restart` 后才切换到新 startup config。CLI 不读取 token，因为 v1 daemon 没有认证，也不因为连接失败而随机换端口或直接打开 SQLite。
 
-一个 daemon 最终承载一个还是多个 Knowledge Base、Knowledge Base 如何选择、`init` / `daemon start|stop|status` / `doctor` 等 operator command 的最终形态仍不属于当前业务命令树；这些后续设计不能改变本文 Object / Graph / Evolution command、stdout/stderr 或 error semantics。
+一个 daemon 最终承载一个还是多个 Knowledge Base、Knowledge Base 如何选择、`init` / `doctor` 等其它 operator command 是否需要仍未冻结；这些后续设计不能改变本文 Object / Graph / Evolution command、stdout/stderr 或 error semantics。
 
 ## 兼容性
 
