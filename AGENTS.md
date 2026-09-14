@@ -3,8 +3,8 @@
 ## 当前来源与权限
 
 - 涉及本地事实时，默认通过正式版 Nexum 连接 Yi Mac，打开 `/Users/yi/Code/KGOS`；后续回合按工具要求刷新上下文。工具的项目简介和历史聊天不能代替当前文件、Git 与命令结果。
-- 进入项目先读 [README](README.md) 和 [设计真源](docs/design.md)。继续同一主题时，至少重新核对相关设计章节；来源不可读时说明未知，不用旧结论补齐。
-- `README.md` 负责产品定义，`docs/design.md` 负责技术与数据设计；本文件负责协作规则。背景、研究与 Noven 只作参考，不自动成为 KG OS 决定。
+- 进入项目先读 [README](README.md) 和 [设计总入口](docs/design.md)。继续同一主题时，必须重新核对 `docs/design/` 中拥有该主题的职责文件；来源不可读时说明未知，不用旧结论补齐。
+- `README.md` 负责产品定义；`docs/design.md` 负责设计导航与职责索引；`docs/design/*.md` 按 `docs/design.md` 的 ownership 表分别维护技术与数据设计唯一真源；本文件负责协作规则。背景、研究与 Noven 只作参考，不自动成为 KG OS 决定。
 - 讨论、评审默认只读。记录设计、修改文件、实现、提交、推送分别按用户授权执行；历史授权不自动覆盖本次动作。分别授权指每类动作都必须有明确依据，不要求分成多轮对话；同一本次请求可以明确授权多个动作。核对授权不等于再次索取授权。
 - 明确执行请求在已授权范围内推进到修改、必要验证和汇报，不把最小方案汇报设成额外批准节点。新设计仍先获得确认并记录到所属真源，再实现依赖它的代码；只阻塞依赖该决定的工作。Skill 结束后继续本次请求已经授权的剩余步骤。
 
@@ -21,11 +21,11 @@
 | 用户新决定与旧文档冲突 | 标出具体差异；获准写入时同步受影响规则，不静默改写无关决定 |
 | 只有外部产品有某能力 | 不据此认定 KG OS 缺失，先说明它解决的当前需求 |
 
-读取“剩余依赖与工程合同”时，必须把它与对应主题的已确认 owner 章节一起判断。不得仅因该列表出现 `transport`、`serialization`、`wire`、`physical identifier`、底层 projection 或 `compiler mapping`，就推断该主题的产品语义、Object logical model 或 owner 边界未设计；只有对应 owner 章节本身明确保留 gap，或剩余选择会改变已确认产品合同，才提出新的设计问题。
+读取 `docs/design/implementation.md` 的“剩余依赖与工程合同”时，必须把它与对应职责设计文件的已确认 owner 章节一起判断。不得仅因该列表出现 `transport`、`serialization`、`wire`、`physical identifier`、底层 projection 或 `compiler mapping`，就推断该主题的产品语义、Object logical model 或 owner 边界未设计；只有对应 owner 章节本身明确保留 gap，或剩余选择会改变已确认产品合同，才提出新的设计问题。
 
 用户已授权完善设计时，属于 wire shape、字段命名、serialization、pagination、error mapping、internal persistence encoding、adapter mapping 或 compiler mapping 的工程合同，如果能从已确认产品语义、适用标准和当前底层公开合同确定，就直接选择满足当前需求的最简单方案、写入设计真源并验证，不逐项要求用户决定。只有不同可行答案会改变调用方可观察的产品语义、能力边界、数据 ownership、identity/lifecycle 或兼容承诺，并且现有真源与底层证据无法裁决时，才把具体分歧提交用户确认。
 
-评审图模型时，必须同时检查 Lithograph Schema 中的图结构、KG OS 上层语义和实际 Knowledge graph data，不能只检查 JSON/YAML 字段表。区分 Schema identifying name、数据库 element identity、业务唯一键与关系结构/约束；当前边界以设计文档 `Ontology` 下的“Structure：Lithograph 是唯一结构真源”、`Definition` 和“Knowledge 数据访问”章节为准，不沿用已被替换的旧 KG OS `from/to`、`unique`、`cardinality` 自定义字段模型。
+评审图模型时，必须同时检查 Lithograph Schema 中的图结构、KG OS 上层语义和实际 Knowledge graph data，不能只检查 JSON/YAML 字段表。区分 Schema identifying name、数据库 element identity、业务唯一键与关系结构/约束；当前边界以 `docs/design/ontology.md` 的“Structure：Lithograph 是唯一结构真源”与 `Definition`、以及 `docs/design/graph.md` 的“Knowledge 数据访问”章节为准，不沿用已被替换的旧 KG OS `from/to`、`unique`、`cardinality` 自定义字段模型。
 
 用户纠正后，先修正被指出的那一项，再检查它影响的既有规则。助手自行补出的示例、公式、ID 选择和默认行为仍是提案，不能因紧接在用户纠正后就写成已确认设计。反过来，有明确依据的用户决定也不能再次变成提问。
 
