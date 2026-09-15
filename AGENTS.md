@@ -25,7 +25,7 @@
 
 用户已授权完善设计时，属于 wire shape、字段命名、serialization、pagination、error mapping、internal persistence encoding、adapter mapping 或 compiler mapping 的工程合同，如果能从已确认产品语义、适用标准和当前底层公开合同确定，就直接选择满足当前需求的最简单方案、写入设计真源并验证，不逐项要求用户决定。只有不同可行答案会改变调用方可观察的产品语义、能力边界、数据 ownership、identity/lifecycle 或兼容承诺，并且现有真源与底层证据无法裁决时，才把具体分歧提交用户确认。
 
-评审图模型时，必须同时检查 Lithograph Schema 中的图结构、KG OS 上层语义和实际 Knowledge graph data，不能只检查 JSON/YAML 字段表。区分 Schema identifying name、数据库 element identity、业务唯一键与关系结构/约束；当前边界以 `docs/design/ontology.md` 的“Structure：Lithograph 是唯一结构真源”与 `Definition`、以及 `docs/design/graph.md` 的“Knowledge 数据访问”章节为准，不沿用已被替换的旧 KG OS `from/to`、`unique`、`cardinality` 自定义字段模型。
+评审图模型时，必须同时检查 Lithograph Schema 中的图结构、KG OS 上层语义和实际 Knowledge graph data，不能只检查 JSON/YAML 字段表。区分 Schema identifying name、数据库 element identity、业务唯一键与关系结构/约束；当前边界以 `docs/design/ontology.md` 的“使用模型”“公共可编辑格式”与持久化章节，以及 `docs/design/graph.md` 的“Knowledge 数据访问”为准。分别检查公共 aggregate 与底层存储：不得把“不持久化第二份 Schema”误读成“公共格式不能表达 type/required/unique/from/to”，也不得由底层 standalone ownership 推导必须提供独立 CRUD。
 
 用户纠正后，先修正被指出的那一项，再检查它影响的既有规则。助手自行补出的示例、公式、ID 选择和默认行为仍是提案，不能因紧接在用户纠正后就写成已确认设计。反过来，有明确依据的用户决定也不能再次变成提问。
 
@@ -35,8 +35,9 @@
 
 | 错误推断 | 正确检查 |
 | --- | --- |
-| JSON 没有 `from/to`，所以没有表达关系两端 | 查看定义图中的连接；不要换成另一个字段名重复保存同一结构 |
+| 公共 `from/to` 字段等于重复持久化一份关系 Schema | 检查逻辑字段到真实图结构的 compiler/decoder；表示、持久化与执行责任分别判断 |
 | 存在一条业务边，所以所有同名边自动受该类型限制 | 检查上层指定的定义与执行合同，不能由一个实例推导规则 |
+| 底层资源拆成多个 owner，所以 AI 必须逐个操作它们 | 先检查 Ontology mutation aggregate；资源拆分、引用维护和去重由 KG OS compiler 处理 |
 | Schema 身份、边标签、端点身份和业务唯一键是一回事 | 先说明正在定位哪种对象、比较哪些数据，禁止未经确认相互替换 |
 | `unique` 与 `cardinality` 可以互相替代 | 分别检查业务键重复和关系数量，不因调整一项而隐式修改另一项 |
 | 用户指出理解错误，就顺带确认一套新的实现公式 | 只记录用户明确决定；其余标明解释或待核对边界 |

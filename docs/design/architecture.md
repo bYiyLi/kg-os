@@ -26,7 +26,7 @@ KG OS 不替调用方定义世界，而是提供**定义世界并操作这个世
 
 ## 目标架构
 
-KG OS 是构建在 Lithograph 之上的 AI-first 高级知识库。KG OS 不再维护独立 Graph Engine、Ontology Schema Engine、Search Engine 或 Version Engine；这些底层数据库能力以 Lithograph 的公开合同为准。
+KG OS 是构建在 Lithograph 之上的 AI-first 高级知识库。KG OS 不再维护独立 Graph Engine、数据库约束执行引擎、Search Engine 或 Version Engine；这些底层数据库能力以 Lithograph 的公开合同为准。KG OS 自己拥有面向 AI 的 Ontology 逻辑 aggregate 与 compiler；这不是重复实现数据库。
 
 ```text
 AI / Agent / Skill / CLI / SDK / Web
@@ -64,11 +64,13 @@ AI / Agent / Skill / CLI / SDK / Web
 
 | 层 | 负责 |
 | --- | --- |
-| KG OS | Object / Graph / Evolution 公共能力、Ontology semantic metadata、Definition / Domain / Knowledge 的 AI-facing Object 投影、Knowledge Base 状态演进的业务化解释、AI-facing CLI / Skill、Human-facing Web |
+| KG OS | Object / Graph / Evolution 公共能力、Ontology semantic metadata、Domain / Definition mutation aggregate、渐进式 Ontology read、Knowledge 的 Object 投影、Knowledge Base 状态演进的业务化解释、AI-facing CLI / Skill、Human-facing Web |
 | Lithograph | Property Graph、Cypher 25、Graph Type / Schema、Constraint、Index、Search、immutable Commit DAG、Branch、Tag、Commit Data 与版本化状态操作 |
 | SQLite | Lithograph 的运行宿主、持久化文件、connection、transaction 与基础数据库机制 |
 
-KG OS 的设计必须建立在 Lithograph **公开能力**之上，而不是 Lithograph 的内部存储实现之上。
+KG OS 的设计必须建立在 Lithograph **公开能力**之上，而不是 Lithograph 的内部存储实现之上。公共能力与底层资源不要求一一对应：一次 Definition Patch 可以编排多个 Schema/Constraint/Index 变化，AI 不需要逐个组合它们。
+
+Ontology 阅读提供全局 → 可选 Domain → Definition 的明确入口；编辑仍使用共享 Object read/patch。它不是新的全套 CRUD，也不是虚拟文件系统。具体字段与读取规则唯一见 [Ontology](ontology.md)。
 
 ### v1 运行时与技术分层
 
@@ -133,7 +135,7 @@ KG OS 不把 caller-owned SQLite `BEGIN/COMMIT` 解释为自己的 Object Patch 
 
 ```text
 Public Capability
-├── Object      → 定位、读取、维护明确对象
+├── Object      → 读取/维护业务 aggregate；Ontology 另提供渐进阅读呈现
 ├── Graph       → 查询、遍历、搜索、集合级计算 / mutation
 └── Evolution   → State / Branch / Tag / History / Diff / Merge
 
@@ -171,6 +173,6 @@ State Data、Branch 与 Tag 属于 State Space / Evolution 的 sidecar / ref 状
 
 KG OS v1 只负责初始化自己创建或明确以**空 Lithograph Root State**交给 KG OS 的 Knowledge Base，不自动接管一个已经包含调用方 graph / Schema history 的任意 Lithograph database。自动 adoption 会要求 KG OS 猜测已有 Schema element 与 semantic Binding / Domain 的业务意图，属于独立的数据导入 / 迁移问题，不是普通启动流程。
 
-Bootstrap 流程是：先执行 Lithograph `lithograph_init()` 得到空图 Root Commit 与 `main`，然后以 Root Commit 作为 `expectedHead` 开启一个 Lithograph explicit transaction，在其中通过标准 Cypher 25 建立当前 KG OS 版本要求的 reserved internal Schema resources、internal semantic graph bootstrap data 与当前 bootstrap 真正需要的 Constraint / Index definition，最后一次 `tx_commit` 产生第一个 **KG OS-valid State**。Bootstrap 完成前不开放 Object / Graph / 普通 Evolution mutation；任一 bootstrap query / validation / commit 失败都由 Lithograph explicit transaction 整体 abort，不退回直接 SQL、内部表写入或多个 intermediate Commit。
+Bootstrap 流程是：先执行 Lithograph `lithograph_init()` 得到空图 Root Commit 与 `main`，然后以 Root Commit 作为 `expectedHead` 开启一个 Lithograph explicit transaction，在其中通过标准 Cypher 25 建立当前 KG OS 版本要求的 reserved internal Schema resources、internal semantic graph bootstrap data 与当前 bootstrap 真正需要的 Constraint / Index definition，最后一次 `tx_commit` 产生第一个 **KG OS-valid State**。Bootstrap 完成前不开放 Ontology read / Object / Graph / 普通 Evolution mutation；任一 bootstrap query / validation / commit 失败都由 Lithograph explicit transaction 整体 abort，不退回直接 SQL、内部表写入或多个 intermediate Commit。
 
 因此 v1 正常 bootstrap 不产生 durable intermediate Commit：Lithograph Root Commit 是第一个 KG OS-valid State 之前唯一预期存在的 pre-KGOS / invalid history 节点，只按 D31 的 Evolution 诊断规则查看。KG OS 公共业务能力从 explicit transaction 成功产生的第一个 KG OS-valid State 开始。未来若需要把已有 Lithograph database 导入 KG OS，必须另行设计显式 adoption / migration contract；v1 不做自动推断。

@@ -136,6 +136,7 @@ Change = {
   path: string,          # RFC 6901 JSON Pointer over logical Object Value; "" = whole Object
   beforeRef?: ObjectRef,
   afterRef?: ObjectRef,
+  relatedRefs?: ObjectRef[], # shared resource 的其它受影响 Definition
   before?,
   after?
 }
@@ -153,6 +154,7 @@ MergeConflict = {
   baseRef?: ObjectRef,
   oursRef?: ObjectRef,
   theirsRef?: ObjectRef,
+  relatedRefs?: ObjectRef[],
   base?,
   ours?,
   theirs?,
@@ -187,7 +189,13 @@ MergeSession = {
 }
 ```
 
-`Change.path` 只用于解释 Diff / History 的逻辑位置，不是 mutation API；Object Patch 仍只接受 Git Extended Diff。`before/after` 使用对应 public Object Value / Lithograph typed value 的 JSON-compatible representation，不返回 internal slot。Add 只有 `afterRef`，Delete 只有 `beforeRef`，Update / Restructure 对 identity 未变化的 Object 令 `beforeRef == afterRef`。只有 owner 已有 continuity evidence 能证明 rename 前后仍是同一个 Object 时，Rename Change 才同时给出不同的 `beforeRef/afterRef`，例如 Definition / Property / Domain 的 Binding / Domain identity continuity。Knowledge Relationship 因 type / endpoint change 发生 replacement 时，D20 明确不持久化 old→new continuity，因此 Evolution Diff / History 必须表现为独立 Delete + Add；当次 Object Patch response 的 `transitions` 不能被 History 事后用来拼接生命周期。Definition-level 派生的大量 Relationship replacement 同样表现为可分页的 Delete/Add change。
+`Change.path` 只用于解释 Diff / History 的逻辑位置，不是 mutation API；Object Patch 仍只接受 Git Extended Diff。`before/after` 使用对应 public Object Value / Lithograph typed value 的 JSON-compatible representation，不返回 internal slot。Add 只有 `afterRef`，Delete 只有 `beforeRef`，Update / Restructure 对 identity 未变化的 Object 令 `beforeRef == afterRef`。只有 owner 已有 continuity evidence 能证明 rename 前后仍是同一个 Object 时，Rename Change 才同时给出不同的 `beforeRef/afterRef`，例如顶层 Definition / Domain 的 Binding / Domain identity continuity；内嵌 Property rename 保持 aggregate Ref，在字段级 Change 中说明。Knowledge Relationship 因 type / endpoint change 发生 replacement 时，D20 明确不持久化 old→new continuity，因此 Evolution Diff / History 必须表现为独立 Delete + Add；当次 Object Patch response 的 `transitions` 不能被 History 事后用来拼接生命周期。Definition-level 派生的大量 Relationship replacement 同样表现为可分页的 Delete/Add change。
+
+Ontology Change 的 `kind/ref` 始终定位公共 Domain / Definition，不把 Property/Constraint/Index 重新暴露为独立 Object。`path` 定位 aggregate 中的字段；Property 改名或 canonical 数组排序导致位置变化时，Diff 可以报告对应 collection 的完整 before/after，而不是用一个 index 指向两个不同属性。
+
+共享索引的一次底层变更在 whole-Ontology Diff 中只报告一次：从 before/after 中参与该资源的 Definition Ref 并集按 UTF-8 bytes 选择最小 Ref 作为展示锚点，`relatedRefs` 列出其余受影响 Ref。这个选择只用于报告，不成为编辑 ownership；object-scope 过滤命中任一参与 aggregate 都能看到该变化。beforeRef/afterRef 只在对应 State 的该聚合确实包含被报告字段时给出；共享 target 的加入/移除可以只在一侧具有该展示位置，不据此推断整个 Definition 被新增/删除。查询该 aggregate 当前详情时看到的仍是同一个共享资源。
+
+Merge 也不为同一个底层 conflictId 的多个展示位置制造重复 conflict。选择上述展示锚点，显示完整资源 scope，并按同一个 conflictId 解决一次。显式 replacement value 使用该 conflict 对应的公开 aggregate 字段表示，由 KG OS 映射回原生 conflict slot；这不是要求 AI 用独立 Schema API 修复。一个底层 conflict 无法安全双向表达时仍按既有 consistency 边界拒绝，不猜测或泄露内部资源。
 
 `history.items` 的分页单位是 **一个 State 中的一条 public Change**；同一个 State 有多条变化时可以出现多个相同 `state/parents` 的 HistoryEntry。显式 empty-delta State 在 `scope=all` 时仍返回一个 `change=null` entry，使业务 State 的存在不会因为 Snapshot diff 为空而从 History 消失。
 
@@ -331,7 +339,7 @@ Conflict result 只暴露可映射到公共 Object / Graph 的 conflict；`path`
 
 `merge.resolve` 一次只需要提交调用方当前已经决定的一批 resolution，不要求一次解决全部冲突。`expectedRevision` 必须等于 Session 当前 revision；Lithograph 负责原子 set/replace resolution 并递增 revision。调用方可以先解决 10 个，再解决 20 个，直到 `unresolved=0`；这些中间步骤全部只是 Merge Session state，不产生 KG OS State，也不移动 Branch。`resolutions.conflictId` 原样传回对应 Lithograph Session；unknown / duplicate conflictId 返回 `INVALID_ARGUMENT`。`choice=value` 的显式 value 先按该 public conflict row 的 logical slot/value contract 验证，再确定性映射到底层 conflict 所需 typed value；无法把某个底层 conflict 安全投影/反向映射为公共 target 时返回 `CONSISTENCY_ERROR`，不泄露 internal graph / schema identifiers，也不由 KG OS 猜 resolution。
 
-当 `unresolved=0` 时，KG OS 再次确认 Session pinned `targetState/sourceState` 仍满足 D31，然后使用 Lithograph `options.mergeSession={id, revision}` 对**该精确 revision 的 candidate**做只读一致性校验。校验至少覆盖 Binding coverage、reserved internal graph / Schema isolation 和本文其它 KG OS-valid State invariants；可以通过多条只读 Cypher / Schema introspection 完成，但不能修改 candidate。校验失败返回 `CONSISTENCY_ERROR`，Session 保留且不产生 State/ref move；调用方可以调整已有 conflict resolution 后重新校验，或者 `merge.abort` 放弃。如果当前没有可通过调整 resolution 修复的公共 conflict，调用方应 abort，先通过普通 Object/Graph mutation 修复 source/target State，再开始新的 merge；v1 不再发明一套“直接编辑 merge candidate”的第二 mutation surface。
+当 `unresolved=0` 时，KG OS 再次确认 Session pinned `targetState/sourceState` 仍满足 D31，然后使用 Lithograph `options.mergeSession={id, revision}` 对**该精确 revision 的 candidate**做只读一致性校验。校验至少覆盖 Binding coverage、reserved internal graph / Schema isolation、Ontology aggregate 可解释性与共享声明一致性，以及本文其它 KG OS-valid State invariants；可以通过多条只读 Cypher / Schema introspection 完成，但不能修改 candidate。校验失败返回 `CONSISTENCY_ERROR`，Session 保留且不产生 State/ref move；调用方可以调整已有 conflict resolution 后重新校验，或者 `merge.abort` 放弃。如果当前没有可通过调整 resolution 修复的公共 conflict，调用方应 abort，先通过普通 Object/Graph mutation 修复 source/target State，再开始新的 merge；v1 不再发明一套“直接编辑 merge candidate”的第二 mutation surface。
 
 校验通过后，KG OS 立刻以同一个 `expectedRevision` 调用 Lithograph `merge.finalize`。Lithograph 再检查 Session revision 未变化且 target Branch head 仍等于 pinned `targetState`；resolution 被并发修改时返回 `MERGE_SESSION_CHANGED`，target Branch 已前进时返回 `BRANCH_HEAD_MOVED`。因此 KG OS 校验过的 candidate 不会在校验与 finalize 之间被静默替换。成功 finalize 的 `up_to_date / fast_forward / merged` 都返回最终 `state`；只有 `merged` 创建新的 two-parent Commit，`fast_forward` 只移动 Branch，`up_to_date` 不移动 Branch。
 
@@ -345,7 +353,7 @@ Conflict result 只暴露可映射到公共 Object / Graph 的 conflict；`path`
 
 `history` 返回统一 State DAG 上与调用方 scope / Object address 相关的业务变化序列；`diff` 比较两个 immutable State Snapshot。两者都把底层历史业务化为公开 Object / Knowledge graph 变化，并过滤 KG OS internal Binding Record、reserved Label / Relationship、Schema Locator 等实现细节；mutable State Data、Branch 与 Tag 不进入 Snapshot diff。
 
-Object-specific History / Diff **不能只用裸 Object Ref 作为跨版本 continuity anchor**。任何基于名称 / locator 的 Ref 都可能在旧对象删除后被新的资源重新使用；因此对象级历史定位使用上述 `object.anchorState + object.ref`。KG OS 在 anchor State 内先解析该 Object，再只使用 owner 已有的稳定 continuity evidence 跟踪后续历史：Definition / Property / Domain 使用 internal Binding / Domain identity，Knowledge 使用 Lithograph element identity，Graph Type / Constraint / Index 使用 Lithograph 公开 Schema history / identity 能实际提供的连续性。若底层对某类 Schema resource 只有名称而没有可证明的跨 drop+create identity，KG OS 不把同名新资源猜成旧对象的延续。
+Object-specific History / Diff **不能只用裸 Object Ref 作为跨版本 continuity anchor**。任何基于名称 / locator 的 Ref 都可能在旧对象删除后被新的资源重新使用；因此对象级历史定位使用上述 `object.anchorState + object.ref`。KG OS 在 anchor State 内先解析该 Object，再只使用 owner 已有的稳定 continuity evidence 跟踪后续历史：Definition / Domain 使用 internal Binding / Domain identity，Knowledge 使用 Lithograph element identity；Property 使用内部 Binding 在 Definition 内跟踪。Constraint / Index 的变更归入 Definition，资源连续性只使用 Lithograph 公开 history / identity 的实际证据。若底层对某类 Schema resource 只有名称而没有可证明的跨 drop+create identity，KG OS 不把同名新资源猜成旧对象的延续。
 
 Ontology / Knowledge / 单 Object 历史都只是同一 `history` / `diff` 的 scope filter，不建立平行 History API。History / Diff 结果可能因为批量 migration 很大，因此公共 wire 必须支持 bounded result / cursor，而不是承诺一次返回全部变化。Raw Lithograph Patch 不作为 KG OS 当前 Evolution 公共能力。
 

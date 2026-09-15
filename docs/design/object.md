@@ -1,135 +1,65 @@
 # Object 设计
 
-本文件是 KG OS **Object identity、Object Value、representation、discovery、read 与 Patch mutation** 的设计真源。State / History / Merge 由 [Evolution](evolution.md) 负责。
+本文件拥有 KG OS **共享 Object Ref、序列化、read 与统一 Patch mutation 合同**。Ontology 聚合的逻辑字段、渐进式读取和结构语义由 [Ontology](ontology.md) 拥有；Knowledge 数据由 [Graph](graph.md) 拥有；State / History / Merge 由 [Evolution](evolution.md) 拥有。
 
 ## Object Ref 与公共身份
 
-KG OS 不建立一套覆盖所有资源的额外 UUID / Resource ID 体系。Object Ref 直接复用对象 owner 已有的原生 identity，或使用当前 Snapshot 中足以确定定位的业务名称；KG OS 不再把原生 identity 包装成第二种公开地址：
+Object 定位的是 KG OS 公共业务对象，不是一比一暴露底层数据库资源。公共 Object kinds 固定为：
 
-| Object | Object Ref / 定位依据 |
-| --- | --- |
-| Knowledge Node | Lithograph `elementId()`，例如 `n:123` |
-| Knowledge Relationship | Lithograph `elementId()`，例如 `r:456` |
-| Current Graph Type | Lithograph 公开 current Graph Type locator / identity |
-| Node Definition | `kind=node` + 当前 Schema identifying name |
-| Relationship Definition | `kind=relationship` + 当前 Relationship Type / Schema identifying name |
-| Property | owner Definition Ref + 当前 property name |
-| Standalone Constraint | Lithograph 公开 constraint identity / name |
-| Index Definition | Lithograph 公开 index identity / name |
-| Domain | 当前 Domain name |
+| Object | Canonical Ref | 定位依据 |
+| --- | --- | --- |
+| Knowledge Node | `n:<decimal-id>` | Lithograph elementId |
+| Knowledge Relationship | `r:<decimal-id>` | Lithograph elementId |
+| Node Definition | `node:<name>` | 当前 Definition name |
+| Relationship Definition | `relationship:<name>` | 当前 Definition name |
+| Domain | `domain:<name>` | 当前 Domain name |
 
-Object Ref v1 的 canonical string serialization 固定为：
+名称 decode 后非空；Definition/Property 名按对应 Lithograph identifier 合同校验，Domain 名的长度限制见 Ontology。`n:`/`r:` id 必须是原生有效范围内的 canonical 十进制，无前导零或符号；不再重新分配或转换 element identity。
 
-```text
-Knowledge Node             n:<decimal-id>
-Knowledge Relationship     r:<decimal-id>
-Node Definition            node:<name>
-Relationship Definition    relationship:<name>
-Property                   property:<owner-definition-ref>#<property-name>
-Domain                     domain:<name>
-Current Graph Type         graph-type:<lithograph-locator>
-Standalone Constraint      constraint:<lithograph-locator>
-Index Definition           index:<lithograph-locator>
-```
+`<name>` 先 UTF-8 编码，再用 RFC 3986 单 component percent-encoding；unreserved bytes 保持，其余为 uppercase `%HH`。不做 Unicode normalization 或 case folding。输入必须是 canonical spelling：decode 后必须为合法 UTF-8，unreserved byte 不能额外 percent-encode，percent escape 必须为 uppercase。非法或非 canonical Ref 返回 `INVALID_ARGUMENT`，合法但不存在返回 `OBJECT_NOT_FOUND`。
 
-其中 `<name>`、`<property-name>` 与 Lithograph locator component 先按 UTF-8 编码，再按 RFC 3986 percent-encoding 作为单个 component 序列化；unreserved bytes `ALPHA / DIGIT / - . _ ~` 保持原样，其它 byte 使用 `%HH` uppercase hex。KG OS 不做 Unicode normalization、case folding 或名称重写。Property 的 owner 只能是 `node:...` 或 `relationship:...` Definition Ref；因为 component 内的 `#` 必须 percent-encode，raw `#` 可以无歧义作为 owner Ref 与 property name 的分隔符。
+`property:`、`constraint:`、`index:`、`graph-type:` 不再是 v1 的公共 read / patch / history Object kinds。Property 和具名 Constraint / Index 在 Definition aggregate 内定位；错误与 Diff 使用 Definition Ref + 字段位置。真实 Index name 仍可用于 Cypher，但它不要求成为独立 KG OS CRUD resource。旧设计尚未实现，本次直接替换合同，不添加兼容层。
 
-公共 API 输入的 Object Ref 必须是 canonical serialization：percent escape 使用 uppercase `%HH`，可保持 unreserved 的 byte 不能额外 percent-encode，decode 后必须是合法 UTF-8；同一个 Object 不接受多种等价 Ref 拼写。非 canonical / 非法编码返回 `INVALID_ARGUMENT`，不存在的 canonical Ref 才返回 `OBJECT_NOT_FOUND`。
+`n:<id>` / `r:<id>` 原样用于 Cypher `elementId()`；Definition / Domain Ref 不是 Knowledge elementId。State / Branch / Tag 仍是独立 Evolution reference；历史定位为 **State reference + Object Ref**，不拼新 ID，不新增公共 UUID。
 
-`graph-type:` / `constraint:` / `index:` 后的 locator 只是 Lithograph **公开 canonical locator / identity 的无损字符串编码**，不建立 KG OS name→ID mapping。若 Lithograph 对某类 Schema resource 尚未提供可无歧义序列化的公开 canonical locator，该 Object kind 的实现继续按前述规则视为底层公共能力阻塞；KG OS 不通过内部表或自建 UUID 补洞。
-
-Knowledge element 必须直接使用 Lithograph 已公开的 `n:<id>` / `r:<id>`，不能再转换成 `/knowledge/n:<id>`、`object:n:<id>` 或其它 KG OS 专用身份。Graph 查询返回的 `elementId()` 因而可以原样用于 Object `read` / `patch`，也可以原样重新用于 Cypher。
-
-“统一 Object Ref”表示所有 Object 都通过一个公共 `ref` 概念定位，**不表示所有 Ref 都是同一种 Lithograph value**。只有 Knowledge Node / Relationship 的 `n:<id>` / `r:<id>` 是 Cypher `elementId()` 字符串，可以直接用于 `elementId()` 比较；Definition / Property / Domain / Graph Type / Constraint / Index Ref 是各自 owner 的 Schema / KG OS locator，只用于相应 Object / Evolution 语义，不能当作 Knowledge elementId 传入 Cypher。Object discovery result 按本文 `ObjectSummary` 同时返回 `kind + ref`，调用方不需要从任意 locator 内容猜 Object kind。
-
-如果 Lithograph 对某类 versioned Schema resource 尚未提供足以无歧义 read / mutate / history 的公共 locator / identity，KG OS 不得通过读取内部表、生成持久 UUID 或维护 name→ID side table 来补洞；对应 Object kind 的实现 readiness 视为被底层公共能力阻塞，直到 Lithograph 自身公共合同能够支持。这个规则保证“统一 Object”不会反过来迫使 KG OS 建立第二套 Schema identity。
-
-State / Branch / Tag 不是另一类 Object identity，而是 Evolution reference：State 直接复用 Lithograph Commit identity，Branch / Tag 直接复用各自名称。一个历史对象的完整定位语义是 **State reference + Object Ref**；两者保持独立字段，不拼成新的永久 ID。
-
-Definition、Property 与 Domain 的 Object Ref 用于在一个确定 Snapshot 中定位当前对象，不承担跨版本永久身份。显式 rename 后 Object Ref 随名称变化；KG OS internal Binding Record / Domain Node 的稳定 Lithograph graph element identity 负责跨 Commit 的内部连续性，使 Evolution History / Diff 可以把 rename 解释为同一对象的演化，而不是要求调用方持有额外 UUID。
-
-因此：
-
-```text
-Object Ref
-→ 在目标 Snapshot 中定位对象
-
-State reference + Object Ref
-→ 定位历史 Snapshot 中的对象
-
-internal graph identity
-→ KG OS 内部识别跨 Snapshot 连续性
-```
-
-内部 Binding Record / Domain Node identity 当前不进入 v1 公共 identity。未来只有出现必须跨 rename 长期持有 opaque public identifier 的真实需求时，才重新评估是否暴露稳定公共 ID。
+Definition / Domain Ref 随显式 rename 变化，内部 Binding / Domain Node identity 保持连续。Property 的连续性在 Definition 内由 Property Binding 保持。这个内部身份不冒充数据库 Schema 永久 identity，也不进入公共 body。关系 replacement 的旧新 `r:` 不建立持久 alias。
 
 ## Object
 
-Object 是 KG OS 面向 AI / SDK / Web 的统一**可寻址、可读取、可编辑投影**。Ontology 与 Knowledge 仍然保持各自的数据责任，但不再各自维护一套 CRUD surface；Domain、Definition、Property、Lithograph current Graph Type / standalone Constraint / Index definition，以及 Knowledge Node / Relationship 都通过同一个 Object 模型被定位和维护。
-
-Object 不是新的持久化层。每次读取都从目标 State 的 Lithograph Schema、普通 Knowledge graph 与 KG OS internal semantic graph 动态生成；每次修改都必须回写到底层真实 owner，不能保存第二份 Object JSON 作为真源。
+Object 提供明确对象的稳定读取和统一局部修改，不强迫 AI 逐个理解底层资源。Ontology 使用 Domain / Definition aggregate；Knowledge 保留 Node / Relationship。Object Value 只在读取和编译时组合，不持久化第二份 YAML / JSON 真源。
 
 ### Object 能力面
 
 ```text
-Object Capability
-│
-├── list
-├── search
-├── read
-└── patch
+list    → 枚举公共 aggregate / Knowledge 对象的摘要
+search  → 仅保留 Knowledge 范围的既有定位能力
+read    → 同一对象的 canonical YAML / equivalent JSON
+patch   → 统一 Add / Update / Delete / Rename / Restructure
 ```
 
-这些名称描述逻辑能力，不冻结最终 CLI command、SDK method 或 HTTP route。**Object Patch 的交互模型已经冻结为“canonical YAML + Git Extended Diff textual Patch”**。文本 Patch 语法直接采用普通 two-way `git diff -p` / Git Extended Diff 格式，KG OS 不再定义自己的 section marker、hunk grammar 或 path escaping。
+Ontology 首次发现与渐进理解使用 [Ontology read](ontology.md#ontology-read-合同)，不是 Object search。Ontology 不支持关键字搜索，也不能通过 `scope=all` 或省略 scope 间接搜索 Ontology。普通 Knowledge 的属性全文、Vector、条件与遍历仍用 Graph Cypher。
 
-KG OS v1 不再增加独立 `save` / `create` / `update` / `replace` / `upsert` 核心 mutation capability。Add / Update / Delete / Rename / Restructure 都由同一个 `patch` 表达；“新增一个 Object”使用 Git new-file entry，“修改已有 Object”使用基于 `baseState` canonical YAML 的 hunk，“删除 / rename”复用 Git 对应 extended headers。这样 `save` 不会再引入“Ref 不存在是否自动 create”“完整 Object 缺失字段是删除还是保留”“更新是否等价 replace / upsert”等第二套写入语义，也不会为多 Object 原子变化再复制 batch / alias / concurrency contract。Adapter 可以提供生成 Patch 的本地 convenience helper，但不能把它提升成具有独立写入语义的第二个公共能力。
-
-`list` 用于按 Object kind / scope 做轻量枚举与分页，只返回定位和必要摘要，不因为某个 scope 下对象很多就展开所有 Object 内容。`search` 用于不知道准确 Ref 时发现相关 Object；Ontology 的 `name` / `title` / `description` 等语义可以进入这一能力，但它不演化成第二套 Search DSL。海量 Knowledge 的条件发现、关系遍历、全文/向量混合检索等复杂任务继续由 Graph `query` 完成。
+写入始终只有一套 **canonical YAML + Git Extended Diff textual Patch**。不为 Domain、Node Definition、Relationship Definition、Property、Constraint、Index 分别建立 create/update/save API，也不新增 full-object PUT / upsert。聚合 Patch 可以编排多个底层资源，底层 ownership 不决定公共 API 的粒度。
 
 ### Object Value 与 representation
 
-`read` 接受 State reference + Object Ref，先解析出唯一的逻辑 **Object Value**，再按调用方需要序列化。YAML 与 JSON 只是同一 Object Value 的不同 representation，不是两份对象状态、两套 Schema 或第二持久化真源。
-
-Object Value 的**逻辑内容和 ownership 已由各 owner 章节确认**，serialization contract 不重新设计它们：Domain 使用已确认的 `name / title? / description? / includes`；Definition / Property 聚合 Lithograph Structure 与对应 `title? / description?`；Knowledge Node / Relationship 投影 Lithograph 当前 graph state；current Graph Type / standalone Constraint / Index 直接投影各自 Lithograph Schema resource 的 owner state。本文已经冻结 KG OS 自己拥有的字段、顺序、typed value 与调用合同；唯一仍依赖底层设计的是 `structure` 内部如何无损投影 Lithograph public Schema resource。
-
-v1 已能从当前 owner contract 冻结的 Object Value shape 如下；这些字段描述**可编辑 owner state**，Object Ref、resolved State、Object kind 等定位 metadata 不放进 canonical body：
+`read` 接受 State reference + Object Ref，在该 State 中解析一个公共逻辑值，再序列化。Ontology 的三种 aggregate 使用 [公共可编辑格式](ontology.md#公共可编辑格式)，不使用 raw `structure` 容器。Knowledge 的字段保持不变：
 
 ```text
-Domain
-  name
-  title? / description?
-  includes[]                 # Object Ref
-
 Knowledge Node
   labels[]
   properties{}
 
 Knowledge Relationship
   type
-  start                      # n:<id>
-  end                        # n:<id>
+  start       # n:<id>
+  end         # n:<id>
   properties{}
-
-Node / Relationship Definition
-  name
-  title? / description?
-  structure                  # Lithograph public Schema projection
-  properties[]               # 按 Property name 排序的完整 child Property projection
-
-Property
-  name
-  title? / description?
-  structure                  # Lithograph public Property Schema projection
-
-Graph Type / Constraint / Index
-  structure                  # 对应 Lithograph public Schema resource projection
 ```
 
-上面的 Object Value shape 描述 `read` 返回和成功 State 中的**正式 logical value**。Request-local `new:<kind>:<alias-component>` 不是新的 Object Value scalar type；它只允许在 Object Patch 输入中替代一个本来要求 Object Ref、但目标是本请求新增 Object 的 Ref-typed slot。成功后的 Relationship `start/end`、Domain `includes` 等位置必须全部解析成正式 Object Ref，canonical `read` 永远不返回 `new:...`。反过来，普通 String / Property value 即使文本恰好以 `new:` 开头，只要该 slot 不是 Object Ref 类型，就按普通 String 处理，不能被 alias resolver 截获。
+`state/ref/kind` 是 metadata，不是可编辑 body。Domain 不复制成员内容；Knowledge Relationship 不复制 endpoint Node；**Definition 可以直接编辑它聚合的 Property / Constraint / Index**，即使这些内容映射到多个独立底层资源。共享索引的重叠展示不增加持久 owner，遵守 Ontology 的显式 delta 归一化规则。
 
-`structure` **不是 KG OS 自建 Schema AST**。它由 Lithograph 已确认的 Cypher 25 Schema / current-graph `SHOW` public surface 投影，并由 KG OS projection/compiler 层归一化成 owner-only logical value，再编译回标准 Cypher 25 Schema mutation。精确字段 / row 到 `structure` slot 的映射与 canonical normalization 属于实现合同；如果实现时发现某个 KG OS 已确认 owner state 确实无法通过 Lithograph public surface 读取或修改，这是具体底层能力缺口，而不是允许 KG OS 自建第二套 Schema AST 的理由。
-
-`structure` 仍必须服从 owner-only、single-slot 原则，不能把已经由外层字段或 child Object 拥有的状态再复制一遍：Definition 的 `structure` 不重复自身 identifying `name`，也不内联 child Property state；Property 的 `structure` 不重复 Property `name` / `title` / `description`；Graph Type 的 `structure` 只包含 D27 定义的 graph-level owner state，不内联 Definition / Property / Constraint / Index；Constraint / Index 的 `structure` 只包含自身 Lithograph owner state，并以 public locator / Object Ref 引用其它资源而不是复制其可变内容。KG OS renderer / parser 必须把每个可编辑 logical slot 映射到唯一位置；如果 Lithograph introspection 原始结果有嵌套重复，projection 层负责归一化，而不是原样制造第二个 mutation owner。
+Request-local `new:<kind>:<alias>` 只在 Patch 的 Ref-typed slot 中引用本请求新建 Object，例如 Domain includes、Relationship Definition from/to、Index targets、Knowledge Relationship start/end。普通字符串恰好以 `new:` 开头不当作引用。成功后全部 Ref 解析为正式 Ref；内嵌 Property 不需要单独的 Object alias 或 Patch entry。
 
 v1 确认两种公开 serialization：
 
@@ -146,7 +76,11 @@ Object Value
 - 核心 Object 合同不发明 `representation: {mode, format}` 之类参数。HTTP adapter 使用标准 content negotiation：客户端通过 `Accept: application/yaml` 或 `Accept: application/json` 请求 representation，响应通过对应 `Content-Type` 声明实际媒体类型。CLI / SDK 可以提供 `--format`、`readText`、`readObject` 等便利接口，但它们只是同一 Object Value / serialization contract 的适配，不建立新的数据模型；
 - State、Object Ref、请求时使用的 Branch / Tag 等定位上下文仍属于 read result metadata，不是可编辑 Object Value。具体 HTTP header / response envelope、CLI 输出包装和 SDK method shape 仍由 transport contract 冻结。
 
-canonical YAML renderer v1 使用 YAML 1.2 block style，并固定：2-space indentation、LF document newline、文档末尾一个 newline、不输出 anchors / aliases / custom tags、不输出 comment；固定字段按上面各 Object shape 的顺序输出，动态 map key 与 set-like collection 按 UTF-8 byte ascending 排序。固定 schema field name 使用 plain key；调用方数据产生的动态 map key 一律 double-quote。
+批量 editable presentation 不建立第三种 Object serialization。多个 canonical YAML Object body 需要在同一 stdout 中返回时，CLI 使用标准 YAML 1.2 **multi-document stream**：每个 document 的 mapping/list/scalar 内容必须与该 Object 单独 canonical render 的 bytes 一致；document-start marker 以及 marker/stream 上的 `kgos-state` / `kgos-ref` comment 属于 adapter framing，不属于 document 的 Object Value。Framing comment 被标准 YAML parser 丢弃不影响任何业务值；程序化 target association 使用请求顺序与结构化 metadata，不把 comment 当成持久 identity。v1 不建立自动拆文件、目录结构或 `{ref, value}` YAML wrapper，因为这些都会改变 Patch base 或重新引入文件身份。
+
+canonical YAML renderer v1 使用 YAML 1.2 block style，并固定：2-space indentation、LF document newline、文档末尾一个 newline、不输出 anchors / aliases / custom tags、不输出 comment；固定字段按对应 owner 文档的 Object shape 顺序输出，动态 map key 与 set-like collection 按 UTF-8 byte ascending 排序；Property 列表按 name、具名 Constraint/Index 列表按 name 排序。索引/组合约束的 properties 等有序业务列表保留顺序，不能当作 set 排序。固定 schema field name 使用 plain key；调用方数据产生的动态 map key 一律 double-quote。
+
+这里“不输出 comment”约束的是**单个 canonical Object body**。Batch stream 的 `# kgos-state` / `# kgos-ref` 属于外层 transport framing，不由 canonical Object renderer 产生，也不能进入 Git hunk；抽取任意 document body 后仍满足本段 canonical renderer 规则。
 
 String rendering 必须无损：
 
@@ -157,38 +91,24 @@ String rendering 必须无损：
 
 其它 scalar / typed value rendering 继续以 Lithograph JSON v1 为类型边界，并固定：`null` 写作 `null`；Boolean 只写 `true / false`；JSON safe-range Integer 使用无前导 `+`、无多余前导零的 base-10 scalar，超出 safe range 继续使用 `$type: Integer` + decimal String；finite Float 使用能 round-trip 回同一 IEEE-754 value 的 shortest decimal，并且 lexical form 必须带小数点或 exponent 以区别 Integer，整数值 Float 例如 `1.0` 不能规范化成 `1`，negative zero 固定保留为 `-0.0`；NaN / ±Infinity 继续使用 Lithograph `$type: Float` tagged form。Temporal、Duration、Point、Vector、UUID 与 reserved-`$type` Map wrapper 都与 Lithograph JSON v1 同构。
 
-因此 canonical renderer 往返解析必须得到逐 code point 相同的 String 和同一 typed scalar value，不允许为了“更好看”增加/移除末尾换行、把 Float 改成 Integer，或丢失特殊值类型。缺省的可选 `title` / `description` 不输出；结构性 collection 即使为空也输出为空 collection。Lithograph typed value 只是在 YAML 中表达同一 tagged map，不创建第二套特殊类型语法。
+因此 canonical renderer 往返解析必须得到逐 code point 相同的 String 和同一 typed scalar value，不允许为了“更好看”增加/移除末尾换行、把 Float 改成 Integer，或丢失特殊值类型。缺省的可选 `title` / `description` 不输出；必需 collection 即使为空也输出；optional/default field 的省略规则由对应 owner 文档规定。Lithograph typed value 只是在 YAML 中表达同一 tagged map，不创建第二套特殊类型语法。
 
 输入仍遵守 D34：调用方不需要复刻 canonical renderer 的风格，只要标准 YAML 能无歧义解析为同一合法 Object Value 即可；成功写入后再次 `read` 会规范化回 canonical YAML。
 
 ### Object 公共调用合同
 
-Object 的逻辑 wire contract 独立于具体 HTTP route、CLI command 或 SDK method；不同 adapter 必须保持下列字段与语义，不得因为 transport 不同产生第二套行为。
-
-共同类型：
+下面的 logical wire 与 HTTP route、CLI command 和 SDK method 无关。所有 adapter 使用相同字段与语义。
 
 ```text
-ObjectKind =
-  domain | node-definition | relationship-definition | property |
-  graph-type | constraint | index | knowledge-node | knowledge-relationship
-
-ObjectSummary = {
-  kind,
-  ref,
-  name?,
-  title?
-}
-
-Page<T> = {
-  state,          # 本次读取 pin 的 ResolvedState
-  items: T[],
-  cursor: string? # null 表示结束
-}
+ObjectKind = domain | node-definition | relationship-definition |
+             knowledge-node | knowledge-relationship
+ObjectSummary = { kind, ref, name?, title?, description? }
+Page<T> = { state: ResolvedState, items: T[], cursor: string? }
 ```
 
-这里使用的 `StateRef / ResolvedState` 直接引用 Evolution [State reference](evolution.md#state-reference) 的唯一 canonical grammar；Object 不维护第二份版本引用定义。
+Ontology `renameFrom` 是唯一已确认的内嵌 input-only rename 字段；解析 Patch 后先验证并提取该指令再生成正式 Object Value，不把它当未知持久字段，也不存入下一次 read。
 
-所有 pageable read 的 `limit` 省略时为 `100`，v1 接受 `1..1000`；`cursor` 是 opaque continuation，只能与产生它时相同的 resolved State、operation 和 filters 一起继续使用。调用方不能解析或修改 cursor；不匹配时返回 `INVALID_ARGUMENT`。
+StateRef / ResolvedState 引用 [Evolution State reference](evolution.md#state-reference)。分页默认 limit=100，接受 1..1000；cursor 绑定 operation、resolved State 和 filters。不能解析或改写 cursor，参数不匹配返回 INVALID_ARGUMENT。
 
 `list`：
 
@@ -197,38 +117,28 @@ request  = { at: StateRef, kind?, scope?: all|ontology|knowledge, limit?, cursor
 response = Page<ObjectSummary>
 ```
 
-结果按 `kind`、canonical Object Ref 的 UTF-8 bytes 升序稳定排序。`scope=ontology` 覆盖 Domain / Definition / Property / Graph Type / Constraint / Index；`scope=knowledge` 覆盖 Knowledge Node / Relationship；省略 scope 等价 `all`。`kind` 与 scope 冲突时返回 `INVALID_ARGUMENT`。
+按 kind、canonical Ref 的 UTF-8 bytes 升序排列。`scope=ontology` 只列 Domain / Node Definition / Relationship Definition；`scope=knowledge` 只列 Knowledge Node / Relationship；缺省为 all。kind 与 scope 不一致报 INVALID_ARGUMENT。它是程序化枚举，不替代带业务说明和明确下一步入口的 Ontology read。
 
 `search`：
 
 ```text
-request  = { at: StateRef, query: string, kind?, scope?: all|ontology|knowledge, limit?, cursor? }
+request  = { at: StateRef, query: string,
+             kind?: knowledge-node|knowledge-relationship,
+             scope?: knowledge, limit?, cursor? }
 response = Page<ObjectSummary>
 ```
 
-它只是 Object discovery，不建立 correctness-sensitive Search DSL。`query` 必须是非空 String；v1 不做 relevance ranking：
-
-- canonical Object Ref 与 query 完全相等时命中；
-- Domain / Definition / Property 的 identifying name、`title`、`description`，以及 Graph Type / Constraint / Index 的公开 resource name / locator，对 query 做 Unicode default case-fold 后的 substring match；不做 Unicode normalization；
-- Knowledge Node / Relationship 除 canonical Object Ref exact match 外不承诺属性文本搜索，属性全文、向量、关系与条件 discovery 继续使用 Graph Cypher。
-
-匹配后的结果仍按 `kind`、canonical Object Ref UTF-8 bytes 升序分页，因此没有 score/ranking cursor。搜索算法未来可以增加新的 discovery surface，但不能让已经定义的 exact Ref / name / title / description match 消失或改变同一 API 的排序语义。
+scope 省略等价 knowledge；ontology/all 或 Ontology kind 均拒绝。维持既有 Knowledge 最小定位语义：query 是非空 String，仅 canonical n:/r: Ref 完全相等时命中；不增加语义排序、属性文本匹配或另一套 Search DSL。Knowledge 内容检索使用 Graph。返回仍按 kind/ref 排序分页。
 
 `read`：
 
 ```text
 request = { at: StateRef, ref: ObjectRef }
-
-result metadata = {
-  state: ResolvedState,
-  kind: ObjectKind,
-  ref: ObjectRef
-}
-
-result body = canonical YAML | equivalent JSON Object Value
+metadata = { state: ResolvedState, kind: ObjectKind, ref: ObjectRef }
+body = canonical YAML | equivalent JSON Object Value
 ```
 
-representation 仍通过 adapter 的标准 content negotiation / format selection 决定，不加入业务 request field。canonical body 只包含 Object Value；metadata 必须由 adapter 的 metadata channel 与 body 分离，不能为了返回 `state/ref/kind` 把它们混入可编辑 YAML。SDK 可以把两者组合成一个语言内 result object，但 Patch base 始终只取 canonical YAML body。
+body 只包含公共逻辑值。Metadata 由 adapter 独立携带，不能混入 editable YAML。JSON 与 YAML 等价，默认 Markdown Ontology read 是另一个只读呈现，不是 Patch base。
 
 `patch`：
 
@@ -240,7 +150,6 @@ request = {
   author?: string,
   message?: string
 }
-
 response = {
   state: ResolvedState,
   created: [ { alias, kind, ref } ... ],
@@ -248,9 +157,11 @@ response = {
 }
 ```
 
-`baseState` 只接受 immutable `commit/<id>`，不能传 Branch / Tag；`branch` 使用 Lithograph Branch name validation。Patch 中已有 Object target 直接使用 canonical Object Ref；新增 Object target 固定为 `new:<kind>:<alias-component>`，其中 `<kind>` 使用上述 ObjectKind，alias component 使用与 Object Ref 相同的 RFC 3986 component encoding。alias 只在本请求内存在。成功无 effective delta 时 `state == baseState` 且不创建 Commit。
+baseState 只接受 immutable `commit/<64-hex>`，branch 是真实 Branch name。Patch 已有 target 用 canonical Object Ref；新建顶层 Object 用 `new:<kind>:<alias-component>`。这里的 kind 只取五种公共 ObjectKind；alias component 复用 Ref 的 RFC 3986 encoding。无 effective delta 时 state==baseState 且不创建 Commit。
 
-`new:<kind>:<alias-component>` **不是 Git、YAML 或其它外部标准定义的协议，也不是 KG OS Object Ref 的新一种永久类型**。它是 KG OS 在标准 Git pathname slot 上定义的最小 application-level target / reference convention，只解决 Git Extended Diff 与 YAML 本身没有定义的一个问题：同一个多 Object Patch 中，尚未获得最终 owner-backed Ref 的新增 Object 必须能被其它新增 Object 无歧义引用。KG OS 只自定义这一层 Object target mapping；Patch framing / hunk / rename / pathname quoting 继续使用 Git，Object body 使用 YAML 1.2，alias component escaping 使用 RFC 3986，不再为这些已有标准覆盖的部分另造语法。
+Adapter 可以在不改变上述 logical contract 的前提下收窄允许的 ObjectKind。`kg ontology patch` 固定只接受 Domain / Node Definition / Relationship Definition target，并直接复用本 `patch`；它不是新的 mutation capability。通用 `kg object patch` 仍可处理五种 ObjectKind，因此需要 Ontology + Knowledge 同请求原子变化时不必发明另一套 batch API。
+
+`new:...` 是 KG OS 的 request-local 引用约定，不是 Git/YAML 标准，也不是永久身份。它只解决同一请求中新对象尚未有最终 Ref 时的相互引用；Patch framing/escaping 仍用 Git，值用 YAML 1.2。不能把 new:... 保存到后续请求或作为 Graph elementId 使用。
 
 所有新增 Object 的 Patch target 都统一使用 `new:<kind>:<alias-component>`，即使某个 name-backed Object 的最终 Ref 可以从目标内容推导，也不允许在 Add entry 中直接把“未来 Ref”当作已存在 Object Ref。这样 Add 的定位规则不因 Object kind 改变，也不会出现一部分新增对象按 alias、另一部分靠预测最终 Ref 的双重创建模型。`<kind>` 显式存在是为了在解析 Object body 之前就确定目标 owner / Object schema，并让同名 alias 在不同 kind 下保持可区分；KG OS 不从 YAML 字段组合猜 Object kind。
 
@@ -260,15 +171,9 @@ response = {
 
 `created.alias` 返回 decode 后的逻辑 alias String，不返回 percent-encoded target component；`created` 按 `kind` + alias UTF-8 bytes 升序，`transitions` 按 `from` Object Ref UTF-8 bytes 升序。Patch entry 原始文本顺序不影响 result ordering。
 
-因此 `n:123` / `r:456` 等系统分配 identity 不会因为 AI 修改 YAML 而被重新赋值。Definition / Domain / Property 的 identifying name 属于业务结构本身，可以出现在 canonical YAML / JSON Object Value 中；修改这些名称表示 rename，并按 Ref transition 语义处理。
+因此 `n:123` / `r:456` 等系统分配 identity 不会因为 AI 修改 YAML 而被重新赋值。Definition / Domain 的 identifying name 属于可编辑业务结构，显式顶层 rename 按 Ref transition 语义处理。Property 名称属于 Definition 的内嵌字段；通过 `renameFrom` 声明连续性，在 Definition 字段级 History / Diff 中解释，不返回不存在的独立 Property Object Ref。
 
-Object Value / canonical YAML 遵守 **owner-only projection**：只包含当前 Object 自己拥有的可编辑状态，以及指向其它 Object 的 Ref；不能为了“更易理解”把其它独立 Object 的可变内容复制进当前 representation。例如 Knowledge Node 可以包含自己的 Labels / Properties，但不能内联这些 Label 对应 Definition 的 `title` / `description`；Relationship 可以保存 endpoint Ref，但不能内联 endpoint Node 内容；Domain 保存 `includes` Ref，不复制成员 Definition。需要额外语义时由 AI 继续 `read` 对应 Ref。唯一明确的重叠投影是 Definition → Property parent/child 关系，并受 D21 overlap rule 约束。
-
-同一原则适用于 Lithograph Schema aggregation：Current Graph Type Object 只投影不能由 child Definition / Property / Constraint / Index Object 独立拥有的 graph-level state；如果为了理解需要展示其 element definitions，只返回 child Object Ref / summary，不复制可编辑 Definition 内容，也不允许通过 Graph Type Patch 间接 add/update/delete Definition。Definition lifecycle 继续由 Definition Object 管理；KG OS compiler 在需要调用 whole-Graph-Type 底层操作时从同一 target Object set 重新合成完整 Lithograph Schema，而不是把底层整体结构原样暴露成第二个公共 mutation target。
-
-Constraint ownership 同样按 Lithograph 真实 Schema model 切分：属于 Graph Type / element definition 本身的 property type、key、existence / `NOT NULL` 等内生结构继续由 Definition / Property Object 表达；Lithograph 明确建模为 **standalone constraint definition** 的资源只由 Constraint Object 拥有。Definition 为理解需要展示相关 standalone Constraint / Index 时只能返回 Ref / summary，不能复制成第二份可编辑定义。Index definition 统一由 Index Object 拥有。
-
-Owner-only 不禁止**引用目标自身 rename 引起的派生 Ref rewrite**。如果 Constraint / Index / Domain 等 Object 保存了对 `node:Person` 或某 Property 的逻辑引用，而该被引用 Object 在同一 Patch 中 rename，KG OS 可以自动把这些 locator 重写为目标 Snapshot 的新 Ref，以保持原有引用关系；这类 rewrite 只能改变 locator，不得顺带修改 Constraint / Index 的其它配置或 Domain membership 语义。调用方若在同一 Patch 中还显式修改该 Constraint / Index，其显式变化与派生 locator rewrite 必须在 logical-slot normalization 后不冲突，否则整体 reject。
+公共编辑边界按 KG OS aggregate 定义，不按底层 resource owner 拆分。Node/Relationship Definition entry 可以在同一次局部修改中改变属性、约束、索引和业务说明。共享声明先按 [Ontology 共享资源规则](ontology.md#共享资源与聚合编辑) 合成一个显式 logical delta，再编译到数据库；每条底层资源变化只执行一次。
 
 `patch` 是明确 Object 的统一 mutation 模型。调用方不是提交 JSON Patch、JSON Merge Patch 或 `op/path/value` mutation DSL，而是以 Object `read` 的 canonical YAML 为 base，提交**文件式文本 Patch**。Patch 可以覆盖：
 
@@ -289,15 +194,15 @@ Object Patch v1 的 textual syntax 固定采用普通 two-way **Git Extended Dif
 - Object target 字符串放入 Git path slot 后，特殊字符的 quoting / escaping 服从 Git patch 的 pathname quoting 规则；KG OS 不再定义第二套 Patch path escaping。已有对象 target 使用上面 canonical Object Ref；新增对象使用 `new:<kind>:<alias-component>`；
 - 标准 `similarity index` / `dissimilarity index` / `index <hash>..<hash>` 等 Git metadata 如果出现，只是 Patch framing / advisory metadata，不是 KG OS identity、concurrency guard 或业务状态；`baseState` + target Branch 才是 Object Patch 的权威并发基线；
 - v1 不接受 Git combined diff、copy semantics、binary patch、symlink / submodule、mode-only mutation 或其它没有 Object mutation 语义的 Git patch 形式。Add / Delete 使用的 `100644` 只作为 canonical YAML regular-file framing，不产生权限或文件模式业务状态；
-- KG OS 采用的是成熟 Git patch **文本语法**，不是 Git filesystem / index / blob 模型。Patch parser/application 必须把 file target 映射到 Object Ref，或新增对象的 alias + object kind，再按本文 strict base-State、exact apply、owner-only、overlap、dependency、derived migration 与 all-or-nothing 规则执行；不得直接把 `git apply` 的文件系统行为当成 KG OS mutation semantics。
+- KG OS 采用的是成熟 Git patch **文本语法**，不是 Git filesystem / index / blob 模型。Patch parser/application 必须把 file target 映射到 Object Ref，或新增对象的 alias + object kind，再按本文 strict base-State、exact apply、aggregate delta normalization、dependency、derived migration 与 all-or-nothing 规则执行；不得直接把 `git apply` 的文件系统行为当成 KG OS mutation semantics。
 
-这五类描述的是统一 Patch 能表达的**变化类别**，不是给所有 Object kind 强行增加相同生命周期。每个 Object 的合法 target change 仍由其真实 owner contract 决定：例如系统分配 Knowledge element identity 不能 rename；current Graph Type 的存在 / 生命周期服从 Lithograph Graph Type 语义；Constraint / Index 是否支持原生 rename 或只能 drop + create 以 Lithograph 公开 Cypher contract 为准。KG OS 可以为已明确设计的 Definition / Property / Domain rename 提供上层语义，但不能仅因为 Patch 有 `Rename` 类别就给其它底层资源发明新数据库语义。
+五类 Patch 变化以 KG OS 公共逻辑模型为准。系统分配的 Knowledge identity 不能 rename；Definition / Domain name 可显式 rename；Property rename 在 Definition 内表达。底层缺少原地 ALTER/rename 不等于公共变化不可用：compiler 可以用安全的 staged replacement 实现同一逻辑目标，不允许因此丢失数据或更改未请求语义。
 
-对于公共 Ref 由自身 identifying name 决定的顶层 Object（当前包括 Domain、Definition、独立寻址的 Property Object，以及未来 owner contract 明确支持 rename 的其它 name-backed Object），**修改自身 identifying name 必须使用 Git Rename entry**；普通 Update / Restructure entry 不能只在 YAML 中把顶层 `name` 改成另一个值。Rename header 的 `<old-target> → <new-target>` 是该顶层 rename 的显式 locator delta；如果同一个 entry 的 YAML hunk 也修改 `name`，其目标必须与 `<new-target>` 解码出的 identifying name 完全一致，否则返回 `OBJECT_CONFLICT`。如果 YAML hunk 没有触碰 `name`，compiler 以 Rename header 派生目标 Object Value 的新 identifying name。Definition 内嵌 child Property 的 rename 仍是该 Definition entry 内的 child logical-slot change，不要求把 parent file entry 本身 rename。
+顶层 identifying name 修改必须使用 Git Rename entry。old target 定位 baseState 的 Object，new target 表达新名称；若 YAML hunk 也改 name，则必须一致；未触碰 name 时 compiler 从 Rename header 派生。Property rename 使用 Ontology 规定的 input-only `renameFrom`，不能把普通字段移除/新增靠相似度猜成 rename。
 
 一个 Object Patch 可以同时包含一个或多个 Git patch file entry。已有对象的 entry 通过 old/current target 解码出的 canonical Object Ref 定位；新增对象尚无最终 Object Ref，使用已经冻结的 `new:<kind>:<alias-component>` 定位该 entry。不得再创建 KG OS 自有 Patch section header、escaping grammar，也不得在后续 adapter 设计中替换成另一套 JSON mutation language。
 
-Object projection 允许为读取便利包含 child Object 内容，但一个 Patch 内的 target change 必须可归一化为**不重叠的底层 logical slots**。例如 Definition entry 可以直接修改 `Person.email`，Property entry 也可以单独修改同一个 Property；二者不能在同一 Patch 同时触碰该 Property。KG OS 在执行顺序之前先检测这种 overlap，存在重叠即整体拒绝，避免同一个目标因 entry 顺序产生不同结果。
+同一 Patch 的 aggregate overlap 按**显式变化的 logical slots**检测，而不是因为两个 body 读到了同一 Index 就拒绝。相同 slot 相同目标合并，不同值或 delete/update 竞争整体拒绝；不重叠变化合成后验证最终资源。未变化字段只是上下文。内嵌资源在单字段与组合位置间移动时先按资源名称配对，不依赖 entry 顺序。
 
 因为 Object Patch 严格基于 `baseState`，**Patch 中对任何已经存在 Object 的引用都按 baseState Object Ref 解析**。如果同一 Patch 把 `node:Person` rename 为新的 Ref，其他 entry 要继续引用“同一个 Definition”时仍使用 base Ref `node:Person`；KG OS 通过本次 rename continuity 把该逻辑引用带到目标 Snapshot。调用方不能依赖尚未产生的 target Ref 在同一 Patch 中重新定位该已有对象。只有本次新建、在 baseState 中不存在的 Object 使用 request-local alias。成功后新的 Ref 只通过 alias mapping / Ref transition 返回。这样多 Object Patch 的引用解析完全由 `baseState + Ref | alias` 决定，不依赖 entry 顺序或对未来 Ref 的猜测。
 
@@ -325,12 +230,10 @@ Object `list` / `search` / `read` 使用统一 State reference semantics。Branc
 
 ### Object 能力边界
 
-- 不建立虚拟文件系统或把“目录路径”作为第二套 Object identity；稳定文本与 Git Extended Diff Patch 只是 AI 交互方式；
-- 不建立与 `patch` 平行的 `save` / `create` / `update` / `replace` / `upsert` 核心写入面；新增、局部更新、删除、rename 与 restructure 都归一到 Object Patch，避免第二套 full-object replace / upsert / batch / concurrency 语义；
-- 不建立 Definition / Domain / Property / Node / Relationship 各自完整 CRUD surface；
-- 不为 Graph Type / Constraint / Index 再建立平行 Schema API；它们作为 Lithograph-owned Schema Object projection 进入同一个 Object surface，且不获得 KG OS semantic Binding Record，除非未来出现真实业务语义需求再单独设计；
-- Object 统一的是 **State Snapshot 内 Ontology / Knowledge 对象**的定位与维护；State Data、Branch、Tag、Merge 等版本 sidecar / ref 不是 Snapshot Object，由 Evolution 负责，不为它们再套一层 Object identity；
-- 不暴露 `OntologyElement`、Binding Record、Schema Locator、reserved internal graph element / Schema resource 等实现资源；
-- 不允许通过 Object 能力绕过 Knowledge / internal semantic graph 的 `graphView` 隔离；
-- 不把 Object `search` 扩展成 Graph traversal、全文、向量、聚合和复杂过滤语言；这些能力继续属于 Graph / Lithograph；
-- 不把 Lithograph raw Patch 直接提升为 KG OS Object wire contract，公共 Patch 始终使用业务 Object / Object Ref 表达。
+- 不建立虚拟文件系统或第二套路径 identity；Git file entry 只是 textual Patch framing。
+- Object 统一 KG OS 业务 aggregate 的维护，不把每个底层 Schema resource 提升为公共对象。Ontology 聚合字段只在 ontology.md 定义。
+- 不另建 save/create/update/upsert、各 Property/Constraint/Index CRUD 或平行 Ontology Patch engine；`kg ontology patch` 只是本 Patch 的 kind-scoped CLI adapter。
+- Ontology discovery 使用渐进式读取，无 Ontology search；Knowledge 查询/批量写保持 Graph Cypher。
+- State Data、Branch、Tag、Merge 等 sidecar/ref 由 Evolution 负责，不套 Object 身份。
+- 不暴露 Binding Record、Schema Locator 或 reserved internal graph/Schema，不绕过 Graph View。
+- 不把 Lithograph raw Structural Patch 当作 Object wire；一次 logical Patch 由 KG OS 编译为一次真实 transaction。

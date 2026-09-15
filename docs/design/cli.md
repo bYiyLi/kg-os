@@ -1,6 +1,6 @@
 # CLI
 
-本文件是 KG OS v1 **AI-facing CLI 命令、参数、输入输出、错误与非交互行为**的设计真源。CLI 只适配已经确认的 [Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。`kgosd` 的本地 HTTP endpoint 与 daemon home 由 [本地运行时](runtime.md) 负责。
+本文件是 KG OS v1 **AI-facing CLI 命令、参数、输入输出、错误与非交互行为**的设计真源。CLI 只适配已经确认的 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。`kgosd` 的本地 HTTP endpoint 与 daemon home 由 [本地运行时](runtime.md) 负责。
 
 ## 目标与边界
 
@@ -16,8 +16,8 @@ v1 CLI executable 固定为 `kg`。短 binary 适合 AI 高频调用和人工输
 
 CLI 遵守以下边界：
 
-- 命令树直接映射 Object / Graph / Evolution，不按底层 REST route、Lithograph procedure 或数据库内部资源组织；
-- 默认输出稳定 JSON，适合 AI、脚本和 shell pipeline；人类需要可读缩进时使用 `--pretty`，不维护第二套 table 输出合同；
+- 命令树提供 Ontology 渐进读取，并映射共享 Object / Graph / Evolution；不按底层 REST route、Lithograph procedure 或数据库内部资源组织；
+- 除 Ontology 文本读取等下述显式例外外，默认输出稳定 JSON，适合 AI、脚本和 shell pipeline；人类需要可读缩进时使用 `--pretty`，不维护第二套 table 输出合同；
 - 不存在 connection-local current Branch、current State 或 checkout；需要 StateRef / Branch 的命令必须显式提供；
 - 不弹交互确认、不自动启动 editor、不进入 REPL、不自动打开 pager；命令参数不足时直接失败；
 - 不自动遍历所有 pagination page；AI / 调用方显式读取 cursor 并决定是否继续，避免一次命令无界扩大上下文；
@@ -37,6 +37,10 @@ kg
 │   ├── status
 │   ├── stop
 │   └── restart
+│
+├── ontology
+│   ├── [<OntologyRef> ...]      # 0 refs = Overview；1..100 refs = batch read
+│   └── patch                    # Ontology-scoped Object Patch
 │
 ├── object
 │   ├── list
@@ -87,7 +91,7 @@ kg
 
 ### JSON-first stdout
 
-除 Object raw body 和 Graph streaming 两个明确例外外，命令成功时 stdout 只输出**一个 UTF-8 JSON document**，字段保持对应 logical result 的语义；不在 stdout 混入日志、spinner、颜色、提示语或表格。
+除 Ontology Markdown/--edit、Object raw body 和 Graph streaming 明确例外外，命令成功时 stdout 只输出**一个 UTF-8 JSON document**，字段保持对应 logical result 的语义；不在 stdout 混入日志、spinner、颜色、提示语或表格。
 
 ```text
 default        → compact JSON + trailing LF
@@ -96,11 +100,11 @@ default        → compact JSON + trailing LF
 
 `--pretty` 只改变空白，不改变 field、value、排序或类型，因此不是第二种数据格式。v1 不提供 `--table`、template、`--jq` 或字段选择 DSL；调用方需要进一步转换时使用标准 shell / JSON 工具。
 
-成功但结果为空仍返回 exit `0` 和合法 JSON，例如 `items: []`；不能用非零 exit code 表示“没找到搜索结果”。
+结果为空仍返回 exit `0`；JSON 命令返回如 `items: []`，Ontology 返回带明确空范围说明的 Markdown。不能用非零 exit code 表示“没有匹配结果”。
 
 ### Required text input
 
-Cypher、Object Patch 和 Merge resolutions 等**必填的大文本 / 结构化正文**统一支持三种互斥来源：
+Cypher、Object/Ontology Patch 和 Merge resolutions 等**必填的大文本 / 结构化正文**统一支持三种互斥来源：
 
 ```text
 inline flag
@@ -120,7 +124,7 @@ stdin
 | Payload | Inline | File | implicit stdin |
 | --- | --- | --- | --- |
 | Graph Cypher | `--cypher` | `--cypher-file` | 是 |
-| Object Patch | `--patch` | `--patch-file` | 是 |
+| Object / Ontology Patch | `--patch` | `--patch-file` | 是 |
 | Merge resolutions | `--resolutions` | `--resolutions-file` | 是 |
 | required State Data | `--data` | `--data-file` | 是 |
 
@@ -216,6 +220,64 @@ kg daemon restart
 {"status":"running","endpoint":"http://127.0.0.1:4765"}
 ```
 
+## Ontology CLI
+
+```text
+kg ontology [<OntologyRef> ...]
+  --at <StateRef>
+  [--limit <n>]
+  [--cursor <token>]
+
+kg ontology <OntologyRef> [<OntologyRef> ...]
+  --at <ResolvedState>
+  --edit
+
+kg ontology patch
+  --base-state <ResolvedState>
+  --branch <branch-name>
+  (--patch <git-extended-diff> | --patch-file <path> | stdin)
+  [--author <text>]
+  [--message <text>]
+```
+
+`--at` 必填，不暗中使用 main/current Branch。没有目标读取全局；一个或多个 `domain:` / `node:` / `relationship:` positional Ref 分别读取对应 Domain / Definition。OntologyRef 使用 Object 的 canonical typed string，帮助 AI 区分同名领域、节点和关系；正文始终同时提供业务名称、说明与可复制 Ref，不要求 AI 猜前缀。
+
+默认 stdout 输出 [Ontology read](ontology.md#ontology-read-合同) 的只读 Markdown。批量读取一次接受 `1..100` 个 Ref；daemon 只解析一次 `--at`，全部结果使用同一 resolved State，并按 positional Ref 顺序输出。CLI Markdown 顶部只写一次 resolved State，随后为每个 logical `results[]` item 输出独立范围段及其 `ref/total/cursor`；单 Ref 与 batch 只是同一 read 的不同 cardinality。任一 Ref 失败时 stdout 为空，整批按统一错误 envelope 失败。SDK/Web 直接使用 structured `results[]`，不需要解析 CLI Markdown。
+
+`--limit` 只影响 Overview / Domain items，在 batch 中对每个 Domain 独立应用。`--cursor` 只能用于没有 Ref 的 Overview 或单个 Domain Ref；batch 返回的各 Domain cursor 需要以返回的 resolved State + 对应单 Ref 分别续读。Definition 详情不分页拆成碎片；整个 batch 超出资源限制返回错误，不截断、不返回 partial success。`--pretty` 不适用于 Ontology 文本输出。Ontology 没有 search、文本定位、文件路径或 raw Schema passthrough。
+
+`--edit` 用于 `1..100` 个 Domain / Node Definition / Relationship Definition Ref。它不启动 editor，不创建 session，不写数据库；`--edit --at` 必须是已有读取返回的 immutable `commit/<64-hex>`，不接受 Branch/Tag 或分页参数。整个 batch 先完整解析并验证，任一 Ref 失败时 stdout 为空，不输出 partial stream。
+
+单 Ref `--edit` stdout 保持既有行为：只输出该 Object 的完整 canonical YAML body。多 Ref `--edit` stdout 是**标准 YAML 1.2 multi-document stream**，顺序与 positional Ref 一致：
+
+```text
+# kgos-state: commit/<64-hex>
+--- # kgos-ref: node:Person
+<node:Person 的 canonical YAML body>
+--- # kgos-ref: node:Document
+<node:Document 的 canonical YAML body>
+```
+
+`# kgos-state:` 和 `--- # kgos-ref:` 是 CLI-only framing comment，不是 Object Value，也不是 Git Patch base 的一部分；每个 document body 与同一 State 下对应的单 Ref `--edit` / `object read <ref> --body` 逐字一致。Ref comment 让 AI / 人在文本中直接识别 target；程序化 consumer 应以调用请求顺序和 structured API metadata 为准，不依赖 YAML parser 保留 comment。v1 不提供 output directory、自动拆文件或 multi-object wrapper schema。
+
+`ontology patch` 是 Ontology-scoped Object Patch adapter。Patch framing、canonical YAML、strict `baseState`、request-local alias、并发、错误、transaction、`created/transitions` result 都**完全复用 Object Patch**；唯一额外约束是 file target / alias kind 只能是 `domain`、`node-definition`、`relationship-definition` 对应的 Ontology aggregate。出现 `n:` / `r:` Knowledge target 或 `new:knowledge-*` 时返回 `INVALID_ARGUMENT`，整批不执行。普通 Ontology 修改优先使用此命令；确实需要在同一 atomic Patch 中显式同时修改 Ontology 与 Knowledge Object 时，使用通用 `kg object patch`。
+
+以下为命令格式示意，`<resolved-state>` 必须替换成上一步实际返回的 State：
+
+```text
+kg ontology --at branch/main
+→ state = commit/<64-hex>，包含可继续读取的准确 Ref
+
+kg ontology domain:Content --at <resolved-state>
+kg ontology node:Person node:Document relationship:AUTHORED --at <resolved-state>
+kg ontology node:Document --at <resolved-state> --edit
+kg ontology node:Person node:Document relationship:AUTHORED --at <resolved-state> --edit
+
+kg ontology patch --base-state <resolved-state> --branch main --patch-file change.diff
+```
+
+只有最后一步写数据。`kg ontology patch` 可以在一个 Patch 中修改多个 Domain / Definition，包括它们聚合的 Property / Constraint / Index；它只是统一 Object Patch 的 Ontology scope，不增加 `kg index/constraint` 或第二个 compiler。单 Ref `--edit` 与 `object read <ref> --body` 逐字一致；batch `--edit` 只是把这些 canonical bodies 放进标准 YAML multi-document stream，天然对应一个 multi-entry Git Patch。
+
 ## Object CLI
 
 ### list
@@ -234,7 +296,7 @@ kg object list
 示例：
 
 ```bash
-kg object list --at branch/main --scope ontology --limit 50
+kg object list --at branch/main --scope knowledge --limit 50
 ```
 
 ### search
@@ -242,13 +304,13 @@ kg object list --at branch/main --scope ontology --limit 50
 ```text
 kg object search <query>
   --at <StateRef>
-  [--kind <ObjectKind>]
-  [--scope all|ontology|knowledge]
+  [--kind knowledge-node|knowledge-relationship]
+  [--scope knowledge]
   [--limit <n>]
   [--cursor <token>]
 ```
 
-`<query>` 是 Object discovery query，不解释成 Cypher 或 shell expression。
+此处只保留 Object 已有的 Knowledge exact-Ref 定位行为。scope 缺省为 knowledge；ontology/all 或 Ontology kind 是非法参数。Ontology 导航使用 `kg ontology`，Knowledge 属性搜索使用 Graph Cypher，不隐藏增加第二套搜索语言。
 
 ### read
 
@@ -484,17 +546,22 @@ kg evolution merge abort <session>
 CLI v1 的 canonical workflow 由小而确定的命令组成：
 
 ```text
-discover Object
-→ object list / search
+understand Ontology
+→ ontology overview
+→ optional Domain
+→ Definition detail
+
+discover Knowledge Object
+→ object list / graph query
 
 read exact Object
 → object read
 
-edit exact Object
+edit exact Ontology aggregate(s) / Object
 → pin resolved commit
-→ read --body
+→ ontology <ref>... --edit / object read --body
 → generate Git Extended Diff
-→ object patch
+→ ontology patch（只改 Ontology）/ object patch（通用或跨 Ontology + Knowledge）
 
 discover / compute Knowledge
 → graph query
@@ -521,7 +588,7 @@ KG OS CLI 不单独维护 human-only 命令树。人类与 AI 使用相同 comma
 
 - `--help` 提供短说明、required flags 和可复制示例；
 - `--pretty` 让 JSON 更适合终端查看；
-- `object read --body` 直接提供可阅读 / 可编辑 YAML；
+- `ontology` 提供可读概览/详情；`ontology <ref>... --edit` 提供单对象 canonical YAML 或多对象 YAML stream，`object read --body` 提供单对象 canonical body；
 - shell redirect、pipe 和普通 JSON 工具完成保存、过滤与进一步展示。
 
 这样避免“AI API”与“人类 CLI”行为漂移。未来只有真实用户需求证明 table、interactive TUI、shell completion 或其它 human convenience 值得维护时，才作为兼容 convenience 增加；不能改变当前默认 JSON / non-interactive contract。
@@ -540,10 +607,12 @@ current kgosd
 
 如果没有 active owner，普通业务命令直接使用本文既有 exit `3` transport failure；**不能自动执行 `kg daemon start`**。如果运行中的 daemon 启动后 `config.toml` 被修改，业务命令继续使用 lock 中的 effective endpoint；只有显式 `kg daemon restart` 后才切换到新 startup config。CLI 不读取 token，因为 v1 daemon 没有认证，也不因为连接失败而随机换端口或直接打开 SQLite。
 
-一个 daemon 最终承载一个还是多个 Knowledge Base、Knowledge Base 如何选择、`init` / `doctor` 等其它 operator command 是否需要仍未冻结；这些后续设计不能改变本文 Object / Graph / Evolution command、stdout/stderr 或 error semantics。
+一个 daemon 最终承载一个还是多个 Knowledge Base、Knowledge Base 如何选择、`init` / `doctor` 等其它 operator command 是否需要仍未冻结；这些后续设计不能改变本文 Ontology / Object / Graph / Evolution command、stdout/stderr 或 error semantics。
 
 ## 兼容性
 
-本文命令名、required flag、flag meaning、默认 JSON result shape、raw body / streaming framing 与 exit-code category 构成 v1 CLI public adapter contract。实现可以增加新的可选命令 / flag，但不能让已有 canonical invocation 改变业务语义；删除 / 改名已有 command 或 required flag、改变默认输出类型、引入隐藏 current Branch / auto-page / interactive confirmation，都属于 CLI breaking change，需要新的设计决定。
+本文命令名、required flag、flag meaning、默认 JSON result shape、Ontology Markdown/--edit、raw body / streaming framing 与 exit-code category 构成 v1 CLI public adapter contract。实现可以增加新的可选命令 / flag，但不能让已有 canonical invocation 改变业务语义；删除 / 改名已有 command 或 required flag、改变默认输出类型、引入隐藏 current Branch / auto-page / interactive confirmation，都属于 CLI breaking change，需要新的设计决定。
 
 CLI 的 JSON 内部 Object / Graph / Evolution field 继续由对应 logical contract 拥有；如果 logical contract 合法增加 optional field，CLI 可以原样增加该 field，不需要再复制一条 CLI-specific data-model decision。
+
+本次文档阶段的 Ontology 命令及 Object kind/scope 调整按 D46 替换旧设计基线；它不意味着已发布实现需保留旧 Ontology search 或独立 Index/Constraint 接口的兼容层。

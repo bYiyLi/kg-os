@@ -19,11 +19,21 @@ KG OS（Knowledge Graph Operating System）是**面向 AI 的可编程知识基�
 
 KG OS 独立于 Noven 或任何具体领域；领域语义由调用方表达。
 
+## 使用模型
+
+先通过 **Ontology 全局概览 → 可选 Domain → Definition 详情**理解模型；每个入口给出名称、业务说明与准确的下一步引用，不依赖 Ontology search。需要同时理解一组相关模型时，可以一次 batch 读取多个 Domain / Definition，并保证它们来自同一个 State。
+
+需要修改时，`--edit` 可以一次取得一个或多个 Domain / Definition：单个返回 canonical YAML，多个返回标准 YAML multi-document stream；再用 `kg ontology patch` 提交局部变化。它只是统一 **Object Patch** 的 Ontology 专用入口；跨 Ontology + Knowledge 的原子修改仍可使用通用 Object Patch。一个 Node / Relationship Definition 一起表达 Property、约束和索引；KG OS 负责拆解为底层数据库操作，而不是要求 AI 分别编辑它们。索引的真实名字与作用范围直接可见，AI 可以继续用 Cypher 查询。
+
+Knowledge 仍然是 Property Graph，查询和批量写入使用 Graph Cypher；State、Branch、History、Diff、Merge 使用 Evolution。不把知识库包装为虚拟文件系统。详细命令和示例见 [Ontology 设计](docs/design/ontology.md) 与 [CLI 合同](docs/design/cli.md)。
+
 ## 当前状态
 
-KG OS v1 的核心技术架构、`kgosd` HTTP runtime 与 explicit daemon lifecycle、Ontology / Knowledge 数据边界、Object / Graph / Evolution 公共逻辑合同，以及 AI-first `kg` CLI command contract 已经确认，其中包括 configurable `server.host/server.port`、默认本地 `127.0.0.1:4765` endpoint、startup-only `config.toml`、`kgosd.lock` single-instance/current-endpoint、`kg daemon start/status/stop/restart`、`~/.kgosd/` runtime home、same-origin Web/API、Object Patch 单-State transaction boundary，以及支持大量冲突分页、渐进 resolution、candidate consistency validation 后再 finalize 的 Evolution Merge Session。当前剩余工作主要是 Lithograph 对应能力的实现 readiness、Schema / `SHOW` 到 Object `structure` 的 projection/compiler mapping、Object Patch statement planning、Merge conflict projection、HTTP/lifecycle 实现、Knowledge Base target/layout，以及 CLI / Skill / SDK / Web 等 adapter 实现，具体范围见[设计状态导航](docs/design.md#设计状态导航)。项目目前仍只有文档，没有业务实现；设计确认不代表功能已经实现或验证。
+KG OS 已确认上述 Ontology 交互与聚合编辑方向，以及 Object / Graph / Evolution 共享逻辑合同、Rust `kgosd` + TypeScript/npm client 架构、本地 HTTP runtime 和显式 daemon lifecycle。结构与版本数据库职责仍由独立的 Lithograph 承担，KG OS 保存自己的业务说明与组织语义并提供 compiler / decoder。
 
-本 README 承载产品定义；`docs/design.md` 是设计总入口，`docs/design/` 按职责维护架构、本地运行时、Ontology、Object、Graph、Evolution、CLI、共享合同、关键决策与工程映射的唯一真源。协作与评审规则集中在 `AGENTS.md`。其他文档只引用对应职责真源，不重复维护技术选型或 Schema 规则。
+**项目目前仍只有文档，没有业务实现。** 命令是设计合同，不是已发布功能。剩余实现包括 Ontology reader、aggregate decoder/compiler、原子 Patch planning、Merge conflict projection、HTTP/runtime、CLI/Skill/SDK/Web；Knowledge Base target/layout 仍是独立待设计事项。范围与验收见 [设计状态导航](docs/design.md#设计状态导航) 和 [工程实现待办](docs/design/implementation.md)。
+
+本 README 负责产品定义；`docs/design.md` 是导航，`docs/design/` 按职责维护唯一真源；协作规范在 `AGENTS.md`。2026-09-15 的 Ontology 基线修正见 [D46](docs/design/decisions.md#d46-ontology-交互基线修正2026-09-15)，batch read/edit 与 `kg ontology patch` 的后续确认见 [D47](docs/design/decisions.md#d47-ontology-读取编辑支持-batch写入提供-scoped-patch2026-09-15)。
 
 ## License
 

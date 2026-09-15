@@ -1,44 +1,96 @@
 # 工程映射与实现待办
 
-本文件只记录 KG OS 已确认设计到实现之间的 **readiness、projection/compiler mapping、adapter mapping 与实现顺序**。它不能重新定义 [架构](architecture.md)、[Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md) 或 [Evolution](evolution.md) 的产品语义。
+本文件记录已确认设计的 **实现依赖、compiler/adapter 工作和验收**，不重新定义 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 或 [Runtime](runtime.md)。
 
 ## 剩余依赖与工程合同
 
-以下问题属于实现 readiness、compiler / projection mapping、adapter mapping 或实现级持久化设计，**不等于对应产品语义或 logical model 未设计**。判断是否真的出现新设计缺口时，必须先回看该主题所属章节和已确认 Decision；如果 logical state、ownership、identity、lifecycle 与公共 logical wire 已经明确，而只剩底层 projection、字符串常量、adapter carrier 或 operation mapping，则按工程问题处理，不重新向产品层提问。
+Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能因为仍需实现 compiler，就把它退回“模型尚未设计”或要求 AI 操作单独的 Property/Constraint/Index。逻辑字段和行为只在各 owner 文档维护。
 
-| 已确认，不因本节重新打开 | 剩余依赖 / 工程工作 |
+| 已确认的合同 | 工程工作 |
 | --- | --- |
-| Object logical state / owner、ObjectRef、canonical YAML / JSON、list/search/read/patch logical wire | Lithograph Cypher 25 Schema / current-graph `SHOW` result → owner-only `structure` projection / normalization 与反向 compiler mapping |
-| StateRef、Graph query/execute、Evolution read/mutation、pagination、公共 error envelope 与 [`kg` CLI command contract](cli.md) | CLI parser / I/O / NDJSON / exit-code 实现；SDK / HTTP / Skill 的 adapter-specific route / method / metadata carrier 与 usage docs |
-| Object Patch 的 Git Extended Diff、strict base、logical delta、derived migration、conflict/all-or-nothing 语义 | logical slot → explicit transaction 内标准 Cypher 25 mutation 的 statement planning、alias/result capture 与测试矩阵 |
-| internal semantic graph 的职责、隔离、一致性不变量与 `__kgos_` v1 persistence encoding | bootstrap Schema、migration 与 consistency checker 的实现和验证 |
-| Evolution Merge Session、conflict projection、incremental resolution、revision-bound candidate validation / finalize | Lithograph raw logical slot → KG OS `MergeConflict` projection、candidate consistency-check query plan 与 adapter workflow tests |
-| `kgosd` foreground daemon、configurable IPv4 HTTP bind、startup-only config、`kgosd.lock` single-instance/endpoint、`kg daemon start/status/stop/restart`、Web/API same-origin、v1 no-auth | HTTP route / control handler、cross-platform file-lock/background-spawn/signal integration、shutdown timeout、Web asset packaging、Knowledge Base target/layout 与开发/分发方式 |
+| Ontology Overview → 可选 Domain → Definition，无 search；1..100 Ref batch read | 单次 State pin、输入顺序、per-Domain cursor、batch all-or-nothing、描述缺省提示与有界图预览 |
+| Node/Relationship 聚合 Property、required/unique、Constraint/Index | 从公开 Graph Type/SHOW 与 semantic graph 反向构建逻辑值；编译到数据库，不建立 owner-only 公共 structure AST |
+| Domain/Definition canonical YAML + 唯一 Object Patch | 标准 YAML/Git parser、exact apply、input-only renameFrom、语义差异、共享资源去重和冲突定位 |
+| 单 State、strict base、无隐式数据损失 | Native explicit transaction 内 DDL/DML 顺序、即时约束、引用改写和 Knowledge migration |
+| Binding / Graph View / reserved identifier | 空库 bootstrap、双向覆盖与内部数据隔离验证，不增加第二套结构存储 |
+| Evolution 统一历史与 Merge Session | Definition 内字段级历史；shared resource 单次 conflict 投影；固定 revision 的 candidate 检查 |
+| CLI / SDK / Web 共享合同 | ontology batch Markdown、batch --edit YAML multi-document stream、ontology scoped patch、Object JSON、Graph NDJSON、HTTP metadata 与错误映射 |
 
-1. **Schema projection / compiler mapping**：Definition / Property / Graph Type / Constraint / Index 的 `structure` 已确认只投影 Lithograph owner state。实现使用 Lithograph Cypher 25 Schema 与 current-graph `SHOW` public surface，把返回结果归一化成 owner-only logical slots，并为 editable slot 建立反向 Cypher compiler 与 round-trip tests；这属于 KG OS projection/compiler 工作，不再要求一个额外 KG OS-specific Schema API。若实现证据表明某个已确认 owner state 确实无法由 Lithograph public surface 无损读取/修改，再以具体底层缺口处理，而不是预先发明第二套 Schema AST。
-2. **Object Patch compiler implementation mapping**：本文已经冻结 parse → exact apply → Object Value → explicit delta → derived migration → logical-slot conflict → candidate validation → `tx_begin(expectedHead=baseState)` → 标准 Cypher 25 mutation → `tx_commit` 的语义。剩余是每个 logical slot 的 statement planning、request-local alias 到 Cypher-created identity 的 result capture、Ref transition、错误映射与测试矩阵，属于工程设计/实现，不再要求产品层逐项选择。
-3. **Merge projection / validation mapping**：Evolution Merge 的 Session lifecycle 已确认；实现只需把 Lithograph conflict logical slot 转换为公开 Object/Knowledge `MergeConflict`，并在 exact session revision 上执行 Binding coverage / reserved internal Schema / graph consistency checker。无法安全映射的 raw/internal conflict 返回 `CONSISTENCY_ERROR`，不把内部 slot 暴露给调用方，也不由 KG OS 猜 resolution。
-4. **Adapter contracts**：CLI command / argument / stdout-stderr / input-source contract 已由 [CLI](cli.md) 冻结；daemon transport / home 已由 [本地运行时](runtime.md) 冻结。剩余是 TypeScript parser、stdin/file、JSON/NDJSON、HTTP client、具体 route / handler 与 Web adapter 实现。Skill、SDK、HTTP 与 Web adapter 仍需把已确认 logical wire 映射成各自 method / route / metadata carrier 并建立 usage/reference 文档；任何 adapter 都不能重新定义能力语义。
-5. **Human-facing Web**：Object / Graph / Evolution 的查看、管理和纠正交互可以在核心能力实现后按真实用户流程设计，不阻塞 Kernel / CLI / SDK 的数据与版本合同。
-6. **`kgosd` runtime implementation**：v1 已确认 IPv4 HTTP、configurable `server.host/server.port`、默认 `127.0.0.1:4765`、startup-only config、`kgosd.lock` single-instance/current-endpoint、foreground `kgosd`、显式 daemon lifecycle、same-origin Web/API 与 no-auth。实现剩余是 HTTP route / streaming/control handler、配置加载、host/port bind validation、port bind fail-fast、`0.0.0.0` local-connect mapping、cross-platform OS file lock、background spawn/detach、signal → graceful-shutdown mapping、shutdown wait timeout、日志输出、Web asset serving 与 package/distribution。Knowledge Base 在 `data/` 下的具体 target/layout 在对应产品设计冻结前保持独立 gap。上层 client 始终没有直接 SQLite / Lithograph 访问路径。
+### Ontology compiler / decoder
 
-以上剩余项按真实实现依赖解决，不作为继续产品讨论的默认议题。只有实现证据表明现有产品合同无法唯一决定行为，并且不同答案会改变调用方可观察语义时，才升级为新的产品设计决定。
+实现先从目标 State 的公开 Schema 与 metadata 得到完整源信息，再建立本次操作的 source mapping，区分字段自带规则、具名约束、derived backing index 和独立显式索引。该映射是 operation-local 工程数据，不是新的公共结构、不作为第二份 Schema 持久化。
+
+反向读取必须保留真实的 index/constraint name、target、字段顺序、类型、端点语义及配置。相同公共值能通过多种底层 DDL 实现，不要求 AST/资源数量一一对应；但不能把另一种 coverage、复合约束或多目标索引简化成语义不同的 Boolean。
+
+正向编译先比较公共逻辑变化，再保留未修改的来源与配置，计算必需的底层变动。一次 Node/Relationship Patch 可同时改变 Schema、Constraint、Index 和 Binding；shared resource 使用一个规范化变化计划。新建时源映射为空，按 ontology.md 的命名/默认规则选择最小合法计划。不能靠临时 UUID、公共 owner registry 或 raw Schema escape hatch 填补 mapping。
+
+公开 type/required/from/to 能力由 Lithograph Schema/Constraint 实际执行，KG OS 做的是输入、依赖与编排校验，不实现另一套数据库运行时约束引擎。
+
+### Mutation planning
+
+执行链路复用 Object contract：parse → exact apply → 公共值 → explicit delta → shared-resource normalization → derived reference/migration → conflict/dependency check → tx_begin(expectedHead) → 标准 Cypher → tx_commit。
+
+实现必须证明中间每条 statement 符合 Lithograph immediate semantics，不能只比较最终 Schema。对合法上层目标可采用同 transaction 内受控 drop/recreate 或先迁移再施加约束；语义保持要求仍由公共合同约束。新 alias result capture、顶层 Ref transition 与 Property Binding continuity 都在这一个边界内完成。
+
+### Adapter 与运行时
+
+Ontology batch read 在 daemon/kernel 层先解析一次 State，再读取全部 refs；adapter 不能通过循环读取 `branch/...` 模拟 batch，否则 Branch 移动会产生跨 State 结果。Batch `--edit` 要先取得并验证全部 Object bodies，再一次性写 stdout；任一失败不得留下半个 stream。单个 body 继续使用 Object canonical renderer，multi-document marker/comment 由 CLI framing 层添加。`ontology patch` 与 `object patch` 只有一套 request/result/compiler，前者只做 kind scope validation。不得让 CLI、Web、SDK 对缺失字段、删除、rename、shared resource、baseState 产生不同解释。Knowledge 保持直接 Cypher，不文件化。
+
+**`kgosd` runtime implementation**：v1 已确认 IPv4 HTTP、configurable `server.host/server.port`、默认 `127.0.0.1:4765`、startup-only config、`kgosd.lock` single-instance/current-endpoint、foreground `kgosd`、显式 daemon lifecycle、same-origin Web/API 与 no-auth。实现剩余是 HTTP route / streaming/control handler、配置加载、host/port bind validation、port bind fail-fast、`0.0.0.0` local-connect mapping、cross-platform OS file lock、background spawn/detach、signal → graceful-shutdown mapping、shutdown wait timeout、日志输出、Web asset serving 与 package/distribution。Knowledge Base 在 `data/` 下的具体 target/layout 在对应产品设计冻结前保持独立 gap。上层 client 始终没有直接 SQLite / Lithograph 访问路径。
+
+上述 runtime 工作不随 Ontology 调整重做；Knowledge Base target/layout 是保留的独立产品设计事项，其余已能由当前逻辑合同裁决的 mapping 自行完成，不逐字段重新要求用户设计。
 
 ## 工程实现待办
 
-实现顺序应建立在 Lithograph 对应公开能力真实可用的基础上，具体 readiness 始终从 Lithograph 仓库检查，不在这里复制状态。
+实现前检查 Lithograph 实际文件与测试，不复制它的 Phase 状态为 KG OS 真源。当前 KG OS 仍只有文档，以下都是待实现工作。
 
-设计层已经没有“mixed Schema + graph 必须等待另一套 Lithograph mutation contract”的 gate：该问题由 Lithograph public explicit transaction + `expectedHead` + 标准 Cypher 25 mutation 解决。实现 readiness 仍必须从 Lithograph 仓库确认对应 explicit transaction、Schema / `SHOW` surface 与所需 Cypher mutation 已真实可用；实现未完成时只能报告依赖尚未 ready，不能把它重新表述为 KG OS 产品模型未设计。
+1. 建立 kgosd + Lithograph public host，完成 empty-database bootstrap、Native transaction 与结构化错误；不直接访问底层表。
+2. 实现 ontology.md 的 semantic graph、Binding coverage、Schema Locator 与 Graph View；正常 Knowledge/Schema 输入都不能写 reserved identifier。
+3. 实现五种公共 Object Ref、Domain/Definition aggregate decoder 和 Knowledge 原生 Object value；稳定 canonical YAML / equivalent JSON。
+4. 实现 Ontology read 的全局/Domain/Definition 展开与 1..100 Ref batch，同一次请求只 pin 一个 resolved State；实现 Object read/list，Object search 限定 Knowledge，不为 Ontology 加旁路搜索。
+5. 实现共享 Object Patch compiler，覆盖聚合内字段/规则/索引、多 aggregate 原子修改、alias、显式 rename、no-op、冲突、rollback；不实现单独 Schema resource CRUD。
+6. 实现 Graph query/execute，保持普通 Knowledge Cypher 与真实只读/写入边界；其它数据库管理和 version 能力仍按各自产品边界访问。
+7. 实现 Evolution read/state/ref/history/diff/merge，内部 schema slot 转为 aggregate 字段，固定 candidate revision 检查一致性后 finalize。
+8. 按 CLI / Runtime 文档实现 TypeScript/npm client、Ontology batch Markdown / batch-edit YAML stream / scoped patch、YAML/JSON/NDJSON 输出和 daemon 生命周期，再提供 Skill/SDK/Web 使用文档。
 
-1. 建立 Rust `kgosd` 本地 daemon 与最小 Lithograph host / client 边界，只暴露 KG OS 所需公开能力，不访问内部表；由 `kgosd` 打开 Knowledge Base、加载 Lithograph extension，接入 Native explicit transaction lifecycle、`expectedHead` 与结构化错误映射，实现 D33 的 empty-database bootstrap boundary，未完成 KG OS-valid bootstrap 前不开放公共业务能力。
-2. 按本文 `__kgos_` v1 internal physical encoding 实现 Ontology semantic graph：Definition / Property Binding Record、Domain / `INCLUDES`、同一 Lithograph Schema 中的 required internal Schema resources，以及基于 Lithograph `graphView` 的 Knowledge/Internal 隔离、双向 Binding coverage 与 Snapshot-scoped Schema Locator resolution。
-3. 实现统一 Object Ref resolver 与 Object Value projection：按 D36 canonical Ref；Domain 与 Knowledge Node / Relationship 直接投影 graph state；Graph Type / Constraint / Index 与 Definition / Property 的 `structure` 通过 Lithograph Cypher 25 Schema / current-graph `SHOW` public surface 做 owner-only projection。同一 State + Ref 产生同一 logical Object Value，并按 D34 renderer 稳定渲染为 canonical YAML 或等价 JSON，同时保持 internal graph 不可见。
-4. 实现 Object `list` / `search` / `read`，支持大集合分页与轻量摘要；复杂 Knowledge discovery 不扩展 Object search，而是交给 Graph Cypher。
-5. 实现 Object Patch compiler：canonical YAML + Git Extended Diff parser/application、标准 YAML parse → Object Value、Add / Update / Delete / Rename / Restructure、多 Object、request-local alias、strict base State / target Branch、direct Ref transition。先在 `baseState` 上完成 logical planning / conflict / dependency validation；存在有效 target delta 时调用 `tx_begin(targetBranch, expectedHead=baseState)`，在一个 Lithograph explicit transaction 内执行最少标准 Cypher 25 graph / Schema / Constraint / Index mutation，捕获本请求新 element identity 解析 alias，最后一次 `tx_commit`。所有路径落实 D17 rename migration、Schema↔Binding 一一覆盖、semantic cleanup 与 request all-or-nothing；任何失败都不得留下 intermediate State。
-6. 实现 Graph `query` / `execute`：只读查询具有真实只读边界，writable execute 只修改普通 Knowledge graph data；两者固定到统一 State semantics、复用 Lithograph value encoding，并执行 Knowledge/Internal Graph View isolation。
-7. 实现 Evolution 基础 Read：`overview`、State `get`、从明确 root 渐进读取 State DAG 的 `ancestry`、统一 `history`，以及 Branch / Tag list；保持 immutable State 与 mutable State Data / refs 的返回边界。
-8. 实现 Evolution mutation：State create/data、Branch lifecycle、Tag lifecycle，以及 D41 的 whole-Knowledge-Base Merge Session lifecycle。Merge conflict 转成公开 Object/Knowledge slot，支持 bounded page + incremental resolution；unresolved=0 后在同一 session revision 上跑 KG OS consistency checker，再用该 revision finalize。候选不合法时保留 Session、不移动 Branch；不暴露 checkout，也不复制尚无 KG OS use case 的其它 Lithograph Version Procedure。
-9. 实现统一 History / Diff 的 Lithograph version 过滤与业务解释视图，支持 scope / Object Ref filter，覆盖公开 Ontology + Knowledge 并隐藏 internal semantic graph。
-10. 按 [CLI](cli.md) 与 [本地运行时](runtime.md) 实现 TypeScript / npm `kg` → `kgosd` HTTP、`kgosd.lock` endpoint resolution 与 `kg daemon start/status/stop/restart`，并让 `kgosd` 提供 same-origin Human-facing Web；随后建立 Skill、SDK 与其它 Web interaction。所有上层 surface 只通过 daemon 的公共 HTTP contract 使用 Kernel，不直接访问 SQLite / Lithograph。
+## Ontology 专项验收
 
-实现、验证、提交和推送必须分别按仓库真实状态报告；设计完成不代表 Lithograph 依赖能力或 KG OS 功能已经实现。
+下表是**后续实现需要运行的验收场景**，不是本次已通过的运行测试。设计文档的文本/示例校验另记开发日志。
+
+| 场景 | 必须证明的结果 |
+| --- | --- |
+| 无 Domain；多个 Domain；多父级；cycle | 每个 Definition 从全局可达，单次响应有界，不递归爆炸、不强制建 Domain |
+| 说明缺失、同名不同 kind | 明确缺省提示、typed Ref 消歧，不猜业务语义，不自动添加 search |
+| Root/Domain 大集合 | total/cursor 与 State 一致，无静默截断；Overview 不可写 |
+| 多 Ref batch read | 1..100 个 Domain/Definition 只解析一次 State，按请求顺序返回；重复/缺失/invalid ref 或整体资源超限时不返回 partial success |
+| batch Domain pagination | limit 对各 Domain 独立生效，各自 cursor 可用同一 resolved State + 单 Ref 继续；多 Ref 请求不能提交单个 cursor |
+| Definition 普通 read 与 --edit | 阅读有真实查询信息；编辑正文与 Object read canonical YAML 相同 |
+| 多 Ref batch --edit | 输出是合法 YAML 1.2 multi-document stream；每个 document body 与单独 canonical YAML 逐字一致，顺序与请求一致；state/ref framing 不进入 Object Value / Git hunk；任一目标失败时 stdout 为空 |
+| ontology patch scope | 多 Definition/Domain Patch 与 object patch 得到相同 Ontology 结果；出现 Knowledge target 时在执行前整体拒绝；不建立第二 transaction/compiler |
+| Document 新建及正文/向量索引 | 一个 aggregate Patch 建立完整模型与真实可查询索引，不需独立 API |
+| 同请求新建 Node/Relationship/Domain | alias 跨 entry 解析，与文本顺序无关，最终 from/to/includes 为正式 Ref |
+| required / unique / 复合 KEY | 单字段和联合规则不混淆，类型/空值/冲突遵守对应数据库语义 |
+| Vector dimension/filterProperties/options | 显式配置、坐标类型、维度保留且一致；Embedding 不在 KG OS 生成 |
+| 多字段/多目标 Full-text | 保留完整覆盖范围，不拆成不等价的多个索引 |
+| shared Index 从任一 Definition 编辑 | 相同 delta 合并一次；不改另一份上下文也成功；矛盾目标整体失败 |
+| shared targets 减少、整条删除 | 范围变更与全局删除有明确不同结果，不误删正文/向量 |
+| 单字段索引改成复合索引 | 按资源名识别延续，保留未修改配置及有序 properties |
+| 只改 description | 只有 semantic delta，不触发 Schema/Index rebuild |
+| 无变化与纯排版变化 | strict base check 后返回原 State，不建空 Commit |
+| 顶层 rename 与 Property renameFrom | 真实 Knowledge、Binding、端点/Index/Constraint 引用共同更新，不靠相似度 |
+| 删除字段或 Definition，仍有数据/共享依赖 | 无隐式数据损失；可在同一 Patch 明确处理依赖，否则诊断聚合位置 |
+| 目标合法但中间 DDL/DML 有约束 | planner 找到合法原子序列；任何失败不产生中间 durable State |
+| stale base、重复字段、未知字段、无效 type/索引 | 分类正确并拒绝整个请求，不 fuzzy apply、不忽略输入 |
+| rename 后/历史 Snapshot 再读取 | Schema、semantics 与索引来自同一历史 State，不用当前数据解释历史 |
+| 多 Label 与作用范围重叠 | 不能局部改名时覆盖另一模型或其它 key；同一数据所有生效约束都保留 |
+| shared resource History / Merge | 以 Definition+path 表达，同一 native conflictId 不因多处展示重复解决 |
+| reserved/internal targets 与 raw 旧 Ref | 不泄露/误写内部资源，不因旧接口形成旁路 |
+| read → no-op → read；edit → compile → read | 公共逻辑 round-trip，保留未编辑的图数据、名称、选项与作用范围 |
+
+## 参考证据
+
+2026-09-15 只读核对 Lithograph 仓库：`docs/design.md` §9.2（explicit transaction 的 immediate constraints / rollback）与 §11（versioned Schema / Index）；`crates/lithograph-core/tests/phase07_schema.rs` 的 `graph_type_relationship_endpoint_identity_is_versioned_and_round_trips`；`phase08_search_ingestion.rs` 的 multi-target Full-text 与 vector filter/config 场景。这些证明映射需要覆盖的真实差异，不规定 KG OS 的公共 API 形状。本次没有重跑 Lithograph 测试，也没有修改其工作区。
+
+公开语言参考（2026-09-15 核对；Lithograph 冻结 profile 而非未来网页变化决定实际支持范围）：[Constraints](https://neo4j.com/docs/cypher-manual/current/schema/constraints/)、[Full-text indexes](https://neo4j.com/docs/cypher-manual/current/indexes/semantic-indexes/full-text-indexes/)、[Vector indexes](https://neo4j.com/docs/cypher-manual/current/indexes/semantic-indexes/vector-indexes/)。研究证据不覆盖 ontology.md 的上层产品决定。
+
+实现、验证、提交和推送分别按真实执行结果报告；文档完成不代表 KG OS compiler 或依赖库集成已经通过验收。

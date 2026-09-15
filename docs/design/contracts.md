@@ -1,6 +1,6 @@
 # 共享公共合同
 
-本文件只拥有 **跨 Object / Graph / Evolution 的共享公共错误合同**。各能力自己的 request / result / identity 语义仍由对应职责文件拥有。
+本文件只拥有 **跨 Ontology read / Object / Graph / Evolution 的共享公共错误合同**。各能力自己的 request / result / identity 语义仍由对应职责文件拥有。
 
 ## 公共错误合同
 
@@ -36,13 +36,17 @@ Object Patch 的错误归类固定为：
 - Git Extended Diff / YAML **语法无法解析** → `PARSE_ERROR`；
 - Git form 语法合法但不在 KG OS v1 profile（combined diff、binary、copy、mode-only 等）→ `UNSUPPORTED_OPERATION`；
 - malformed / non-canonical Object Ref、StateRef、cursor、alias，unknown alias，duplicate `(kind, alias)`，或 request field 组合非法 → `INVALID_ARGUMENT`；
-- YAML 可解析但字段类型、Lithograph tagged value 或 Object Value shape 不合法 → `TYPE_ERROR`；
+- YAML 可解析但未知字段、字段类型、Lithograph tagged value 或 Object Value shape 不合法 → `TYPE_ERROR`；
 - exact hunk 与 regenerated base canonical YAML 不匹配 → `PATCH_BASE_MISMATCH`；
 - existing target 不存在 → `OBJECT_NOT_FOUND`；
-- duplicate Add target/name、parent/child overlap、explicit-vs-derived slot 冲突、rename target 与显式 `name` 不一致 → `OBJECT_CONFLICT`；
+- duplicate Add target/name、共享资源显式 slot 冲突、explicit-vs-derived slot 冲突、rename target 与显式 `name` 不一致 → `OBJECT_CONFLICT`；
 - 触碰 `__kgos_` reserved namespace → `RESERVED_IDENTIFIER`；
-- owner lifecycle 本身不允许请求的变化 → `UNSUPPORTED_OPERATION`；
+- KG OS 公共模型本身不允许请求的变化（不等同于底层没有原地 ALTER） → `UNSUPPORTED_OPERATION`；
 - target Snapshot 违反 Lithograph Schema / Constraint → 保留 `SCHEMA_ERROR` / `CONSTRAINT_ERROR`；
 - target Snapshot 违反 KG OS Binding / internal isolation consistency → `CONSISTENCY_ERROR`。
 
 这些 code 表示稳定的调用方可观察类别；`message/details` 可以增加诊断信息，但不能通过文案改变 code 语义。
+
+Ontology read / batch edit 与 aggregate Patch 使用相同错误 envelope。Ontology batch 的重复 Ref、超过 100 个 Ref、batch `--edit` 携带 pagination 参数，以及 `ontology patch` 出现 Knowledge target / alias kind，都返回 `INVALID_ARGUMENT`；任一 Ref 不存在返回 `OBJECT_NOT_FOUND`；完整 batch 输出超过资源限制返回 `RESOURCE_ERROR`。这些错误都发生在 stdout 产生之前，不能返回 partial Markdown / YAML stream。对 Property/Constraint/Index 的错误，details 使用公开的 `ref`（Domain/Definition）与 `path`（RFC 6901，必要时指向整个相关 collection），可附真实 name 与受影响 Definition refs。不能要求调用方改用独立 index/constraint API，也不能泄露内部 Binding identity。
+
+不支持的旧 Object kind/Ref、Ontology search 参数和无目标 Overview --edit 返回 `INVALID_ARGUMENT`。共享索引的相同显式目标合并不算冲突；不同目标、delete/update 竞争或依赖未解决返回 `OBJECT_CONFLICT`。底层 immediate constraint failure 仍返回对应数据库公开分类，整个 Patch rollback。
