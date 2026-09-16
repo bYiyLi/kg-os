@@ -145,7 +145,7 @@ Graph `params` 是可选 JSON Map，并且 stdin 可能已经用于 Cypher，因
 
 ### Error 与 exit code
 
-失败时 stdout 必须为空；stderr 输出一个 [公共错误合同](contracts.md#公共错误合同) JSON envelope，并以 LF 结束。默认不在 error envelope 前后输出其它 diagnostics。CLI 参数解析、本地 JSON/YAML/text parse 或文件读取也尽量使用同一公开 category，例如 `INVALID_ARGUMENT`、`PARSE_ERROR`、`IO_ERROR`，但不能伪造成 daemon 已执行请求。
+除 Graph `--stream` 已经开始输出的情况外，失败时 stdout 必须为空；stderr 输出一个 [公共错误合同](contracts.md#公共错误合同) JSON envelope，并以 LF 结束。Graph streaming 如果在第一个 event 前失败，stdout 同样为空；一旦已经输出 `columns` / `row` 后才发生 server / public-value / transport failure，既有 stdout 允许保留为 partial NDJSON，但**绝不能输出 final `summary`**，stderr 仍输出 error envelope，进程以非零 exit 结束。默认不在 error envelope 前后输出其它 diagnostics。CLI 参数解析、本地 JSON/YAML/text parse 或文件读取也尽量使用同一公开 category，例如 `INVALID_ARGUMENT`、`PARSE_ERROR`、`IO_ERROR`，但不能伪造成 daemon 已执行请求。
 
 v1 exit code 只表达粗粒度执行层级，稳定业务分类始终读取 error `code`：
 
@@ -397,6 +397,17 @@ cat query.cypher | kg graph query --at branch/main
 
 默认 stdout 是 logical `{state, columns, rows}` JSON。
 
+托管语义检索不增加新命令。Cypher 仍写 Lithograph `SEARCH`，对应参数在 `--params` / `--params-file` 中用 `{"$semantic":"..."}` 标记：
+
+```bash
+kg graph query \
+  --at branch/main \
+  --cypher 'MATCH (d:Document) SEARCH d IN (VECTOR INDEX document_semantic FOR $q LIMIT 10) SCORE AS score RETURN d, score' \
+  --params '{"q":{"$semantic":"如何设计知识图谱"}}'
+```
+
+CLI 只传递 Graph logical params；semantic conversion 在 daemon adapter 中完成。stdout 仍只有 KG OS public profile 允许的业务查询值，例如 Node/Relationship、普通业务 Property 与 score；KG OS-managed embedding 不作为额外列或 element Property 返回。v1 不接受调用方在 `--params` 中直接提交 Lithograph `$type:"Vector"`，查询若显式返回 Vector 也按 `UNSUPPORTED_OPERATION` 失败；调用方不需要构造、读取或持久化 Vector。
+
 ### execute
 
 ```text
@@ -427,7 +438,9 @@ CLI 必须保持 Graph logical contract：`execute` **没有 `--base-state`**。
 {"type":"summary","state":"commit/...","counters":{}}
 ```
 
-`columns` 恰好一次，`row` 零到多次，`summary` 成功时恰好一次并且必须是最后一个 event。stream 中途发生 transport / server failure 时，已经输出的 row 只是 partial result；调用方只有在**进程 exit 0 且观察到 final `summary`**时才能把整个 stream 视为成功。
+`columns` 恰好一次，`row` 零到多次，`summary` 成功时恰好一次并且必须是最后一个 event。stream 中途发生 transport / server / public-value validation failure 时，已经输出的 row 只是 partial result；例如后续 row 首次出现 KG OS v1 不支持的 Vector value 时，本次 stream 以 `UNSUPPORTED_OPERATION` 失败，不输出 summary，先前 rows 不能当作完整查询结果。调用方只有在**进程 exit 0 且观察到 final `summary`**时才能把整个 stream 视为成功。
+
+对 `graph execute --stream`，final `summary.state` 还是 durability boundary：summary 之前观察到的 Node / Relationship / elementId 只能视为本次 mutation 的 provisional result。若后续 candidate validation、Embedding Provider、commit 或 transport 失败且没有 final summary，这些 Ref 不得作为 durable Knowledge identity 保存或用于后续请求。
 
 Streaming 只改变 transport framing，不改变 column order、row value encoding、resolved State 或 counter 语义。
 
@@ -565,6 +578,9 @@ edit exact Ontology aggregate(s) / Object
 
 discover / compute Knowledge
 → graph query
+
+semantic search
+→ graph query with Vector SEARCH + SemanticText param
 
 bulk / conditional Knowledge mutation
 → graph execute

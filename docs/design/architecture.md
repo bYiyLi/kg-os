@@ -17,6 +17,7 @@ KG OS 不替调用方定义世界，而是提供**定义世界并操作这个世
 - KG OS 的确定性能力应作用于明确的定义，而不是依赖 Kernel 内部的隐式领域判断。
 - KG OS 不根据上层业务意图绕过 Lithograph 已生效的 Schema、transaction 或 version contract。
 - 理解、提炼、分类和建模等认知决策仍属于外部 Agent 与 Skill。
+- 调用配置好的 Embedding Provider 把明确文本确定性转换为向量属于基础数据处理，不属于 Agent 认知决策；KG OS 不因此内置聊天模型、分类器或领域判断。
 
 ### 这不意味着
 
@@ -64,7 +65,7 @@ AI / Agent / Skill / CLI / SDK / Web
 
 | 层 | 负责 |
 | --- | --- |
-| KG OS | Object / Graph / Evolution 公共能力、Ontology semantic metadata、Domain / Definition mutation aggregate、渐进式 Ontology read、Knowledge 的 Object 投影、Knowledge Base 状态演进的业务化解释、AI-facing CLI / Skill、Human-facing Web |
+| KG OS | Object / Graph / Evolution 公共能力、Ontology semantic metadata、Domain / Definition mutation aggregate、渐进式 Ontology read、Knowledge 的 Object 投影、OpenAI-compatible embedding service 编排与托管语义向量、Knowledge Base 状态演进的业务化解释、AI-facing CLI / Skill、Human-facing Web |
 | Lithograph | Property Graph、Cypher 25、Graph Type / Schema、Constraint、Index、Search、immutable Commit DAG、Branch、Tag、Commit Data 与版本化状态操作 |
 | SQLite | Lithograph 的运行宿主、持久化文件、connection、transaction 与基础数据库机制 |
 
@@ -103,6 +104,7 @@ kgosd
 ```
 
 - **`kgosd` 是 KG OS v1 的本地统一访问入口。** 它承载 KG OS Kernel，并负责打开 Knowledge Base、加载 Lithograph extension、维护所需 connection / transaction lifecycle，以及执行 KG OS 到 Lithograph 的 projection / compiler / consistency orchestration。
+- **OpenAI-compatible Embeddings service 是 `kgosd` 的基础运行依赖。** v1 只支持这一种远端协议，不提供 provider plugin / selector；`base_url/model/dimensions/credential/similarity` 由全局 startup config 统一确定，Ontology 不重复保存。KG OS 使用它生成托管 embedding，并把 Graph params 中调用方显式标记的 SemanticText 转成 query Vector；它不解析/改写 Cypher，也不把远端模型服务提升为领域 Model 或 Agent。
 - **Rust 层负责确定性核心。** `kgosd`、Kernel、Lithograph host/client、Object projection / Patch compiler、Evolution projection 与 KG OS consistency validation 使用 Rust 实现；Rust 层不重新实现 Lithograph 已拥有的 Graph Engine、Search Engine、Schema Engine 或 Version Engine。
 - **TypeScript / npm 层负责上层产品面。** SDK、CLI、Web 以及 Skill / 生态集成以 TypeScript / npm 为主要交付形态；它们消费 KG OS 公共 logical contract，不直接打开 SQLite database、加载 Lithograph extension 或依赖 `_lithograph_*` 内部状态。
 - **client ↔ `kgosd` 使用 HTTP，默认绑定本机 loopback。** configurable host / port、Web hosting、`~/.kgosd/` 目录与无认证边界由 [本地运行时](runtime.md) 唯一负责；具体 HTTP route / metadata carrier 仍由 adapter mapping 决定，但不能改变 Object / Graph / Evolution logical contract。
@@ -115,7 +117,9 @@ kgosd
 
 KG OS 对知识、Ontology 结构、查询、搜索和状态演进的操作统一通过 Lithograph 公开接口完成。KG OS 不直接读写 `_lithograph_*` 内部对象，也不把 Lithograph 的内部物理结构提升为 KG OS 产品合同。
 
-KG OS 不要求 Lithograph 增加 KG OS 专用语法、Schema 字段或 Annotation。Lithograph 的公开查询与 Schema 语义继续以其冻结的 Cypher 25 compatibility profile 为准；Cypher 25 没有的 Ontology 语义由 KG OS 在上层表达，不修改 Lithograph 方言。
+KG OS 不要求 Lithograph 增加 KG OS 专用语法、Schema 字段或 Annotation。Lithograph 的公开查询与 Schema 语义继续以其冻结的 Cypher 25 compatibility profile 为准；Cypher 25 没有的 Ontology 语义由 KG OS 在上层表达，不修改 Lithograph 方言。`SemanticText` 是 KG OS transport/adapter 的 parameter marker，进入 Lithograph 前已经变成标准 Vector parameter，因此不构成 Cypher 方言扩展。
+
+Lithograph 作为通用数据库继续完整支持 `VECTOR` value / Property / Index；KG OS v1 **有意不把 caller-owned Vector 提升为自己的 Ontology / Knowledge 数据类型**。KG OS-valid State 中，Vector 只能出现在 reserved KG OS-managed semantic materialization；caller-owned Schema type/constraint 或 public Knowledge Property value 出现 Vector 都违反 KG OS public profile。由于 Lithograph Graph Type 保持 open semantics，这个不变量不能只靠 Schema 声明保证；KG OS Graph write 必须在 durable commit 前基于 candidate / staged changes 验证实际变化。
 
 ### SQLite 只作为 Host
 
@@ -143,6 +147,8 @@ State Snapshot Data Semantics
 ├── Ontology    → 世界如何建模、模型是什么意思
 └── Knowledge   → 世界中实际存在的 Node / Relationship / Property values
 ```
+
+每个 KG OS-valid State 还保存一个 KG OS-owned、不可由调用方编辑的 **embedding-space fingerprint**。它对固定协议 identity `openai-compatible-embeddings-v1`、canonical `base_url`、model、dimension、similarity 与 KG OS semantic-input framing version做 canonical digest；`api_key` / `api_key_env` / resolved credential 不参与也不进入 State。全局 `config.toml` 是实际 service 连接配置；fingerprint 只用于防止当前 runtime config 与 State 中已有向量空间不兼容。KG OS-valid State 的 consistency invariants 同时要求不存在 caller-owned Vector Schema/Property value；reserved managed vector 不属于调用方数据。
 
 Ontology 与 Knowledge 仍是 KG OS 的核心产品语义和数据责任，但**不是另外两套平行公共 CRUD API**。一个 State Snapshot 内也不存在 Object、Graph、Evolution、Ontology、Knowledge 五份数据；Object / Graph 是访问同一 Ontology / Knowledge Snapshot 的公共能力，Evolution 管理 Snapshot 的版本演进。当前存储模型是：
 

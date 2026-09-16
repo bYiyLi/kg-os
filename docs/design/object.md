@@ -37,7 +37,7 @@ read    → 同一对象的 canonical YAML / equivalent JSON
 patch   → 统一 Add / Update / Delete / Rename / Restructure
 ```
 
-Ontology 首次发现与渐进理解使用 [Ontology read](ontology.md#ontology-read-合同)，不是 Object search。Ontology 不支持关键字搜索，也不能通过 `scope=all` 或省略 scope 间接搜索 Ontology。普通 Knowledge 的属性全文、Vector、条件与遍历仍用 Graph Cypher。
+Ontology 首次发现与渐进理解使用 [Ontology read](ontology.md#ontology-read-合同)，不是 Object search。Ontology 不支持关键字搜索，也不能通过 `scope=all` 或省略 scope 间接搜索 Ontology。普通 Knowledge 的属性全文、托管语义检索、条件与遍历仍用 Graph Cypher；Vector 本身不是 KG OS v1 caller-owned Object 能力。
 
 写入始终只有一套 **canonical YAML + Git Extended Diff textual Patch**。不为 Domain、Node Definition、Relationship Definition、Property、Constraint、Index 分别建立 create/update/save API，也不新增 full-object PUT / upsert。聚合 Patch 可以编排多个底层资源，底层 ownership 不决定公共 API 的粒度。
 
@@ -59,6 +59,8 @@ Knowledge Relationship
 
 `state/ref/kind` 是 metadata，不是可编辑 body。Domain 不复制成员内容；Knowledge Relationship 不复制 endpoint Node；**Definition 可以直接编辑它聚合的 Property / Constraint / Index**，即使这些内容映射到多个独立底层资源。共享索引的重叠展示不增加持久 owner，遵守 Ontology 的显式 delta 归一化规则。
 
+KG OS 托管 semantic vector 使用的 reserved `__kgos_` Property / metadata 不属于 Knowledge Object Value：即使物理上与业务 element 共存，也不能出现在 `properties{}`、canonical YAML / JSON、Object diff/history 或调用方可写 slot 中。调用方只看到产生它的 public source Property 与 public semantic Index 定义。KG OS v1 同时不接受 caller-owned Vector Property/value，因此公共 Object Value 中不存在 Vector typed Property。
+
 Request-local `new:<kind>:<alias>` 只在 Patch 的 Ref-typed slot 中引用本请求新建 Object，例如 Domain includes、Relationship Definition from/to、Index targets、Knowledge Relationship start/end。普通字符串恰好以 `new:` 开头不当作引用。成功后全部 Ref 解析为正式 Ref；内嵌 Property 不需要单独的 Object alias 或 Patch entry。
 
 v1 确认两种公开 serialization：
@@ -70,7 +72,7 @@ Object Value
 ```
 
 - **YAML 是唯一 canonical editable representation。** 同一个 immutable State + 同一个 Object Ref 必须由 KG OS renderer 产生确定、可重放的 canonical YAML；字段顺序、集合排序、缩进、多行字符串、escaping 与特殊 typed value 的 canonical rendering 由 Object serialization contract 冻结；
-- **JSON 是同一 Object Value 的等价结构化 representation。** JSON wire 继续复用适用的 Lithograph JSON typed-value encoding，不为 Integer64、Temporal、Point、Vector、UUID 等值再建立第二套类型编码；SDK / Web 可以把 `application/json` payload 解析成语言内 Object / Map，这不构成另一种 wire format；
+- **JSON 是同一 Object Value 的等价结构化 representation。** JSON wire 继续复用适用的 Lithograph JSON typed-value encoding，不为 Integer64、Temporal、Point、UUID 等 KG OS public Object value 再建立第二套类型编码；Vector 不属于 v1 caller-owned Object Value；SDK / Web 可以把 `application/json` payload 解析成语言内 Object / Map，这不构成另一种 wire format；
 - KG OS **不定义自己的 YAML 方言或 YAML 子语言**。调用方提交的 YAML 只要能由标准 YAML 1.2 parser 解析，并能无歧义映射为目标 Object 的合法 logical value，就可以进入后续 Object schema / type validation；同义但非 canonical 的 YAML 写法不会因为格式不同而被拒绝。Parser 必须在构造普通 Map/List/String/value tree 前拒绝 duplicate mapping key；anchors / aliases 可以使用，但展开后必须是有限、无循环并可映射到普通 Object Value；unknown/custom tag 只有在能按 KG OS/Lithograph 已知 value encoding 无歧义解释时才合法，否则返回 `INVALID_ARGUMENT`。resource/depth/alias-expansion limit 命中返回 `RESOURCE_ERROR`，而不是由 KG OS 猜测或截断输入；
 - canonical YAML 是 Git Extended Diff 的唯一文本 base。JSON 可以作为文本或结构化数据读取，但 v1 Object Patch 不以 JSON serialization 作为 diff base，因此 Patch request 不需要额外携带 `yaml | json` patch-format selector；
 - 核心 Object 合同不发明 `representation: {mode, format}` 之类参数。HTTP adapter 使用标准 content negotiation：客户端通过 `Accept: application/yaml` 或 `Accept: application/json` 请求 representation，响应通过对应 `Content-Type` 声明实际媒体类型。CLI / SDK 可以提供 `--format`、`readText`、`readObject` 等便利接口，但它们只是同一 Object Value / serialization contract 的适配，不建立新的数据模型；
@@ -89,7 +91,7 @@ String rendering 必须无损：
 - 其余包含 `LF` 的 String 使用 literal block，不使用 folded `>`：逻辑值末尾没有 `LF` 时用 `|-`，恰好一个 trailing `LF` 时用 `|`，两个及以上 trailing `LF` 时用 `|+` 并输出对应 trailing blank lines；
 - UTF-8 printable Unicode character 保持原字符，不做 normalization 或 ASCII escaping。
 
-其它 scalar / typed value rendering 继续以 Lithograph JSON v1 为类型边界，并固定：`null` 写作 `null`；Boolean 只写 `true / false`；JSON safe-range Integer 使用无前导 `+`、无多余前导零的 base-10 scalar，超出 safe range 继续使用 `$type: Integer` + decimal String；finite Float 使用能 round-trip 回同一 IEEE-754 value 的 shortest decimal，并且 lexical form 必须带小数点或 exponent 以区别 Integer，整数值 Float 例如 `1.0` 不能规范化成 `1`，negative zero 固定保留为 `-0.0`；NaN / ±Infinity 继续使用 Lithograph `$type: Float` tagged form。Temporal、Duration、Point、Vector、UUID 与 reserved-`$type` Map wrapper 都与 Lithograph JSON v1 同构。
+其它 scalar / typed value rendering 继续以 Lithograph JSON v1 为类型边界，并固定：`null` 写作 `null`；Boolean 只写 `true / false`；JSON safe-range Integer 使用无前导 `+`、无多余前导零的 base-10 scalar，超出 safe range 继续使用 `$type: Integer` + decimal String；finite Float 使用能 round-trip 回同一 IEEE-754 value 的 shortest decimal，并且 lexical form 必须带小数点或 exponent 以区别 Integer，整数值 Float 例如 `1.0` 不能规范化成 `1`，negative zero 固定保留为 `-0.0`；NaN / ±Infinity 继续使用 Lithograph `$type: Float` tagged form。Temporal、Duration、Point、UUID 与 reserved-`$type` Map wrapper 都与 Lithograph JSON v1 同构；遇到 caller-owned Vector value 不是 serialization 问题，而是先按 KG OS public Object profile 拒绝。
 
 因此 canonical renderer 往返解析必须得到逐 code point 相同的 String 和同一 typed scalar value，不允许为了“更好看”增加/移除末尾换行、把 Float 改成 Integer，或丢失特殊值类型。缺省的可选 `title` / `description` 不输出；必需 collection 即使为空也输出；optional/default field 的省略规则由对应 owner 文档规定。Lithograph typed value 只是在 YAML 中表达同一 tagged map，不创建第二套特殊类型语法。
 
@@ -208,7 +210,9 @@ Object Patch v1 的 textual syntax 固定采用普通 two-way **Git Extended Dif
 
 Object Patch 以调用方实际读取的 immutable `baseState` 为 patch base、以明确 Branch 为 write target。**v1 使用 strict base-State 语义：mutation 开始时 target Branch 的当前 head 必须仍等于 `baseState`；如果 Branch 已前进，则整个 Patch 以 `STALE_BASE_STATE` 失败，不把基于旧文本生成的 Patch 自动套用到新 State，也不自动 rebase / merge。** 对存在有效 target delta 的 Patch，这个并发基线由 Lithograph `tx_begin(expectedHead=baseState)` 在取得 single-writer ownership 后原子检查；成功 begin 后其它 writer 不能在本 transaction 生命周期内移动该 Branch。无 effective delta 的 Patch 不开启 transaction，但仍必须先读取并比较 target Branch head，stale 时同样返回 `STALE_BASE_STATE`。
 
-在 base State 校验通过后，KG OS 重新生成对应 Object canonical YAML，精确应用 textual Patch 得到目标 YAML，使用标准 YAML parser 解析为 target Object Value / target Object set，再执行 Object schema / type、Ontology / Knowledge dependency、Schema、Graph View 与其它公开规则校验，最后编排 Lithograph。请求默认 all-or-nothing；任一变化失败都不能留下部分 durable 结果。
+在 base State 校验通过后，KG OS 重新生成对应 Object canonical YAML，精确应用 textual Patch 得到目标 YAML，使用标准 YAML parser 解析为 target Object Value / target Object set，再执行 Object schema / type、Ontology / Knowledge dependency、Schema、Graph View 与其它公开规则校验，最后编排 Lithograph。请求默认 all-or-nothing；任一变化失败都不能留下部分 durable 结果。若 Knowledge Object 变化会新增/删除 semantic-index target 或改变 source Property，managed vector refresh 属于该 Patch 的 mandatory derived change；Provider/refresh 失败必须让整个 Patch rollback，不能提交 source/vector 不一致 State。
+
+Ontology Patch 对 semantic Index 的 create/delete、targets 变化、source properties 增删/重排，或 source Property rename/type change，也必须把**当前 baseState 中全部受影响 Knowledge element**的 managed materialization migration 纳入同一个最终 State：新建/扩展要 backfill，删除/缩小要删除不再需要的 managed value，source framing 改变要重算。不能先提交新的 public Index 定义，再异步补 embedding 或追加第二个隐藏 Commit。调用方显式 delta 仍只有 Ontology aggregate；这些 Knowledge vector 变化属于 mandatory derived migration，不要求 AI 枚举每个实例。
 
 对于 Update / Rename / Restructure，KG OS 不把“应用 Patch 后得到的一整份 YAML”当成 `PUT` 语义，而是比较 base Object Value 与 patched YAML 解析得到的 Object Value，只把调用方**显式改变的 logical slots**作为 target delta；Rename entry 的 old/new target 额外贡献该 Object identifying locator 的显式 rename delta。未被 textual Patch 改动的字段只是 context，不会阻止同一请求为了 rename、referential integrity 或 consistency 产生必要的 derived migration。例如 Relationship Definition rename 与某条 Relationship 的 Property update 可以同时存在：该 Relationship entry 没有编辑的旧 type 字段不会覆盖 mandatory type migration。反过来，如果调用方显式修改的 slot 与 mandatory derived change 要写同一 slot 且目标不同，则整个 Object Patch 冲突失败，不按 entry 顺序覆盖。
 

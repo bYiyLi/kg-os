@@ -27,9 +27,18 @@ CONSISTENCY_ERROR
 UNSUPPORTED_OPERATION
 STATE_NOT_FOUND
 RESERVED_IDENTIFIER
+EMBEDDING_CONFIG_ERROR
+EMBEDDING_PROVIDER_ERROR
+EMBEDDING_SPACE_MISMATCH
 ```
 
 Lithograph `VERSION_NOT_FOUND` 在 KG OS 公共语义中映射为 `STATE_NOT_FOUND`；Object Patch 的 `tx_begin(expectedHead=baseState)` mismatch 或 no-op strict-head check mismatch 映射为 `STALE_BASE_STATE`；Git hunk 无法精确应用到 `baseState` 重新生成的 canonical YAML 时返回 `PATCH_BASE_MISMATCH`，不能 fuzzy/offset apply，也不能误报为 Branch stale；Binding coverage、reserved internal graph/schema 等 KG OS invariants 失败映射为 `CONSISTENCY_ERROR`。HTTP status 与 SDK exception class 仍属于各 adapter mapping；CLI 的 stdout/stderr 与 coarse exit-code mapping 由 [CLI](cli.md#error-与-exit-code) 冻结，但都不能改变上述稳定 error `code`。
+
+Embedding 错误固定区分：`EMBEDDING_CONFIG_ERROR` 表示 `[embedding]` 缺失、`base_url/model/dimensions/similarity` 非法、出现已经移除的 `provider`/其它未知字段、`api_key` 与 `api_key_env` 同时配置、inline/env credential 为空，或 `api_key_env` 指向不存在/空环境变量；`EMBEDDING_PROVIDER_ERROR` 表示配置合法但实际 `POST {base_url}/embeddings` timeout、网络失败、非成功 HTTP status、响应 JSON/`data/index/embedding` shape 非法、embedding 非 finite number 或返回维度不等于配置；`EMBEDDING_SPACE_MISMATCH` 表示当前 runtime config 的非敏感 fingerprint 与目标 State 已记录的 embedding space 不一致。后两者不能伪装成 `INTERNAL_ERROR`；任何依赖 embedding 的 mutation 失败都必须保持原 Branch/State 不变。任何 error/debug surface 都不得回显 `api_key` 或 resolved env credential。
+
+Graph params 的 `SemanticText` marker **只在 Graph `params` 的直接 value 位置识别**，并只接受 exact `{"$semantic":"<non-empty-string>"}`。在这个识别位置，`$semantic` 与其它 key 并存、value 非 String/空 String 返回 `INVALID_ARGUMENT`；调用方确实要传同形状普通 Cypher Map 时使用 Lithograph `$type:"Map"` wrapper。Graph params 的嵌套 Map、Object/State Data 或其它 surface 中的 `$semantic` key 没有特殊含义，按各自普通 Map/data contract 处理。SemanticText 在 Lithograph parameter decode 前由 KG OS 消费，因此不会作为 Cypher Map 或持久值进入 Lithograph。
+
+KG OS v1 public profile 不接受 caller-owned Vector。Ontology Property `type` / type-constraint `valueType` 包含 `VECTOR`、Object/Knowledge Property value 含 Vector、Graph caller parameter 的任意 public value tree 中出现 Lithograph `$type:"Vector"`、Graph result 的任意 public value tree 中出现 Vector，或 Graph mutation candidate 的 caller-owned Property 写入 Vector，统一属于**底层支持但 KG OS v1 未公开的能力**，返回 `UNSUPPORTED_OPERATION`；mutation 必须在 commit 前 abort。reserved `__kgos_` managed vector 与 SemanticText 解析后生成的内部 query Vector 不适用此错误，它们永不作为公共 Object/Graph value 返回。KG OS 不解析 Cypher 去禁止只存在于表达式内部且未跨越上述边界的 Vector 计算；这类行为属于 Lithograph execution semantics，不建立 KG OS public Vector contract。
 
 Object Patch 的错误归类固定为：
 

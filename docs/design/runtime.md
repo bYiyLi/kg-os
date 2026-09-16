@@ -1,6 +1,6 @@
 # 本地运行时
 
-本文件是 KG OS v1 **`kgosd` 本地服务、HTTP bind、daemon lifecycle、Web hosting、默认 endpoint 与 `~/.kgosd/` 本地目录布局**的设计真源。Kernel 能力由 [Object](object.md)、[Graph](graph.md) 与 [Evolution](evolution.md) 负责；CLI 命令由 [CLI](cli.md) 负责。
+本文件是 KG OS v1 **`kgosd` 本地服务、HTTP bind、Embedding Provider startup config、daemon lifecycle、Web hosting、默认 endpoint 与 `~/.kgosd/` 本地目录布局**的设计真源。Kernel 能力由 [Object](object.md)、[Graph](graph.md) 与 [Evolution](evolution.md) 负责；CLI 命令由 [CLI](cli.md) 负责。
 
 ## 本地服务模型
 
@@ -70,15 +70,61 @@ KG OS v1 在当前 OS 用户 home 下使用一个明确的 daemon home：
 
 ### `config.toml`
 
-`config.toml` 是持久的 **startup configuration**。v1 当前冻结的 server 配置只有 host 与 port：
+`config.toml` 是持久的 **startup configuration**。v1 冻结 server 与全局 OpenAI-compatible Embeddings 两组基础配置：
 
 ```toml
 [server]
 host = "127.0.0.1"
 port = 4765
+
+[embedding]
+base_url = "https://api.example.com/v1"
+model = "text-embedding-model"
+dimensions = 1536
+similarity = "cosine"
+# 二选一，也可以都不配表示无认证：
+# api_key_env = "EMBEDDING_KEY"
+# api_key = "sk-..."
 ```
 
-省略 `server.host` 等价默认 `127.0.0.1`；省略 `server.port` 等价默认 `4765`。`server.host` 必须是合法 IPv4 address string；v1 不把 hostname / DNS resolution 引入 bind contract。未来新增配置字段必须有真实运行需求，不能把尚未存在的扩展点提前塞入配置文件。
+省略 `server.host` 等价默认 `127.0.0.1`；省略 `server.port` 等价默认 `4765`。`server.host` 必须是合法 IPv4 address string；v1 不把 hostname / DNS resolution 引入 bind contract。
+
+KG OS v1 **只支持 OpenAI-compatible Embeddings API**，因此没有 `embedding.provider` 字段，也不建立 provider plugin / registry。`embedding.base_url`、`embedding.model`、`embedding.dimensions` **全部必填**：
+
+- `base_url` 是 API root，必须是 absolute `http://` 或 `https://` URL，不允许 query / fragment；canonical form 去掉末尾 `/`。KG OS 请求 `${base_url}/embeddings`，因此 OpenAI 官方服务应配置为 `https://api.openai.com/v1`，本地兼容服务可使用例如 `http://127.0.0.1:8080/v1`；
+- `model` 是非空模型 ID，原样放入 embeddings request；KG OS 不通过 List Models 猜模型；
+- `dimensions` 是该 endpoint/model 实际返回的正整数向量维度。v1 **不把 `dimensions` 发送给远端**，而是用它建立内部 Vector Schema/Index 并校验每个返回 embedding 的长度，因此不要求兼容服务实现 OpenAI 可选的 dimensions request parameter；
+- `similarity` 缺省为 `cosine`，v1 只允许 KG OS/Lithograph 当前共同支持的值；它影响本地 Vector Index，不发送给远端服务；
+- `api_key` 与 `api_key_env` 都是 optional 且**互斥**。`api_key` 直接保存非空 secret；`api_key_env` 保存非空环境变量名称，`kgosd` 启动时解析且目标变量必须存在并为非空。两者都不配置表示该 endpoint 无需认证。二者任一解析出 credential 后，请求添加 `Authorization: Bearer <credential>`；未配置 credential 时不发送 `Authorization` header。
+
+`api_key_env` 是减少 secret 落盘的推荐方式；`api_key` 是明确支持的便利方式。使用 inline `api_key` 时，`config.toml` 就是 secret-bearing file，调用方应把文件权限限制给当前用户；KG OS 不在日志、错误、HTTP/CLI 输出中回显 credential，也不把它写入 State / Commit Data。未知 `[embedding]` 字段直接返回配置错误，不预留任意 headers/options bag。
+
+#### OpenAI-compatible Embeddings 子集
+
+这里的 **OpenAI-compatible** 只冻结 KG OS 实际使用的 Embeddings 子集，不承诺兼容 OpenAI 的其它 API。当前 wire contract 以 OpenAI `POST /embeddings` 的请求/响应形状为依据：
+
+```http
+POST {base_url}/embeddings
+Content-Type: application/json
+Authorization: Bearer <credential>   # 仅在配置 credential 时
+```
+
+```json
+{
+  "model": "text-embedding-model",
+  "input": "text to embed"
+}
+```
+
+实现允许为了 backfill/refresh 合并多个独立文本，把 `input` 发送为 `string[]`；兼容 endpoint 因此必须接受 String 或 Array<String> 两种输入。KG OS v1 不发送 `user`、`encoding_format`、`dimensions` 或 provider-specific options；服务返回 numeric float array 即可。
+
+响应至少必须包含可解释的 `data[]`，每个 entry 具有整数 `index` 与 numeric `embedding[]`。单输入必须能得到 index `0` 的唯一 embedding；批量输入必须对每个输入恰好有一个唯一 index，KG OS 按 `index` 而不是 response array 顺序关联输入。每个 embedding 必须只包含 finite number，且长度严格等于配置的 `dimensions`；缺项、重复/越界 index、非数值/NaN/Infinity、维度不符、非成功 HTTP status、无法解析 JSON 或 transport timeout/网络错误都属于 `EMBEDDING_PROVIDER_ERROR`。响应中的 `object`、`model`、`usage` 等其它 OpenAI 字段不是 KG OS correctness source，可以存在但不要求消费。
+
+Embedding 配置是 **Knowledge Base 基础前置条件**。缺少 `[embedding]`、`base_url/model/dimensions` 非法、`api_key + api_key_env` 同时出现，或 `api_key_env` 无法解析为非空 credential 时，`kgosd` 不能开放 Knowledge Base 业务能力。启动只验证配置形状与本地 credential 来源，不把一次远端 health check / sample embedding request 作为数据库可读性的前置条件；OpenAI-compatible endpoint 临时网络/服务故障只让本次需要 embedding 的 semantic-parameter resolution、managed-vector maintenance 或 migration 返回 `EMBEDDING_PROVIDER_ERROR`，已经可以独立完成的 Ontology read、普通 Graph read 与 Full-text 查询不因此伪装成数据库损坏。
+
+KG OS bootstrap 会把当前 embedding config 的**非敏感 embedding-space fingerprint**写入 reserved internal metadata；State 只保存 digest，不保存原始 config。v1 provider protocol identity 是固定常量 `openai-compatible-embeddings-v1`，fingerprint 输入固定覆盖该 identity、canonical `base_url`、`model`、`dimensions`、`similarity` 与 KG OS semantic-input framing version。`api_key`、`api_key_env` 名称、解析出的 credential 和任何 Authorization header 都不参与 fingerprint，也永不进入 State；在 endpoint/model/其它 semantic config 不变时，仅在 `api_key ↔ api_key_env` 间切换或轮换 credential 不要求 migration。credential source/value 仍属于 startup-read config/environment：修改 inline key、环境变量名称或环境变量值后需要 restart 才会被 `kgosd` 重新读取，但不需要 embedding migration。打开已有 Knowledge Base 时，当前 config 的 fingerprint 必须与 writable head 的 fingerprint 一致，否则返回 `EMBEDDING_SPACE_MISMATCH`，不能用新模型/endpoint 查询旧向量，也不能静默批量重算。更换上述任一 semantic config 是显式 Knowledge Base migration，不是普通 restart-only 配置变化；migration workflow 在单独设计冻结前保持未实现，v1 不能靠手改 TOML 绕过。
+
+Fingerprint 只能检测**配置身份发生变化**，不能证明远端服务在相同 `base_url + model` identity 下永远返回同一向量空间。兼容服务若在不改变这些配置的情况下把同一 model/deployment 静默替换为语义不兼容实现，KG OS 至少会拒绝维度不符的结果，但无法仅凭本地配置发现同维度的向量空间旋转；服务/运维必须使用稳定的 model/deployment identity。这是外部服务合同的限制，不通过启动时强制远端 probe 或把 secret 写进 State 规避。
 
 `kgosd` **只在进程启动时读取配置**。运行期间修改 `config.toml`：
 
@@ -87,7 +133,7 @@ port = 4765
 - 不触发当前进程自动退出；
 - `server.host` / `server.port` 的新值只在下一次 `kgosd` 启动时生效。
 
-因此 host / port 是 restart-required settings。`kg daemon restart` 是应用这类新配置的显式 lifecycle 操作；普通业务命令不能因为发现文件变化而隐式 restart daemon。
+因此 server 与 embedding config 都是 restart-read settings。`kg daemon restart` 只负责让新 startup config 被重新读取；它**不等于 embedding migration**。普通业务命令不能因为发现文件变化而隐式 restart daemon，也不能在 fingerprint mismatch 时自动迁移 Knowledge Base。
 
 ### `kgosd.lock`
 
@@ -141,9 +187,11 @@ resolve ~/.kgosd/
 → open/create kgosd.lock
 → acquire exclusive OS lock
 → clear stale lock content
-→ load/create config.toml once
+→ load config.toml once
+→ validate server + embedding config
 → resolve configured host + port
 → open / bootstrap Knowledge Base and Kernel
+→ verify embedding-space fingerprint for existing writable head
 → bind <host>:<port>
 → write active local endpoint into kgosd.lock
 → serve Web + API
@@ -212,6 +260,7 @@ exact HTTP control route、background detach 的平台实现、shutdown wait tim
 - v1 不提供 local token / auth；显式配置非 loopback host 也不会改变这一点；
 - Web 与 API 由同一 `kgosd` origin 提供；
 - `config.toml` 不 hot reload；host / port 通过显式 restart 生效；
+- `[embedding]` 是 Knowledge Base 必填基础配置；`base_url/model/dimensions/similarity` 的 embedding-space 语义改变不能通过 restart 冒充 migration；credential source/value 变化本身不需要 migration；
 - `kgosd.lock` 只承担 single-instance + active-endpoint 定位，不保存 PID 或业务状态；
 - 业务命令不隐式启动 `kgosd`；
 - `~/.kgosd/` 是 daemon runtime/config/persistent-data home，但不是 KG OS Knowledge graph 本身的另一套存储模型；

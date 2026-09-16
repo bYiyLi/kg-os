@@ -97,7 +97,7 @@ cursor: null
 
 组织人物、文档及作者关系；用于内容管理和检索。
 
-- **Document（文档）** — 保存文章与教学资料；通过正文全文检索和外部生成的向量检索。`node:Document`
+- **Document（文档）** — 保存文章与教学资料；支持正文全文检索和托管语义检索。`node:Document`
 - **Person（人物）** — 现实世界中的自然人，可作为文档作者。`node:Person`
 - **AUTHORED（创作）** — `Person → Document`，某人创作某篇文档；不隐含一篇文档只有一位作者。`relationship:AUTHORED`
 ```
@@ -135,7 +135,7 @@ indexes: []
 --- # kgos-ref: node:Document
 name: "Document"
 title: "文档"
-description: "保存文章与教学资料；通过正文全文检索和外部生成的向量检索。"
+description: "保存文章与教学资料；支持正文全文检索和标题+正文语义检索。"
 properties:
   - name: "content"
     description: "文档正文。"
@@ -143,16 +143,6 @@ properties:
     indexes:
       - name: "document_content"
         type: "fulltext"
-  - name: "embedding"
-    description: "外部生成的三维示例向量；实际维度由调用方的模型决定。"
-    type: "VECTOR<FLOAT32>(3)"
-    indexes:
-      - name: "document_embedding"
-        type: "vector"
-        options:
-          "indexConfig":
-            "vector.dimensions": 3
-            "vector.similarity_function": "cosine"
   - name: "id"
     description: "文档业务编号，不是数据库 element identity。"
     type: "STRING"
@@ -163,7 +153,12 @@ properties:
     type: "STRING"
     required: true
 constraints: []
-indexes: []
+indexes:
+  - name: "document_semantic"
+    type: "vector"
+    properties:
+      - "title"
+      - "content"
 --- # kgos-ref: relationship:AUTHORED
 name: "AUTHORED"
 title: "创作"
@@ -228,7 +223,7 @@ Index:
 - Node 的 `name` 是 identifying Label；`labels` 为附加必须具有的 Label 集合，缺省为空，不重复 `name`。不隐式创建继承、领域隔离或额外 Node identity。普通 Knowledge Node 仍可有多个 Label。
 - Relationship 的 `name` 是 identifying Relationship Type。`from/to` 为 Node Definition Ref，或 `null` 表示这一端不限制类型。具名端点表示该类型关系的对应节点必须符合该 Node Definition；Node 定义必须存在。它不是 Node 实例 Ref，也不表示关系数量限制。
 - v1 常规关系按 Relationship Type 识别，`from/to` 约束端点，不把端点作为隐藏的另一套匹配范围。底层 compiler 选择实现该语义的 Graph Type pattern。关系端点变化是模型约束变化，不能自行把现有边迁往另一节点。
-- `properties` 是完整 Property 声明列表，按 name 唯一；`type` 使用 Lithograph 冻结 profile 的 Cypher 属性类型表达式，canonical 例子为 `STRING`、`INTEGER`、`DATE`、`ZONED DATETIME`、`LIST<STRING NOT NULL>`、`VECTOR<FLOAT32>(3)`。不增加自己的 scalar family / 类型推断引擎。
+- `properties` 是完整 Property 声明列表，按 name 唯一；`type` 使用 Lithograph 冻结 profile 的 Cypher 属性类型表达式，canonical 例子为 `STRING`、`INTEGER`、`DATE`、`ZONED DATETIME`、`LIST<STRING NOT NULL>`。KG OS v1 **不接受 caller-owned `VECTOR<...>` Property type**，也不接受通过 list/compound type 或显式 type constraint 把 Vector 带回调用方 Property；Vector 只用于 KG OS 托管 semantic index 的内部 materialization。这个收窄不改变 Lithograph 自身对 Vector 的支持。
 - `required: true` 要求 Property 存在且不为 null；`unique: true` 要求该 Definition 覆盖的元素中此单字段值唯一。二者独立，unique 不自动变为 required，更不是 element identity 或关系 cardinality。缺省或 false 表示未声明该规则；canonical 省略 false。
 - `type` 最外层存在性只由 `required` 表达；输入最外层 `NOT NULL` 归一到 required，若显式 `required:false` 与之冲突则拒绝。List 元素的 `NOT NULL` 保留在 type 中，不能误当整个字段必填。
 - 顶层 `properties/constraints/indexes` 与 Domain `includes` 在 canonical body 中即使为空也输出；其它 optional collection 为空时省略。未知字段报错，不忽略。title/description 保持 optional，不把自然语言中的“必须”“唯一”等字样解释成 Schema 规则。
@@ -239,17 +234,23 @@ Index:
 
 只作用于当前 Definition 单个 Property 的额外约束 / 索引放在该 Property 下；同一 Definition 的多字段规则放在 Definition 下。Property 内不再重复 `properties: [自身名称]`。涉及多个 Definition 的共享索引放在参与 Definition 的顶层，并显示**完整 targets、properties 与配置**。
 
-简单的存在性与单字段唯一性优先使用 `required/unique`；需要显式命名或组合规则时使用 `constraints`：`type` 为 `unique | key | not_null | type`。`key` 表示字段组合必填且联合唯一；`type` constraint 必须带 `valueType`。顶层 Constraint 的 `properties` 必填非空，Property 内由所在字段确定目标。联合唯一不是每个字段分别唯一，索引也不能拆成多个单字段后声称等价。
+简单的存在性与单字段唯一性优先使用 `required/unique`；需要显式命名或组合规则时使用 `constraints`：`type` 为 `unique | key | not_null | type`。`key` 表示字段组合必填且联合唯一；`type` constraint 必须带 `valueType`，并与 Property `type` 使用同一个 KG OS public type profile，因此同样不能声明 `VECTOR<...>`。顶层 Constraint 的 `properties` 必填非空，Property 内由所在字段确定目标。联合唯一不是每个字段分别唯一，索引也不能拆成多个单字段后声称等价。
 
 同一个约束不能同时由 Boolean 与一个同义的内嵌声明重复编辑；发现相同覆盖范围与同一规则重复表达时拒绝并指出位置。多字段 KEY 的存在性效果不反写成每个 Property 的独立 required 声明。默认阅读可说明有效规则，editable body 保留真实声明来源，不把“推导结果”变成另一份规则。
 
 Constraint 名称可省略，由 KG OS 创建时确定；explicit named Constraint 读取时保留真实名称。匿名 standalone Constraint 所需名称使用 `kgos_c_` 加其 canonical `{kind, targetRefs, type, properties, valueType?}` UTF-8 JSON 的 SHA-256 hex（kind 为 node/relationship，targetRefs 按 UTF-8 bytes 排序，properties 保序，键按上述顺序，JSON 无空白、直接 UTF-8 且不转义非 ASCII；缺省 valueType 不输出），创建后读回真实名称；若该名称已被不同资源占用则报冲突，不覆盖。创建后已存在的资源名称不因字段或 Definition 改名而重新计算。简单 required/unique 的底层内生资源名称不成为 AI 必须管理的对象。来源归并与派生 backing index 的区别由 compiler 从当前公开 Schema 读取，不能丢弃原有显式约束名称。
 
-Index 的 `name` 必填，是之后 Cypher 实际使用的名称，不是显示别名。`type` 为 `range | text | point | fulltext | vector`；名字冲突按底层同一 Schema 的规则检测，不能以 Domain 当 namespace。`options` 为对应 Cypher DDL 的公开 options Map，未知/无效配置报错，不重建第二套索引配置语义。`filterProperties` 对应 vector 的附加过滤字段；只能使用该索引类型支持的组合。
+Index 的 `name` 必填，是之后查询真实使用的名称，不是显示别名。`type` 为 `range | text | point | fulltext | vector`；名字冲突按底层同一 Schema 的规则检测，不能以 Domain 当 namespace。`range/text/point/fulltext` 继续表示对调用方业务 Property 的直接数据库索引；`options` 对这些类型按对应公开 DDL 语义传递。
 
-单字段索引的目标来自所在 Property；顶层 Index 必须写非空 `properties`。`targets` 缺省为当前 Definition，显式时为同 kind Definition Ref 的非空集合。多目标不能把 Node 与 Relationship 混为一个索引。新建声明所在 Definition 必须属于 targets；已有共享索引可通过某个 base target 编辑后移除该 target，下一次读取该 Definition 时相应声明自动不再显示，这是目标视图归一化，不是丢失编辑。Vector 仍只有一个向量字段，过滤字段不成为第二个向量字段；维度和坐标类型在 Property type 中保留，显式 vector dimension 配置必须一致。Embedding 由外部 Agent/Application 生成，KG OS 不调用模型。
+`vector` 在 KG OS Ontology 中表示**托管语义向量索引**，不是要求调用方自己定义/维护 embedding Property。Property-local `type: vector` 以所在 `STRING` Property 为语义输入；Definition-level vector Index 使用有序非空 `properties` 作为语义输入字段。所有 source Property 必须是当前 Definition/targets 上可解释的 `STRING` 字段；`filterProperties` 仍表示底层 Vector SEARCH 可用的附加过滤字段，不进入 embedding 文本。v1 vector Index 不接受公开 `options`：dimension、coordinate type、similarity 与 HNSW/quantization 细节由全局 OpenAI-compatible embedding service 配置和 KG OS compiler/Lithograph 默认值管理，不能在每个 Definition 重复声明。
 
-`properties` 中复合字段顺序有意义，不能排序为另一种索引。Full-text 多目标表示底层允许的任一 Label/Type 匹配与多字段检索，不把它改成“所有 Label 必须同时出现”。这些语义由 compiler 正确映射，不要求调用方编排 DDL。
+多字段 embedding 输入按 `properties` 顺序确定性构造：每个非-null source 形成 `propertyName:\nvalue` 段，段之间用两个 LF 分隔；缺失/null source 跳过，全部缺失/null 时该 element 没有托管向量。Property-local vector 使用同一规则生成单段。这个 framing 是 KG OS 的稳定 semantic-index input contract；Property rename、source list/order 或 source value 改变都使对应托管向量失效并要求重新生成。
+
+KG OS compiler 为每个 public vector Index 建立 reserved `__kgos_` managed vector materialization，并使用全局 `[embedding]` 的统一向量空间生成/维护实际 Vector value；该物理 Property/metadata 不属于调用方 Ontology，不出现在 canonical Definition YAML，也必须从 Object 与 Graph 的公共 Knowledge view 中语义隔离。public Index `name` 仍是 AI 在 Vector `SEARCH` 中使用的真实索引名。`targets` 缺省为当前 Definition，显式时为同 kind Definition Ref 集合；多 target vector Index 要求每个 target 都能按同一 source field list 构造输入。
+
+KG OS v1 不提供 caller-managed raw Vector Property / Vector Index profile。`type: vector` 只存在于 **Index**，表示上述托管语义索引；它不是 Property type。若绕过 KG OS 直接在 Lithograph Schema 或 public Knowledge data 中建立 caller-owned Vector Property/value，该 Snapshot 超出 KG OS v1 public profile，应按 invalid KG OS State 处理，而不是让 aggregate decoder 把它伪装成可编辑 Ontology。
+
+`properties` 中复合字段顺序有意义，不能排序为另一种索引。Full-text 多目标表示底层允许的任一 Label/Type 匹配与多字段检索，不把它改成“所有 Label 必须同时出现”；vector 的 properties 顺序则定义 embedding 输入 framing。两者都由 compiler 正确映射，不要求调用方编排 DDL 或 embedding API。
 
 ### 共享资源与聚合编辑
 
@@ -297,7 +298,7 @@ indexes: []
 ```yaml
 name: "Document"
 title: "文档"
-description: "保存文章与教学资料；通过正文全文检索和外部生成的向量检索。"
+description: "保存文章与教学资料；支持正文全文检索和标题+正文语义检索。"
 properties:
   - name: "content"
     description: "文档正文。"
@@ -305,16 +306,6 @@ properties:
     indexes:
       - name: "document_content"
         type: "fulltext"
-  - name: "embedding"
-    description: "外部生成的三维示例向量；实际维度由调用方的模型决定。"
-    type: "VECTOR<FLOAT32>(3)"
-    indexes:
-      - name: "document_embedding"
-        type: "vector"
-        options:
-          "indexConfig":
-            "vector.dimensions": 3
-            "vector.similarity_function": "cosine"
   - name: "id"
     description: "文档业务编号，不是数据库 element identity。"
     type: "STRING"
@@ -325,7 +316,12 @@ properties:
     type: "STRING"
     required: true
 constraints: []
-indexes: []
+indexes:
+  - name: "document_semantic"
+    type: "vector"
+    properties:
+      - "title"
+      - "content"
 ```
 
 `kg ontology relationship:AUTHORED --at <resolved-state> --edit`：
@@ -384,13 +380,30 @@ indexes:
       - "team"
 ```
 
-看 Document 的默认详情时，AI 已知道真实的 `document_content`，可直接使用 Graph Cypher：
+看 Document 的默认详情时，AI 已知道真实的 `document_content` 与 `document_semantic`。全文可直接使用 Graph Cypher：
 
 ```cypher
 CALL db.index.fulltext.queryNodes('document_content', $query)
 YIELD node, score
 RETURN node, score
 ```
+
+语义检索仍写普通 Lithograph `SEARCH`；查询文本在 Graph params 中显式标记为 SemanticText，由 KG OS 在调用 Lithograph 前转换成当前 Knowledge Base embedding space 的 Vector。KG OS 不解析或改写 Cypher：
+
+```cypher
+MATCH (d:Document)
+SEARCH d IN (VECTOR INDEX document_semantic FOR $query LIMIT 10)
+SCORE AS score
+RETURN d.title, d.content, score
+```
+
+对应 params：
+
+```json
+{"query":{"$semantic":"如何设计知识图谱"}}
+```
+
+AI 不需要知道 provider、model、dimension、query Vector 或托管 vector Property 名称。查询结果只包含 KG OS public result profile 允许的业务数据与 score；托管 embedding 不作为业务 Property 返回，caller-owned Vector Property 也不是 KG OS v1 的数据模型能力。
 
 ### 局部 Patch 示例
 

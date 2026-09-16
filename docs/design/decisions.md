@@ -362,3 +362,26 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 授权依据：用户明确确认 `kg ontology patch` 使职责更单一，要求读取支持批量，并随后确认批量 `--edit` 采用标准 YAML multi-document stream。
 - 约束：Overview 仍用零 Ref且不可 edit；batch 中每个 Domain 可以返回自己的 continuation cursor，cursor continuation 用对应单 Ref + resolved State 单独继续。`--edit` 不接受 pagination；stream framing 的 state/ref comment 不进入 Object Value 或 Patch hunk。跨 Ontology + Knowledge 的原子显式修改继续使用通用 Object Patch。
 - 取舍：AI 可以一次加载或编辑一组相关 Definition，减少调用次数且不会混入不同 Branch head；采用 YAML 标准 document stream 而不是自动拆文件或自定义 wrapper，保持单对象 canonical YAML 与 multi-object Git Patch 一一对应。
+
+### D48 Embedding Provider 是 Knowledge Base 基础配置，语义向量由 KG OS 托管（2026-09-15）
+
+- 决定：`~/.kgosd/config.toml` 必须配置一个 daemon-global embedding service/model/dimension；没有合法配置就不开放 Knowledge Base。Ontology 的 `type: vector` 不再要求调用方定义 embedding Property/model/dimension，而是声明一个或多个 String source fields 需要语义检索。KG OS 使用全局 service 生成 managed vector materialization；查询时调用方继续写原始 Lithograph Cypher `SEARCH`，仅把对应 Graph parameter 写成 `{"$semantic":"..."}`，KG OS 在 adapter 层把该 parameter 转成 Vector 后将**原始 Cypher**交给 Lithograph。v1 的具体 service protocol/config 由 D50 冻结。
+- 授权依据：用户明确提出向量模型不应成为外部使用者负担，应在全局 TOML 中作为 Knowledge Base 基础配置，后续所有向量使用统一从这里取得。
+- 边界：Embedding service 是确定性基础设施依赖，不是 Agent；credential 不进入 State。KG OS 不为此解析/改写 Cypher，也不提供 `graph embed` / `graph search`。`SemanticText` 只是一种 Graph params input marker，不是 Cypher 类型或持久数据；Vector 的公共暴露边界由 D49 统一冻结。每个 KG OS-valid State 保存非敏感 embedding-space fingerprint；任何 embedding-dependent read 或会创建新 Snapshot/推进 Branch 的 mutation 都要求目标/base fingerprint 与当前 config 匹配，Merge 两端还必须处于同一 embedding space。semantic config 变化必须走显式 migration；单纯 credential rotation 不需要。Full-text 不依赖 embedding service。
+- 取舍：KG OS 必须承担参数预处理、向量生成、source→embedding 一致性、reserved managed data 隔离和 merge/mutation refresh；换取调用方只表达“哪些内容需要语义检索”，不重复管理 model、dimension、内部 vector Property 或 query-vector 生成，同时保持 Lithograph 是唯一 Cypher parser/planner/executor。Vector 的额外 public-profile 收窄与 staged-state 成本见 D49。
+
+### D49 KG OS v1 不公开 caller-owned Vector 数据类型（2026-09-16）
+
+- 决定：KG OS v1 的 caller-owned Ontology / Knowledge / Graph public value profile 排除 Vector。`VECTOR<...>` 不能作为 Property `type` 或 type constraint `valueType`，Object/Knowledge 不能保存 caller-owned Vector value，Graph 不接受 raw Vector parameter，也不返回 Vector result；`type: vector` 只作为 Index type 表示 KG OS 托管 semantic index。Vector 仍由 Lithograph 完整支持，并仅在 KG OS reserved managed materialization 与 SemanticText 解析后的内部 query parameter 中使用。
+- 授权依据：用户明确指出 Ontology 中不需要 `VECTOR<FLOAT32>(...)` 这类业务字段，并要求重新整理、优化和深度 review；此前已经确认向量模型与 query vector 不应成为外部使用者负担。
+- 一致性边界：Lithograph Graph Type 是 open semantics，仅从 Ontology 禁止 Vector 不能阻止 `graph execute` 向未声明 Property 写 Vector。KG OS 因此不解析 Cypher，而要求 Graph mutation 在 durable commit 前基于确定 candidate / staged changes 完成 caller-owned Vector 与 `__kgos_` reserved-identifier validation，并在 semantic source 变化时把 managed refresh 纳入同一个最终 State；失败整体不产生 Commit。普通 staged validation 可以使用 Lithograph explicit transaction，但 Lithograph 当前合同禁止在持有 single-writer 时等待长时间网络 I/O，因此动态 semantic-source mutation 还依赖能在 writer 外完成 embedding、再以同一 expected base 原子提交的通用 candidate/preparation 能力；在该 readiness 关闭前不能用长网络 transaction 或第二隐藏 Commit降级实现。绕过 KG OS 直接产生 caller-owned Vector 的 Lithograph Snapshot 属于 KG OS-invalid State，按 D31 只允许 Evolution 诊断；Merge candidate 同样必须通过该不变量。
+- 备选：继续把 Vector 当普通业务 Property；只在 Ontology 隐藏但允许 Graph 写入；为了拦截 Vector 另做一套 KG OS Cypher parser/rewrite；提交后再用隐藏 Commit 清理/补向量。前两项会形成公共模型旁路，后两项分别重复 Lithograph 查询层或破坏单-State 一致性，因此不采用。
+- 取舍：KG OS 的 public value profile 成为 Lithograph value system 的有意子集，并要求 Graph write 具备 staged change inspection；换取外部使用者完全不管理 Vector 数据模型，同时保持 Lithograph 作为通用数据库的 Vector 能力不被 KG OS 产品边界反向限制。未来只有出现明确 caller-owned Vector 业务需求时，才单独扩展 KG OS public profile。
+
+### D50 KG OS v1 只支持 OpenAI-compatible Embeddings API（2026-09-16）
+
+- 决定：v1 不提供 `provider` 配置、provider registry 或插件系统，唯一远端 embedding protocol 是 OpenAI-compatible Embeddings 子集。`[embedding]` 必填 `base_url / model / dimensions`，`similarity` 缺省 `cosine`；认证可用 `api_key` 或 `api_key_env`，二者互斥，也允许都不配置表示无认证。`api_key_env` 在启动时解析为非空环境变量；任一方式得到 credential 后使用 `Authorization: Bearer <credential>`。
+- Wire 子集：KG OS 向 `${base_url}/embeddings` 发送 JSON `model + input`；`input` 支持 String / Array<String> 以便内部批量生成。v1 不发送 `dimensions/user/encoding_format` 或 provider-specific options。响应使用 `data[].index + data[].embedding`，每个 embedding 必须是 finite numeric array 且长度严格等于配置 `dimensions`；其它 OpenAI response 字段不是 correctness source。
+- 授权依据：用户明确要求 v1 先只支持 `openai-compatible`，随后确认写入设计，并要求同时支持 `api_key_env` 与直接 `api_key` 配置。
+- Secret / State：inline `api_key` 是支持的本地 secret 配置，`api_key_env` 是推荐的减少 secret 落盘方式；secret 不回显、不进入 State/Commit Data/fingerprint。fingerprint 使用固定协议 identity `openai-compatible-embeddings-v1` + canonical base_url/model/dimensions/similarity/input-framing；credential source/value 变化不触发 migration。
+- 取舍：用户必须显式知道 model 的实际 output dimension，因为 KG OS 在无远端 health/probe 的启动设计下不能可靠自动发现；换取 config 可离线验证、底层 Index dimension 在首次远端调用前就确定，并避免为了未来假设中的其它 Provider 提前增加 provider 抽象。

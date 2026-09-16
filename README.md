@@ -11,10 +11,10 @@ KG OS（Knowledge Graph Operating System）是**面向 AI 的可编程知识基�
 ## 核心边界
 
 - **AI-first**：AI 是第一使用者，人主要负责查看、管理和纠正。
-- **Graph-first**：知识以图结构组织；搜索、全文和向量能力属于访问与数据能力。
+- **Graph-first**：知识以图结构组织；搜索、全文和托管语义检索属于访问与数据能力。
 - **调用方定义 Model**：Kernel 不预定义领域节点、关系或知识语义。
 - **Agent 在系统外部**：理解、提炼、分类、建模和决策由外部 Agent 与 Skill 完成。
-- **KG OS 提供确定性基础设施**：负责存储、读取、图操作、查询、索引和管理。
+- **KG OS 提供确定性基础设施**：负责存储、读取、图操作、查询、索引和管理；Embedding Provider 是运行时基础依赖，不是 Agent。
 - 面向 AI 提供 **CLI + Skill**，面向人提供 **Web**。
 
 KG OS 独立于 Noven 或任何具体领域；领域语义由调用方表达。
@@ -25,15 +25,15 @@ KG OS 独立于 Noven 或任何具体领域；领域语义由调用方表达。
 
 需要修改时，`--edit` 可以一次取得一个或多个 Domain / Definition：单个返回 canonical YAML，多个返回标准 YAML multi-document stream；再用 `kg ontology patch` 提交局部变化。它只是统一 **Object Patch** 的 Ontology 专用入口；跨 Ontology + Knowledge 的原子修改仍可使用通用 Object Patch。一个 Node / Relationship Definition 一起表达 Property、约束和索引；KG OS 负责拆解为底层数据库操作，而不是要求 AI 分别编辑它们。索引的真实名字与作用范围直接可见，AI 可以继续用 Cypher 查询。
 
-Knowledge 仍然是 Property Graph，查询和批量写入使用 Graph Cypher；State、Branch、History、Diff、Merge 使用 Evolution。不把知识库包装为虚拟文件系统。详细命令和示例见 [Ontology 设计](docs/design/ontology.md) 与 [CLI 合同](docs/design/cli.md)。
+Knowledge 仍然是 Property Graph，查询和批量写入使用 Graph Cypher；State、Branch、History、Diff、Merge 使用 Evolution。不把知识库包装为虚拟文件系统。全文索引直接声明在业务字段上；语义向量索引只声明“哪些业务字段需要语义检索”。v1 的全局 embedding service 只支持 OpenAI-compatible Embeddings API，通过 `~/.kgosd/config.toml` 配置 `base_url / model / dimensions`，认证可用 `api_key` 或 `api_key_env`。查询时仍写原始 Lithograph `SEARCH`，只把对应参数标记为 `{"$semantic":"..."}`；KG OS 只预处理参数，不解析 Cypher。Vector 是 KG OS 托管 semantic search 的内部实现，不是 caller-owned Ontology / Knowledge Property 类型，也不进入公共 Object/Graph 结果。详细规则见 [Ontology 设计](docs/design/ontology.md)、[Graph](docs/design/graph.md) 与 [Runtime](docs/design/runtime.md)。
 
 ## 当前状态
 
-KG OS 已确认上述 Ontology 交互与聚合编辑方向，以及 Object / Graph / Evolution 共享逻辑合同、Rust `kgosd` + TypeScript/npm client 架构、本地 HTTP runtime 和显式 daemon lifecycle。结构与版本数据库职责仍由独立的 Lithograph 承担，KG OS 保存自己的业务说明与组织语义并提供 compiler / decoder。
+KG OS 已确认上述 Ontology 交互与聚合编辑方向，以及 Object / Graph / Evolution 共享逻辑合同、Rust `kgosd` + TypeScript/npm client 架构、本地 HTTP runtime、显式 daemon lifecycle 与 Knowledge Base 全局 OpenAI-compatible Embeddings 配置。结构与版本数据库职责仍由独立的 Lithograph 承担，KG OS 保存自己的业务说明与组织语义并提供 compiler / decoder。
 
 **项目目前仍只有文档，没有业务实现。** 命令是设计合同，不是已发布功能。剩余实现包括 Ontology reader、aggregate decoder/compiler、原子 Patch planning、Merge conflict projection、HTTP/runtime、CLI/Skill/SDK/Web；Knowledge Base target/layout 仍是独立待设计事项。范围与验收见 [设计状态导航](docs/design.md#设计状态导航) 和 [工程实现待办](docs/design/implementation.md)。
 
-本 README 负责产品定义；`docs/design.md` 是导航，`docs/design/` 按职责维护唯一真源；协作规范在 `AGENTS.md`。2026-09-15 的 Ontology 基线修正见 [D46](docs/design/decisions.md#d46-ontology-交互基线修正2026-09-15)，batch read/edit 与 `kg ontology patch` 的后续确认见 [D47](docs/design/decisions.md#d47-ontology-读取编辑支持-batch写入提供-scoped-patch2026-09-15)。
+本 README 负责产品定义；`docs/design.md` 是导航，`docs/design/` 按职责维护唯一真源；协作规范在 `AGENTS.md`。2026-09-15 的 Ontology 基线修正见 [D46](docs/design/decisions.md#d46-ontology-交互基线修正2026-09-15)，batch read/edit 与 `kg ontology patch` 见 [D47](docs/design/decisions.md#d47-ontology-读取编辑支持-batch写入提供-scoped-patch2026-09-15)，全局 embedding 与托管语义向量见 [D48](docs/design/decisions.md#d48-embedding-provider-是-knowledge-base-基础配置语义向量由-kg-os-托管2026-09-15)，v1 不公开 caller-owned Vector 的边界见 [D49](docs/design/decisions.md#d49-kg-os-v1-不公开-caller-owned-vector-数据类型2026-09-16)，OpenAI-compatible provider/config 合同见 [D50](docs/design/decisions.md#d50-kg-os-v1-只支持-openai-compatible-embeddings-api2026-09-16)。
 
 ## License
 
