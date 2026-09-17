@@ -97,7 +97,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D10 Object Patch 使用 canonical YAML + Git Extended Diff
 
-- 决定：Object `read` 的 editable representation 是稳定 canonical YAML；Object `patch` 接收基于该 YAML 生成的普通 two-way Git Extended Diff（`git diff -p`）Patch，并覆盖 Add / Update / Delete / Rename / Restructure。KG OS 不自定义 Patch section / hunk / pathname-quoting grammar；多 Object 使用多个 `diff --git` entry，新增 / 删除 / rename 复用 Git 标准 extended headers 与 `/dev/null` 语义。一个请求可以修改多个明确 Object；已有对象使用 owner-backed Object Ref，新增对象只使用 request-local alias。Patch 对 `baseState` canonical YAML 精确应用，不 fuzzy match；Add/Update/Delete/Rename 不做隐式 upsert / no-op。KG OS 不使用 JSON Patch、JSON Merge Patch 或 `op/path/value` mutation DSL 作为公共 Object mutation 模型。系统分配的 identity 不能由调用方直接重写，但业务结构变化可以导致底层 replacement / migration，并通过 Ref transition / Evolution diff 暴露结果。
+- 决定：Object `read` 的 editable representation 是稳定 canonical YAML；Object `patch` 接收基于该 YAML 生成的普通 two-way Git Extended Diff（`git diff -p`）Patch，并覆盖 Add / Update / Delete / Rename / Restructure。KG OS 不自定义 Patch section / hunk / pathname-quoting grammar；多 Object 使用多个 `diff --git` entry，新增 / 删除 / rename 复用 Git 标准 extended headers 与 `/dev/null` 语义。一个请求可以修改多个明确 Object；已有对象使用 owner-backed Object Ref，新增对象只使用 request-local alias。Patch 对 `baseState` canonical YAML 精确应用，不 fuzzy match；Add/Update/Delete/Rename 不做隐式 upsert / no-op。KG OS 不使用 JSON Patch、JSON Merge Patch 或 `op/path/value` mutation DSL 作为公共 Object mutation 模型。系统分配的 identity 不能由调用方直接重写，但业务结构变化可以导致底层 replacement / data rewrite，并通过 Ref transition / Evolution diff 暴露结果。
 - 依据：AI 天然擅长读取稳定文本并生成文件式局部 Patch；Git Extended Diff 已经提供成熟、广泛实现的修改、新增、删除、rename、多目标和 pathname quoting 文本语法，没有当前需求要求 KG OS 再发明一套 Patch grammar。同一 Object mutation 模型可以维护 Definition（含 Property/Constraint/Index）、Domain、Knowledge Node / Relationship，避免 `mutate`、Ontology CRUD、Domain CRUD 等重复写接口。Lithograph 已经把标准 Cypher 25 定义为正常 graph / Schema / Index mutation language，并提供 explicit transaction 作为多 query 单 Commit boundary；KG OS 只负责把业务 Object target change 编译到这条底层路径，不再发明数据库 mutation engine，也不把 Lithograph Structural Patch 扩成第二套 CRUD API。
 - 备选：自定义 KG OS textual Patch framing；使用 RFC JSON Patch / Merge Patch；使用 operation-oriented JSON mutation DSL；Object Patch 只做 Update 而 Create/Delete/Rename 使用独立 API。
 - 取舍：KG OS 必须维护 canonical YAML renderer、标准 YAML parser，并解析 / 应用本文冻结的 Git Extended Diff profile，再把业务 target change 编译成 Lithograph 实际 graph / Schema / Index mutation；Object Ref / alias target 与 logical Patch request/result 已由 D36/D37 冻结，剩余复杂度集中在 logical slot 到 Lithograph public mutation 的实现映射。Git blob hash、file mode、filesystem / index 行为不会成为 KG OS 业务语义，unsupported Git patch form 也不会因为 Git 支持就自动进入 KG OS v1。
@@ -132,10 +132,10 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D15 Definition / Property 删除不隐式级联 Knowledge
 
-- 决定：Definition / Property delete 必须对整个 Object Patch 的目标 Snapshot 做 dependency 校验。若目标状态仍有依赖则 reject；KG OS 不自动删除、迁移或保留 orphan Knowledge，也不在 v1 提供 `force` / `cascade` / `preserve_orphan` 模式。调用方可以在同一个 Object Patch 中**显式**迁移 / 删除依赖 Knowledge 后再删除结构，只要最终 Snapshot 合法。成功删除同时清理对应 Binding Record；删除 Definition 时同时清理其 Property Binding Records 与 Domain `INCLUDES` membership。历史 State 不受影响。
-- 依据：Schema 生命周期操作不应隐式触发大规模业务数据丢失或替调用方做迁移决策；同时 Object Patch 应能原子表达调用方已经明确给出的完整迁移计划，不强迫拆成多个请求。
+- 决定：Definition / Property delete 必须对整个 Object Patch 的目标 Snapshot 做 dependency 校验。若目标状态仍有依赖则 reject；KG OS 不自动删除、改写或保留 orphan Knowledge，也不在 v1 提供 `force` / `cascade` / `preserve_orphan` 模式。调用方可以在同一个 Object Patch 中**显式**改写 / 删除依赖 Knowledge 后再删除结构，只要最终 Snapshot 合法。成功删除同时清理对应 Binding Record；删除 Definition 时同时清理其 Property Binding Records 与 Domain `INCLUDES` membership。历史 State 不受影响。
+- 依据：Schema 生命周期操作不应隐式触发大规模业务数据丢失或替调用方做数据改写决策；同时 Object Patch 应能原子表达调用方已经明确给出的完整目标变化，不强迫拆成多个请求。
 - 备选：删除 Definition 时级联删除相关 Knowledge；允许删除结构后保留无法由当前 Ontology 解释的 orphan Knowledge；提供 `force` 参数让单个操作选择行为。
-- 取舍：调用方必须显式声明依赖 Knowledge 的迁移或删除，不能只要求“强制删结构”；这些变化可以放在同一个 Object Patch 中原子完成。换取的是无隐式数据损失、没有 orphan 状态，也无需维护多套删除模式。
+- 取舍：调用方必须显式声明依赖 Knowledge 的改写或删除，不能只要求“强制删结构”；这些变化可以放在同一个 Object Patch 中原子完成。换取的是无隐式数据损失、没有 orphan 状态，也无需维护多套删除模式。
 
 ### D16 Object Patch 使用 strict base State
 
@@ -144,11 +144,11 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 备选：即使 Branch 已前进，只要 Lithograph raw patch 的 before condition 仍满足就继续应用；自动 three-way merge / rebase。
 - 取舍：并发写发生后调用方需要重新读取最新 Object 并重新生成 Patch；换取明确、可重复的 mutation base 和更简单的冲突语义。
 
-### D17 Definition rename 执行语义保持的 Knowledge migration
+### D17 Definition rename 执行语义保持的 Knowledge data rewrite
 
-- 决定：Definition / Property rename 不是只修改 Schema 名称与 Binding Locator；KG OS 必须同步更新依赖的 Schema / Constraint / Index references，并完成保持已有 Knowledge 业务含义所必需的数据迁移。Node identifying Label rename 迁移受影响 Node 的 Label；Property rename 只作用于 owner Definition 按 Lithograph Schema coverage 覆盖的 element，不全图修改同名 key，并且不得静默覆盖已有新 key value；如果同一 physical property 同时承载其它 Definition 的语义且无法无损局部迁移则失败。Relationship Type rename 在底层不能原地修改时重建受影响 Relationship 并产生新的 element identity。任何不能安全得到合法目标 Snapshot 的 rename 整体失败。这个语义保持 migration 是显式 rename 的组成部分，不属于 D15 禁止的“Delete 隐式级联数据删除”。
+- 决定：Definition / Property rename 不是只修改 Schema 名称与 Binding Locator；KG OS 必须同步更新依赖的 Schema / Constraint / Index references，并完成保持已有 Knowledge 业务含义所必需的**同次 mutation 内数据改写**。Node identifying Label rename 改写受影响 Node 的 Label；Property rename 只作用于 owner Definition 按 Lithograph Schema coverage 覆盖的 element，不全图修改同名 key，并且不得静默覆盖已有新 key value；如果同一 physical property 同时承载其它 Definition 的语义且无法无损局部改写则失败。Relationship Type rename 在底层不能原地修改时重建受影响 Relationship 并产生新的 element identity。任何不能安全得到合法目标 Snapshot 的 rename 整体失败。这个 semantic-preserving data rewrite 是显式 rename 的组成部分，不是独立 migration job，也不属于 D15 禁止的“Delete 隐式级联数据删除”。
 - 依据：Definition 是当前 Knowledge 的模型解释；只 rename Schema 而留下旧 Label / Type / Property key 会使同一成功操作产生结构与数据脱节的 State，这与 Object Patch“描述目标 Object 变化并由 KG OS 编排底层实现”的合同冲突。
-- 备选：rename 只改 Definition，要求调用方另行显式迁移全部 Knowledge；禁止 rename，只允许 create + migrate + delete。
+- 备选：rename 只改 Definition，要求调用方另行逐项改写全部 Knowledge；禁止 rename，只允许 create + manual rewrite + delete。
 - 取舍：rename 可能是高成本批量操作，Relationship Type rename 还会改变大量 Relationship Ref。只有调用方直接寻址修改的 Object 承诺 Ref transition；Definition-level 批量 Relationship replacement 不承诺可永久恢复的一对一 oldRef→newRef 映射，调用方通过新 State 的 Graph 重新发现对象，并通过 bounded Evolution diff/history 审计集合变化。
 
 ### D18 Object 删除不隐式 DETACH Knowledge Node
@@ -226,7 +226,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 决定：单字段规则放在 Property 附近，多字段规则放在 Definition；多 Definition 索引展示完整 targets，可从任一参与聚合修改。真实索引名称对 AI 可见，底层独立资源由 compiler 管理。
 - 依据：用户需要一次读写完整局部模型；standalone 是底层组织，不是强制公共 CRUD。
 - 备选：旧规则只允许 Constraint Object / Index Object 修改，或把 Index 隐藏为抽象 Search Boolean。
-- 取舍：KG OS 负责确定命名、来源归并、作用范围、冲突与迁移，不新增 Index UUID/owner registry。
+- 取舍：KG OS 负责确定命名、来源归并、作用范围、冲突与必要 rebuild/maintenance，不新增 Index UUID/owner registry。
 
 ### D29 聚合变化可以派生引用维护
 
@@ -251,10 +251,10 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D32 Textual Patch 只把 base→patched 差异视为显式 target change
 
-- 决定：Update / Rename / Restructure entry 应用 textual Patch 后，KG OS 将 patched YAML 解析得到的 Object Value 与 base canonical YAML 对应的 Object Value 比较，只把实际变化的 logical slots 作为调用方显式 target delta；Rename entry 的 old/new target 另外提供顶层 identifying locator 的显式 rename delta。未改变字段是 Patch context，不具有“锁定旧值”的 PUT 语义。Mandatory rename migration、locator rewrite 和当前操作所需 consistency change 可以更新这些 untouched slots；若派生变化与显式 delta 同时写同一 slot 且目标不同则 conflict。
+- 决定：Update / Rename / Restructure entry 应用 textual Patch 后，KG OS 将 patched YAML 解析得到的 Object Value 与 base canonical YAML 对应的 Object Value 比较，只把实际变化的 logical slots 作为调用方显式 target delta；Rename entry 的 old/new target 另外提供顶层 identifying locator 的显式 rename delta。未改变字段是 Patch context，不具有“锁定旧值”的 PUT 语义。Mandatory rename-derived rewrite、locator rewrite 和当前操作所需 consistency change 可以更新这些 untouched slots；若派生变化与显式 delta 同时写同一 slot 且目标不同则 conflict。
 - 依据：文件 Patch 天然表达局部编辑。若把 patch 后整份文本当成 full replacement，任何 Definition rename 都会与同时修改相关 Knowledge Object 的无关字段产生伪冲突，因为它们的 base 文本仍显示旧 label / type / property ref。
 - 备选：Object Patch 等价完整 PUT；要求 AI 在每个受影响 Object entry 中手工同步所有派生字段；按 entry 顺序最后写入者获胜。
-- 取舍：compiler 必须执行 canonical parse + logical diff，而不能只 parse final text；换取真正的 Git Extended Diff 局部修改语义、可组合多 Object migration 和确定的冲突检测。
+- 取舍：compiler 必须执行 canonical parse + logical diff，而不能只 parse final text；换取真正的 Git Extended Diff 局部修改语义、可组合多 Object mutation 和确定的冲突检测。
 
 ### D33 KG OS v1 只 bootstrap 空 Lithograph Knowledge Base
 
@@ -301,7 +301,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 ### D39 Object Patch 使用 Lithograph explicit transaction 作为单一 State boundary
 
 - 决定：所有存在有效 target delta 的 Object Patch 都在一个 Lithograph public explicit transaction 中执行。KG OS 在 `tx_begin` 传入 target Branch 与 `expectedHead = baseState`，随后只执行标准 Cypher 25 graph / Schema / Constraint / Index mutation；成功 `tx_commit` 恰好产生一个 Lithograph Commit / KG OS State。任何 query / callback / validation / commit failure 都由 Lithograph fail-closed auto-abort，不留下 intermediate Commit；`BRANCH_HEAD_MOVED` / expected-head mismatch 映射为 `STALE_BASE_STATE`。无有效 target delta 的 Patch 在 strict base check 通过后直接返回 `baseState`，不启动 mutation transaction、不创建 State。
-- 依据：KG OS 的一次 Object Patch 是一个上层 logical mutation unit，Definition / Property 的 Structure、Binding semantic graph 与必要 Knowledge migration 必须在同一个 public State 中共同成立。Lithograph explicit transaction 已把多个标准 Cypher execution 定义为一个 Commit boundary，并在 writer ownership 下提供 `expectedHead` CAS，因此 KG OS 不再需要 raw Structural Patch、caller-owned SQLite transaction 或 hidden intermediate State 来实现这一不变量。
+- 依据：KG OS 的一次 Object Patch 是一个上层 logical mutation unit，Definition / Property 的 Structure、Binding semantic graph、必要 Knowledge data rewrite 与 index maintenance 必须在同一个 public State 中共同成立。Lithograph explicit transaction 已把多个标准 Cypher execution 定义为一个 Commit boundary，并在 writer ownership 下提供 `expectedHead` CAS，因此 KG OS 不再需要 raw Structural Patch、caller-owned SQLite transaction 或 hidden intermediate State 来实现这一不变量。
 - 备选：继续让每个底层 query 各自形成 Commit；用 caller-owned SQLite transaction 只做 durability atomicity；让 KG OS 构造 Lithograph Structural Patch 作为第二套 mutation API；事后 squash/rewrite intermediate history；建立 KG OS 自己的 transaction/version layer。
 - 取舍：Object Patch compiler 必须在进入 explicit transaction 前完成尽可能多的 parse / logical planning / conflict validation，并保持 transaction 短小，因为 Lithograph v1 transaction 持有 single-writer reservation；换取一个成功 Object Patch 与一个 KG OS State 一一对应、strict base 无竞态、History 始终可解释，并继续以 Cypher 25 作为唯一正常底层 mutation language。
 
@@ -363,11 +363,11 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 约束：Overview 仍用零 Ref且不可 edit；batch 中每个 Domain 可以返回自己的 continuation cursor，cursor continuation 用对应单 Ref + resolved State 单独继续。`--edit` 不接受 pagination；stream framing 的 state/ref comment 不进入 Object Value 或 Patch hunk。跨 Ontology + Knowledge 的原子显式修改继续使用通用 Object Patch。
 - 取舍：AI 可以一次加载或编辑一组相关 Definition，减少调用次数且不会混入不同 Branch head；采用 YAML 标准 document stream 而不是自动拆文件或自定义 wrapper，保持单对象 canonical YAML 与 multi-object Git Patch 一一对应。
 
-### D48 Embedding Provider 是 Knowledge Base 基础配置，语义向量由 KG OS 托管（2026-09-15）
+### D48 Embedding Provider 是 kgosd 全局运行配置，语义向量由 KG OS 托管（2026-09-15）
 
 - 决定：`~/.kgosd/config.toml` 必须配置一个 daemon-global embedding service/model/dimension；没有合法配置就不开放 Knowledge Base。Ontology 的 `type: vector` 不再要求调用方定义 embedding Property/model/dimension，而是声明一个或多个 String source fields 需要语义检索。KG OS 使用全局 service 生成 managed vector materialization；查询时调用方继续写原始 Lithograph Cypher `SEARCH`，仅把对应 Graph parameter 写成 `{"$semantic":"..."}`，KG OS 在 adapter 层把该 parameter 转成 Vector 后将**原始 Cypher**交给 Lithograph。v1 的具体 service protocol/config 由 D50 冻结。
-- 授权依据：用户明确提出向量模型不应成为外部使用者负担，应在全局 TOML 中作为 Knowledge Base 基础配置，后续所有向量使用统一从这里取得。
-- 边界：Embedding service 是确定性基础设施依赖，不是 Agent；credential 不进入 State。KG OS 不为此解析/改写 Cypher，也不提供 `graph embed` / `graph search`。`SemanticText` 只是一种 Graph params input marker，不是 Cypher 类型或持久数据；Vector 的公共暴露边界由 D49 统一冻结。每个 KG OS-valid State 保存非敏感 embedding-space fingerprint；任何 embedding-dependent read 或会创建新 Snapshot/推进 Branch 的 mutation 都要求目标/base fingerprint 与当前 config 匹配，Merge 两端还必须处于同一 embedding space。semantic config 变化必须走显式 migration；单纯 credential rotation 不需要。Full-text 不依赖 embedding service。
+- 授权依据：用户明确提出向量模型不应成为外部使用者负担，应由全局 TOML 统一配置，Ontology/调用方不重复声明；D53 进一步确认这份配置只属于 daemon runtime，不保存进 Knowledge Base。
+- 边界：Embedding service 是确定性基础设施依赖，不是 Agent；credential 和 service/model config 都不作为 Knowledge Base State metadata 持久化。KG OS 不为此解析/改写 Cypher，也不提供 `graph embed` / `graph search`。`SemanticText` 只是一种 Graph params input marker，不是 Cypher 类型或持久数据；Vector 的公共暴露边界由 D49 统一冻结。SemanticText、semantic Index backfill 与 managed-vector refresh 都直接使用当前 daemon 的 `[embedding]`。修改配置后 restart 不比较历史向量来源、不产生 fingerprint mismatch，也不触发自动迁移；operator 负责保持同一 Knowledge Base 的 embedding semantic config 稳定。Full-text 不依赖 embedding service。
 - 取舍：KG OS 必须承担参数预处理、向量生成、source→embedding 一致性、reserved managed data 隔离和 merge/mutation refresh；换取调用方只表达“哪些内容需要语义检索”，不重复管理 model、dimension、内部 vector Property 或 query-vector 生成，同时保持 Lithograph 是唯一 Cypher parser/planner/executor。Vector 的额外 public-profile 收窄与 staged-state 成本见 D49。
 
 ### D49 KG OS v1 不公开 caller-owned Vector 数据类型（2026-09-16）
@@ -383,5 +383,35 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 决定：v1 不提供 `provider` 配置、provider registry 或插件系统，唯一远端 embedding protocol 是 OpenAI-compatible Embeddings 子集。`[embedding]` 必填 `base_url / model / dimensions`，`similarity` 缺省 `cosine`；认证可用 `api_key` 或 `api_key_env`，二者互斥，也允许都不配置表示无认证。`api_key_env` 在启动时解析为非空环境变量；任一方式得到 credential 后使用 `Authorization: Bearer <credential>`。
 - Wire 子集：KG OS 向 `${base_url}/embeddings` 发送 JSON `model + input`；`input` 支持 String / Array<String> 以便内部批量生成。v1 不发送 `dimensions/user/encoding_format` 或 provider-specific options。响应使用 `data[].index + data[].embedding`，每个 embedding 必须是 finite numeric array 且长度严格等于配置 `dimensions`；其它 OpenAI response 字段不是 correctness source。
 - 授权依据：用户明确要求 v1 先只支持 `openai-compatible`，随后确认写入设计，并要求同时支持 `api_key_env` 与直接 `api_key` 配置。
-- Secret / State：inline `api_key` 是支持的本地 secret 配置，`api_key_env` 是推荐的减少 secret 落盘方式；secret 不回显、不进入 State/Commit Data/fingerprint。fingerprint 使用固定协议 identity `openai-compatible-embeddings-v1` + canonical base_url/model/dimensions/similarity/input-framing；credential source/value 变化不触发 migration。
+- Secret / State：inline `api_key` 是支持的本地 secret 配置，`api_key_env` 是推荐的减少 secret 落盘方式；secret 不回显、不进入 State/Commit Data。KG OS 也不把 `base_url/model/dimensions/similarity` 复制或摘要成 State fingerprint/generation；它们只作为当前 daemon 的 runtime config 使用。
 - 取舍：用户必须显式知道 model 的实际 output dimension，因为 KG OS 在无远端 health/probe 的启动设计下不能可靠自动发现；换取 config 可离线验证、底层 Index dimension 在首次远端调用前就确定，并避免为了未来假设中的其它 Provider 提前增加 provider 抽象。
+
+### D51 SQLite Extension 统一由 startup source resolver 装配（2026-09-17）
+
+- 决定：`~/.kgosd/config.toml` 使用 ordered `[[sqlite.extensions]]` 作为 **唯一 SQLite loadable-extension 配置入口**。Lithograph 自身、第三方 FTS5 tokenizer 与其它 SQLite extension 都使用同一机制；KG OS 不再把 Lithograph shared library 内嵌进 binary、写死安装路径，也不为“全文插件 / 向量插件 / Lithograph 插件”建立多套 loader。每个 entry 只表达 artifact source 与 SQLite load 参数，不声明业务 `kind/capability`；全部加载完成后由 `kgosd` 单独验证 KG OS 必需的 Lithograph public capability。
+- Source contract：`source` 是 absolute local file path 或 absolute HTTPS URL。Remote source 必须配置 artifact SHA-256；local source 可选配置 expected SHA-256，但 resolver 总会计算实际 content hash。Direct `.so/.dylib/.dll` 直接形成 load artifact；`.tar.gz/.zip` 必须用精确 relative `library` 指出 archive 内要加载的 shared library。`entrypoint` optional，省略时使用 SQLite 标准 resolution。数组顺序就是每个 connection 的加载顺序，所有 entry 都是 required；v1 不增加自动发现、plugin registry、可选插件、任意 download headers 或 package dependency solver。
+- Resolution / cache：所有 source 在 daemon startup 先解析为 `~/.kgosd/extensions/<sha256>/` 下的 immutable local artifact；remote 可以跟随有界 HTTPS redirect，但不能降级 HTTP。Archive extraction fail-closed 拒绝 absolute/traversal/symlink/hardlink/special entry，并受下载/解压资源上限约束。有效 content-addressed cache 可以离线复用，cache 删除只触发下次重新 resolve，不改变 Knowledge Base State。`latest` URL 可以使用，但 SHA-256 pin 阻止静默升级；正式可复现部署优先 version URL + hash。
+- Connection / capability / security：每个新 SQLite connection 都加载启动时解析好的**同一批 artifacts**，不能因为 source/cache 后续变化让 connection pool 混用 native binary。Extension loading 只在 host C API 初始化窗口开启，加载完成立即关闭；Graph/Cypher 不获得 SQL `load_extension()` 权限。`kgosd` 需要 Lithograph Native ABI，但不通过配置 `kind` 指定它：daemon 从同一批 resolved libraries 自动发现并绑定**恰好一个**完整 Lithograph ABI 1 symbol family；实际 Native 调用仍要求该 library 已在目标 `sqlite3*` connection 上走 SQLite extension-load path 完成注册。Configured extension 是与 `kgosd` 同 OS authority 运行的 native code，配置文件属于 operator trust boundary；业务 API、Ontology 或 Agent 输入不能动态增加 extension。
+- 授权依据：用户明确提出插件不应只服务 Full-text，应在统一配置区声明 KG OS 要加载的 SQLite plugins，并要求 Lithograph 自身也通过同一方式加载；随后确认 local path 与 HTTPS Release artifact 都作为 source 支持。
+- 备选：把 Lithograph 静态/内嵌进 KG OS；只允许本地路径；按 Full-text/Vector 等功能建立专用插件区；由 analyzer/plugin 名自动下载最新 binary。前两项削弱 Lithograph 独立 SQLite-extension 边界或远程部署便利性，后两项会复制 loader、引入 registry/package-manager/自动执行不受 pin 的 native code，因此不采用。
+- 取舍：运行配置变成平台相关，并且首次 remote resolve 需要网络；native extension 仍由 operator 信任，KG OS 不 sandbox。换取所有 SQLite 能力通过一个最小、可复现、可缓存、每-connection 一致的装配机制接入，同时保留 Lithograph 作为独立数据库产品。
+
+### D52 Full-text analyzer 是 kgosd 全局运行配置，Ontology 不暴露分词实现（2026-09-17）
+
+- 决定：KG OS v1 的 Ontology Full-text Index 只声明真实 `name/targets/properties` 与 `type: fulltext`；不提供 per-index `analyzer/options/eventually_consistent/tokenizer plugin` 字段。Daemon startup config 的 `[fulltext].analyzer` 决定 KG OS **新建或因业务定义变化重建** Full-text IndexDefinition 时写入的 `fulltext.analyzer`，省略整段默认 `unicode61`；`fulltext.eventually_consistent` 固定为 false。Analyzer 是完整 FTS5 tokenizer specification string，但第三方 tokenizer implementation 由 D51 的 `sqlite.extensions` 在每个 SQLite connection 上提供，KG OS 不根据 analyzer 名称查找/安装插件，也不因配置变化覆盖已有 IndexDefinition。
+- State contract：analyzer 不进入公共 Ontology，也不另存 fulltext-space fingerprint/generation。Lithograph Full-text IndexDefinition 自己正常保存创建时的 analyzer，这是数据库执行所需的 versioned Schema 内容，不是 KG OS runtime config 的第二份副本。已有 Index 不因 restart/config change 自动改写；KG OS 新建或因业务 targets/properties 变化重建 Index 时使用当前 `[fulltext].analyzer`。因此同一 Knowledge Base 的不同历史 State，甚至同一 State 的不同 Full-text Index，都可能来自不同 runtime analyzer；这种差异本身不是 KG OS consistency violation。
+- Runtime / history：每个 connection 在 extensions 加载后、进入可用池前 probe 当前 `[fulltext].analyzer`，用于保证当前 daemon 能创建/重建新的 managed Full-text Index。历史 query 使用目标 State 的实际 versioned IndexDefinition analyzer；如果当前 connection 没有注册那个旧 tokenizer，只让该次 Full-text 操作返回 `FULLTEXT_ANALYZER_UNAVAILABLE`，daemon 与普通历史 read 继续可用。Remote extension hash 可以固定插件 binary，但 KG OS 无法仅靠 analyzer name 检测第三方插件外部词典/资源被原地替换；这是 operator/runtime reproducibility responsibility。
+- Query boundary：KG OS 官方 Full-text 查询不提供 analyzer selector，省略 Lithograph query-time override，从目标 IndexDefinition 取得默认 analyzer。因为 Graph 保留原始 Cypher passthrough，KG OS 不新增 parser/rewrite 去拦截调用方显式写下的 Lithograph `{analyzer: ...}` 低层 query override；这种显式 escape hatch 只影响本次 Lithograph query、不修改 State，也不属于 KG OS managed Full-text 简化接口，AI-facing CLI/Skill/文档不得把它作为常规用法生成。
+- 授权依据：用户明确要求 Full-text 像向量一样把底层策略放到全局配置，上层/AI 只表达需要全文检索，不理解 Ontology 中的 tokenizer 配置；随后进一步要求插件加载独立为通用 SQLite Extension runtime 配置。
+- 备选：每个 Ontology Full-text Index 暴露 analyzer/options；把 analyzer 与 extension path 绑在同一 Full-text 插件配置；由 KG OS 内置 Jieba/其它分词实现。它们都会把 SQLite/FTS5 运行细节重新推给 AI、复制通用 extension loader，或让 Kernel 变成具体分词实现 owner，因此不采用。
+- 取舍：KG OS 不承担 analyzer 配置版本管理或迁移，所以 operator 修改 runtime config 后不会统一已有历史定义；换取 Ontology 与查询心智模型显著简化，也避免为了低频配置升级引入全库重写机制。真实 analyzer 仍由 Lithograph versioned IndexDefinition 保留。
+
+### D53 Full-text / Embedding 只使用当前 runtime config，v1 不做配置迁移（2026-09-17）
+
+- 决定：`[fulltext]` 与 `[embedding]` 只属于 `kgosd` startup runtime config。KG OS 不把它们复制、摘要或冻结到 Knowledge Base，不保存 search-space fingerprint/generation，也不在打开已有库时比较“这个 State/Index/Vector 是由哪套 config 生成的”。配置修改后 restart 正常启动并直接使用新值，不返回 config-space mismatch。
+- Full-text：已有 Lithograph Full-text IndexDefinition 保留它创建时 versioned analyzer；当前 `[fulltext].analyzer` 只影响以后由 KG OS 新建或因业务定义变化而重建的 Full-text Index。KG OS 不因为 runtime analyzer 改变批量重建历史 Index。
+- Embedding：SemanticText query vector、semantic Index backfill 与 managed-vector refresh 都使用当前 `[embedding]`。已有 Lithograph Vector IndexDefinition 保留创建时的 actual dimension/similarity，只有新建或因业务定义变化重建的 semantic Index 取当前配置；已有 managed vectors 也不因为 endpoint/model/dimensions/similarity 改变而自动重算。v1 不检测新旧向量是否属于兼容空间。真正发生 query/index dimension、Schema 或 provider 错误时按现有错误合同失败，但 daemon 本身不因历史配置未知而拒绝启动。
+- Ownership：配置语义稳定性属于 operator responsibility。正常使用预期是在项目初始化阶段选好 analyzer / embedding service 并长期保持稳定；如果 operator 主动修改，KG OS 不承诺已有搜索结果与新配置语义兼容，也不提供自动 migration/rebuild/cutover。
+- 授权依据：用户先明确希望采用简单实现、不为后续 Full-text / Vector 配置升级建立迁移系统，随后进一步确认已有 Knowledge Base 与新配置不一致也“照常启动”，最后明确配置无需初始化或保存到 Knowledge Base，运行时直接使用配置文件。
+- 被替换方案：此前讨论过“把配置身份写入 State 并阻止 mismatch”、以及“创建新库后重放完整 Commit DAG 的可恢复全历史迁移”。两者都为当前不存在的配置升级需求引入显著状态机、历史重写和运维复杂度，因此不采用。
+- 取舍：v1 无法防止 operator 把已有 managed vectors 与新的 query embedding 配到不同语义空间，也不会统一历史 Full-text analyzer；这是刻意接受的简化。换取 runtime、State、Evolution 与 daemon lifecycle 都不需要配置版本管理。

@@ -27,14 +27,24 @@ CONSISTENCY_ERROR
 UNSUPPORTED_OPERATION
 STATE_NOT_FOUND
 RESERVED_IDENTIFIER
+SQLITE_EXTENSION_ERROR
+FULLTEXT_CONFIG_ERROR
+FULLTEXT_ANALYZER_UNAVAILABLE
 EMBEDDING_CONFIG_ERROR
 EMBEDDING_PROVIDER_ERROR
-EMBEDDING_SPACE_MISMATCH
 ```
 
 Lithograph `VERSION_NOT_FOUND` 在 KG OS 公共语义中映射为 `STATE_NOT_FOUND`；Object Patch 的 `tx_begin(expectedHead=baseState)` mismatch 或 no-op strict-head check mismatch 映射为 `STALE_BASE_STATE`；Git hunk 无法精确应用到 `baseState` 重新生成的 canonical YAML 时返回 `PATCH_BASE_MISMATCH`，不能 fuzzy/offset apply，也不能误报为 Branch stale；Binding coverage、reserved internal graph/schema 等 KG OS invariants 失败映射为 `CONSISTENCY_ERROR`。HTTP status 与 SDK exception class 仍属于各 adapter mapping；CLI 的 stdout/stderr 与 coarse exit-code mapping 由 [CLI](cli.md#error-与-exit-code) 冻结，但都不能改变上述稳定 error `code`。
 
-Embedding 错误固定区分：`EMBEDDING_CONFIG_ERROR` 表示 `[embedding]` 缺失、`base_url/model/dimensions/similarity` 非法、出现已经移除的 `provider`/其它未知字段、`api_key` 与 `api_key_env` 同时配置、inline/env credential 为空，或 `api_key_env` 指向不存在/空环境变量；`EMBEDDING_PROVIDER_ERROR` 表示配置合法但实际 `POST {base_url}/embeddings` timeout、网络失败、非成功 HTTP status、响应 JSON/`data/index/embedding` shape 非法、embedding 非 finite number 或返回维度不等于配置；`EMBEDDING_SPACE_MISMATCH` 表示当前 runtime config 的非敏感 fingerprint 与目标 State 已记录的 embedding space 不一致。后两者不能伪装成 `INTERNAL_ERROR`；任何依赖 embedding 的 mutation 失败都必须保持原 Branch/State 不变。任何 error/debug surface 都不得回显 `api_key` 或 resolved env credential。
+SQLite Extension / Full-text 运行时错误固定区分：
+
+- `SQLITE_EXTENSION_ERROR`：`[[sqlite.extensions]]` 配置形状非法，remote source 缺/错 `sha256`，source 不存在/下载失败，hash mismatch，archive 不安全或无法解包，配置的 `library` 不存在，SQLite load/entrypoint 初始化失败，或 resolved libraries 中无法发现**恰好一个完整 Lithograph ABI provider**（零个/多个/partial export family）。`details` 可以包含公开的 extension ordinal、source kind（local/https）、phase（resolve/hash/extract/load/capability）与安全可显示的路径/URL，但不能回显下载 credential（v1 不支持）或 native library 私有诊断中的敏感文本。
+- `FULLTEXT_CONFIG_ERROR`：`[fulltext]` 字段未知、`analyzer` 类型错误、空/只含无效分隔内容或含 NUL。省略 `[fulltext]` 不报错，等价 `unicode61`。
+- `FULLTEXT_ANALYZER_UNAVAILABLE`：当前 runtime 在 extension 加载后无法构造 `[fulltext].analyzer`，或实际执行某个历史/当前 Full-text Index query 时，该 IndexDefinition 保存的 analyzer / 显式 query override 当前未注册或不可构造。它不能伪装成零结果；历史索引需要旧 tokenizer 但当前 runtime 没有加载时，只失败该次 Full-text 操作，不把整个 Knowledge Base 判定为损坏。
+
+这些 runtime code 不改变 Lithograph 自己的 `SCHEMA_ERROR` / `SEMANTIC_ERROR` 等数据库分类。KG OS 只有在错误来自自己的 extension resolver、global Full-text config 或已知 tokenizer runtime capability boundary 时使用上述稳定 code；普通 Lithograph Full-text query expression 语法错误仍保留其公开数据库 category。
+
+Embedding 错误固定区分：`EMBEDDING_CONFIG_ERROR` 表示 `[embedding]` 缺失、`base_url/model/dimensions/similarity` 非法、出现已经移除的 `provider`/其它未知字段、`api_key` 与 `api_key_env` 同时配置、inline/env credential 为空，或 `api_key_env` 指向不存在/空环境变量；`EMBEDDING_PROVIDER_ERROR` 表示配置合法但实际 `POST {base_url}/embeddings` timeout、网络失败、非成功 HTTP status、响应 JSON/`data/index/embedding` shape 非法、embedding 非 finite number 或返回维度不等于配置。KG OS v1 不定义 embedding-space mismatch 错误，也不比较当前 runtime config 与历史 managed vectors 的生成配置；任何依赖 embedding 的 mutation/provider 调用失败仍必须保持原 Branch/State 不变。任何 error/debug surface 都不得回显 `api_key` 或 resolved env credential。
 
 Graph params 的 `SemanticText` marker **只在 Graph `params` 的直接 value 位置识别**，并只接受 exact `{"$semantic":"<non-empty-string>"}`。在这个识别位置，`$semantic` 与其它 key 并存、value 非 String/空 String 返回 `INVALID_ARGUMENT`；调用方确实要传同形状普通 Cypher Map 时使用 Lithograph `$type:"Map"` wrapper。Graph params 的嵌套 Map、Object/State Data 或其它 surface 中的 `$semantic` key 没有特殊含义，按各自普通 Map/data contract 处理。SemanticText 在 Lithograph parameter decode 前由 KG OS 消费，因此不会作为 Cypher Map 或持久值进入 Lithograph。
 

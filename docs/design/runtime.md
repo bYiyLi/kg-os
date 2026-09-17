@@ -62,6 +62,7 @@ KG OS v1 在当前 OS 用户 home 下使用一个明确的 daemon home：
 ~/.kgosd/
 ├── config.toml
 ├── kgosd.lock
+├── extensions/
 ├── logs/
 └── data/
 ```
@@ -70,12 +71,25 @@ KG OS v1 在当前 OS 用户 home 下使用一个明确的 daemon home：
 
 ### `config.toml`
 
-`config.toml` 是持久的 **startup configuration**。v1 冻结 server 与全局 OpenAI-compatible Embeddings 两组基础配置：
+`config.toml` 是持久的 **startup configuration**。v1 冻结 server、SQLite Extension、Full-text 与全局 OpenAI-compatible Embeddings 四组基础配置：
 
 ```toml
 [server]
 host = "127.0.0.1"
 port = 4765
+
+[[sqlite.extensions]]
+source = "https://github.com/bYiyLi/Lithograph/releases/download/v0.1.1/lithograph-linux-x64.tar.gz"
+sha256 = "<64-hex-sha256>"
+library = "lithograph.so"
+entrypoint = "sqlite3_lithograph_init"
+
+# 其它 SQLite extension 使用同一加载机制；这里的 tokenizer 注册名由插件自身定义。
+[[sqlite.extensions]]
+source = "/opt/kgos/extensions/sqlite-jieba.so"
+
+[fulltext]
+analyzer = "jieba"
 
 [embedding]
 base_url = "https://api.example.com/v1"
@@ -88,6 +102,66 @@ similarity = "cosine"
 ```
 
 省略 `server.host` 等价默认 `127.0.0.1`；省略 `server.port` 等价默认 `4765`。`server.host` 必须是合法 IPv4 address string；v1 不把 hostname / DNS resolution 引入 bind contract。
+
+### SQLite Extension source resolver
+
+`[[sqlite.extensions]]` 是 **kgosd 创建 SQLite connection 时必须加载的通用 SQLite loadable-extension 列表**。Lithograph 本身也通过这套配置提供，不再由 KG OS binary 内嵌、写死安装路径或另设 `[lithograph]` 特例；Jieba tokenizer、其它 tokenizer、SQL function、virtual table 或未来其它 SQLite extension 都使用同一机制。配置数组顺序就是每个 connection 的加载顺序，配置了就表示 required；v1 不增加 `kind/name/enabled/optional/capabilities` 等插件注册层。
+
+每个 entry 的合同固定为：
+
+- `source` **必填**，只能是本机 absolute file path 或 absolute `https://` URL；不接受 relative path、`http://`、其它 scheme、目录或自动按插件名发现/下载。KG OS 不维护插件 registry/package manager。
+- `source` 可以直接指向当前平台可加载的 `.so` / `.dylib` / `.dll`，也可以指向 `.tar.gz` / `.zip` archive。archive 必须额外提供 `library`，它是解包根目录内要交给 SQLite 加载的精确 relative regular-file path；direct library 不提供 `library`。v1 不做 glob、basename 猜测或平台自动选包。
+- `entrypoint` optional；省略时使用 SQLite 标准 entrypoint resolution，提供时把该非空 symbol name 交给 SQLite C API。它只选择 shared library 中的初始化入口，不声明插件类别。
+- `sha256` 对 **远程 source 必填**，必须是 64 位 lowercase hex，校验的是下载得到的原始 artifact bytes；本地 source 可省略，提供时同样必须匹配。无论配置是否显式给出，resolver 都会计算实际 artifact SHA-256，并以内容 hash 固定本次 daemon 使用的 artifact identity。
+
+远程 URL 只作为 artifact location，不是可执行 identity。resolver 可以跟随有界的 **HTTPS → HTTPS** redirect，以支持 GitHub Releases 这类下载；不得降级到 HTTP。`releases/latest/download/...` 可以配置，但仍由 `sha256` 固定本次允许的 bytes：若远端 `latest` 已变化且本地没有旧 hash cache，校验失败而不是自动升级。因此正式可复现部署优先使用带版本号 URL + SHA-256。
+
+所有 source 都先解析成 daemon-local immutable artifact，再进入 SQLite connection lifecycle：
+
+```text
+local source --------------------┐
+                                 ├─ read/download bytes
+https source -- bounded redirect ┘
+               ↓
+        verify configured SHA-256 when present/required
+               ↓
+        actual SHA-256 content identity
+               ↓
+        ~/.kgosd/extensions/<sha256>/
+               ↓
+        direct library or safely extracted archive
+               ↓
+        resolved local library path
+```
+
+archive extraction 必须 fail-closed：拒绝 absolute path、`..` traversal、symlink/hardlink、device/special entry 与越界 `library`；download / decompression / extracted-size 受实现资源上限约束。先写临时文件/目录，hash 与 extraction 全部成功后再原子发布 content-addressed cache。缓存命中时重新确认目标 artifact 与 hash 一致；缓存可删除并从 source 重建，不属于 Knowledge Base history 或 correctness source。远程 cache 已存在且有效时，daemon restart 不要求网络可用。
+
+`kgosd` 对每个新 SQLite connection 使用**同一批已解析的本地 artifacts**：仅在 host C API 层临时允许 extension loading，按配置顺序调用 SQLite extension load API，随后立即关闭该能力；业务 Cypher/SQL 不获得任意 `load_extension()` 权限。任一 configured extension 在任一 connection 加载失败，该 connection 不进入可用池。
+
+KG OS 还需要 Lithograph Native ABI 完成 streaming execution 与 explicit transaction，因此 generic loader 之外必须有一个**自动 capability binding** 步骤，但仍不要求配置 `kind = "lithograph"`：daemon 对同一批 resolved local shared libraries 使用平台 dynamic-loader symbol lookup，只做导出符号发现/函数指针绑定，不通过这条路径再次执行 SQLite extension init；必须恰好有一个 resolved library 暴露 KG OS 当前要求的完整 Lithograph ABI 1 symbol family（`lithograph_v1_execute/validate/tx_begin/tx_execute/tx_commit/tx_abort/free`）。零个、多个候选或只暴露部分 family 都返回 extension capability error。实际调用这些函数前，对应 library 仍必须已经通过 SQLite extension-loading path 在**目标 `sqlite3*` connection** 完成注册；Native ABI binding 不能实例化第二套 SQLite，也不能替代 `.load` 生命周期。
+
+因此“Lithograph 是 KG OS 必需数据库能力”由公开 symbol/capability probe 证明，而不是由 extension 配置中的名字、顺序、文件名或 `kind` 猜测。缺少兼容 Lithograph capability 时 Knowledge Base 不能开放。
+
+SQLite Extension 是与 `kgosd` 同权限执行的 native code。配置文件因此属于 operator trust boundary：KG OS 不 sandbox 插件，不根据 Ontology/AI 输入动态添加 extension，也不把 remote headers/token/options bag 暴露给业务调用方。修改 extension source/hash/library/entrypoint 只在下一次 daemon start/restart 生效；它本身不创建 State 或自动执行任何数据 migration。
+
+### Full-text 全局配置
+
+KG OS v1 的 Full-text 只暴露一个 daemon-global 运行时分词配置：
+
+```toml
+[fulltext]
+analyzer = "jieba"
+```
+
+省略整个 `[fulltext]` 等价 `analyzer = "unicode61"`。`analyzer` 是非空、无 NUL 的**完整 FTS5 tokenizer specification STRING**，例如 `unicode61`、`porter unicode61`、`jieba`；KG OS 不解析第三方 tokenizer 的业务参数含义。它只决定 KG OS **新建或因业务定义变化重建** managed Full-text Index 时写入的 `fulltext.analyzer`，不负责根据名字寻找插件，也不覆盖已有 IndexDefinition。若 specification 需要第三方 tokenizer，对应实现必须由前述 `[[sqlite.extensions]]` 在每个 connection 上注册。
+
+KG OS v1 不公开 per-Index analyzer、`fulltext.eventually_consistent`、tokenizer path/arguments registry 或其它 FTS5 建表 options。Ontology 只声明“哪些字段需要 Full-text”。KG OS **创建或因业务定义变化重建** Full-text IndexDefinition 时写入当前 `[fulltext].analyzer`，并保持 `fulltext.eventually_consistent = false`；已经存在且本次不需要重建的 IndexDefinition 保留自己的 versioned analyzer。KG OS 不把 analyzer 配置、fingerprint 或 generation 额外写入 Knowledge Base。
+
+每个 SQLite connection 在配置 extension 全部加载后、进入可用池前，都必须对**当前 `[fulltext].analyzer`**做无持久副作用的 FTS5 capability probe；未知 tokenizer、参数构造失败或运行时依赖缺失都使该 connection 初始化失败。这个 probe 只验证本次 daemon 要用于新建/重建索引的 analyzer，不要求启动时枚举并验证全部历史 State 曾经使用过的 tokenizer。
+
+打开已有 Knowledge Base 时，KG OS **不比较**当前 `[fulltext].analyzer` 与库中已有 IndexDefinition，也不迁移或批量重建历史索引。历史 Full-text query 继续使用目标 State 的 versioned IndexDefinition 实际保存的 analyzer；如果那个 tokenizer 当前没有通过 `sqlite.extensions` 注册，则只让该次 Full-text 操作返回 `FULLTEXT_ANALYZER_UNAVAILABLE`。修改 runtime analyzer 后 restart 仍照常启动，后续新建/重建 Full-text Index 使用新值。
+
+KG OS 不承诺检测第三方 extension 在同一 analyzer name 下偷偷替换算法/词典；远程 artifact SHA-256 pin 能固定 binary bytes，但插件外部资源仍由 operator 负责版本化。这与 Lithograph 的 tokenizer 可复现性边界一致。对同一 Knowledge Base 长期保持 analyzer 语义稳定是 operator responsibility，v1 不建立配置兼容检查或迁移机制。
 
 KG OS v1 **只支持 OpenAI-compatible Embeddings API**，因此没有 `embedding.provider` 字段，也不建立 provider plugin / registry。`embedding.base_url`、`embedding.model`、`embedding.dimensions` **全部必填**：
 
@@ -120,20 +194,24 @@ Authorization: Bearer <credential>   # 仅在配置 credential 时
 
 响应至少必须包含可解释的 `data[]`，每个 entry 具有整数 `index` 与 numeric `embedding[]`。单输入必须能得到 index `0` 的唯一 embedding；批量输入必须对每个输入恰好有一个唯一 index，KG OS 按 `index` 而不是 response array 顺序关联输入。每个 embedding 必须只包含 finite number，且长度严格等于配置的 `dimensions`；缺项、重复/越界 index、非数值/NaN/Infinity、维度不符、非成功 HTTP status、无法解析 JSON 或 transport timeout/网络错误都属于 `EMBEDDING_PROVIDER_ERROR`。响应中的 `object`、`model`、`usage` 等其它 OpenAI 字段不是 KG OS correctness source，可以存在但不要求消费。
 
-Embedding 配置是 **Knowledge Base 基础前置条件**。缺少 `[embedding]`、`base_url/model/dimensions` 非法、`api_key + api_key_env` 同时出现，或 `api_key_env` 无法解析为非空 credential 时，`kgosd` 不能开放 Knowledge Base 业务能力。启动只验证配置形状与本地 credential 来源，不把一次远端 health check / sample embedding request 作为数据库可读性的前置条件；OpenAI-compatible endpoint 临时网络/服务故障只让本次需要 embedding 的 semantic-parameter resolution、managed-vector maintenance 或 migration 返回 `EMBEDDING_PROVIDER_ERROR`，已经可以独立完成的 Ontology read、普通 Graph read 与 Full-text 查询不因此伪装成数据库损坏。
+Embedding 配置是 **kgosd 运行前置条件**。缺少 `[embedding]`、`base_url/model/dimensions` 非法、`api_key + api_key_env` 同时出现，或 `api_key_env` 无法解析为非空 credential 时，`kgosd` 不能开放 Knowledge Base 业务能力。启动只验证配置形状与本地 credential 来源，不把一次远端 health check / sample embedding request 作为数据库可读性的前置条件。endpoint 临时故障只让本次 SemanticText resolution / managed-vector mutation 返回 `EMBEDDING_PROVIDER_ERROR`。
 
-KG OS bootstrap 会把当前 embedding config 的**非敏感 embedding-space fingerprint**写入 reserved internal metadata；State 只保存 digest，不保存原始 config。v1 provider protocol identity 是固定常量 `openai-compatible-embeddings-v1`，fingerprint 输入固定覆盖该 identity、canonical `base_url`、`model`、`dimensions`、`similarity` 与 KG OS semantic-input framing version。`api_key`、`api_key_env` 名称、解析出的 credential 和任何 Authorization header 都不参与 fingerprint，也永不进入 State；在 endpoint/model/其它 semantic config 不变时，仅在 `api_key ↔ api_key_env` 间切换或轮换 credential 不要求 migration。credential source/value 仍属于 startup-read config/environment：修改 inline key、环境变量名称或环境变量值后需要 restart 才会被 `kgosd` 重新读取，但不需要 embedding migration。打开已有 Knowledge Base 时，当前 config 的 fingerprint 必须与 writable head 的 fingerprint 一致，否则返回 `EMBEDDING_SPACE_MISMATCH`，不能用新模型/endpoint 查询旧向量，也不能静默批量重算。更换上述任一 semantic config 是显式 Knowledge Base migration，不是普通 restart-only 配置变化；migration workflow 在单独设计冻结前保持未实现，v1 不能靠手改 TOML 绕过。
+KG OS **不把 embedding config 或其 fingerprint/generation 写入 State、State Data 或其它 reserved metadata**。每次 SemanticText resolution、semantic Index backfill 或 managed-vector refresh 都直接使用当前进程启动时读取的 `[embedding]`。修改 `base_url/model/dimensions/similarity` 后 restart 照常打开已有 Knowledge Base：不会比较旧向量的生成配置，不会自动批量重算，也不会返回 embedding-space mismatch。
 
-Fingerprint 只能检测**配置身份发生变化**，不能证明远端服务在相同 `base_url + model` identity 下永远返回同一向量空间。兼容服务若在不改变这些配置的情况下把同一 model/deployment 静默替换为语义不兼容实现，KG OS 至少会拒绝维度不符的结果，但无法仅凭本地配置发现同维度的向量空间旋转；服务/运维必须使用稳定的 model/deployment identity。这是外部服务合同的限制，不通过启动时强制远端 probe 或把 secret 写进 State 规避。
+因此如果 operator 在已有 managed vectors 的库上切换到语义不兼容的 model/endpoint，旧向量与以后生成的 query/new managed vectors 可能不在同一向量空间；KG OS v1 **不检测也不修复这种配置漂移**。维度或数据库约束真正不兼容时，相关后续操作按现有 provider / Schema / type error fail closed，但 daemon 本身仍按当前合法配置正常启动。正常部署应为同一 Knowledge Base 保持稳定的 embedding semantic config。
 
 `kgosd` **只在进程启动时读取配置**。运行期间修改 `config.toml`：
 
 - 不触发 file watch / hot reload；
 - 不改变当前进程的 effective config；
 - 不触发当前进程自动退出；
-- `server.host` / `server.port` 的新值只在下一次 `kgosd` 启动时生效。
+- `server.host` / `server.port`、`sqlite.extensions`、`fulltext` 与 `embedding` 的新值只在下一次 `kgosd` 启动时生效。
 
-因此 server 与 embedding config 都是 restart-read settings。`kg daemon restart` 只负责让新 startup config 被重新读取；它**不等于 embedding migration**。普通业务命令不能因为发现文件变化而隐式 restart daemon，也不能在 fingerprint mismatch 时自动迁移 Knowledge Base。
+因此这些配置都是 restart-read settings。`kg daemon restart` 只负责让新 startup config 被重新读取；它不比较已有 Knowledge Base 的历史配置、不触发 Full-text / Embedding 数据迁移或自动重建。普通业务命令仍不能因为磁盘上的 config 文件变化而自行 hot-reload / restart daemon。
+
+### `extensions/`
+
+`extensions/` 是 SQLite Extension resolver 的 content-addressed artifact cache。目录名使用实际 artifact SHA-256；remote archive 解包后的文件也只存在对应 hash root 下。这个目录不是插件 registry、安装数据库或 Knowledge Base State：删除未被运行进程使用的 cache 只会让下次启动重新从配置 source 解析，不能改变任何 Commit/Branch。运行中的 daemon 固定使用启动时已经解析的 artifacts，不因 cache/source 文件后来变化而让新 connection 漂移到另一份 native binary。
 
 ### `kgosd.lock`
 
@@ -188,10 +266,15 @@ resolve ~/.kgosd/
 → acquire exclusive OS lock
 → clear stale lock content
 → load config.toml once
-→ validate server + embedding config
+→ validate server + sqlite.extensions + fulltext + embedding config
+→ resolve every SQLite extension source to immutable local artifacts
+→ discover exactly one complete Lithograph Native ABI provider from those artifacts
 → resolve configured host + port
-→ open / bootstrap Knowledge Base and Kernel
-→ verify embedding-space fingerprint for existing writable head
+→ open SQLite connection
+→ load the resolved extension set in config order
+→ verify Lithograph public capability
+→ validate effective Full-text analyzer on the connection
+→ open / bootstrap active Knowledge Base and Kernel
 → bind <host>:<port>
 → write active local endpoint into kgosd.lock
 → serve Web + API
@@ -260,7 +343,11 @@ exact HTTP control route、background detach 的平台实现、shutdown wait tim
 - v1 不提供 local token / auth；显式配置非 loopback host 也不会改变这一点；
 - Web 与 API 由同一 `kgosd` origin 提供；
 - `config.toml` 不 hot reload；host / port 通过显式 restart 生效；
-- `[embedding]` 是 Knowledge Base 必填基础配置；`base_url/model/dimensions/similarity` 的 embedding-space 语义改变不能通过 restart 冒充 migration；credential source/value 变化本身不需要 migration；
+- `[[sqlite.extensions]]` 是唯一 SQLite loadable-extension 配置入口；Lithograph 与第三方 tokenizer/其它 SQLite extension 都走同一 resolver/load lifecycle，不由业务请求动态加载；
+- remote extension 必须 SHA-256 pin，最终总是从 daemon-local immutable artifact 加载；每个 SQLite connection 都加载同一解析结果；
+- `[fulltext].analyzer` 是 KG OS 创建/重建 managed Full-text Index 时使用的 daemon runtime config，缺省 `unicode61`；已有 IndexDefinition 保留其 versioned analyzer；
+- `[embedding]` 是 daemon 必填运行配置；SemanticText 与 managed-vector create/refresh 都直接使用当前进程配置；
+- Full-text / Embedding runtime config 不持久化为 Knowledge Base fingerprint/generation。修改后 restart 照常启动，不检查已有数据配置、不自动迁移或批量重建；operator 负责长期语义兼容性；
 - `kgosd.lock` 只承担 single-instance + active-endpoint 定位，不保存 PID 或业务状态；
 - 业务命令不隐式启动 `kgosd`；
 - `~/.kgosd/` 是 daemon runtime/config/persistent-data home，但不是 KG OS Knowledge graph 本身的另一套存储模型；

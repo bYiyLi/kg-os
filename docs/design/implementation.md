@@ -11,9 +11,11 @@ Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能
 | Ontology Overview → 可选 Domain → Definition，无 search；1..100 Ref batch read | 单次 State pin、输入顺序、per-Domain cursor、batch all-or-nothing、描述缺省提示与有界图预览 |
 | Node/Relationship 聚合 Property、required/unique、Constraint/Index | 从公开 Graph Type/SHOW 与 semantic graph 反向构建逻辑值；编译到数据库，不建立 owner-only 公共 structure AST |
 | Domain/Definition canonical YAML + 唯一 Object Patch | 标准 YAML/Git parser、exact apply、input-only renameFrom、语义差异、共享资源去重和冲突定位 |
-| 单 State、strict base、无隐式数据损失 | Native explicit transaction 内 DDL/DML 顺序、即时约束、引用改写和 Knowledge migration |
+| 单 State、strict base、无隐式数据损失 | Native explicit transaction 内 DDL/DML 顺序、即时约束、引用改写、Knowledge data rewrite 与 index maintenance |
 | Binding / Graph View / reserved identifier | 空库 bootstrap、双向覆盖与内部数据隔离验证，不增加第二套结构存储 |
-| OpenAI-compatible Embeddings + managed semantic vector | startup config/fingerprint、OpenAI-compatible `/embeddings` adapter、SemanticText param resolution、source framing、managed vector 隔离、mutation/merge refresh；不解析 Cypher |
+| 通用 SQLite Extension startup runtime | local/HTTPS source resolve、SHA-256 pin、safe archive extract、content-addressed cache、ordered per-connection load、Lithograph capability validation；不按插件用途建 loader |
+| 全局 Full-text analyzer + 简化 Ontology | `type: fulltext` 只编译业务 targets/properties；新建/业务重建时写当前 `[fulltext].analyzer` + `eventually_consistent=false`，已有 versioned analyzer 保留，connection probe 当前 analyzer；不做 config migration |
+| OpenAI-compatible Embeddings + managed semantic vector | 当前 startup config、OpenAI-compatible `/embeddings` adapter、SemanticText param resolution、source framing、managed vector 隔离、mutation/merge refresh；不保存 fingerprint、不解析 Cypher、不做 config migration |
 | Evolution 统一历史与 Merge Session | Definition 内字段级历史；shared resource 单次 conflict 投影；固定 revision 的 candidate 检查 |
 | CLI / SDK / Web 共享合同 | ontology batch Markdown、batch --edit YAML multi-document stream、ontology scoped patch、Object JSON、Graph NDJSON、HTTP metadata 与错误映射 |
 
@@ -29,15 +31,23 @@ Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能
 
 ### Mutation planning
 
-执行链路复用 Object contract：parse → exact apply → 公共值 → explicit delta → shared-resource normalization → derived reference/migration → conflict/dependency check → tx_begin(expectedHead) → 标准 Cypher → tx_commit。
+执行链路复用 Object contract：parse → exact apply → 公共值 → explicit delta → shared-resource normalization → derived reference / maintenance → conflict/dependency check → tx_begin(expectedHead) → 标准 Cypher → tx_commit。
 
-实现必须证明中间每条 statement 符合 Lithograph immediate semantics，不能只比较最终 Schema。对合法上层目标可采用同 transaction 内受控 drop/recreate 或先迁移再施加约束；语义保持要求仍由公共合同约束。新 alias result capture、顶层 Ref transition 与 Property Binding continuity 都在这一个边界内完成。Object/Ontology Patch 的 baseState 和 target Object delta 在取得 writer 前已经确定，因此 semantic source value / Index backfill 能从 immutable base + target logical delta 预先收集并调用 OpenAI-compatible embedding service，待 embedding 全部成功后再 `tx_begin(expectedHead=baseState)` 应用 public delta 与 managed values；Branch 已前进则丢弃预计算结果并返回 stale，不在 writer transaction 内重做网络请求。
+实现必须证明中间每条 statement 符合 Lithograph immediate semantics，不能只比较最终 Schema。对合法上层目标可采用同 transaction 内受控 drop/recreate 或先改写受影响数据再施加约束；语义保持要求仍由公共合同约束。新 alias result capture、顶层 Ref transition 与 Property Binding continuity 都在这一个边界内完成。Object/Ontology Patch 的 baseState 和 target Object delta 在取得 writer 前已经确定，因此 semantic source value / Index backfill 能从 immutable base + target logical delta 预先收集并调用 OpenAI-compatible embedding service，待 embedding 全部成功后再 `tx_begin(expectedHead=baseState)` 应用 public delta 与 managed values；Branch 已前进则丢弃预计算结果并返回 stale，不在 writer transaction 内重做网络请求。
 
 ### Adapter 与运行时
 
 Ontology batch read 在 daemon/kernel 层先解析一次 State，再读取全部 refs；adapter 不能通过循环读取 `branch/...` 模拟 batch，否则 Branch 移动会产生跨 State 结果。Batch `--edit` 要先取得并验证全部 Object bodies，再一次性写 stdout；任一失败不得留下半个 stream。单个 body 继续使用 Object canonical renderer，multi-document marker/comment 由 CLI framing 层添加。`ontology patch` 与 `object patch` 只有一套 request/result/compiler，前者只做 kind scope validation。不得让 CLI、Web、SDK 对缺失字段、删除、rename、shared resource、baseState 产生不同解释。Knowledge 保持直接 Cypher，不文件化。
 
-**`kgosd` runtime implementation**：v1 已确认 IPv4 HTTP、server + mandatory embedding startup config、`kgosd.lock` single-instance/current-endpoint、foreground daemon、显式 lifecycle、same-origin Web/API 与 no-auth。Embedding 只实现一个 OpenAI-compatible adapter：校验 `base_url/model/dimensions/similarity`、`api_key xor api_key_env`、环境变量解析，构造 `POST {base_url}/embeddings`、可选 Bearer auth、单/批量 `input`，校验 `data[].index/embedding` 与 finite exact dimension，并映射 timeout/network/status/JSON/shape 错误。还需 embedding-space fingerprint bootstrap/open check，以及 Graph params 中 top-level `SemanticText` → Lithograph Vector 的 adapter resolution。该步骤不能引入 provider registry 或第二套 Cypher parser/AST/rewrite。Knowledge Base 在 `data/` 下的具体 target/layout 仍是独立 gap。
+**`kgosd` runtime implementation**：v1 已确认 IPv4 HTTP、server + SQLite extensions + Full-text + mandatory embedding startup config、`kgosd.lock` single-instance/current-endpoint、foreground daemon、显式 lifecycle、same-origin Web/API 与 no-auth。
+
+SQLite Extension resolver 先把全部 configured source 固定为 daemon-local immutable artifacts：local/HTTPS input、remote mandatory SHA-256、HTTPS-only redirect、direct library/archive 分支、`library` exact member、safe extraction 与 content-addressed cache 都必须在 database connection 进入可用生命周期前完成。每个新 connection 按 config order 加载同一批 resolved artifacts，extension loading 只在 host C API initialization window 开启；任一 load 失败拒绝该 connection。配置本身不标记 `kind=lithograph`。Daemon 从同一批 resolved libraries 自动发现完整 Lithograph ABI 1 export family，必须恰好一个 provider；只做 platform dynamic-loader symbol binding，实际 Native API 调用仍以前置的 target-connection SQLite extension registration 为条件。实现不能把下载放到 connection checkout 热路径、不能让不同 connection 因 source 更新加载不同 binary、不能实例化第二套 private SQLite，也不能通过业务 SQL/Cypher 暴露任意 extension loading。
+
+Full-text runtime 在 extension load 后对当前 `[fulltext].analyzer` 做 connection-local FTS5 probe。Ontology compiler 对新建或业务定义变化后必须重建的 KG OS-managed `type: fulltext` 生成当前 analyzer 与 `eventually_consistent=false`；已有 IndexDefinition 未被本次业务 Patch 触碰时保留其实际 versioned analyzer。Decoder 有意不把 analyzer 暴露到公共 Ontology，因此不同 analyzer 不构成 public-profile mismatch；其它无法安全解释的未公开 Full-text 配置仍按 consistency boundary 拒绝。实现不维护 fulltext fingerprint/generation，也不因为 runtime config 改变迁移已有 State。
+
+Embedding 只实现一个 OpenAI-compatible adapter：校验 `base_url/model/dimensions/similarity`、`api_key xor api_key_env`、环境变量解析，构造 `POST {base_url}/embeddings`、可选 Bearer auth、单/批量 `input`，校验 `data[].index/embedding` 与 finite exact dimension，并映射 timeout/network/status/JSON/shape 错误。Graph params 中 top-level `SemanticText` → Lithograph Vector、semantic Index backfill 与 managed-vector refresh 都读取当前 daemon config；不实现 embedding-space fingerprint/open mismatch check。该步骤不能引入 provider registry、第二套 Cypher parser/AST/rewrite 或 config-migration state machine。
+
+修改 `[fulltext]` / `[embedding]` 后 restart 只重新读取 runtime config。实现**不得**扫描历史 State、比较 config identity、批量 rebuild managed data、创建新 database generation 或增加 `migrating` daemon 状态；已有搜索数据与新 runtime config 的语义兼容性由 operator 负责。
 
 ### Managed semantic-vector readiness
 
@@ -56,7 +66,7 @@ Ontology batch read 在 daemon/kernel 层先解析一次 State，再读取全部
 
 实现前检查 Lithograph 实际文件与测试，不复制它的 Phase 状态为 KG OS 真源。当前 KG OS 仍只有文档，以下都是待实现工作。
 
-1. 建立 kgosd + Lithograph public host，完成 empty-database bootstrap、Native transaction 与结构化错误；不直接访问底层表。
+1. 建立 kgosd SQLite host：实现 `sqlite.extensions` resolver/cache 与 ordered per-connection loading，验证 Lithograph public capability，再完成 empty-database bootstrap、Native transaction 与结构化错误；Lithograph 不内嵌，不直接访问底层表。
 2. 实现 ontology.md 的 semantic graph、Binding coverage、Schema Locator 与 Graph View；正常 Knowledge/Schema 输入都不能写 reserved identifier。
 3. 实现五种公共 Object Ref、Domain/Definition aggregate decoder 和 Knowledge 原生 Object value；稳定 canonical YAML / equivalent JSON。
 4. 实现 Ontology read 的全局/Domain/Definition 展开与 1..100 Ref batch，同一次请求只 pin 一个 resolved State；实现 Object read/list，Object search 限定 Knowledge，不为 Ontology 加旁路搜索。
@@ -80,12 +90,22 @@ Ontology batch read 在 daemon/kernel 层先解析一次 State，再读取全部
 | 多 Ref batch --edit | 输出是合法 YAML 1.2 multi-document stream；每个 document body 与单独 canonical YAML 逐字一致，顺序与请求一致；state/ref framing 不进入 Object Value / Git hunk；任一目标失败时 stdout 为空 |
 | ontology patch scope | 多 Definition/Domain Patch 与 object patch 得到相同 Ontology 结果；出现 Knowledge target 时在执行前整体拒绝；不建立第二 transaction/compiler |
 | Document 新建及全文/语义索引 | aggregate 只声明业务 source fields；不出现 caller-managed embedding Property/model/dimension，真实 fulltext/semantic Index name 均可查询 |
+| SQLite extension local source | absolute direct library 可解析到 content-addressed cache；启动期间 source 被替换后，本进程后续 connection 仍加载启动时固定的同一 artifact |
+| SQLite extension remote source | HTTPS artifact 必须 SHA-256 pin；GitHub redirect 可解析；cache 命中可离线 restart；download/hash mismatch/unsafe archive/missing library/entrypoint failure 都 fail closed |
+| SQLite extension archive 安全 | absolute/`..`/symlink/hardlink/special entry 与越界 library 拒绝；资源超限中止且不发布半成品 cache |
+| SQLite extension connection lifecycle | 每个实际 SQLite connection 按同一顺序加载全部 configured extensions，随后关闭任意 load 权限；任一 connection 缺插件不能进入 pool |
+| Lithograph 统一加载与 ABI binding | 配置不声明 plugin kind；同一批 resolved libraries 中恰好一个暴露完整 Lithograph ABI 1 family，并且在每个 target sqlite3* 上实际 extension-load 注册后 Native smoke 可调用；零个/多个/partial provider 都拒绝开放 Knowledge Base |
+| Full-text config 缺省/显式 | 无 `[fulltext]` 等价 `unicode61`；显式完整 FTS5 specification 原样编译到所有 managed Full-text definitions；Ontology 不出现 analyzer/plugin/options |
+| Full-text analyzer runtime probe | extension load 后每个 connection 验证当前 analyzer；未知 tokenizer/无效参数/缺运行资源返回 FULLTEXT_ANALYZER_UNAVAILABLE，不伪装为空结果 |
+| Full-text State profile | analyzer 不在 public Ontology；已有 Index 保留 actual versioned analyzer，新建/业务重建使用当前 runtime analyzer；不同 analyzer 本身不被 decoder 误报为 consistency failure，无法安全解释的其它 hidden config 仍拒绝 |
+| Runtime analyzer change | 修改 `[fulltext].analyzer` 后 restart 正常 `running`，不扫描/迁移历史；已有 IndexDefinition 不变，之后新建/重建使用新 analyzer；旧 tokenizer 当前未加载时只让对应历史 Full-text query 返回 FULLTEXT_ANALYZER_UNAVAILABLE |
+| Runtime embedding change | 修改 base_url/model/dimensions/similarity 后 restart 正常 `running`；已有 managed vectors 不自动重算，之后 SemanticText / backfill / refresh 使用新 config；KG OS 不返回 embedding-space mismatch，也不声称新旧空间兼容 |
+| Full-text query-time override 边界 | 官方 KG OS query 不生成 analyzer override；调用方手写 Lithograph override 时由 Lithograph 直接执行且只影响本次 query，不被 KG OS 误当为全局 config/State mutation |
 | 同请求新建 Node/Relationship/Domain | alias 跨 entry 解析，与文本顺序无关，最终 from/to/includes 为正式 Ref |
 | required / unique / 复合 KEY | 单字段和联合规则不混淆，类型/空值/冲突遵守对应数据库语义 |
 | caller-owned Vector Property/type constraint | `VECTOR<...>` Property、包含 Vector 的 type/valueType 或 caller Knowledge Vector value 均拒绝；只允许 reserved managed semantic materialization |
 | Embedding config 缺失/非法 | Knowledge Base 不开放；错误分类为 EMBEDDING_CONFIG_ERROR，不偷偷使用默认模型 |
 | Provider 暂时不可用 | 普通独立 read/fulltext 可继续；SemanticText resolution 或需要 semantic refresh 的 mutation 返回 EMBEDDING_PROVIDER_ERROR 且不产生不一致 State |
-| embedding-space fingerprint | bootstrap/current head 与 config 一致；带 SemanticText 的旧空间查询与所有新 Snapshot write 明确拒绝 mismatch 并要求 migration；不带 SemanticText 的普通历史 Graph/Full-text read 仍可读取旧 State |
 | 单/多字段 semantic vector | source framing 稳定；dimension/similarity 来自全局 config；managed Vector Property 不进入 Ontology/Object/Graph/History public view |
 | SemanticText + SEARCH | `{"$semantic":"text"}` 只作为顶层 Graph param value；KG OS 转成 Vector 后保持 Cypher bytes 不变交给 Lithograph，AI 不需要 provider/model/dimension/query Vector |
 | raw Vector param/result | caller `$type:"Vector"` parameter 与任何 Vector result（含 `RETURN $semanticParam`）拒绝；SemanticText 内部生成的 query Vector 不进入 public result |

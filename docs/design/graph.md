@@ -67,6 +67,8 @@ Graph Capability
 
 `query` 执行任意 **普通 Knowledge graph-data 范围内的 read-only Cypher**。它直接使用 Lithograph 的只读执行路径，并受公共 Knowledge Graph View 约束。除了拒绝 graph / schema / version/ref mutation、外部 I/O、connection-state mutation 或其它副作用，还必须拒绝会绕过公共能力边界的 read-only surface：模型结构、约束和索引通过 Ontology / Object 的 Definition aggregate 读取，不直接透传 current Graph Type / Schema SHOW，Commit / Branch / Tag / log 等 version introspection 通过 Evolution 读取，KG OS internal procedure / metadata 不通过 Graph 暴露。全文、托管语义检索、结构化条件、图遍历、聚合、排序与混合检索都可以由 AI 在同一个 Knowledge Cypher 查询中按 Lithograph 当前公开能力自由组合，因此 KG OS 不增加另一套 Search DSL。
 
+KG OS-managed Full-text 的官方使用模型不提供 analyzer selector：Ontology 只暴露真实 Full-text index name/targets/properties，查询调用 `db.index.fulltext.queryNodes/queryRelationships` 时省略 Lithograph 的 query-time analyzer override，使目标 State 的**实际 versioned IndexDefinition**决定 index/query 默认 tokenizer。全局 `[fulltext].analyzer` 只用于 KG OS 创建或因业务 Schema 变化重建 Full-text IndexDefinition，不作为每次 query 参数重复传递，也不会在 restart 时覆盖既有 IndexDefinition。由于 Graph 保持原始 Lithograph Cypher passthrough，KG OS **不会为了禁止一个显式写在 Cypher 里的底层 `{analyzer: ...}` override 而再实现 Cypher parser/rewrite**；调用方若主动使用这个 Lithograph 专有低层选项，其本次 query tokenization 直接遵守 Lithograph contract，属于 KG OS managed Full-text 简化模型之外的显式 escape hatch，不修改 State、Ontology 或 runtime config。AI-facing CLI/Skill/文档不得把它生成成 KG OS 常规能力。
+
 当 `query` 返回 Lithograph Node / Relationship 时，其 `elementId()` `n:<id>` / `r:<id>` 就是对应 Knowledge Object Ref；KG OS 不做 identity 转换。AI 可以把这个 Ref 直接交给 Object `read` / `patch`，也可以原样重新写入 Cypher。这个直接互操作只适用于 Knowledge element Ref；Schema / Domain 等其它 Object Ref 不是 `elementId()`。Scalar、Map、List、Path、aggregate 等普通 query result 只是计算结果，不因为来自 Graph 就自动成为 Object。
 
 `execute` 执行**普通 Knowledge graph-data mutation Cypher**，适合条件级、集合级、大规模或模式驱动的 mutation，例如条件更新、`MERGE`、复杂模式匹配后修改。一个或少量明确 Object 的维护优先使用 Object Patch；需要对大量匹配结果逐个生成 Object Patch 时，应直接使用 Graph `execute`。最终成功语义要求调用方 mutation、KG OS public-profile validation 与任何 mandatory managed-vector refresh **共同形成一个最终 State**；任一 validation / Provider / refresh 失败都不能留下 partial Commit 或第二个隐藏修复 Commit。
@@ -118,7 +120,9 @@ execute({
 }
 ```
 
-`query.at` 必填，避免 AI / SDK 依赖隐藏的 current Branch。`query` 先 pin immutable State 并解析 params；只有存在至少一个 SemanticText parameter 时，才要求该 State 的 embedding-space fingerprint 与当前 runtime config 匹配，再调用 embedding service 完成转换。fingerprint mismatch 返回 `EMBEDDING_SPACE_MISMATCH`，service failure 返回 `EMBEDDING_PROVIDER_ERROR`，此时不执行 Lithograph query。没有 SemanticText 的普通 Graph / Full-text 历史读取不依赖当前 embedding service，可以继续读取旧 embedding-space State。Lithograph query 执行后，adapter 在返回前递归验证 public result value；任何 Vector result 都按当前 public profile 拒绝，因此 `RETURN $semanticParam` 不会把内部 query embedding 暴露给调用方。
+`query.at` 必填，避免 AI / SDK 依赖隐藏的 current Branch。`query` 先 pin immutable State 并解析 params；存在 SemanticText parameter 时，KG OS 直接使用**当前 daemon 的 `[embedding]`**生成 query Vector。service failure 返回 `EMBEDDING_PROVIDER_ERROR`，此时不执行 Lithograph query。KG OS 不在 State 中保存 embedding-space fingerprint，也不检查当前 query Vector 与目标 State 已有 managed vectors 是否来自同一个 embedding model/space；修改 runtime config 后由 operator 自己承担已有向量与当前 query space 的兼容性，v1 不自动迁移或拒绝查询。
+
+没有 SemanticText 的普通 Graph / Full-text historical read 不调用 embedding service。历史 Full-text query 使用目标 State 中实际 versioned IndexDefinition 保存的 analyzer；如果当前 connection 没有注册那个 analyzer/tokenizer，则该 Full-text 操作返回 `FULLTEXT_ANALYZER_UNAVAILABLE`，但普通历史 graph read 不受影响。Lithograph query 执行后，adapter 在返回前递归验证 public result value；任何 Vector result 都按当前 public profile 拒绝，因此 `RETURN $semanticParam` 不会把内部 query embedding 暴露给调用方。
 
 `execute.branch` 必填且没有 `baseState`。KG OS 在 operation 开始时解析 Branch head；实现使用的 atomic preparation/commit boundary 必须以这个 head 作为 expected base，因此仍保持 command-based“执行开始时的 Branch State”语义，而不是变成 Object Patch 的 caller-supplied `baseState`。最终 commit 前至少验证：调用方 result 不含 Vector；caller-owned changed Property value/type 不含 Vector；changed Label / Relationship Type / Property key 不使用 reserved `__kgos_` prefix；semantic Index target membership 与 source value 的所有变化都已经对应到需要 create/recompute/delete 的 managed materialization。SemanticText 只使用当前 runtime OpenAI-compatible service 生成内部 Vector。Branch 在 preparation 期间前进时必须整体失败，不把旧 candidate 套到新 head。普通 public `rows` / parameter value 使用 Lithograph JSON v1 tagged-value encoding 的 KG OS 子集；`counters` 复用 Lithograph public summary counter names。
 
@@ -133,6 +137,7 @@ KG OS v1 不建立“业务 Vector”和“托管 Vector”两套公开概念：
 ### Graph 能力边界
 
 - 不建立 KG OS query language、Search DSL、Traversal DSL 或独立 Search Engine；
+- Full-text analyzer 不进入 Ontology、Graph request 或 KG OS Search DSL；常规 query 使用目标 IndexDefinition 的 analyzer，第三方 tokenizer implementation 由 daemon SQLite extension runtime 提供；
 - 不增加 `graph embed` / `graph search` 或 KG OS 自有查询语言；semantic text 只通过 Graph params 的显式 input marker 转成 Vector，真正检索仍是 Lithograph Cypher / `SEARCH`；
 - KG OS 不为了 semantic search 引入第二套 Cypher parser、AST 或 query rewrite；
 - 不把 Lithograph 的 Vector value/type 提升为 KG OS caller-owned Knowledge 类型；

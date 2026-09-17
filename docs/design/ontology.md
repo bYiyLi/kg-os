@@ -192,7 +192,7 @@ Semantics  → KG OS metadata graph in the same Lithograph State
 
 KG OS 可以且应当提供 `type / required / unique / from / to / constraints / indexes` 这样的直接表达，并负责把它们编译为 Lithograph 的公开能力。读取反向组合当前 Schema 与 metadata，不保存整份 Definition YAML / JSON。数据库的类型、约束、查询和版本执行仍由 Lithograph 负责。
 
-KG OS 不为方便实现把底层缺少原地 ALTER/rename 的问题转交给 AI。只要可通过公开操作安全完成目标，就由 compiler 编排必要的替换与迁移。不能实现合法目标时返回具体能力或数据冲突，不降级为“请逐个编辑底层资源”，也不静默丢弃字段。
+KG OS 不为方便实现把底层缺少原地 ALTER/rename 的问题转交给 AI。只要可通过公开操作安全完成目标，就由 compiler 编排必要的替换、引用维护与数据改写。不能实现合法目标时返回具体能力或数据冲突，不降级为“请逐个编辑底层资源”，也不静默丢弃字段。
 
 KG OS-owned reserved internal Schema 不属于调用方 Ontology，读取不显示，输入不能指向它们。KG OS 不要求修改 Lithograph 方言、不访问内部表，不重建 Graph/Search/Version Engine。v1 不自动接管任意已有 Lithograph database；bootstrap 边界见 [架构](architecture.md#knowledge-base-bootstrap)。
 
@@ -240,17 +240,34 @@ Index:
 
 Constraint 名称可省略，由 KG OS 创建时确定；explicit named Constraint 读取时保留真实名称。匿名 standalone Constraint 所需名称使用 `kgos_c_` 加其 canonical `{kind, targetRefs, type, properties, valueType?}` UTF-8 JSON 的 SHA-256 hex（kind 为 node/relationship，targetRefs 按 UTF-8 bytes 排序，properties 保序，键按上述顺序，JSON 无空白、直接 UTF-8 且不转义非 ASCII；缺省 valueType 不输出），创建后读回真实名称；若该名称已被不同资源占用则报冲突，不覆盖。创建后已存在的资源名称不因字段或 Definition 改名而重新计算。简单 required/unique 的底层内生资源名称不成为 AI 必须管理的对象。来源归并与派生 backing index 的区别由 compiler 从当前公开 Schema 读取，不能丢弃原有显式约束名称。
 
-Index 的 `name` 必填，是之后查询真实使用的名称，不是显示别名。`type` 为 `range | text | point | fulltext | vector`；名字冲突按底层同一 Schema 的规则检测，不能以 Domain 当 namespace。`range/text/point/fulltext` 继续表示对调用方业务 Property 的直接数据库索引；`options` 对这些类型按对应公开 DDL 语义传递。
+Index 的 `name` 必填，是之后查询真实使用的名称，不是显示别名。`type` 为 `range | text | point | fulltext | vector`；名字冲突按底层同一 Schema 的规则检测，不能以 Domain 当 namespace。`range/text/point` 继续表示对调用方业务 Property 的直接数据库索引，只有这些类型可以在当前 KG OS profile 中携带对应公开 `options`。`fulltext` 与 `vector` 是 KG OS v1 主动收窄后的托管检索能力，不接受 per-index `options`。
 
-`vector` 在 KG OS Ontology 中表示**托管语义向量索引**，不是要求调用方自己定义/维护 embedding Property。Property-local `type: vector` 以所在 `STRING` Property 为语义输入；Definition-level vector Index 使用有序非空 `properties` 作为语义输入字段。所有 source Property 必须是当前 Definition/targets 上可解释的 `STRING` 字段；`filterProperties` 仍表示底层 Vector SEARCH 可用的附加过滤字段，不进入 embedding 文本。v1 vector Index 不接受公开 `options`：dimension、coordinate type、similarity 与 HNSW/quantization 细节由全局 OpenAI-compatible embedding service 配置和 KG OS compiler/Lithograph 默认值管理，不能在每个 Definition 重复声明。
+`fulltext` 只表达“这些业务 String 字段需要全文检索”，不要求 AI/调用方理解 FTS5 tokenizer、`fulltext.analyzer`、`eventually_consistent` 或 SQLite extension。Property-local `type: fulltext` 以所在 `STRING` Property 为唯一字段；Definition-level Full-text Index 使用非空 `properties`，所有 source Property 必须是目标 Definition 上可解释的 `STRING` 字段。KG OS compiler 新建或因业务定义变化重建 Lithograph Full-text Index 时，把**当前 daemon `[fulltext].analyzer` 的值**写入 IndexDefinition，并固定 `fulltext.eventually_consistent = false`；不是去修改 `config.toml`，也不是批量改写已有 IndexDefinition。Analyzer 的实际 tokenizer implementation 由 `[[sqlite.extensions]]` 在每个 SQLite connection 上提供；Ontology 不保存插件路径、下载 URL、entrypoint 或 tokenizer 参数 registry。
+
+Full-text analyzer 是有意隐藏的运行/数据库参数，不属于公共 Ontology Value。Aggregate decoder 读取某个 State 时，可以把不同 analyzer 创建的实际 Lithograph Full-text IndexDefinition 都投影为同一个简化 `type: fulltext`；**analyzer 不同本身不是 KG OS consistency violation**。已经存在且本次业务 Patch 没有要求重建的 Full-text Index 保留其 versioned analyzer；新建或因 targets/properties 等业务定义变化必须重建时，compiler 使用当前 daemon 的 `[fulltext].analyzer`，并继续固定 `fulltext.eventually_consistent = false`。
+
+KG OS 不在 State 中额外保存 analyzer fingerprint/generation，也不在打开已有 Knowledge Base 时比较当前 config 与历史 IndexDefinition。修改 `[fulltext].analyzer` 后 restart 照常启动；历史索引不批量迁移，后续新建/重建索引直接使用新配置。除 analyzer 这一有意隐藏字段外，若底层 Full-text definition 含 KG OS v1 无法安全解释的其它配置，decoder 仍不能静默伪装成等价公共定义。
+
+`vector` 在 KG OS Ontology 中表示**托管语义向量索引**，不是要求调用方自己定义/维护 embedding Property。Property-local `type: vector` 以所在 `STRING` Property 为语义输入；Definition-level vector Index 使用有序非空 `properties` 作为语义输入字段。所有 source Property 必须是当前 Definition/targets 上可解释的 `STRING` 字段；`filterProperties` 仍表示底层 Vector SEARCH 可用的附加过滤字段，不进入 embedding 文本。v1 vector Index 不接受公开 `options`：新建或因业务定义变化重建时，dimension/similarity 取当前 daemon `[embedding]`，coordinate type 与 HNSW/quantization 由 KG OS compiler / Lithograph 当前规则确定；已经存在的 Lithograph Vector IndexDefinition 保留创建时的实际 versioned 参数，不因 runtime config 改变被自动改写。
 
 多字段 embedding 输入按 `properties` 顺序确定性构造：每个非-null source 形成 `propertyName:\nvalue` 段，段之间用两个 LF 分隔；缺失/null source 跳过，全部缺失/null 时该 element 没有托管向量。Property-local vector 使用同一规则生成单段。这个 framing 是 KG OS 的稳定 semantic-index input contract；Property rename、source list/order 或 source value 改变都使对应托管向量失效并要求重新生成。
 
-KG OS compiler 为每个 public vector Index 建立 reserved `__kgos_` managed vector materialization，并使用全局 `[embedding]` 的统一向量空间生成/维护实际 Vector value；该物理 Property/metadata 不属于调用方 Ontology，不出现在 canonical Definition YAML，也必须从 Object 与 Graph 的公共 Knowledge view 中语义隔离。public Index `name` 仍是 AI 在 Vector `SEARCH` 中使用的真实索引名。`targets` 缺省为当前 Definition，显式时为同 kind Definition Ref 集合；多 target vector Index 要求每个 target 都能按同一 source field list 构造输入。
+KG OS compiler 为每个 public vector Index 建立 reserved `__kgos_` managed vector materialization；需要 create/backfill/recompute 时直接使用当前 daemon `[embedding]` 生成实际 Vector value。该物理 Property/metadata 不属于调用方 Ontology，不出现在 canonical Definition YAML，也必须从 Object 与 Graph 的公共 Knowledge view 中语义隔离。public Index `name` 仍是 AI 在 Vector `SEARCH` 中使用的真实索引名。`targets` 缺省为当前 Definition，显式时为同 kind Definition Ref 集合；多 target vector Index 要求每个 target 都能按同一 source field list 构造输入。KG OS 不记录旧 managed vector 使用过的 model/space，也不因为 runtime config 改变主动重算未受业务 mutation 影响的 vector。
+
+### 检索维护术语
+
+为了避免把正常数据库写入误解成“迁移”，v1 固定使用下面的术语：
+
+- **Index Maintenance**：普通业务 INSERT / UPDATE / DELETE 使已有 Full-text / Vector Index 同步变化。Full-text 的物理维护由 Lithograph / FTS5 负责；Vector 在 semantic source 或 target membership 变化时由 KG OS 为受影响 element 重新生成 / 删除 managed vector，并与本次业务 mutation 形成同一个最终 State。
+- **Backfill / Index Build**：第一次创建或扩展 semantic Index 时，为当前 base State 中已经存在且进入 target 的 Knowledge element 生成 managed vector。
+- **Rebuild / Refresh**：业务 Index 定义本身变化（例如 semantic `properties` / `targets` 改变、source rename/type change）后，对受影响数据重算或清理 managed materialization。
+- **Config Migration**：因为 `[fulltext]` / `[embedding]` runtime config 改变而主动扫描并改写旧 Index / Vector / 历史 State。KG OS v1 **不提供**这种能力。
+
+因此本文后续的 backfill、refresh、rebuild、managed-vector maintenance 都是**正常 mutation / index lifecycle**，不是配置升级迁移；只有真正跨数据库版本、导入/adoption、持久化格式变化等独立问题才继续使用 migration 这个词。
 
 KG OS v1 不提供 caller-managed raw Vector Property / Vector Index profile。`type: vector` 只存在于 **Index**，表示上述托管语义索引；它不是 Property type。若绕过 KG OS 直接在 Lithograph Schema 或 public Knowledge data 中建立 caller-owned Vector Property/value，该 Snapshot 超出 KG OS v1 public profile，应按 invalid KG OS State 处理，而不是让 aggregate decoder 把它伪装成可编辑 Ontology。
 
-`properties` 中复合字段顺序有意义，不能排序为另一种索引。Full-text 多目标表示底层允许的任一 Label/Type 匹配与多字段检索，不把它改成“所有 Label 必须同时出现”；vector 的 properties 顺序则定义 embedding 输入 framing。两者都由 compiler 正确映射，不要求调用方编排 DDL 或 embedding API。
+`properties` 中复合字段顺序有意义，不能排序为另一种索引。Full-text 多目标表示底层允许的任一 Label/Type 匹配与多字段检索，不把它改成“所有 Label 必须同时出现”；新建/业务重建时的分词策略来自当前 runtime config，已有 Index 继续由自身 versioned analyzer 决定，不成为每个 Definition 的公共模型字段。vector 的 properties 顺序则定义 embedding 输入 framing。两者都由 compiler 正确映射，不要求调用方编排 DDL、SQLite extension 或 embedding API。
 
 ### 共享资源与聚合编辑
 
@@ -388,7 +405,7 @@ YIELD node, score
 RETURN node, score
 ```
 
-语义检索仍写普通 Lithograph `SEARCH`；查询文本在 Graph params 中显式标记为 SemanticText，由 KG OS 在调用 Lithograph 前转换成当前 Knowledge Base embedding space 的 Vector。KG OS 不解析或改写 Cypher：
+语义检索仍写普通 Lithograph `SEARCH`；查询文本在 Graph params 中显式标记为 SemanticText，由 KG OS 使用当前 daemon `[embedding]` 在调用 Lithograph 前转换成 Vector。KG OS 不解析或改写 Cypher，也不根据目标历史 State 选择另一套 embedding config：
 
 ```cypher
 MATCH (d:Document)
@@ -557,9 +574,9 @@ Lithograph Schema
 
 KG OS 不要求 Lithograph 为 Node element type、Relationship element type 或 Property 新增跨版本永久 `SchemaElementId`。如果 Lithograph 未来提供通用稳定 Schema identity，KG OS 可以在新的设计修订中评估是否采用，但当前合同不依赖它。
 
-当调用方通过 Object Patch 明确请求 Definition / Property rename 时，KG OS 在产品层保持 Binding Record 连续，并把 rename 编译为 Lithograph 当前公开能力能够表达的**语义保持目标 Snapshot change**。这个合同不要求 Lithograph 提供原生 rename；底层可以表现为 old element remove + new element add，并必须同步完成 D17 定义的已有 Knowledge migration。Domain `INCLUDES` 等指向 Binding Record 的组织关系不因此重建。顶层 Definition / Domain rename 返回旧 Ref → 新 Ref transition；内嵌 Property rename 的连续性由 Binding 保持，并在 Definition 的 History / Diff 字段变化中解释。若 Relationship Definition rename 派生出大量 Relationship replacement，旧 Relationship Ref 在新 State 中失效，调用方通过 Graph 重新发现新 Relationship；Evolution diff/history 只保证可审计新旧集合变化，不承诺恢复一对一 oldRef → newRef 映射。
+当调用方通过 Object Patch 明确请求 Definition / Property rename 时，KG OS 在产品层保持 Binding Record 连续，并把 rename 编译为 Lithograph 当前公开能力能够表达的**语义保持目标 Snapshot change**。这个合同不要求 Lithograph 提供原生 rename；底层可以表现为 old element remove + new element add，并必须同步完成 D17 定义的已有 Knowledge data rewrite。Domain `INCLUDES` 等指向 Binding Record 的组织关系不因此重建。顶层 Definition / Domain rename 返回旧 Ref → 新 Ref transition；内嵌 Property rename 的连续性由 Binding 保持，并在 Definition 的 History / Diff 字段变化中解释。若 Relationship Definition rename 派生出大量 Relationship replacement，旧 Relationship Ref 在新 State 中失效，调用方通过 Graph 重新发现新 Relationship；Evolution diff/history 只保证可审计新旧集合变化，不承诺恢复一对一 oldRef → newRef 映射。
 
-如果有人绕过 KG OS 直接修改 Lithograph Schema，导致上述双向 Binding 覆盖不成立，KG OS 必须把该 Snapshot 判定为 **Ontology consistency error**：不猜测 rename target、不自动创建或迁移 metadata、不静默删除 Binding Record。历史 KG OS-valid Snapshot 仍按各自当时的 Binding Record + Schema Locator 正常解析。
+如果有人绕过 KG OS 直接修改 Lithograph Schema，导致上述双向 Binding 覆盖不成立，KG OS 必须把该 Snapshot 判定为 **Ontology consistency error**：不猜测 rename target、不自动创建或改写 metadata、不静默删除 Binding Record。历史 KG OS-valid Snapshot 仍按各自当时的 Binding Record + Schema Locator 正常解析。
 
 Consistency-invalid Lithograph Commit 仍然存在于底层 DAG，KG OS 不篡改历史把它“修掉”。Evolution `overview` / `get` / `ancestry` 可以为了诊断暴露该 Commit / ref 的轻量 identity、topology、State Data 与一致性状态，但不能把它伪装成正常可解释 Snapshot。Ontology read、Object `list` / `search` / `read` / `patch`、Graph `query` / `execute` 以及会创建新 State 或把 Branch / Tag 指向目标 Snapshot 的 KG OS mutation 都要求相关 base / target State 满足当前 KG OS consistency invariants；否则返回 consistency error。修复这种绕过 KG OS 造成的底层状态不属于 v1 自动恢复能力。
 
@@ -578,7 +595,7 @@ Definition aggregate + local Patch
     ↓
 tx_begin(branch, expectedHead=baseState)
     ↓
-标准 Cypher Schema / Index / semantic graph / 必要 Knowledge migration
+标准 Cypher Schema / Index / semantic graph / 必要 Knowledge data rewrite / index maintenance
     ↓
 tx_commit → 一个新 State
 ```
@@ -587,7 +604,7 @@ tx_commit → 一个新 State
 
 只修改描述不执行 Schema/Index DDL。底层资源名、现有选项和没有被显式修改的字段必须保持；默认值规范化不能重置配置。共享资源显式变化遵守前文归一化规则。
 
-单个请求可以跨多个 aggregate，并包含为迁移明确给出的 Knowledge Object 修改。已有数据不满足新的类型、必填、唯一或端点规则时，若同一请求没有明确解决则整体失败；不填造默认值、不丢弃重复记录、不删除边、不靠“最终检查”掩盖非法中间 statement。
+单个请求可以跨多个 aggregate，并包含为结构变化明确给出的 Knowledge Object 改写。已有数据不满足新的类型、必填、唯一或端点规则时，若同一请求没有明确解决则整体失败；不填造默认值、不丢弃重复记录、不删除边、不靠“最终检查”掩盖非法中间 statement。
 
 compiler 必须按 Lithograph immediate constraint semantics 安排 DDL/DML；必要的临时 Schema 替换只存在同一 transaction 内。任一 statement/validation/commit 失败整体 rollback，不允许先提交中间状态再 squash。Branch 前进返回 STALE_BASE_STATE；纯格式变化或语义无变化在 strict base check 后返回原 State，不建立 transaction。
 
@@ -606,15 +623,15 @@ properties:
         type: "fulltext"
 ```
 
-这个片段表示将 content 改名为 body，不改索引的真实名字。`renameFrom` 必须存在于 base、同一旧字段只能被消费一次、新名不能与目标中仍存在字段冲突；没有标记的移除+增加按 delete+add 处理，不能依据相似度自动迁移。交换名字可以在同一 Patch 中明确成对表达，compiler 负责无损 staged planning。
+这个片段表示将 content 改名为 body，不改索引的真实名字。`renameFrom` 必须存在于 base、同一旧字段只能被消费一次、新名不能与目标中仍存在字段冲突；没有标记的移除+增加按 delete+add 处理，不能依据相似度自动猜成 rename。交换名字可以在同一 Patch 中明确成对表达，compiler 负责无损 staged planning。
 
-rename 必须同步维护 Binding 连续性、Domain / 关系端点 / Constraint / Index 的引用，以及实际 Knowledge 的对应 Label / Property / Relationship Type。Property value 只在该 Definition 覆盖的元素上迁移；同一物理元素受多个 Definition 覆盖时必须检查所有受影响语义。不能静默覆盖已存在的新 key；同一 Patch 明确安排的字段交换或迁移必须先保留源值再执行，不属于隐式覆盖。不能全图修改所有同名字段。不能安全保持数据语义时整体冲突，而不是留下定义与实例脱节。
+rename 必须同步维护 Binding 连续性、Domain / 关系端点 / Constraint / Index 的引用，以及实际 Knowledge 的对应 Label / Property / Relationship Type。Property value 只在该 Definition 覆盖的元素上改写；同一物理元素受多个 Definition 覆盖时必须检查所有受影响语义。不能静默覆盖已存在的新 key；同一 Patch 明确安排的字段交换或数据改写必须先保留源值再执行，不属于隐式覆盖。不能全图修改所有同名字段。不能安全保持数据语义时整体冲突，而不是留下定义与实例脱节。
 
 Relationship Type rename 在底层需要 replacement 时保持端点与 Property。直接寻址的顶层对象 transition 沿用 Object 合同；派生的大量 Relationship replacement 不建立永久 alias，调用方从新 State 查询实际关系，History/Diff 记录集合变化。
 
 ### Delete
 
-删除 Definition / Property 不隐式删除 Knowledge，不提供 `force/cascade/preserve_orphan` 模式。按**整个 Patch 的 planned target**检查：若仍有使用该定义的 Node/Relationship、该 Property 的值或未解决 Schema 依赖，就拒绝；同一 Patch 可以明确迁移/删除依赖后再删除定义。
+删除 Definition / Property 不隐式删除 Knowledge，不提供 `force/cascade/preserve_orphan` 模式。按**整个 Patch 的 planned target**检查：若仍有使用该定义的 Node/Relationship、该 Property 的值或未解决 Schema 依赖，就拒绝；同一 Patch 可以明确改写/删除依赖后再删除定义。
 
 删除聚合时清理只服务被删结构的类型/必填/唯一声明、专属索引、对应 Binding，以及 Definition 的 Domain membership。这是已删除聚合的结构清理，不是删除实际业务数据。涉及其它存活字段/Definition 的 composite/shared 规则必须在同一 Patch 中明确处理，不能凭包含关系级联删除。
 
@@ -624,4 +641,4 @@ Relationship Type rename 在底层需要 replacement 时保持端点与 Property
 
 验收比较的是 **KG OS 公共逻辑值**，不是要求公共 YAML 与底层 AST 一一相同。无修改 read→patch 应为 no-op；合法修改 compile→读取新 State 应得到规范化后的目标 aggregate，同时保持无关图数据/Schema/名字/配置。
 
-Schema 来源、依赖与共享资源归并是 KG OS compiler 的责任。声明式输入与数据库状态转换需要实际 round-trip、错误和迁移测试；文档例子通过解析不等于 compiler 已实现。具体工程验收见 [实现待办](implementation.md)。
+Schema 来源、依赖与共享资源归并是 KG OS compiler 的责任。声明式输入与数据库状态转换需要实际 round-trip、错误、data rewrite 与 index-maintenance 测试；文档例子通过解析不等于 compiler 已实现。具体工程验收见 [实现待办](implementation.md)。
