@@ -56,40 +56,52 @@ Knowledge 的 Property、Label、Relationship Type、端点、类型和查询语
 
 ## Graph
 
-Graph 是 KG OS 面向普通 Knowledge 图的通用计算入口，直接复用 Lithograph Cypher 25，不再提供 `get` / `list` / `expand` / `mutate` 等另一套 Knowledge CRUD / traversal language。
+Graph 是 KG OS 的通用 Cypher 执行入口，直接使用 Lithograph 支持的 Cypher 与 procedure。KG OS 不按语句内容限制能力，不维护允许或禁止的语句清单，也不解析、重写 Cypher。
 
 ```text
-Graph Capability
-│
-├── query
-└── execute
+graph query   → 只读连接 → Lithograph
+graph execute → 读写连接 → Lithograph
 ```
 
-`query` 执行任意 **普通 Knowledge graph-data 范围内的 read-only Cypher**。它直接使用 Lithograph 的只读执行路径，并受公共 Knowledge Graph View 约束。除了拒绝 graph / schema / version/ref mutation、外部 I/O、connection-state mutation 或其它副作用，还必须拒绝会绕过公共能力边界的 read-only surface：模型结构、约束和索引通过 Ontology / Object 的 Definition aggregate 读取，不直接透传 current Graph Type / Schema SHOW，Commit / Branch / Tag / log 等 version introspection 通过 Evolution 读取，KG OS internal procedure / metadata 不通过 Graph 暴露。全文、托管语义检索、结构化条件、图遍历、聚合、排序与混合检索都可以由 AI 在同一个 Knowledge Cypher 查询中按 Lithograph 当前公开能力自由组合，因此 KG OS 不增加另一套 Search DSL。
+调用方通过 `query` / `execute` 选择读写入口；KG OS 据此选择连接，不根据关键字猜测语句类型。`query` 中误提交写语句时，由底层只读执行保证拒绝，不自动改走读写连接。`execute` 可以执行底层支持的读或写语句。只读连接与内部缓存写入的衔接见 [Runtime](runtime.md#cypher-执行连接)。
 
-KG OS-managed Full-text 的官方使用模型不提供 analyzer selector：Ontology 只暴露真实 Full-text index name/targets/properties，查询调用 `db.index.fulltext.queryNodes/queryRelationships` 时省略 Lithograph 的 query-time analyzer override，使目标 State 的**实际 versioned IndexDefinition**决定 index/query 默认 tokenizer。全局 `[fulltext].analyzer` 只用于 KG OS 创建或因业务 Schema 变化重建 Full-text IndexDefinition，不作为每次 query 参数重复传递，也不会在 restart 时覆盖既有 IndexDefinition。由于 Graph 保持原始 Lithograph Cypher passthrough，KG OS **不会为了禁止一个显式写在 Cypher 里的底层 `{analyzer: ...}` override 而再实现 Cypher parser/rewrite**；调用方若主动使用这个 Lithograph 专有低层选项，其本次 query tokenization 直接遵守 Lithograph contract，属于 KG OS managed Full-text 简化模型之外的显式 escape hatch，不修改 State、Ontology 或 runtime config。AI-facing CLI/Skill/文档不得把它生成成 KG OS 常规能力。
+`LOAD CSV`、Schema `SHOW` / DDL、Version Procedure、全文、向量、结构化条件、图遍历等都直接遵守 Lithograph 的语法、参数、事务与错误合同。KG OS 不再以“只能查询 Knowledge”“只有 Embedding Provider 可以访问外部资源”等理由拦截它们。文件与网络访问使用 `kgosd` 宿主进程的实际权限；读连接不等于禁止读取文件或调用网络服务。原样执行 Cypher 不等于提供 raw SQL 或直接访问 SQLite 内部表的接口。
 
-当 `query` 返回 Lithograph Node / Relationship 时，其 `elementId()` `n:<id>` / `r:<id>` 就是对应 Knowledge Object Ref；KG OS 不做 identity 转换。AI 可以把这个 Ref 直接交给 Object `read` / `patch`，也可以原样重新写入 Cypher。这个直接互操作只适用于 Knowledge element Ref；Schema / Domain 等其它 Object Ref 不是 `elementId()`。Scalar、Map、List、Path、aggregate 等普通 query result 只是计算结果，不因为来自 Graph 就自动成为 Object。
+公共 Graph 不注入排除 `__kgos_` 的 Knowledge `graphView`，不在参数、结果或提交前按 Vector / reserved identifier 增加 KG OS 检查。否则仍会限制有效 Cypher，或使底层 Schema / Version Procedure 因固定 Graph View 而无法执行。Object / Ontology 的聚合编辑、内部数据投影和一致性检查仍由各自合同负责，不反向变成 Graph 的执行条件。
 
-`execute` 执行**普通 Knowledge graph-data mutation Cypher**，适合条件级、集合级、大规模或模式驱动的 mutation，例如条件更新、`MERGE`、复杂模式匹配后修改。一个或少量明确 Object 的维护优先使用 Object Patch；需要对大量匹配结果逐个生成 Object Patch 时，应直接使用 Graph `execute`。最终成功语义要求调用方 mutation、KG OS public-profile validation 与任何 mandatory managed-vector refresh **共同形成一个最终 State**；任一 validation / Provider / refresh 失败都不能留下 partial Commit 或第二个隐藏修复 Commit。
+Semantic query 可能产生模型 I/O，`LOAD CSV` 可能产生文件或网络 I/O，因此公共 Graph 使用普通 Native execution，不使用会拒绝这些能力的 `lithograph_rows()`。KG OS 负责认证、request / parameter 解码、连接与执行上下文、结果传输；语句解析、读写判定、procedure 行为、数据库约束与执行错误由 Lithograph 负责。具体接入证据见 [integration readiness](implementation.md#managed-semantic-integration-readiness)。
 
-普通 staged validation 可以使用 KG OS-owned Lithograph explicit transaction，但实现不能因此在持有 Lithograph single-writer ownership 时等待 Embedding Provider 网络 I/O。对动态 Cypher 修改 semantic source **或改变 element 是否属于某个 semantic Index target** 的场景，受影响 element、最终 target membership 与 source value 只有执行后才能确定，而当前 Lithograph explicit transaction 又明确要求 writer transaction 保持短小、不能等待长时间网络交互；因此该场景在当前依赖能力下是明确的 integration readiness blocker，而不是允许实现退化为 `tx_execute → 网络 embedding → tx_commit`。满足这一公共合同需要 Lithograph 提供通用、非 KG OS 私有的 candidate/preparation boundary 或等价能力，使 KG OS 能在不长时间持有 writer 的情况下取得确定的最终 target/source changes、完成 embedding，并仍以原 base/head 原子提交同一逻辑 mutation。具体下层机制由 Lithograph 自身设计决定。
+KG OS-managed Full-text 默认使用目标 State 的实际 versioned IndexDefinition 中的 analyzer；全局 `[fulltext].analyzer` 只用于创建或因业务 Schema 变化重建索引。调用方在 Cypher 中显式传入底层 `{analyzer: ...}` 时原样执行，不修改全局配置或已有 IndexDefinition。KG OS 不为此增加解析或重写逻辑。
 
-Definition、其 Property/Constraint/Index 与 Domain 的变更由统一 Object Patch 编译，Branch / Tag / State / Merge 属于 Evolution，不通过 Graph `execute` 暴露。Graph 也不能访问 `_lithograph_*` 内部实现或 KG OS internal Ontology semantic graph。
+普通 Knowledge Node / Relationship 的 `elementId()` `n:<id>` / `r:<id>` 可直接作为 Object Ref 使用，无需转换。但 Graph 现在也能返回内部 semantic graph element；这些 element 不因此成为公共 Knowledge Object。Schema / Domain 等其它 Object Ref 不是 Knowledge elementId。Scalar、Map、List、Path、Vector 与 aggregate 等查询值也不会自动成为 Object。
 
-Graph `query` / `execute` 使用统一 State reference semantics：读取可以引用 State / Branch / Tag，并在 operation 开始时 pin 到 immutable State；写入必须显式指定目标 Branch。Graph `execute` 是 command-based Cypher mutation，不继承 Object textual Patch 的 explicit `baseState` 合同：它以执行开始时解析出的目标 Branch head 为输入 Snapshot，并继续使用 Lithograph 的 branch-head compare 处理执行期间并发移动。成功的 writable `execute` 返回最终 State identity。Graph 与 Object 共享同一 Knowledge `graphView` isolation，不建立 `knowledgeVersion` 或第二套数据身份。
+`execute` 直接使用 Lithograph 的执行和提交语义，不再附加 KG OS public-profile candidate validation。普通 graph / schema mutation 的原子性、Branch CAS 与 Commit 行为由底层保证；Version Procedure 与 `CALL ... IN TRANSACTIONS` 等按各自底层合同执行，KG OS 不把任意 Cypher 包装成“恰好一个 Commit”或统一 all-or-nothing 事务，也不追加隐藏修复 Commit。
+
+保存 semantic source / target membership 只写普通 graph data，不触发 KG OS embedding refresh。Semantic query、cache maintenance 与 graph mutation 能否共用 execution / transaction，由 Lithograph 判定；KG OS 不在执行前扫描语句或重复实现这些规则。
+
+Ontology / Object / Evolution 仍提供模型聚合、Patch 和版本操作的专用交互，但不是禁止调用对应 Cypher 的理由。直接通过 Graph 修改 Schema、Binding、内部图或 Raw Vector，可能产生不能按 KG OS 高层模型解释的 Snapshot；Graph 仍可按底层合同执行，高层能力按 [Ontology 一致性规则](ontology.md#binding-record-与-schema-locator)报告错误，不自动补 Binding、修复数据或回滚已完成的底层提交。
+
+Graph `query` / `execute` 继续使用 State / Branch 上下文，不建立 `knowledgeVersion` 或另一套数据身份；它们不继承 Object Patch 的 textual Patch / strict `baseState` 规则。
 
 ### Graph 公共调用合同
 
-Graph v1 对普通 parameter / result value 复用 Lithograph JSON v1 encoding，但 **public value profile 排除 Vector**；Node / Relationship / Temporal / Point / UUID 等仍沿用 Lithograph encoding。调用方直接提交 Lithograph `$type: "Vector"` parameter，或查询结果中出现 Vector（包括嵌套在 List / Map / Path-visible property 中的 Vector）都不属于 KG OS v1 Graph public contract。唯一允许产生内部 query Vector 的公共输入是 KG OS adapter-only `SemanticText`：
+Graph parameter / result 直接复用 Lithograph JSON v1 encoding，包括底层支持的 Node、Relationship、Temporal、Point、UUID、Vector 等值。KG OS 不再对 Graph 单独裁剪 Vector 类型。托管语义查询仍只需要普通 String：
 
 ```json
-{"$semantic":"如何设计知识图谱"}
+{"query":"如何设计知识图谱"}
 ```
 
-它只允许作为 `params` 的**直接 value**，并且 object 必须恰好只有 `$semantic` 一个 key，其 value 为非空 String。KG OS 在把请求交给 Lithograph 之前遍历顶层 params：普通 public value 原样按 Lithograph JSON v1 解码；raw Vector parameter 直接拒绝；`SemanticText` 使用当前全局 OpenAI-compatible embedding service 转成**仅供本次内部 execution 使用**的 Lithograph Vector parameter。这个 marker 是 input-only adapter metadata，不是 Cypher value、不是 Object Value、不会持久化，也不会传给 Lithograph。调用方确实要传一个普通 Map 且 key 为 `$semantic` 时，使用 Lithograph 已有的 `$type: "Map"` wrapper 明确转义。
+对应 Cypher：
 
-**KG OS 不解析、验证或改写 Cypher 来完成 semantic parameter conversion。** Cypher bytes 原样交给 Lithograph；KG OS 只根据 parameter 自己的显式 marker 决定是否调用 OpenAI-compatible embedding service。因此同一个 semantic parameter 被放到不接受 Vector 的 Cypher 位置时，后续由 Lithograph 按正常 Cypher type/semantic error 处理。全文与语义检索需要同时使用同一段文本时，调用方传两个参数：普通 String 给 Full-text，`SemanticText` 给 Vector `SEARCH`。
+```cypher
+CALL db.index.semantic.queryNodes('document_semantic', $query, {limit: 10})
+YIELD node, score
+RETURN node.title, node.content, score
+```
+
+Relationship 使用 `db.index.semantic.queryRelationships`，返回 `relationship, score`。`limit` 为必填非负 Integer，`skip` 缺省为 `0`；其它参数与错误遵守 Lithograph procedure contract。这段示例返回调用方选择的业务值与 score，不要求调用方先生成向量。
+
+不提供 `SemanticText` / `$semantic` 参数预处理。含 `$semantic` key 的普通 Map 没有特殊意义，把它传给要求 String 的 procedure 会按底层参数类型错误失败。全文和语义检索可以复用同一个 String 参数；需要 Raw Vector 的调用使用 Lithograph 自身的值编码与接口。
 
 逻辑 request / response：
 
@@ -120,32 +132,28 @@ execute({
 }
 ```
 
-`query.at` 必填，避免 AI / SDK 依赖隐藏的 current Branch。`query` 先 pin immutable State 并解析 params；存在 SemanticText parameter 时，KG OS 直接使用**当前 daemon 的 `[embedding]`**生成 query Vector。service failure 返回 `EMBEDDING_PROVIDER_ERROR`，此时不执行 Lithograph query。KG OS 不在 State 中保存 embedding-space fingerprint，也不检查当前 query Vector 与目标 State 已有 managed vectors 是否来自同一个 embedding model/space；修改 runtime config 后由 operator 自己承担已有向量与当前 query space 的兼容性，v1 不自动迁移或拒绝查询。
+`query.at` 必填：在 operation 开始时解析并 pin immutable State。Semantic query 使用该 Snapshot 的 IndexDefinition 和 provider/config，不以当前 `[embedding]` 覆盖历史配置。KG OS 不生成 query Vector，也不保存第二份配置 fingerprint。
 
-没有 SemanticText 的普通 Graph / Full-text historical read 不调用 embedding service。历史 Full-text query 使用目标 State 中实际 versioned IndexDefinition 保存的 analyzer；如果当前 connection 没有注册那个 analyzer/tokenizer，则该 Full-text 操作返回 `FULLTEXT_ANALYZER_UNAVAILABLE`，但普通历史 graph read 不受影响。Lithograph query 执行后，adapter 在返回前递归验证 public result value；任何 Vector result 都按当前 public profile 拒绝，因此 `RETURN $semanticParam` 不会把内部 query embedding 暴露给调用方。
+`execute.branch` 必填，用于选择本次调用的默认 Branch 上下文；没有 `baseState`。procedure 若在语句内部显式选择其它 target，按 Lithograph 合同执行，KG OS 不检查或改写它。adapter 必须用公开连接 / execution 能力绑定上下文，不能把 `branch` / `graphView` 等 options 无条件附加到不接受它们的 procedure，也不能依赖其它请求遗留的 checkout。该映射需通过 [集成验收](implementation.md#managed-semantic-integration-readiness)。`author/message` 的适用性与结果 `state/counters` 使用底层公开执行合同；不能为没有生成 Commit 的操作虚构新 State。
 
-`execute.branch` 必填且没有 `baseState`。KG OS 在 operation 开始时解析 Branch head；实现使用的 atomic preparation/commit boundary 必须以这个 head 作为 expected base，因此仍保持 command-based“执行开始时的 Branch State”语义，而不是变成 Object Patch 的 caller-supplied `baseState`。最终 commit 前至少验证：调用方 result 不含 Vector；caller-owned changed Property value/type 不含 Vector；changed Label / Relationship Type / Property key 不使用 reserved `__kgos_` prefix；semantic Index target membership 与 source value 的所有变化都已经对应到需要 create/recompute/delete 的 managed materialization。SemanticText 只使用当前 runtime OpenAI-compatible service 生成内部 Vector。Branch 在 preparation 期间前进时必须整体失败，不把旧 candidate 套到新 head。普通 public `rows` / parameter value 使用 Lithograph JSON v1 tagged-value encoding 的 KG OS 子集；`counters` 复用 Lithograph public summary counter names。
+普通 graph / Full-text read 不调用 embedding service。Semantic query 必须能在当前 connection 解析所需 Provider，即使 cache 已热也不能缺少该扩展；远端服务仅在需要计算缺失 embedding 时被调用。Provider failure / cancellation 不能变成遗漏部分候选的“成功 top-k”。错误分类见 [公共合同](contracts.md#公共错误合同)。
+
+联合检索的执行顺序由 Lithograph 决定。`YIELD` 后追加的 `WHERE` 只过滤 procedure 已返回的候选，不承诺过滤范围内的 top-k；不因取消 KG OS 限制就声称底层新增过滤能力。
 
 ### 托管向量的结果边界
 
-KG OS semantic Index 的 managed Vector 是**内部 materialization**，不是 Knowledge Property。对公共 Graph 语义，它必须像不存在一样：`RETURN n` / `RETURN r` 的 element properties、`properties(n)`、`keys(n)`、map projection、dynamic property access 和其它正常 Knowledge 读取都不能观察到 reserved managed vector Property/metadata；调用方也不能直接写它。Vector Search 的可观察结果是调用方自己 `RETURN` 的业务字段 / Node / Relationship 与 `SCORE` 等普通计算结果，不额外返回 embedding。
+Lithograph Semantic Index 的 embedding 是非图属性派生数据；`RETURN n`、`properties(n)`、`keys(n)`、projection / dynamic property access 不会因此返回内部 embedding。KG OS 不为它增加隐藏 Property 或结果删字段。
 
-KG OS v1 不建立“业务 Vector”和“托管 Vector”两套公开概念：**caller-owned Vector Property/value 一律不在公共 Knowledge profile 中**。Lithograph 自身仍可计算和存储 Vector；KG OS 只在内部 semantic-index path 使用它。因为 Graph 保持原始 Cypher passthrough，KG OS 不尝试通过解析语法禁止每一种只存在于 Cypher expression 内部的 Lithograph Vector 计算；只要 Vector 不穿过 caller parameter、public result 或 durable caller-owned Property 边界，这类底层表达式由 Lithograph 自己解释，但**不属于 KG OS 承诺的 Vector 使用接口**。KG OS 官方 semantic-search input 仍只有 SemanticText；raw Vector parameter、Vector result 与持久化 caller-owned Vector Property 都在 adapter / candidate-state boundary 拒绝，不能形成 KG OS-valid State 或公共返回值。
+调用方显式计算、传入、返回或存储的 Raw Vector 则遵守 Lithograph 合同，Graph 不拦截。Object / Ontology v1 的简化值模型仍不接受 caller-owned Vector；直接 Cypher 能力与高层 Object 能否解释该状态是两件事，不能用 Object profile 限制 Graph。
 
-大型 result 的 adapter 可以流式传输 `columns` 一次、`row` 零到多次、最终 summary 一次，但 row/value semantics 与上述 bounded result 完全相同；streaming 只是 transport，不建立第二套 Graph API。
+大型结果可以按 `columns`、多条 `row`、最终 `summary` 流式传输。streaming 只改变 transport，不改变值编码或底层事务语义；没有最终 summary 表示调用方未获得完整成功结果，不证明任意 Cypher 都没有已提交副作用。
 
 ### Graph 能力边界
 
-- 不建立 KG OS query language、Search DSL、Traversal DSL 或独立 Search Engine；
-- Full-text analyzer 不进入 Ontology、Graph request 或 KG OS Search DSL；常规 query 使用目标 IndexDefinition 的 analyzer，第三方 tokenizer implementation 由 daemon SQLite extension runtime 提供；
-- 不增加 `graph embed` / `graph search` 或 KG OS 自有查询语言；semantic text 只通过 Graph params 的显式 input marker 转成 Vector，真正检索仍是 Lithograph Cypher / `SEARCH`；
-- KG OS 不为了 semantic search 引入第二套 Cypher parser、AST 或 query rewrite；
-- 不把 Lithograph 的 Vector value/type 提升为 KG OS caller-owned Knowledge 类型；
-- 不通过 Graph `query` 暴露 Schema `SHOW` / introspection 或 Version Procedure；Ontology 模型理解属于渐进式 Ontology read，编辑基线属于 Object aggregate read，State / ref / history introspection 属于 Evolution；
-- 不再维护与 Object Patch 重复的 Knowledge `mutate` / CRUD surface；
-- 不为 Node / Relationship 建立 KG OS 自己的 ID；
-- 不允许普通 Graph query / execute 返回或修改 KG OS internal Ontology semantic metadata，也不访问 Lithograph 内部表。
+- KG OS 不建立 query language、Search DSL、Traversal DSL、Cypher parser、AST 或 query rewrite。
+- `query` / `execute` 只负责选择只读 / 读写连接，语句能力与执行规则由 Lithograph 决定。
+- 不增加 `graph embed` / `graph search`；托管语义检索直接调用 `db.index.semantic.query*`。
+- Object、Ontology、Evolution 的专用合同保留；它们不成为 Graph 的语句或值白名单。
+- 不提供 raw SQL / SQLite 内部表接口，不为 Node / Relationship 建立第二套 ID。
 
-Ontology 负责告诉上层“当前 Knowledge 应按什么模型理解”；Object 负责明确对象的读取与维护；Graph 负责关系发现、计算与集合级 mutation；真实约束和 query / mutation 数据库语义由 Lithograph 按其公开 Schema 与 Cypher 合同负责。
-
-Embedding 统一由 `kgosd` 使用全局 OpenAI-compatible Embeddings service 生成；外部 Agent/Application 不需要选择协议实现或维护托管 Vector Property。远端 service 调用是确定性基础设施 I/O，不把 Agent 认知能力放入 Kernel。Ontology 中显示的 Label、Relationship Type、Property name 与 Index name 必须对应同一 State 的真实查询名称；semantic query 只需要写正常 Lithograph `SEARCH` 并把对应参数标记为 `SemanticText`。
+Embedding 由 Lithograph 调用当前 connection 的 Provider 扩展生成。KG OS 只负责运行配置和 Ontology 声明的映射，不实现 HTTP client 或缓存。实际调用示例见 [CLI](cli.md#query)，连接、缓存与凭证配置见 [Runtime](runtime.md#cypher-执行连接)。

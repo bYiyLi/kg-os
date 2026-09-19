@@ -21,19 +21,23 @@ KG OS 独立于 Noven 或任何具体领域；领域语义由调用方表达。
 
 ## 使用模型
 
-先通过 **Ontology 全局概览 → 可选 Domain → Definition 详情**理解模型；每个入口给出名称、业务说明与准确的下一步引用，不依赖 Ontology search。需要同时理解一组相关模型时，可以一次 batch 读取多个 Domain / Definition，并保证它们来自同一个 State。
+通过 **Ontology 全局概览 → 可选 Domain → Definition 详情**理解模型；已知 Ref 可以直接读取，也可以 batch 读取同一 State 下的一组模型。`--edit` 取得 canonical YAML，`kg ontology patch` 提交局部变化；跨 Ontology + Knowledge 的原子修改使用同一个 Object Patch。
 
-需要修改时，`--edit` 可以一次取得一个或多个 Domain / Definition：单个返回 canonical YAML，多个返回标准 YAML multi-document stream；再用 `kg ontology patch` 提交局部变化。它只是统一 **Object Patch** 的 Ontology 专用入口；跨 Ontology + Knowledge 的原子修改仍可使用通用 Object Patch。一个 Node / Relationship Definition 一起表达 Property、约束和索引；KG OS 负责拆解为底层数据库操作，而不是要求 AI 分别编辑它们。索引的真实名字与作用范围直接可见，AI 可以继续用 Cypher 查询。
+Node / Relationship Definition 一起表达字段、约束和索引。单字段索引放在字段下，复合或跨 Definition 共享索引放在模型顶层；没有顶层索引时省略 `indexes`。Knowledge 保持 Property Graph。Graph 原样执行 Lithograph Cypher，`query` / `execute` 分别选择只读 / 读写连接，KG OS 不审查语句内容；Evolution 提供 State、Branch、History、Diff、Merge 的专用交互。
 
-Knowledge 仍然是 Property Graph，查询和批量写入使用 Graph Cypher；State、Branch、History、Diff、Merge 使用 Evolution。不把知识库包装为虚拟文件系统。全文索引只在 Ontology 中声明“哪些业务字段需要全文检索”，分词实现不进入模型：v1 由 `~/.kgosd/config.toml` 的全局 `[fulltext].analyzer` 决定新建/业务重建 Full-text Index 使用的 analyzer；需要的第三方 tokenizer 与 Lithograph 自身都通过同一 `[[sqlite.extensions]]` 运行时列表加载。Extension source 可以是本地文件或 SHA-256 pin 的 HTTPS artifact，启动时解析到 daemon-local immutable cache，再一致加载到每个 SQLite connection。语义向量索引同样只声明“哪些业务字段需要语义检索”；全局 embedding service 只支持 OpenAI-compatible Embeddings API，通过 `base_url / model / dimensions` 配置，认证可用 `api_key` 或 `api_key_env`。查询时仍写原始 Lithograph `SEARCH`，只把对应参数标记为 `{"$semantic":"..."}`；KG OS 使用当前 daemon 的 embedding config 预处理参数，不解析 Cypher。Vector 是 KG OS 托管 semantic search 的内部实现，不是 caller-owned Ontology / Knowledge Property 类型，也不进入公共 Object/Graph 结果。正常业务 INSERT / UPDATE / DELETE 引起的 Full-text / Vector **Index Maintenance** 属于普通数据写入；首次创建 semantic Index 为已有数据补向量叫 **Backfill / Index Build**，业务索引定义变化后重算受影响数据叫 **Rebuild / Refresh**。这些都不是 Config Migration。Full-text / Embedding 配置只属于 runtime：不写入 Knowledge Base fingerprint/generation，修改后 restart 直接使用新值，不自动迁移、重建或检查已有搜索数据。
+托管语义检索由 Lithograph 执行。KG OS 把全局 embedding 默认配置和 Ontology 的文本字段声明编译成 Semantic Index；调用方传普通查询字符串。KG OS 不生成内部向量 Property，不在保存或合并正文时调用模型，也不维护独立 `cache.db`。配置只支持可选 `api_key_env`，实际凭证不进入索引历史。
+
+一个 `KG_HOME`（默认 `~/.kgosd`）对应一个 `kgosd` 和根目录 `kgos.db`；所有 daemon API/control request 使用 Bearer authentication，CLI 从 `KG_TOKEN` 取得 credential。
+
+配置、模型与调用示例，以及设计职责索引，统一从 [设计入口](docs/design.md)进入。本文只维护产品定义，具体配置、数据和接口规则由各 owner 文档维护。
 
 ## 当前状态
 
-KG OS 已确认上述 Ontology 交互与聚合编辑方向，以及 Object / Graph / Evolution 共享逻辑合同、Rust `kgosd` + TypeScript/npm client 架构、本地 HTTP runtime、显式 daemon lifecycle、通用 SQLite Extension source resolver、daemon-global Full-text analyzer 与 OpenAI-compatible Embeddings runtime 配置。结构与版本数据库职责仍由独立的 Lithograph 承担；Lithograph 作为标准 SQLite loadable extension 通过同一 runtime 配置装配，而不是内嵌进 KG OS。KG OS 保存自己的业务说明与组织语义并提供 compiler / decoder；v1 不承担 Full-text / Embedding 配置版本管理或升级迁移。
+**项目目前仍只有文档，没有业务实现。** 命令和配置示例是设计合同，不是已发布功能。
 
-**项目目前仍只有文档，没有业务实现。** 命令是设计合同，不是已发布功能。剩余实现包括 Ontology reader、aggregate decoder/compiler、原子 Patch planning、Merge conflict projection、HTTP/runtime、CLI/Skill/SDK/Web；Knowledge Base target/layout 仍是独立待设计事项。范围与验收见 [设计状态导航](docs/design.md#设计状态导航) 和 [工程实现待办](docs/design/implementation.md)。
+首版语义索引只支持单字段；Cypher 原样执行和内部自动填充缓存的设计已记录。模型修改、批量 Patch、Merge 与底层连接 / 缓存对接仍需实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
-本 README 负责产品定义；`docs/design.md` 是导航，`docs/design/` 按职责维护唯一真源；协作规范在 `AGENTS.md`。2026-09-15 的 Ontology 基线修正见 [D46](docs/design/decisions.md#d46-ontology-交互基线修正2026-09-15)，batch read/edit 与 `kg ontology patch` 见 [D47](docs/design/decisions.md#d47-ontology-读取编辑支持-batch写入提供-scoped-patch2026-09-15)，全局 embedding 与托管语义向量见 [D48](docs/design/decisions.md#d48-embedding-provider-是-kgosd-全局运行配置语义向量由-kg-os-托管2026-09-15)，v1 不公开 caller-owned Vector 的边界见 [D49](docs/design/decisions.md#d49-kg-os-v1-不公开-caller-owned-vector-数据类型2026-09-16)，OpenAI-compatible provider/config 合同见 [D50](docs/design/decisions.md#d50-kg-os-v1-只支持-openai-compatible-embeddings-api2026-09-16)，统一 SQLite Extension source resolver 见 [D51](docs/design/decisions.md#d51-sqlite-extension-统一由-startup-source-resolver-装配2026-09-17)，全局 Full-text analyzer 见 [D52](docs/design/decisions.md#d52-full-text-analyzer-是-kgosd-全局运行配置ontology-不暴露分词实现2026-09-17)，runtime-only 且不做配置迁移的决定见 [D53](docs/design/decisions.md#d53-full-text--embedding-只使用当前-runtime-configv1-不做配置迁移2026-09-17)。
+相关决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D60 自动填充缓存](docs/design/decisions.md#d60-automatic-embedding-cache)和 [D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
 ## License
 

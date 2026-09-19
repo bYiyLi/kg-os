@@ -71,11 +71,11 @@ ResolvedState = commit/<64-lowercase-hex>
 
 Branch / Tag name validation 与 Lithograph 完全一致；KG OS 不做大小写折叠、路径重写或别名。任何接受 StateRef 的 read 都在开始时解析并 pin，返回值中的 `state` 永远使用 ResolvedState，而不是把调用方传入的 Branch / Tag 原样当成已解析 State。
 
-Object Patch / Graph Execute 必须明确目标 Branch。Object Patch 使用 Lithograph explicit transaction，把实现同一上层 target change 所需的多条标准 Cypher mutation 合并为恰好一个新 Commit。Graph `execute` **不继承 Object Patch 的 caller-supplied `baseState` / textual Patch strict-base contract**，仍表示“在 operation 开始时解析目标 Branch head，并执行一条 writable Cypher command”；但只要成功，它的 caller mutation、KG OS public-profile validation 与 mandatory managed semantic index maintenance 必须共同形成**一个最终 State / 一个逻辑 Commit boundary**，不能先提交 caller query 再追加隐藏修复 Commit。这里的 index maintenance 是正常业务写入的一部分，不是配置迁移。底层 candidate/preparation 实现必须保持 Lithograph 单个 mutating query 的 write-intent 语义：即使最终 effective graph delta 为空，只要调用方执行的是成功的 mutating query，仍产生一个 Commit。KG OS 不要求调用方执行“修改后再手工 commit”的两步流程。成功响应必须返回最终 State identity；调用方不控制底层 preparation / transaction lifecycle。
+Object Patch / Graph Execute 必须明确 Branch 上下文。Object Patch 使用 Lithograph explicit transaction，把实现同一上层 target change 所需的多条 Cypher mutation 合并为恰好一个新 Commit。Graph `execute` 不继承 Object Patch 的 `baseState` / textual Patch 合同，也不附加 KG OS public-profile validation；它按 [Graph 原样执行合同](graph.md#graph)使用底层事务、procedure 和 Commit 语义。普通 graph / schema mutation、Version Procedure 与 transaction subquery 的提交行为不能统一假定为一个 Commit。保存 semantic source 不生成 embedding，cache 不属于这类业务提交条件。Graph 成功响应反映底层实际结果，不追加隐藏修复 Commit。
 
 ### Evolution 能力面
 
-KG OS 当前只提升对知识世界有直接产品意义的版本能力，不镜像 Lithograph 的全部 Version Procedure：
+Evolution 当前只提升对知识世界有直接产品意义的版本能力，不镜像 Lithograph 的全部 Version Procedure。这个专用 API 的范围不限制调用方通过 Graph 直接执行底层 Version Procedure；直接执行不附带 Evolution 的业务一致性编排：
 
 ```text
 Evolution Capability
@@ -327,7 +327,7 @@ KG OS 没有 connection-local active Branch，因此 `branch.create.from` 必须
 
 D31 对 invalid State 的限制只阻止业务 Snapshot 继续演进或把新 ref 指向 invalid target：`state.create` 的 Branch head、`branch.create.from`、`tag.create/move.target` 必须解析到 KG OS-valid State；Merge 按上文先验证 resolved `targetState/sourceState`，再以 Lithograph `merge.start(..., expectedHead=targetState)` 原子建立只绑定这些已验证 State 的 Session。`state.setData/clearData` 只修改 Commit Data sidecar，因此允许作用于 invalid State，便于诊断注释；`branch.delete` / `tag.delete` 只移除 ref，也允许清理当前指向 invalid State 的引用。这些 sidecar/ref cleanup 不把 invalid Snapshot 重新解释为业务 State。
 
-Merge 采用 **Merge Session**，因为冲突可能非常多，AI / 用户必须能够分页读取并跨多个调用逐步解决。KG OS 开始 merge 时先把 target Branch head 与 `source` 分别解析为 immutable `targetState/sourceState` 并完成 D31 consistency check，然后调用 Lithograph `merge.start(source=sourceState, expectedHead=targetState)`，target Branch 通过 query-level `branch` 指定。KG OS 不保存 embedding-space fingerprint，也不因为历史 managed vectors 可能来自不同 runtime config 而拒绝建立 Merge Session；配置空间兼容性属于 operator responsibility。Lithograph 在 Session 持久化的同一 writer boundary 内做 expected-head CAS：Branch 中间发生变化就返回 `BRANCH_HEAD_MOVED` 且**不创建 Session**；成功 Session 必须返回相同的 `targetState/sourceState`。因此无效 State 不会先变成一个可见 workspace，也不存在“先检查 ref、再由底层重新解析另一个 State”的竞态。
+Merge 采用 **Merge Session**，因为冲突可能非常多，AI / 用户必须能够分页读取并跨多个调用逐步解决。KG OS 开始 merge 时先把 target Branch head 与 `source` 分别解析为 immutable `targetState/sourceState` 并完成 D31 consistency check，然后调用 Lithograph `merge.start(source=sourceState, expectedHead=targetState)`，target Branch 通过 query-level `branch` 指定。Semantic provider/config 随各 State 的 IndexDefinition 参与正常 Schema merge；embedding cache 不进入 merge，也不建立额外的 KG OS embedding-space fingerprint。Lithograph 在 Session 持久化的同一 writer boundary 内做 expected-head CAS：Branch 中间发生变化就返回 `BRANCH_HEAD_MOVED` 且**不创建 Session**；成功 Session 必须返回相同的 `targetState/sourceState`。因此无效 State 不会先变成一个可见 workspace，也不存在“先检查 ref、再由底层重新解析另一个 State”的竞态。
 
 `merge.start` 成功后，无论是否存在 conflict、甚至是否可以 fast-forward，都不创建 State、不移动 Branch。Session id 只是本次未完成 merge 的 operational token，不是 StateRef、ObjectRef 或新的持久业务资源 identity。
 
@@ -339,7 +339,7 @@ Conflict result 只暴露可映射到公共 Object / Graph 的 conflict；`path`
 
 `merge.resolve` 一次只需要提交调用方当前已经决定的一批 resolution，不要求一次解决全部冲突。`expectedRevision` 必须等于 Session 当前 revision；Lithograph 负责原子 set/replace resolution 并递增 revision。调用方可以先解决 10 个，再解决 20 个，直到 `unresolved=0`；这些中间步骤全部只是 Merge Session state，不产生 KG OS State，也不移动 Branch。`resolutions.conflictId` 原样传回对应 Lithograph Session；unknown / duplicate conflictId 返回 `INVALID_ARGUMENT`。`choice=value` 的显式 value 先按该 public conflict row 的 logical slot/value contract 验证，再确定性映射到底层 conflict 所需 typed value；无法把某个底层 conflict 安全投影/反向映射为公共 target 时返回 `CONSISTENCY_ERROR`，不泄露 internal graph / schema identifiers，也不由 KG OS 猜 resolution。
 
-当 `unresolved=0` 时，KG OS 再次确认 Session pinned `targetState/sourceState` 仍满足 D31，然后对**该精确 revision 的 candidate**做一致性校验。校验至少覆盖 Binding coverage、reserved internal graph / Schema isolation、Ontology aggregate 可解释性与共享声明一致性、caller-owned Schema/Knowledge 不含 Vector，以及本次 merge 导致的 semantic source / target-membership 变化是否已经使用当前 daemon `[embedding]` 对应地 create/recompute/delete managed vector。managed vector slot 不是公共 conflict，不能让用户手工选择 ours/theirs；最终 candidate 的受影响 source 必须按合并后的 public value 重新得到确定的向量结果后才可 finalize。KG OS 不扫描或验证未受本次 merge 影响的历史 managed vectors 是由哪套模型生成。若当前底层 Merge Session 只能只读检查而不能在同一 candidate revision 上安全刷新受影响 managed data，则 semantic-source merge 的 finalize 属于实现 readiness blocker，不能先 finalize 再补第二个隐藏 Commit。校验/刷新失败时 Session 保留且不移动 Branch。
+当 `unresolved=0` 时，KG OS 再次确认 Session pinned `targetState/sourceState` 仍满足 D31，然后对**该精确 revision 的 candidate**做一致性校验，覆盖 Binding coverage、reserved internal graph / Schema isolation、Ontology aggregate 可解释性与共享声明一致性，以及 caller-owned Schema/Knowledge 不含 Vector。Semantic source 按合并后的业务值提交，不生成或合并 embedding；后续查询使用最终 Snapshot 的 source 与 IndexDefinition。新增或改变的 Semantic definition 由 Lithograph 在 Schema publication 前本地验证 Provider/config，失败时 Session 保留且不移动 Branch，不做远端模型调用。底层隐藏配置造成的 conflict 仍须遵守既有安全投影规则：不能用当前 runtime 默认值覆盖，也不能编造公共字段；无法安全投影时明确返回 `CONSISTENCY_ERROR`。
 
 校验通过后，KG OS 立刻以同一个 `expectedRevision` 调用 Lithograph `merge.finalize`。Lithograph 再检查 Session revision 未变化且 target Branch head 仍等于 pinned `targetState`；resolution 被并发修改时返回 `MERGE_SESSION_CHANGED`，target Branch 已前进时返回 `BRANCH_HEAD_MOVED`。因此 KG OS 校验过的 candidate 不会在校验与 finalize 之间被静默替换。成功 finalize 的 `up_to_date / fast_forward / merged` 都返回最终 `state`；只有 `merged` 创建新的 two-parent Commit，`fast_forward` 只移动 Branch，`up_to_date` 不移动 Branch。
 
@@ -351,7 +351,7 @@ Conflict result 只暴露可映射到公共 Object / Graph 的 conflict；`path`
 
 `ancestry` 从调用方指定的 State / Branch / Tag root 开始读取该 root **可达的 State ancestry DAG**，每次只返回 bounded slice，并通过 opaque cursor 渐进遍历。它返回轻量 State topology / metadata，默认不展开 State Data，更不加载每个 State 的 Knowledge Snapshot。State 数量很大时不提供“一次返回整个 DAG”的合同；不同 Branch 的独立演进空间通过选择对应 root 分别导航，不为“全库一次聚合所有 roots”增加第二套历史索引。这里刻意不使用 `graph` 作为能力名，避免与顶层 Graph / Cypher 能力混淆。
 
-`history` 返回统一 State DAG 上与调用方 scope / Object address 相关的业务变化序列；`diff` 比较两个 immutable State Snapshot。两者都把底层历史业务化为公开 Object / Knowledge graph 变化，并过滤 KG OS internal Binding Record、reserved Label / Relationship、Schema Locator 与 managed vector materialization 等实现细节；semantic source Property 或 public vector Index 定义本身的变化仍按公开 Object/Knowledge 语义报告。mutable State Data、Branch 与 Tag 不进入 Snapshot diff。
+`history` 返回统一 State DAG 上与调用方 scope / Object address 相关的业务变化序列；`diff` 比较两个 immutable State Snapshot。两者都把底层历史业务化为公开 Object / Knowledge graph 变化，并过滤 KG OS internal Binding Record、reserved Label / Relationship 与 Schema Locator。Semantic source Property 或公共索引声明的变化仍按公开 Object/Knowledge 语义报告；embedding cache 本来就不属于 Commit，无需把向量冲突或缓存变化投影到公共 History。mutable State Data、Branch 与 Tag 不进入 Snapshot diff。
 
 Object-specific History / Diff **不能只用裸 Object Ref 作为跨版本 continuity anchor**。任何基于名称 / locator 的 Ref 都可能在旧对象删除后被新的资源重新使用；因此对象级历史定位使用上述 `object.anchorState + object.ref`。KG OS 在 anchor State 内先解析该 Object，再只使用 owner 已有的稳定 continuity evidence 跟踪后续历史：Definition / Domain 使用 internal Binding / Domain identity，Knowledge 使用 Lithograph element identity；Property 使用内部 Binding 在 Definition 内跟踪。Constraint / Index 的变更归入 Definition，资源连续性只使用 Lithograph 公开 history / identity 的实际证据。若底层对某类 Schema resource 只有名称而没有可证明的跨 drop+create identity，KG OS 不把同名新资源猜成旧对象的延续。
 

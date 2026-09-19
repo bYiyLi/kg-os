@@ -14,7 +14,7 @@ KG OS adapter 的稳定 error envelope：
 }
 ```
 
-`details` 只放公开可定位信息并可省略；不能包含 `_lithograph_*`、Binding Record identity、reserved internal Schema locator 或其它实现细节。Graph / Schema / value 错误在不泄露内部实现时尽量保留 Lithograph 已公开且对调用方有意义的稳定 category，例如 `PARSE_ERROR`、`SEMANTIC_ERROR`、`TYPE_ERROR`、`SCHEMA_ERROR`、`CONSTRAINT_ERROR`、`INVALID_ARGUMENT`、`BRANCH_NOT_FOUND`、`TAG_NOT_FOUND`、`BRANCH_HEAD_MOVED`、`MERGE_CONFLICT`、`MERGE_SESSION_NOT_FOUND`、`MERGE_SESSION_CHANGED`、`RESOURCE_ERROR`、`IO_ERROR`、`INTERNAL_ERROR`。Evolution Merge 的可解决业务冲突通过 `merge.conflicts` 返回结构化 items，不把正常 conflict discovery 强制变成 error response；`MERGE_CONFLICT` 只用于 unresolved conflict 阻止 candidate inspection/finalize 等“当前还没准备好”的调用。
+`details` 可以省略。Ontology / Object / Evolution 的高层错误使用公共 Ref / path 定位，不泄露内部 Binding 或 Schema Locator。Graph 原样执行 Cypher 时保留 Lithograph 对该语句公开的错误位置、identifier 和 category，不因为名称带 `__kgos_` 就改写成 KG OS 禁止错误；认证 secret、运行时解析的 credential 和私有宿主诊断仍不能回显。公开数据库 category 包括 `PARSE_ERROR`、`SEMANTIC_ERROR`、`TYPE_ERROR`、`SCHEMA_ERROR`、`CONSTRAINT_ERROR`、`INVALID_ARGUMENT`、`READ_ONLY_SNAPSHOT`、`BRANCH_NOT_FOUND`、`TAG_NOT_FOUND`、`BRANCH_HEAD_MOVED`、`MERGE_CONFLICT`、`MERGE_SESSION_NOT_FOUND`、`MERGE_SESSION_CHANGED`、`RESOURCE_ERROR`、`IO_ERROR`、`INTERNAL_ERROR`，按实际底层结果映射，不按错误文案猜测。Evolution Merge 的可解决业务冲突仍通过 `merge.conflicts` 返回结构化 items；其 `MERGE_CONFLICT` 表示当前冲突阻止相应操作。
 
 KG OS 自有稳定 code 至少包括：
 
@@ -27,14 +27,16 @@ CONSISTENCY_ERROR
 UNSUPPORTED_OPERATION
 STATE_NOT_FOUND
 RESERVED_IDENTIFIER
+AUTHENTICATION_FAILED
 SQLITE_EXTENSION_ERROR
 FULLTEXT_CONFIG_ERROR
 FULLTEXT_ANALYZER_UNAVAILABLE
 EMBEDDING_CONFIG_ERROR
-EMBEDDING_PROVIDER_ERROR
 ```
 
-Lithograph `VERSION_NOT_FOUND` 在 KG OS 公共语义中映射为 `STATE_NOT_FOUND`；Object Patch 的 `tx_begin(expectedHead=baseState)` mismatch 或 no-op strict-head check mismatch 映射为 `STALE_BASE_STATE`；Git hunk 无法精确应用到 `baseState` 重新生成的 canonical YAML 时返回 `PATCH_BASE_MISMATCH`，不能 fuzzy/offset apply，也不能误报为 Branch stale；Binding coverage、reserved internal graph/schema 等 KG OS invariants 失败映射为 `CONSISTENCY_ERROR`。HTTP status 与 SDK exception class 仍属于各 adapter mapping；CLI 的 stdout/stderr 与 coarse exit-code mapping 由 [CLI](cli.md#error-与-exit-code) 冻结，但都不能改变上述稳定 error `code`。
+Lithograph `VERSION_NOT_FOUND` 在 KG OS 公共语义中映射为 `STATE_NOT_FOUND`；Object Patch 的 `tx_begin(expectedHead=baseState)` mismatch 或 no-op strict-head check mismatch 映射为 `STALE_BASE_STATE`；Git hunk 无法精确应用到 `baseState` 重新生成的 canonical YAML 时返回 `PATCH_BASE_MISMATCH`，不能 fuzzy/offset apply，也不能误报为 Branch stale；高层 Ontology / Object / Evolution 的 Binding coverage、reserved internal graph/schema 等 KG OS invariants 失败映射为 `CONSISTENCY_ERROR`；Graph 不以这项检查拦截底层执行。HTTP status 与 SDK exception class 仍属于各 adapter mapping；CLI 的 stdout/stderr 与 coarse exit-code mapping 由 [CLI](cli.md#error-与-exit-code) 冻结，但都不能改变上述稳定 error `code`。
+
+`AUTHENTICATION_FAILED` 是 `kgosd` single-token authentication 的唯一失败类别：HTTP API/control request 缺少 Bearer credential、header malformed、token 为空或 token 与 `$KG_HOME/auth.json` 不匹配都返回同一 code；HTTP adapter 使用 `401 Unauthorized`，`message/details` 不区分“missing”与“wrong”也不回显任何 secret。CLI 在需要 active daemon 的命令 dispatch 前发现 `KG_TOKEN` 缺失/空时，同样使用该稳定 code 作为本地 pre-dispatch error，但按 CLI 合同返回 exit `2`；请求已发送而被 daemon 拒绝时返回 exit `1`。认证只判断是否持有实例 token，不建立 user/role/scope authorization。
 
 SQLite Extension / Full-text 运行时错误固定区分：
 
@@ -44,11 +46,11 @@ SQLite Extension / Full-text 运行时错误固定区分：
 
 这些 runtime code 不改变 Lithograph 自己的 `SCHEMA_ERROR` / `SEMANTIC_ERROR` 等数据库分类。KG OS 只有在错误来自自己的 extension resolver、global Full-text config 或已知 tokenizer runtime capability boundary 时使用上述稳定 code；普通 Lithograph Full-text query expression 语法错误仍保留其公开数据库 category。
 
-Embedding 错误固定区分：`EMBEDDING_CONFIG_ERROR` 表示 `[embedding]` 缺失、`base_url/model/dimensions/similarity` 非法、出现已经移除的 `provider`/其它未知字段、`api_key` 与 `api_key_env` 同时配置、inline/env credential 为空，或 `api_key_env` 指向不存在/空环境变量；`EMBEDDING_PROVIDER_ERROR` 表示配置合法但实际 `POST {base_url}/embeddings` timeout、网络失败、非成功 HTTP status、响应 JSON/`data/index/embedding` shape 非法、embedding 非 finite number 或返回维度不等于配置。KG OS v1 不定义 embedding-space mismatch 错误，也不比较当前 runtime config 与历史 managed vectors 的生成配置；任何依赖 embedding 的 mutation/provider 调用失败仍必须保持原 Branch/State 不变。任何 error/debug surface 都不得回显 `api_key` 或 resolved env credential。
+Embedding 配置错误由 `EMBEDDING_CONFIG_ERROR` 表示：`[embedding]` 缺失、`base_url/model/dimensions/similarity` 非法、出现不支持的 `api_key/provider` 或其它未知字段、`api_key_env` 字段非法或指向不存在/空的环境变量。KG OS 不再直接发起 Embeddings HTTP 请求；实际 Semantic procedure 的远端失败保留 Lithograph `IO_ERROR`，资源不足保留 `RESOURCE_ERROR`，非法 query 参数保留 `INVALID_ARGUMENT` / `TYPE_ERROR`，Provider registration/Schema validation 失败保留底层公开 category。不要按错误文本猜分类，也不要把普通 cache/database I/O 一律伪装成“模型服务失败”。扩展 resolve/load 失败仍使用 `SQLITE_EXTENSION_ERROR`，取消保留既有 interrupt/cancellation 映射。任何诊断都不得回显 resolved credential。
 
-Graph params 的 `SemanticText` marker **只在 Graph `params` 的直接 value 位置识别**，并只接受 exact `{"$semantic":"<non-empty-string>"}`。在这个识别位置，`$semantic` 与其它 key 并存、value 非 String/空 String 返回 `INVALID_ARGUMENT`；调用方确实要传同形状普通 Cypher Map 时使用 Lithograph `$type:"Map"` wrapper。Graph params 的嵌套 Map、Object/State Data 或其它 surface 中的 `$semantic` key 没有特殊含义，按各自普通 Map/data contract 处理。SemanticText 在 Lithograph parameter decode 前由 KG OS 消费，因此不会作为 Cypher Map 或持久值进入 Lithograph。
+Graph params 不再识别 `SemanticText` / `$semantic` marker；语义检索直接接受 String。普通 Map 中的 `$semantic` key 没有特殊意义；把 Map 传给要求 String 的 Semantic procedure，按底层参数类型规则失败。Semantic query 与 mutation / explicit transaction 混用时，在 Provider I/O 前返回 Lithograph `TRANSACTION_BOUNDARY_REQUIRED`。该类别不表示普通 source 写入需要模型服务；source 写入、普通 read 与未改变 Semantic definition 的 merge 不发 embedding 请求。
 
-KG OS v1 public profile 不接受 caller-owned Vector。Ontology Property `type` / type-constraint `valueType` 包含 `VECTOR`、Object/Knowledge Property value 含 Vector、Graph caller parameter 的任意 public value tree 中出现 Lithograph `$type:"Vector"`、Graph result 的任意 public value tree 中出现 Vector，或 Graph mutation candidate 的 caller-owned Property 写入 Vector，统一属于**底层支持但 KG OS v1 未公开的能力**，返回 `UNSUPPORTED_OPERATION`；mutation 必须在 commit 前 abort。reserved `__kgos_` managed vector 与 SemanticText 解析后生成的内部 query Vector 不适用此错误，它们永不作为公共 Object/Graph value 返回。KG OS 不解析 Cypher 去禁止只存在于表达式内部且未跨越上述边界的 Vector 计算；这类行为属于 Lithograph execution semantics，不建立 KG OS public Vector contract。
+Ontology / Object v1 public profile 仍不接受 caller-owned Vector：Property `type` / type-constraint `valueType` 为 `VECTOR`，或 Object Value 含 Vector，按相应高层合同返回 `UNSUPPORTED_OPERATION`。Graph parameters、results 与 Cypher 写入则直接复用 Lithograph 的 Vector 能力，不因 Vector、`__kgos_` identifier 或高层 Binding 状态而额外拒绝；不再为这些内容附加 Graph commit 前校验。Managed Semantic 内部 embedding 仍不是图 Property，不会因普通 `RETURN n` 自动成为返回字段。写语句进入 Graph `query` 时，保留底层只读连接 / 执行错误，不将其解释成 KG OS 语句黑名单。
 
 Object Patch 的错误归类固定为：
 

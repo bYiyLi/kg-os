@@ -1,6 +1,6 @@
 # CLI
 
-本文件是 KG OS v1 **AI-facing CLI 命令、参数、输入输出、错误与非交互行为**的设计真源。CLI 只适配已经确认的 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。`kgosd` 的本地 HTTP endpoint 与 daemon home 由 [本地运行时](runtime.md) 负责。
+本文件是 KG OS v1 **AI-facing CLI 命令、参数、输入输出、错误与非交互行为**的设计真源。CLI 只适配已经确认的 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。`kgosd` 的本地 HTTP endpoint、`KG_HOME` 与认证由 [本地运行时](runtime.md) 负责。
 
 ## 目标与边界
 
@@ -21,10 +21,12 @@ CLI 遵守以下边界：
 - 不存在 connection-local current Branch、current State 或 checkout；需要 StateRef / Branch 的命令必须显式提供；
 - 不弹交互确认、不自动启动 editor、不进入 REPL、不自动打开 pager；命令参数不足时直接失败；
 - 不自动遍历所有 pagination page；AI / 调用方显式读取 cursor 并决定是否继续，避免一次命令无界扩大上下文；
-- 不提供 `kg request`、raw SQL、raw Lithograph procedure、`_lithograph_*` 或 SQLite pass-through；Graph `query` / `execute` 已是普通 Knowledge graph-data 的完整 Cypher 能力边界；
+- 不提供 `kg request`、raw SQL 或 SQLite 内部表 pass-through；Graph `query` / `execute` 原样执行 Lithograph Cypher / procedure，分别选择只读 / 读写连接；
 - CLI 只通过 `kgosd` 的 HTTP endpoint 使用 Kernel，不直接打开 SQLite database 或加载 Lithograph extension；
-- active daemon endpoint 从 `~/.kgosd/kgosd.lock` 的 active lock owner 定位；`config.toml` 的 `server.host/server.port` 只决定下一次 daemon startup，不为业务命令增加 `--endpoint` / `--host` / random discovery；
-- v1 本地请求不附带 daemon token、API key 或其它 authentication credential。
+- active daemon endpoint 从 `$KG_HOME/kgosd.lock` 的 active lock owner 定位；`KG_HOME` 未设置时默认 `~/.kgosd`。`config.toml` 的 `server.host/server.port` 只决定下一次 daemon startup，不为业务命令增加 `--endpoint` / `--host` / random discovery；
+- 任何发送到 active `kgosd` 的 CLI HTTP request 都必须从非空 `KG_TOKEN` 环境变量取得 credential，并发送 `Authorization: Bearer <KG_TOKEN>`；CLI 不读取 `$KG_HOME/auth.json`、不提供 `--token`、不把 token 写入 stdout/stderr。
+
+`KG_HOME` 与 `KG_TOKEN` 是两个独立输入：前者选择本地 runtime profile / daemon target，后者证明客户端有权访问该实例。改变 `KG_HOME` 不会自动改变 `KG_TOKEN`；调用方必须为目标 profile 提供匹配 credential。
 
 v1 不定义命令别名、缩写 namespace 或另一组 flattened commands。`kg branch ...`、`kg query ...` 等都不是 `kg evolution branch ...`、`kg graph query ...` 的第二种 canonical 拼写。
 
@@ -145,7 +147,7 @@ Graph `params` 是可选 JSON Map，并且 stdin 可能已经用于 Cypher，因
 
 ### Error 与 exit code
 
-除 Graph `--stream` 已经开始输出的情况外，失败时 stdout 必须为空；stderr 输出一个 [公共错误合同](contracts.md#公共错误合同) JSON envelope，并以 LF 结束。Graph streaming 如果在第一个 event 前失败，stdout 同样为空；一旦已经输出 `columns` / `row` 后才发生 server / public-value / transport failure，既有 stdout 允许保留为 partial NDJSON，但**绝不能输出 final `summary`**，stderr 仍输出 error envelope，进程以非零 exit 结束。默认不在 error envelope 前后输出其它 diagnostics。CLI 参数解析、本地 JSON/YAML/text parse 或文件读取也尽量使用同一公开 category，例如 `INVALID_ARGUMENT`、`PARSE_ERROR`、`IO_ERROR`，但不能伪造成 daemon 已执行请求。
+除 Graph `--stream` 已经开始输出的情况外，失败时 stdout 必须为空；stderr 输出一个 [公共错误合同](contracts.md#公共错误合同) JSON envelope，并以 LF 结束。Graph streaming 如果在第一个 event 前失败，stdout 同样为空；一旦已经输出 `columns` / `row` 后才发生 底层执行 / 值编码 / transport failure，既有 stdout 允许保留为 partial NDJSON，但**绝不能输出 final `summary`**，stderr 仍输出 error envelope，进程以非零 exit 结束。默认不在 error envelope 前后输出其它 diagnostics。CLI 参数解析、本地 JSON/YAML/text parse 或文件读取也尽量使用同一公开 category，例如 `INVALID_ARGUMENT`、`PARSE_ERROR`、`IO_ERROR`，但不能伪造成 daemon 已执行请求。
 
 v1 exit code 只表达粗粒度执行层级，稳定业务分类始终读取 error `code`：
 
@@ -154,9 +156,13 @@ v1 exit code 只表达粗粒度执行层级，稳定业务分类始终读取 err
 | `0` | command 成功，包括 empty result |
 | `1` | daemon 已返回 KG OS / Lithograph public error |
 | `2` | CLI usage、参数、stdin/file/local parse/input，或 daemon start 的本地 config/spawn/lifecycle error；请求未成功 dispatch |
-| `3` | `kgosd` target / transport 不可用；请求未成功 dispatch |
+| `3` | `kgosd` target / transport 不可用，或请求 / 响应传输失败 |
+
+连接中断按普通连接错误返回，使用既有 `IO_ERROR` envelope 与 exit `3`。该退出码只表示通信失败，不保证请求尚未执行或已提交变更已经回滚；CLI 不因连接错误自动重试写请求。
 
 进程被 shell signal 中断使用平台惯例，不建立 KG OS 业务 exit code。结构化 stdout/stderr 不输出 ANSI escape sequence。
+
+需要 active daemon 的命令在 dispatch 前发现 `KG_TOKEN` 缺失或为空时，返回本地 input/config failure（exit `2`）并使用 `AUTHENTICATION_FAILED` code，不发送请求；token 存在但 daemon 拒绝时属于 daemon public error（exit `1`，同一 `AUTHENTICATION_FAILED` code）。这包括 active daemon 存在时的 `daemon start/status/stop/restart` control path。`--help` / `--version` 与“当前 profile 没有 active daemon 时，`kg daemon start` 只做本地 process spawn”不属于 HTTP request，不需要预先存在 credential。
 
 ## Daemon CLI
 
@@ -168,7 +174,7 @@ Daemon commands 是本地 operator surface，不是 Object / Graph / Evolution �
 kg daemon start
 ```
 
-如果当前实例已经 `running`，命令 idempotent success；否则按 runtime contract 后台启动 `kgosd` 并等待 ready。成功 stdout：
+如果当前实例已经 `running`，命令通过 authenticated control check 后 idempotent success；因此已有 active daemon 时 `start` 也要求 `KG_TOKEN`。如果当前 profile 没有 active daemon，则按 runtime contract 在本地后台启动 `kgosd`；CLI 通过 child 成功取得 lock 并发布 endpoint 判断 ready，而不是读取 `auth.json` 或调用未认证 health endpoint。这个 bootstrap spawn 不要求预先存在 token。第一次 profile 启动时 child 可以创建 `$KG_HOME/auth.json`；`kg daemon start` 不自动读取或导出其中的 token，operator 需要自行把该 secret 配置为后续客户端的 `KG_TOKEN`。成功 stdout：
 
 ```json
 {"status":"running","endpoint":"http://127.0.0.1:4765"}
@@ -385,7 +391,7 @@ kg graph query
   [--stream]
 ```
 
-Cypher 不要求保存成本地文件。短语句可以直接 `--cypher`，AI / 程序可以 pipe stdin，已有可复用查询才使用 `--cypher-file`：
+`query` 选择只读连接，语句原样交给 Lithograph；误提交写语句由底层拒绝，CLI / daemon 不解析关键字或自动换到写连接。Cypher 不要求保存成本地文件。短语句可以直接 `--cypher`，AI / 程序可以 pipe stdin，已有可复用查询才使用 `--cypher-file`：
 
 ```bash
 kg graph query \
@@ -397,16 +403,16 @@ cat query.cypher | kg graph query --at branch/main
 
 默认 stdout 是 logical `{state, columns, rows}` JSON。
 
-托管语义检索不增加新命令。Cypher 仍写 Lithograph `SEARCH`，对应参数在 `--params` / `--params-file` 中用 `{"$semantic":"..."}` 标记：
+托管语义检索使用同一个 `kg graph query`。Cypher 调用 Lithograph Semantic procedure，`--params` 直接传普通 String：
 
 ```bash
 kg graph query \
   --at branch/main \
-  --cypher 'MATCH (d:Document) SEARCH d IN (VECTOR INDEX document_semantic FOR $q LIMIT 10) SCORE AS score RETURN d, score' \
-  --params '{"q":{"$semantic":"如何设计知识图谱"}}'
+  --cypher 'CALL db.index.semantic.queryNodes("document_semantic", $q, {limit: 10}) YIELD node, score RETURN node.title, node.content, score' \
+  --params '{"q":"如何设计知识图谱"}'
 ```
 
-CLI 只传递 Graph logical params；semantic conversion 在 daemon adapter 中完成。stdout 仍只有 KG OS public profile 允许的业务查询值，例如 Node/Relationship、普通业务 Property 与 score；KG OS-managed embedding 不作为额外列或 element Property 返回。v1 不接受调用方在 `--params` 中直接提交 Lithograph `$type:"Vector"`，查询若显式返回 Vector 也按 `UNSUPPORTED_OPERATION` 失败；调用方不需要构造、读取或持久化 Vector。
+上述托管语义调用只需 String，不需要 Vector、model 或 dimensions。CLI / daemon 不做 `$semantic` 转换；其它 Cypher 可直接使用 Lithograph JSON 的 Vector 参数与结果。stdout 仍是 `{state, columns, rows}`，结果列由底层语句决定。`LOAD CSV`、`SHOW` 等不设 KG OS 黑白名单，详见 [Graph](graph.md#graph)。
 
 ### execute
 
@@ -419,6 +425,17 @@ kg graph execute
   [--message <text>]
   [--stream]
 ```
+
+`execute` 选择读写连接，可运行 Lithograph 支持的 Cypher / procedure，不局限于 Knowledge mutation。普通正文写入只传业务字段。例如前述 `Document` 模型要求 `id/title`：
+
+```bash
+kg graph execute \
+  --branch main \
+  --cypher 'CREATE (d:Document {id: $id, title: $title, content: $content}) RETURN elementId(d) AS ref' \
+  --params '{"id":"doc-001","title":"知识图谱设计","content":"知识图谱通过节点和关系组织知识。"}'
+```
+
+这次写入不调用 embedding 服务，也不要求调用方手工更新向量。上述 CLI 仍是待实现的设计合同。
 
 CLI 必须保持 Graph logical contract：`execute` **没有 `--base-state`**。它不能为了和 Object Patch 外观统一而增加 strict-base 语义。默认 stdout 是 `{state, columns, rows, counters}` JSON。
 
@@ -438,9 +455,9 @@ CLI 必须保持 Graph logical contract：`execute` **没有 `--base-state`**。
 {"type":"summary","state":"commit/...","counters":{}}
 ```
 
-`columns` 恰好一次，`row` 零到多次，`summary` 成功时恰好一次并且必须是最后一个 event。stream 中途发生 transport / server / public-value validation failure 时，已经输出的 row 只是 partial result；例如后续 row 首次出现 KG OS v1 不支持的 Vector value 时，本次 stream 以 `UNSUPPORTED_OPERATION` 失败，不输出 summary，先前 rows 不能当作完整查询结果。调用方只有在**进程 exit 0 且观察到 final `summary`**时才能把整个 stream 视为成功。
+`columns` 恰好一次，`row` 零到多次，`summary` 成功时恰好一次并且必须是最后一个 event。stream 中途发生底层执行、编码或 transport failure 时，已经输出的 row 只是 partial result，不输出成功 summary；Vector 是合法的底层值，不再作为中途拒绝的条件。调用方只有在进程 exit 0 且观察到 final `summary` 时才能把整个 stream 视为成功。
 
-对 `graph execute --stream`，final `summary.state` 还是 durability boundary：summary 之前观察到的 Node / Relationship / elementId 只能视为本次 mutation 的 provisional result。若后续 candidate validation、Embedding Provider、commit 或 transport 失败且没有 final summary，这些 Ref 不得作为 durable Knowledge identity 保存或用于后续请求。
+对 `graph execute --stream`，final `summary.state` 反映底层完成时的 State。summary 前观察到的 elementId 不能直接当作已确认持久结果；缺少 summary 也不等于没有已提交变更，例如底层 transaction subquery 可能已有成功批次，或提交后传输失败。事务、取消与部分提交行为遵守 Lithograph，KG OS 不承诺任意 Cypher 一律整体回滚，也不自动重放结果未知的写入。
 
 Streaming 只改变 transport framing，不改变 column order、row value encoding、resolved State 或 counter 语义。
 
@@ -580,7 +597,7 @@ discover / compute Knowledge
 → graph query
 
 semantic search
-→ graph query with Vector SEARCH + SemanticText param
+→ graph query with db.index.semantic.queryNodes/queryRelationships + String param
 
 bulk / conditional Knowledge mutation
 → graph execute
@@ -611,7 +628,7 @@ KG OS CLI 不单独维护 human-only 命令树。人类与 AI 使用相同 comma
 
 ## Runtime target 与非目标
 
-每次业务命令 dispatch 时，`kg` 按 [本地运行时](runtime.md) 解析 `~/.kgosd/kgosd.lock`：只有 OS lock 存在 active owner 时才把其中的 endpoint 视为当前 daemon target。
+每次业务命令 dispatch 时，`kg` 按 [本地运行时](runtime.md) 先解析 effective `KG_HOME`（默认 `~/.kgosd`），再检查 `$KG_HOME/kgosd.lock`：只有 OS lock 存在 active owner 时才把其中的 endpoint 视为当前 daemon target。
 
 ```text
 active kgosd.lock owner
@@ -621,9 +638,9 @@ published endpoint
 current kgosd
 ```
 
-如果没有 active owner，普通业务命令直接使用本文既有 exit `3` transport failure；**不能自动执行 `kg daemon start`**。如果运行中的 daemon 启动后 `config.toml` 被修改，业务命令继续使用 lock 中的 effective endpoint；只有显式 `kg daemon restart` 后才切换到新 startup config。CLI 不读取 token，因为 v1 daemon 没有认证，也不因为连接失败而随机换端口或直接打开 SQLite。
+如果没有 active owner，普通业务命令直接使用本文既有 exit `3` transport failure；**不能自动执行 `kg daemon start`**。如果运行中的 daemon 启动后 `config.toml` 被修改，业务命令继续使用 lock 中的 effective endpoint；只有显式 `kg daemon restart` 后才切换到新 startup config。CLI 在 dispatch 前要求 `KG_TOKEN`，但**绝不自动读取** `$KG_HOME/auth.json`；连接失败时也不随机换端口或直接打开 SQLite。
 
-一个 daemon 最终承载一个还是多个 Knowledge Base、Knowledge Base 如何选择、`init` / `doctor` 等其它 operator command 是否需要仍未冻结；这些后续设计不能改变本文 Ontology / Object / Graph / Evolution command、stdout/stderr 或 error semantics。
+一个 daemon 固定只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base。Lithograph 在该库内部管理 derived embedding cache，不产生第二个 Knowledge Base 或 CLI target。v1 不提供 `base list/use`、`--base` 或其它单-daemon多库选择 surface；需要另一套知识世界时启动另一个 `KG_HOME` profile。
 
 ## 兼容性
 

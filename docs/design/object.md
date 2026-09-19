@@ -59,7 +59,7 @@ Knowledge Relationship
 
 `state/ref/kind` 是 metadata，不是可编辑 body。Domain 不复制成员内容；Knowledge Relationship 不复制 endpoint Node；**Definition 可以直接编辑它聚合的 Property / Constraint / Index**，即使这些内容映射到多个独立底层资源。共享索引的重叠展示不增加持久 owner，遵守 Ontology 的显式 delta 归一化规则。
 
-KG OS 托管 semantic vector 使用的 reserved `__kgos_` Property / metadata 不属于 Knowledge Object Value：即使物理上与业务 element 共存，也不能出现在 `properties{}`、canonical YAML / JSON、Object diff/history 或调用方可写 slot 中。调用方只看到产生它的 public source Property 与 public semantic Index 定义。KG OS v1 同时不接受 caller-owned Vector Property/value，因此公共 Object Value 中不存在 Vector typed Property。
+Lithograph Managed Semantic 生成的 embedding 是数据库派生数据，不是 Node / Relationship Property，也不进入 State Snapshot。KG OS 不再创建 reserved embedding Property；Object 只读取、修改业务 source Property 与公共索引声明。Object v1 仍不接受 caller-owned Vector Property/value，因此公共 Object Value 中不存在 Vector typed Property。这是 Object 的值模型限制；Graph 原始 Cypher 可使用底层 Vector，不能用 Object profile 拦截 Graph。
 
 Request-local `new:<kind>:<alias>` 只在 Patch 的 Ref-typed slot 中引用本请求新建 Object，例如 Domain includes、Relationship Definition from/to、Index targets、Knowledge Relationship start/end。普通字符串恰好以 `new:` 开头不当作引用。成功后全部 Ref 解析为正式 Ref；内嵌 Property 不需要单独的 Object alias 或 Patch entry。
 
@@ -80,20 +80,22 @@ Object Value
 
 批量 editable presentation 不建立第三种 Object serialization。多个 canonical YAML Object body 需要在同一 stdout 中返回时，CLI 使用标准 YAML 1.2 **multi-document stream**：每个 document 的 mapping/list/scalar 内容必须与该 Object 单独 canonical render 的 bytes 一致；document-start marker 以及 marker/stream 上的 `kgos-state` / `kgos-ref` comment 属于 adapter framing，不属于 document 的 Object Value。Framing comment 被标准 YAML parser 丢弃不影响任何业务值；程序化 target association 使用请求顺序与结构化 metadata，不把 comment 当成持久 identity。v1 不建立自动拆文件、目录结构或 `{ref, value}` YAML wrapper，因为这些都会改变 Patch base 或重新引入文件身份。
 
-canonical YAML renderer v1 使用 YAML 1.2 block style，并固定：2-space indentation、LF document newline、文档末尾一个 newline、不输出 anchors / aliases / custom tags、不输出 comment；固定字段按对应 owner 文档的 Object shape 顺序输出，动态 map key 与 set-like collection 按 UTF-8 byte ascending 排序；Property 列表按 name、具名 Constraint/Index 列表按 name 排序。索引/组合约束的 properties 等有序业务列表保留顺序，不能当作 set 排序。固定 schema field name 使用 plain key；调用方数据产生的动态 map key 一律 double-quote。
+canonical YAML renderer v1 使用 YAML 1.2 block style，并固定：2-space indentation、LF document newline、文档以 LF 结束、不输出 anchors / aliases / custom tags、不输出 comment；固定字段按对应 owner 文档的 Object shape 顺序输出，动态 map key 与 set-like collection 按 UTF-8 byte ascending 排序；Property 列表按 name、具名 Constraint/Index 列表按 name 排序。索引/组合约束的 properties 等有序业务列表保留顺序，不能当作 set 排序。固定 schema field name 使用 plain key；调用方数据产生的动态 map key 一律 double-quote。文档格式不能裁掉 String 值自身包含的末尾换行。
+
+Definition 顶层 `indexes` 的缺省与空数组表示同一个逻辑值，canonical YAML / JSON 都省略空集合；该规则由 [Ontology 公共可编辑格式](ontology.md#公共可编辑格式)拥有。仅把 `indexes: []` 改成省略属于 no-op；删除非空索引声明仍产生正常的索引 delta。Definition 字段的非空要求与其它集合的输出规则也由该 owner 定义。
 
 这里“不输出 comment”约束的是**单个 canonical Object body**。Batch stream 的 `# kgos-state` / `# kgos-ref` 属于外层 transport framing，不由 canonical Object renderer 产生，也不能进入 Git hunk；抽取任意 document body 后仍满足本段 canonical renderer 规则。
 
-String rendering 必须无损：
+String rendering 使用标准 YAML 1.2 序列化与解析实现，并保证 `parse(render(value)) == value`。下列规则只固定 canonical 输出风格，不另定义 YAML 语法；格式缩进与 String 内容按 YAML 标准区分，无损往返是实现验收要求：
 
 - 不含 `LF` 的 String 一律使用 double-quoted scalar；
 - 含 `CR` 或其它需要 escape 的 control character 时，即使同时含 `LF` 也使用 double-quoted scalar；backslash、double quote、BS / FF / LF / CR / TAB 以及其它 control character 按 JSON string escaping 规则确定性转义，避免依赖 YAML emitter 的自由选择；
-- 其余包含 `LF` 的 String 使用 literal block，不使用 folded `>`：逻辑值末尾没有 `LF` 时用 `|-`，恰好一个 trailing `LF` 时用 `|`，两个及以上 trailing `LF` 时用 `|+` 并输出对应 trailing blank lines；
+- 其余包含 `LF` 的 String 优先使用标准 literal block，不使用 folded `>`；缩进指示符与末尾换行处理由标准 YAML 序列化实现生成，保留原值的行首空格、空白行与末尾 `LF`。需要使用 double-quoted scalar 才能无损表达时，使用上一条的 escaping 规则；同一逻辑值的输出仍须确定；
 - UTF-8 printable Unicode character 保持原字符，不做 normalization 或 ASCII escaping。
 
 其它 scalar / typed value rendering 继续以 Lithograph JSON v1 为类型边界，并固定：`null` 写作 `null`；Boolean 只写 `true / false`；JSON safe-range Integer 使用无前导 `+`、无多余前导零的 base-10 scalar，超出 safe range 继续使用 `$type: Integer` + decimal String；finite Float 使用能 round-trip 回同一 IEEE-754 value 的 shortest decimal，并且 lexical form 必须带小数点或 exponent 以区别 Integer，整数值 Float 例如 `1.0` 不能规范化成 `1`，negative zero 固定保留为 `-0.0`；NaN / ±Infinity 继续使用 Lithograph `$type: Float` tagged form。Temporal、Duration、Point、UUID 与 reserved-`$type` Map wrapper 都与 Lithograph JSON v1 同构；遇到 caller-owned Vector value 不是 serialization 问题，而是先按 KG OS public Object profile 拒绝。
 
-因此 canonical renderer 往返解析必须得到逐 code point 相同的 String 和同一 typed scalar value，不允许为了“更好看”增加/移除末尾换行、把 Float 改成 Integer，或丢失特殊值类型。缺省的可选 `title` / `description` 不输出；必需 collection 即使为空也输出；optional/default field 的省略规则由对应 owner 文档规定。Lithograph typed value 只是在 YAML 中表达同一 tagged map，不创建第二套特殊类型语法。
+因此 canonical renderer 往返解析必须得到逐 code point 相同的 String 和同一 typed scalar value，不允许为了“更好看”增加/移除末尾换行、把 Float 改成 Integer，或丢失特殊值类型。缺省的可选 `title` / `description` 不输出；允许为空的必需 collection 为空时也输出；collection 的合法性与 optional/default field 的省略规则由对应 owner 文档规定。Lithograph typed value 只是在 YAML 中表达同一 tagged map，不创建第二套特殊类型语法。
 
 输入仍遵守 D34：调用方不需要复刻 canonical renderer 的风格，只要标准 YAML 能无歧义解析为同一合法 Object Value 即可；成功写入后再次 `read` 会规范化回 canonical YAML。
 
@@ -210,9 +212,9 @@ Object Patch v1 的 textual syntax 固定采用普通 two-way **Git Extended Dif
 
 Object Patch 以调用方实际读取的 immutable `baseState` 为 patch base、以明确 Branch 为 write target。**v1 使用 strict base-State 语义：mutation 开始时 target Branch 的当前 head 必须仍等于 `baseState`；如果 Branch 已前进，则整个 Patch 以 `STALE_BASE_STATE` 失败，不把基于旧文本生成的 Patch 自动套用到新 State，也不自动 rebase / merge。** 对存在有效 target delta 的 Patch，这个并发基线由 Lithograph `tx_begin(expectedHead=baseState)` 在取得 single-writer ownership 后原子检查；成功 begin 后其它 writer 不能在本 transaction 生命周期内移动该 Branch。无 effective delta 的 Patch 不开启 transaction，但仍必须先读取并比较 target Branch head，stale 时同样返回 `STALE_BASE_STATE`。
 
-在 base State 校验通过后，KG OS 重新生成对应 Object canonical YAML，精确应用 textual Patch 得到目标 YAML，使用标准 YAML parser 解析为 target Object Value / target Object set，再执行 Object schema / type、Ontology / Knowledge dependency、Schema、Graph View 与其它公开规则校验，最后编排 Lithograph。请求默认 all-or-nothing；任一变化失败都不能留下部分 durable 结果。若 Knowledge Object 变化会新增/删除 semantic-index target 或改变 source Property，managed vector refresh 属于该 Patch 的 mandatory derived change；Provider/refresh 失败必须让整个 Patch rollback，不能提交 source/vector 不一致 State。
+在 base State 校验通过后，KG OS 重新生成对应 Object canonical YAML，精确应用 textual Patch 得到目标 YAML，使用标准 YAML parser 解析为 target Object Value / target Object set，再执行 Object schema / type、Ontology / Knowledge dependency、Schema、Graph View 与其它公开规则校验，最后编排 Lithograph。请求默认 all-or-nothing；任一变化失败都不能留下部分 durable 结果。修改 semantic source 或 target membership 只写业务 graph data，不调用 embedding 服务，不把 cache 预热纳入 Patch 的成功条件；后续检索由 Lithograph 按该 Snapshot 计算或复用所需 embedding。
 
-Ontology Patch 对 semantic Index 的 create/delete、targets 变化、source properties 增删/重排，或 source Property rename/type change，也必须把**当前 baseState 中全部受影响 Knowledge element**的 managed-vector index maintenance 纳入同一个最终 State：新建/扩展执行 backfill，删除/缩小清理不再需要的 managed value，source framing 改变执行 rebuild / refresh。不能先提交新的 public Index 定义，再异步补 embedding 或追加第二个隐藏 Commit。调用方显式 delta 仍只有 Ontology aggregate；这些 Knowledge vector 变化属于 mandatory derived maintenance，不要求 AI 枚举每个实例，也不是 Config Migration。
+Ontology Patch 对 Semantic Index 的 create/delete、targets/source 变化或 source rename/type change，仍把 Schema、Binding 与必要业务数据变化放在同一个最终 State。新增或改变 Semantic definition 时由 Lithograph 做本地 Provider/config validation；失败整体 rollback，过程中不做远端 embedding 或 source backfill。向量不是 State 数据，因此不要求为每个 Knowledge element 生成内部 Property。首版单字段范围与联合检索边界见 [Ontology](ontology.md#语义索引的首版范围)；独立 cache rebuild 不与 Patch 共用 explicit transaction。
 
 对于 Update / Rename / Restructure，KG OS 不把“应用 Patch 后得到的一整份 YAML”当成 `PUT` 语义，而是比较 base Object Value 与 patched YAML 解析得到的 Object Value，只把调用方**显式改变的 logical slots**作为 target delta；Rename entry 的 old/new target 额外贡献该 Object identifying locator 的显式 rename delta。未被 textual Patch 改动的字段只是 context，不会阻止同一请求为了 rename、referential integrity 或 consistency 产生必要的 derived maintenance。例如 Relationship Definition rename 与某条 Relationship 的 Property update 可以同时存在：该 Relationship entry 没有编辑的旧 type 字段不会覆盖 mandatory type rewrite。反过来，如果调用方显式修改的 slot 与 mandatory derived change 要写同一 slot 且目标不同，则整个 Object Patch 冲突失败，不按 entry 顺序覆盖。
 
@@ -239,5 +241,5 @@ Object `list` / `search` / `read` 使用统一 State reference semantics。Branc
 - 不另建 save/create/update/upsert、各 Property/Constraint/Index CRUD 或平行 Ontology Patch engine；`kg ontology patch` 只是本 Patch 的 kind-scoped CLI adapter。
 - Ontology discovery 使用渐进式读取，无 Ontology search；Knowledge 查询/批量写保持 Graph Cypher。
 - State Data、Branch、Tag、Merge 等 sidecar/ref 由 Evolution 负责，不套 Object 身份。
-- 不暴露 Binding Record、Schema Locator 或 reserved internal graph/Schema，不绕过 Graph View。
+- Object 不暴露 Binding Record、Schema Locator 或 reserved internal graph/Schema，不绕过其 Knowledge Graph View；公共 Graph 原始 Cypher 不受这项 Object 投影限制。
 - 不把 Lithograph raw Structural Patch 当作 Object wire；一次 logical Patch 由 KG OS 编译为一次真实 transaction。

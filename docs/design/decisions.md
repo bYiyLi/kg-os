@@ -2,6 +2,8 @@
 
 本文件记录 KG OS 架构决策的**决定、依据、备选、取舍与被替换基线**。具体运行行为仍由对应职责设计文件拥有；本文件不建立第二份操作合同。
 
+2026-09-19 的最新调整见 [D59 Cypher 原样执行](#d59-cypher-passthrough) 与 [D60 自动填充 embedding 缓存](#d60-automatic-embedding-cache)。[D57](#d57-managed-semantic) / [D58](#d58-optional-indexes) 及更早条目保留当时的决策依据；被后续决定调整的部分在对应条目下标明，不与当前 owner 文档并行生效。
+
 ## 底层架构替换背景
 
 当前仓库尚无 KG OS 业务实现，因此本次是设计基线替换，不存在已经发布的 KG OS 数据格式需要兼容迁移。
@@ -47,6 +49,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 取舍：KG OS 承担类型/required/unique/from/to/Constraint/Index 到公开数据库能力的映射，实际约束执行仍由 Lithograph 完成。
 
 ### D3 Ontology 上层语义作为普通图数据
+
+> 后续调整：[D59](#d59-cypher-passthrough) 将 Knowledge Graph View 隔离限定于 Object / Ontology 高层能力；公共 Graph 不注入该过滤。
 
 - 决定：Definition / Property 的 `title` / `description` 由稳定的 KG OS internal Binding Record 承载；Domain / `INCLUDES` 直接组织这些 Binding Record；Binding Record 通过 Snapshot-scoped Schema Locator 指向同一 Snapshot 的 Lithograph Schema element。全部仍是 Lithograph 中的普通 versioned graph data。
 - 依据：Cypher 25 Graph Type 当前没有通用 description annotation，也不负责 KG OS 业务组织；普通图数据可以在不修改 Lithograph 的前提下承载上层语义并自动版本化。
@@ -117,6 +121,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 取舍：KG OS 公共能力更小、更稳定；高级数据库版本操作仍可由 Lithograph 提供，未来出现真实 KG OS use case 时再按业务语义提升。
 
 ### D13 State 引用显式且所有状态写入返回最终 State
+
+> 后续调整：[D59](#d59-cypher-passthrough) 保留请求的 State / 默认 Branch 上下文；语句内部显式 target、checkout 与 procedure 执行按底层合同，不由 KG OS 解析限制。
 
 - 决定：Ontology / Object / Graph Read 直接使用 State / Branch / Tag reference；Branch / Tag 在 operation 开始时解析并 pin 到 immutable State，不再建立独立 `State Context` 抽象。Object Patch / Graph Execute 显式指定目标 Branch，不暴露 checkout；任何创建新 State 的 KG OS 操作成功后都返回最终 State identity，多步编排不要求调用方理解内部 Commit 数量。
 - 依据：Git-style ref 已足以表达“读取哪个 Snapshot / 推进哪个 Branch”，无需再增加一层状态对象；同时 AI 与并发调用不应依赖 connection-local 隐式状态。
@@ -216,6 +222,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D27 Graph Type 是 compiler 管理的结构组织
 
+> 后续调整：[D59](#d59-cypher-passthrough) 允许 Graph 执行底层 Schema / Graph Type Cypher；本条只限定 Ontology / Object 的聚合表达，不禁止直接 DDL。
+
 - 决定：KG OS 从公共 Definition 集合合成需要的 Graph Type mutation，并保持未修改的结构和 reserved internal Schema。Graph Type 不成为另一个可全量编辑 Definition 的公共 Object。
 - 依据：避免再次产生整图与局部 Definition 两套写入模型。
 - 备选：完整透传 Graph Type AST，或要求 AI 先编辑独立 Graph Type。
@@ -244,6 +252,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D31 Invalid Lithograph Snapshot 只允许 Evolution 诊断，不继续演进
 
+> 后续调整：[D59](#d59-cypher-passthrough) 取消 Graph 对 KG OS-invalid Snapshot 的执行限制；本条仍约束 Object / Ontology 和高层 Evolution，不禁止直接 Cypher 诊断或修改。
+
 - 决定：绕过 KG OS 产生且不满足 Binding / internal Schema 等 invariants 的 Lithograph Commit 保留在底层历史中；KG OS Evolution topology / metadata read 可以标记并诊断它，但 Object / Graph data capability、business History/Diff 和所有会创建新 State、推进 Branch 或创建 / 移动 Tag 到目标 Snapshot 的 KG OS mutation 都拒绝使用 invalid base / target。History 在 invalid / pre-KGOS ancestry boundary 终止，不跨边界猜 continuity。Commit Data set/clear 与 Branch/Tag delete 只修改 sidecar/ref cleanup，可以作用于 invalid State。KG OS v1 不自动修复这种 Snapshot。
 - 依据：底层 immutable history 不能被 KG OS 静默改写；但允许正常公共写继续基于 invalid state 会让 inconsistency 扩散到更多 Commit / refs，并使“KG OS public write 产生可读 State”不再成立。
 - 备选：所有能力一律完全拒绝看 invalid Commit；允许 Graph 继续查询/写普通 Knowledge；自动重建 Binding 或跳过异常 internal metadata。
@@ -257,6 +267,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 取舍：compiler 必须执行 canonical parse + logical diff，而不能只 parse final text；换取真正的 Git Extended Diff 局部修改语义、可组合多 Object mutation 和确定的冲突检测。
 
 ### D33 KG OS v1 只 bootstrap 空 Lithograph Knowledge Base
+
+> 后续调整：[D59](#d59-cypher-passthrough) 允许启动完成后的 Graph 直接访问底层 Snapshot，不再把 pre-KGOS / invalid 历史一律限定为 Evolution 诊断；空库 bootstrap 与不自动 adoption 的规则不变。
 
 - 决定：KG OS v1 只在 Lithograph empty Root State 上 bootstrap 自己需要的 reserved internal Schema resources 与 semantic graph 初始状态；bootstrap 必须在一个 Lithograph explicit transaction 中以 Root Commit 为 `expectedHead` 完成，并只产生一个新的 KG OS-valid Commit。KG OS 从该 State 开放公共业务能力；不自动 adoption 已经存在调用方 graph / Schema history 的任意 Lithograph database。正常 v1 bootstrap 不产生 durable intermediate invalid Commit，pre-KGOS Root 只按 D31 诊断可见。
 - 依据：Definition / Property Binding coverage 与 reserved internal Schema 是 KG OS-valid State 的硬不变量；自动接管已有数据库必须决定如何为既有 Schema 生成 Binding、如何解释已有业务语义和历史连续性，这不是启动时可以确定性猜测的事情。
@@ -292,6 +304,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 取舍：后续 adapter 仍需各自 reference/usage 文档，但它们只能映射已确认逻辑合同，不能重新决定 StateRef、ObjectRef、pagination、typed value 或错误语义。
 
 ### D38 `__kgos_` 是 v1 reserved internal persistence namespace
+
+> 后续调整：[D59](#d59-cypher-passthrough) 保留内部持久化名称和 Object / Ontology reserved 检查，但 Graph 不按该 prefix 拦截输入、输出或写入。
 
 - 决定：KG OS-owned internal graph / Schema identifiers 统一保留 exact UTF-8 prefix `__kgos_`，并使用本文冻结的 marker / Binding / Domain / Relationship / Property key 编码。调用方公共 mutation 不能创建或修改该 namespace；命中时返回 `RESERVED_IDENTIFIER`。这些名字是持久化格式的一部分，未来改名必须显式 migration。
 - 依据：internal Ontology semantic graph 与调用方 Knowledge 共存在同一 Lithograph graph / Schema，需要一个确定、可在 mutation 前拒绝冲突且可由 `graphView` 隔离的持久化 namespace；如果只写“实现时任选内部名”，不同版本会无法稳定解释历史 State。
@@ -339,6 +353,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 依据：默认 loopback 满足本机使用；`host` 配置允许用户明确选择其它 bind address，而不需要新增第二套 daemon/runtime 模式。Web 是正式 Human-facing interface，需要稳定的 configured origin；CLI/SDK/Web 共用 HTTP 可以避免 Unix socket、Named Pipe、gRPC 与 Web transport 多套实现。一个明确 daemon home 让配置、当前运行状态、日志和持久 runtime data 有统一可发现位置。用户明确选择 v1 不引入 token/auth。
 - 备选：每次启动随机端口 + runtime descriptor；CLI 使用 Unix Domain Socket、Web 另走 HTTP；gRPC；把配置/运行状态分散到各平台 config/data/run 目录；本地 token authentication。
 - 取舍：固定默认端口可能与其它本地程序冲突，因此支持显式端口配置并在冲突时 fail-fast；显式配置非 loopback host 会把同一个**无认证** Web/API 暴露到对应网络，v1 不因此自动增加认证、TLS 或权限隔离。`0.0.0.0` 是 bind wildcard，不作为 CLI connect host；本机 CLI 对该配置使用 `127.0.0.1`。`kgosd.lock` 增加一个极小的 runtime primitive，但避免 PID file / daemon descriptor 与 config endpoint 漂移。`data/` 的 Knowledge Base 布局和一个 daemon 管理一个还是多个 Knowledge Base 仍需后续设计。
+- 后续替换：D54 将固定 `~/.kgosd/` 收敛为可通过 `KG_HOME` 选择的单 profile/单 Knowledge Base target，并关闭 `data/` layout gap；D55 用 persistent single-token authentication 取代本条的 no-auth 决定。D44 其余 HTTP bind、固定端口失败与 same-origin Web/API 规则继续有效。
 
 ### D45 `kgosd` lifecycle 使用 startup-only config、OS file lock 与显式 CLI 控制
 
@@ -365,12 +380,16 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D48 Embedding Provider 是 kgosd 全局运行配置，语义向量由 KG OS 托管（2026-09-15）
 
+> 后续调整：向量生成、参数转换、内部 Property 与写入/合并刷新已由 [D57](#d57-managed-semantic) 替换；全局默认配置与简化 Ontology 的方向延续。
+
 - 决定：`~/.kgosd/config.toml` 必须配置一个 daemon-global embedding service/model/dimension；没有合法配置就不开放 Knowledge Base。Ontology 的 `type: vector` 不再要求调用方定义 embedding Property/model/dimension，而是声明一个或多个 String source fields 需要语义检索。KG OS 使用全局 service 生成 managed vector materialization；查询时调用方继续写原始 Lithograph Cypher `SEARCH`，仅把对应 Graph parameter 写成 `{"$semantic":"..."}`，KG OS 在 adapter 层把该 parameter 转成 Vector 后将**原始 Cypher**交给 Lithograph。v1 的具体 service protocol/config 由 D50 冻结。
 - 授权依据：用户明确提出向量模型不应成为外部使用者负担，应由全局 TOML 统一配置，Ontology/调用方不重复声明；D53 进一步确认这份配置只属于 daemon runtime，不保存进 Knowledge Base。
 - 边界：Embedding service 是确定性基础设施依赖，不是 Agent；credential 和 service/model config 都不作为 Knowledge Base State metadata 持久化。KG OS 不为此解析/改写 Cypher，也不提供 `graph embed` / `graph search`。`SemanticText` 只是一种 Graph params input marker，不是 Cypher 类型或持久数据；Vector 的公共暴露边界由 D49 统一冻结。SemanticText、semantic Index backfill 与 managed-vector refresh 都直接使用当前 daemon 的 `[embedding]`。修改配置后 restart 不比较历史向量来源、不产生 fingerprint mismatch，也不触发自动迁移；operator 负责保持同一 Knowledge Base 的 embedding semantic config 稳定。Full-text 不依赖 embedding service。
 - 取舍：KG OS 必须承担参数预处理、向量生成、source→embedding 一致性、reserved managed data 隔离和 merge/mutation refresh；换取调用方只表达“哪些内容需要语义检索”，不重复管理 model、dimension、内部 vector Property 或 query-vector 生成，同时保持 Lithograph 是唯一 Cypher parser/planner/executor。Vector 的额外 public-profile 收窄与 staged-state 成本见 D49。
 
 ### D49 KG OS v1 不公开 caller-owned Vector 数据类型（2026-09-16）
+
+> 后续调整：本条 reserved embedding Property、SemanticText 与 mandatory refresh 由 [D57](#d57-managed-semantic) 替换。[D59](#d59-cypher-passthrough) 进一步取消 Graph 的 Vector / identifier 输入、输出和 commit 前检查；Vector 简化模型限制只保留在 Ontology / Object 及相关高层一致性合同中。
 
 - 决定：KG OS v1 的 caller-owned Ontology / Knowledge / Graph public value profile 排除 Vector。`VECTOR<...>` 不能作为 Property `type` 或 type constraint `valueType`，Object/Knowledge 不能保存 caller-owned Vector value，Graph 不接受 raw Vector parameter，也不返回 Vector result；`type: vector` 只作为 Index type 表示 KG OS 托管 semantic index。Vector 仍由 Lithograph 完整支持，并仅在 KG OS reserved managed materialization 与 SemanticText 解析后的内部 query parameter 中使用。
 - 授权依据：用户明确指出 Ontology 中不需要 `VECTOR<FLOAT32>(...)` 这类业务字段，并要求重新整理、优化和深度 review；此前已经确认向量模型与 query vector 不应成为外部使用者负担。
@@ -379,6 +398,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 取舍：KG OS 的 public value profile 成为 Lithograph value system 的有意子集，并要求 Graph write 具备 staged change inspection；换取外部使用者完全不管理 Vector 数据模型，同时保持 Lithograph 作为通用数据库的 Vector 能力不被 KG OS 产品边界反向限制。未来只有出现明确 caller-owned Vector 业务需求时，才单独扩展 KG OS public profile。
 
 ### D50 KG OS v1 只支持 OpenAI-compatible Embeddings API（2026-09-16）
+
+> 后续调整：OpenAI-compatible 协议选择延续；HTTP 执行 owner、wire 映射与认证配置由 [D57](#d57-managed-semantic) 调整，当前只保留 api_key_env，不再支持内联 api_key。
 
 - 决定：v1 不提供 `provider` 配置、provider registry 或插件系统，唯一远端 embedding protocol 是 OpenAI-compatible Embeddings 子集。`[embedding]` 必填 `base_url / model / dimensions`，`similarity` 缺省 `cosine`；认证可用 `api_key` 或 `api_key_env`，二者互斥，也允许都不配置表示无认证。`api_key_env` 在启动时解析为非空环境变量；任一方式得到 credential 后使用 `Authorization: Bearer <credential>`。
 - Wire 子集：KG OS 向 `${base_url}/embeddings` 发送 JSON `model + input`；`input` 支持 String / Array<String> 以便内部批量生成。v1 不发送 `dimensions/user/encoding_format` 或 provider-specific options。响应使用 `data[].index + data[].embedding`，每个 embedding 必须是 finite numeric array 且长度严格等于配置 `dimensions`；其它 OpenAI response 字段不是 correctness source。
@@ -408,6 +429,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D53 Full-text / Embedding 只使用当前 runtime config，v1 不做配置迁移（2026-09-17）
 
+> 后续调整：Full-text 与不做自动配置迁移的决定延续；Embedding 现在由实际 versioned IndexDefinition 保存 provider/config，历史 query 不使用当前 runtime 默认值，见 [D57](#d57-managed-semantic)。
+
 - 决定：`[fulltext]` 与 `[embedding]` 只属于 `kgosd` startup runtime config。KG OS 不把它们复制、摘要或冻结到 Knowledge Base，不保存 search-space fingerprint/generation，也不在打开已有库时比较“这个 State/Index/Vector 是由哪套 config 生成的”。配置修改后 restart 正常启动并直接使用新值，不返回 config-space mismatch。
 - Full-text：已有 Lithograph Full-text IndexDefinition 保留它创建时 versioned analyzer；当前 `[fulltext].analyzer` 只影响以后由 KG OS 新建或因业务定义变化而重建的 Full-text Index。KG OS 不因为 runtime analyzer 改变批量重建历史 Index。
 - Embedding：SemanticText query vector、semantic Index backfill 与 managed-vector refresh 都使用当前 `[embedding]`。已有 Lithograph Vector IndexDefinition 保留创建时的 actual dimension/similarity，只有新建或因业务定义变化重建的 semantic Index 取当前配置；已有 managed vectors 也不因为 endpoint/model/dimensions/similarity 改变而自动重算。v1 不检测新旧向量是否属于兼容空间。真正发生 query/index dimension、Schema 或 provider 错误时按现有错误合同失败，但 daemon 本身不因历史配置未知而拒绝启动。
@@ -415,3 +438,105 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 授权依据：用户先明确希望采用简单实现、不为后续 Full-text / Vector 配置升级建立迁移系统，随后进一步确认已有 Knowledge Base 与新配置不一致也“照常启动”，最后明确配置无需初始化或保存到 Knowledge Base，运行时直接使用配置文件。
 - 被替换方案：此前讨论过“把配置身份写入 State 并阻止 mismatch”、以及“创建新库后重放完整 Commit DAG 的可恢复全历史迁移”。两者都为当前不存在的配置升级需求引入显著状态机、历史重写和运维复杂度，因此不采用。
 - 取舍：v1 无法防止 operator 把已有 managed vectors 与新的 query embedding 配到不同语义空间，也不会统一历史 Full-text analyzer；这是刻意接受的简化。换取 runtime、State、Evolution 与 daemon lifecycle 都不需要配置版本管理。
+
+### D54 `KG_HOME` 是单 runtime profile 与单 Knowledge Base target（2026-09-17）
+
+> 后续调整：单 profile、单 daemon、单 kgos.db 的决定延续；目录中的独立 cache.db 已随 [D57](#d57-managed-semantic) 的缓存责任转移取消。
+
+- 决定：KG OS v1 使用环境变量 `KG_HOME` 选择完整 runtime profile；未设置时默认当前 OS 用户 home 下的 `~/.kgosd`。一个 effective `KG_HOME` 同时最多一个 active `kgosd`，并固定只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base；**不增加 `data/` 中间目录**。profile 根目录同时拥有 `config.toml`、`auth.json`、`kgosd.lock`、`kgos.db`、`cache.db`，以及 `extensions/`、`logs/`；其中 `cache.db` 的 derived cache 语义由 D56 负责。`KG_HOME` 不写入 `config.toml`，因为它负责定位整个 profile。v1 不建立 Knowledge Base name/registry/selector，不提供 `base list/use`、`--base` 或单-daemon多库切换。
+- 授权依据：用户明确决定“`kgosd` 就打开一个库”，并要求默认 home 为 `~/.kgosd`、同时允许通过 `KG_HOME` 指定其它 profile。
+- 生命周期：`$KG_HOME/kgos.db` 不存在时，daemon 按既有 Lithograph init + KG OS bootstrap 创建第一个 KG OS-valid State；存在时直接按当前 public capability/consistency contract 打开。切换 Knowledge Base 等价于启动另一个 `KG_HOME` profile，不在运行中 daemon 内切换 target。
+- 被替换：D44 中“daemon home 固定 `~/.kgosd`”与“`data/` layout / 单库还是多库待设计”的部分。其它文档或旧决定中出现 `~/.kgosd/...` 时，若没有特指历史方案，现行语义均为 `$KG_HOME/...`，默认 profile 才实际落在 `~/.kgosd`。
+- 取舍：同一进程不能同时服务多个 Knowledge Base，跨库聚合/切换需要多个独立 profile/process；换取 target identity、文件布局、lock、config、credential 与数据 ownership 全部天然一致，不引入额外 registry、selector、命名冲突和跨库 lifecycle。
+
+### D55 `auth.json` + `KG_TOKEN` 提供持久单 Token 实例认证（2026-09-17）
+
+- 决定：每个 `KG_HOME` 有且只有一个 server credential，保存在 `$KG_HOME/auth.json` 的 `token` 字段。首次 daemon startup 缺文件时用 CSPRNG 生成至少 256 bit entropy 的 opaque token并原子写入；后续 restart 复用，不自动 rotate。已有 `auth.json` malformed/unreadable/empty 时 fail closed。v1 不提供 user/password、role/scope、refresh token、OAuth、多 token registry 或 rotation API。
+- Client contract：所有 `kgosd` data/control HTTP request 使用 `Authorization: Bearer <token>`。CLI 只从 `KG_TOKEN` 环境变量取得 credential，不读 `auth.json`、不提供 `--token`；SDK 由调用方显式提供 token；Web 也必须取得相同 token 后访问 API，不存在 credential-free data/control 旁路。`kgosd` 自身 startup，以及当前 profile **没有 active daemon 时**首次/后续 `kg daemon start` 的本地 process spawn，不是 HTTP request，因此可以先创建 server credential；该 local start 以 child 成功取得 lock 并在完成 startup validation + HTTP bind 后发布 endpoint 作为 ready signal，不调用 credential-free health API。一旦 active daemon 存在，`daemon start/status/stop/restart` 的 control HTTP 与其它客户端调用一样必须认证。后续客户端由 operator 把该 secret 放入 `KG_TOKEN` 或其它 SDK/Web 输入。
+- Failure / secret boundary：missing/malformed/wrong Bearer 都映射为统一 `AUTHENTICATION_FAILED`，HTTP 为 401，不通过错误差异泄露 token validity。`auth.json` 是 runtime secret，不进入 Knowledge Base/State/Commit Data/lock/log/error；POSIX 创建权限固定 `0600`，其它平台使用等价 current-user-private ACL。CLI 缺/空 `KG_TOKEN` 在 dispatch 前用同一 code 本地失败；token 值不得出现在参数、URL、stdout/stderr 或日志。
+- Network boundary：认证不等于加密。默认 `127.0.0.1` 继续是 v1 推荐部署；显式 non-loopback bind 仍允许，但因为 v1 不内置 TLS，在不可信网络上传输 Bearer token 不安全，由 operator 承担。TLS、多用户授权与远程 identity 属于未来独立设计。
+- 授权依据：用户先提出 `auth.json` 在启动时生成 token、后续操作都必须持有该 token，随后明确 CLI 同样使用 token 并通过环境变量传递，最终确认采用 `KG_TOKEN` + Bearer 方案。
+- 被替换：D44 的 “v1 不定义 token/authentication/authorization” 与 `runtime.md` 原 “本地模式不做认证”。保持 D44 的 HTTP/same-origin 结构，不新增第二 transport 或账号系统。
+- 取舍：本机调用增加一个 credential 配置步骤，首次初始化后 operator 需要把 `auth.json` 中的 secret 提供给客户端；换取 CLI/SDK/Web 与本机/LAN caller 共享一个一致的认证边界，并避免因为 CLI 与 daemon 同机而获得隐藏旁路。
+
+### D56 `cache.db` 是默认开启、4 GiB 上限的 Embedding result cache（2026-09-17）
+
+> 后续调整：本条独立 cache.db、LRU、文件收缩与 KG OS cache key 已由 [D57](#d57-managed-semantic) 替换；默认开启与 4 GiB 配置偏好保留，映射为 Lithograph payload 预算。
+
+- 决定：KG OS v1 在 `$KG_HOME/cache.db` 使用独立标准 SQLite 保存 **embedding result cache**。`[cache]` 只提供 `enabled` 与 `max_size_mb`：省略整段等价 `enabled = true`、`max_size_mb = 4096`，即默认开启、默认 4 GiB。cache path 不可配置；`[cache]` 不控制 D51 的 `extensions/` artifact cache。
+- Identity：每个最终 provider input 独立缓存。key 由固定 cache/protocol format version、canonical embedding `base_url`、`model`、`dimensions`、KG OS input-framing version 与 exact provider input bytes 共同决定并 SHA-256；credential 不参与，`similarity` 因不改变 embedding 输出也不参与。缓存不持久化原始业务文本，Provider success 只有经过 finite/exact-dimension validation 才能写入；negative result 不缓存。
+- Eviction：cache 启用时在 daemon startup 与新写入后检查容量；超过 `max_size_mb` 时按 least-recently-used 顺序清理最久未使用 entry，直到实际 SQLite 文件经 page reclamation 回到上限内，因此降低 max 后 restart 也会收缩旧 cache。hit 与新写入都会更新最近使用顺序。单个 entry 自身超过上限时正常返回 embedding 但不缓存。v1 不增加 TTL、第二种 eviction strategy、compression 或 path 配置。
+- Correctness boundary：`cache.db` 是纯 derived runtime data，不属于 Knowledge Base、State、Commit Data、Search Index truth 或配置 migration。文件不存在就创建；entry 损坏、cache schema/version 不兼容或整个 cache 损坏都允许丢弃后重新生成；cache read/write/eviction failure 必须退化为 miss/bypass，而不是让本来可以通过 Provider 完成的业务操作失败。删除 `cache.db` 不得改变任何权威 State、Commit 或公共合同；需要的 embedding 只是在当前 runtime config 下重新请求 Provider。若同一外部 Provider 在相同 config/input 下自身改变输出，仍属于 D53 已接受的 provider/runtime stability 边界，不由 cache 承诺修正。
+- Runtime：`enabled=false` 时完全绕过 cache，但不主动删除已有文件；修改 enable/max 后 restart 生效。embedding config 变化自然产生不同 cache namespace，不扫描/迁移旧 cache，也不触发 Knowledge Base migration。Object/Ontology Patch 即使后来因 stale base 未提交，已经成功产生的 input→embedding cache entry 仍可保留供 retry 使用。
+- 授权依据：用户明确要求向量处理增加专用 `cache.db`，随后要求在 runtime config 中提供 cache 配置，最终确认默认开启、默认最大 4 GiB、超过后清理旧数据，并确认 `kgos.db` 与 `cache.db` 都直接位于 `KG_HOME` 根目录、不保留 `data/` 层级。
+- 取舍：每次 cache hit 需要维护 LRU metadata，达到上限时需要 SQLite page reclamation；换取 SemanticText、Backfill、refresh、retry 与 Merge 等重复 embedding 输入可以避免重复远端 I/O、成本与延迟，同时不污染 Knowledge Base 历史。
+
+
+<a id="d57-managed-semantic"></a>
+
+### D57 托管语义检索交给 Lithograph（2026-09-19）
+
+> 后续调整：[D59](#d59-cypher-passthrough) 取消 Graph 的语句 / Vector / identifier 限制与相应 guard 待办；[D60](#d60-automatic-embedding-cache) 以正常查询自动持久填充替换本条 query miss 仅进内存、rebuild 填充与预热入口待定的旧规则；[D61](#d61-single-field-semantic) 确认首版只支持单字段。联合检索可组合及托管接口的具体限制以 [Ontology 当前范围](ontology.md#语义索引的首版范围)为准，下列历史“待定”文字不再作为首版设计确认清单。其余职责与配置决定继续有效。
+
+- 决定：KG OS 保留 `type: vector` 的简化本体声明，编译为 Lithograph Managed Semantic Index。向量生成、缓存和检索由 Lithograph / OpenAI-compatible Provider extension 承担；KG OS 不实现 Embeddings HTTP client、reserved 向量 Property、source framing 或写入/合并后的向量刷新。
+- 配置与调用：`[embedding]` 作为新建 / 必须重建索引的默认值，完整 provider/config/dimensions/similarity 保存到 Lithograph versioned IndexDefinition；已有索引与历史查询使用自身配置。调用方使用 `db.index.semantic.queryNodes/queryRelationships`，参数是普通 String，移除 `SemanticText` / `$semantic` 转换，不增加 Search DSL。
+- 凭证：用户最终选择只保留可选 `api_key_env`，省略表示无认证；不再接受内联 `api_key`。数据库只保存环境变量名称，secret 留在 kgosd 进程环境，不新增 secret registry 或转接机制。
+- 写入与缓存：保存 source、创建索引、merge 不以远端 embedding 成功为提交条件；新增 / 改变索引仍做本地 Provider/config validation。取消独立 `cache.db`，保留 `[cache]` 默认开启与 4096 MiB，映射到 Lithograph 内部 cache 的 payload 预算。缓存算法与持久化边界跟随底层公开合同：FIFO、query miss 仅进 connection-local cache，source 持久填充使用独立 rebuild，不保证数据库文件即时缩小。
+- 依据：用户确认职责转移，要求以配置、Ontology YAML、调用代码表达优化方案，并授权写入 / 整理设计；随后明确选择 `api_key_env` 简化凭证。底层依据是 Lithograph Phase 13 的 Managed Semantic / Provider / cache 公开合同，当前 KG OS 仍只有文档。
+- 被替换：D48 的 KG OS 自行生成向量与 `SEARCH + SemanticText`；D49 的内部向量 Property / refresh 路径；D50 的 KG OS HTTP adapter 与内联凭证；D53 的 Embedding 查询始终使用当前 runtime 配置；D54/D56 的独立缓存文件和其具体实现。D49 的 caller-owned Vector 限制、D51 loader、D52 Full-text 与 D54/D55 单库认证边界继续有效。
+- 取舍与未决：冷查询可能发生 Provider I/O；历史结果还依赖外部模型语义稳定。多字段语义索引、`filterProperties` 不能直接映射 Phase 13，留在 Ontology owner 待定；KG OS 预热入口留在 Runtime owner 待定。Native query guard、staged public-profile validation 与真实 ABI 集成需要工程验证，不因本决定宣称已经实现。
+- 当前合同：[Runtime](runtime.md#embedding-配置与索引映射)、[Ontology](ontology.md#托管语义索引)、[Graph](graph.md#graph-公共调用合同)、[Object](object.md#object-公共调用合同)、[Evolution](evolution.md)、[集成验收](implementation.md#managed-semantic-integration-readiness)。
+
+<a id="d58-optional-indexes"></a>
+
+### D58 顶层 indexes 可选，保留复合与共享索引（2026-09-19）
+
+> 后续调整：[D62](#d62-nonempty-definition-properties) 要求 Node / Relationship Definition 的 `properties` 非空；本条末尾对 properties 空集合的旧说明不再适用。`indexes` 可选与空集合规范化的决定继续有效。
+
+- 决定：只作用于当前 Definition 单个字段的索引放在 Property 内；多字段索引与跨 Definition 共享索引保留在 Definition 顶层。顶层 `indexes` 缺省与 `[]` 逻辑等价，canonical YAML / JSON 为空时省略，非空时完整输出。
+- 依据：用户提出把索引统一放到字段层；核对已有多字段 Full-text、复合 Range 与共享索引后，用户确认“单字段放字段下、多字段/共享留顶层、空数组省略”的方案并要求写入设计。
+- 取舍：减少普通单字段模型的空字段噪声，同时不删除已有多字段能力，也不把一个组合索引拆成多个不等价的索引。只规范化空集合不产生 Schema delta；删除非空声明仍按原共享资源 / Patch 语义执行。
+- 当前合同：[Ontology 公共格式与索引组织](ontology.md#公共可编辑格式)、[Object representation](object.md#object-value-与-representation)。`properties/constraints` 的空集合输出规则不变。
+
+<a id="d59-cypher-passthrough"></a>
+
+### D59 Cypher 原样执行，KG OS 只区分读写连接（2026-09-19）
+
+- 决定：Graph `query` 使用只读连接，`execute` 使用读写连接；Cypher 原样交给 Lithograph。KG OS 不解析、重写、按关键字判定语句，不实现 procedure 黑白名单。只读入口中的写操作由底层拒绝，不自动升级到写连接。
+- 依据：用户明确决定“任何 Cypher 都不限制”，语句内部交给 Lithograph，随后授权修正设计文件并记录 vlog。
+- 直接影响：取消 Graph 的 `LOAD CSV` / Schema / Version Procedure 限制、固定 Knowledge Graph View，以及 Graph Vector / `__kgos_` identifier 的输入、结果和提交前检查。参数与结果采用完整 Lithograph JSON；底层的语法、事务、约束和只读规则继续生效。请求上下文不能通过无条件附加不兼容 Native options 变相限制 procedure。
+- 高层边界：Object / Ontology / Evolution 的聚合模型、Patch 和一致性校验继续有效，但不再约束原始 Graph Cypher。直接变更可能得到无法按高层模型解释的 Snapshot；高层接口据实报错，Graph 可继续执行，不自动修复 Binding。文件 / 网络能力继承宿主权限；此决定不开放 raw SQL 或动态配置 native extension。
+- 备选：在 KG OS 按 statement / procedure / value 增加拦截，或要求底层增加专门的 KG OS 允许列表；均不采用。KG OS 只保留读写连接职责，不复制数据库解析与执行规则。
+- 取舍：普通 Cypher、procedure 与 transaction subquery 按底层各自提交语义执行，不再承诺所有 Graph 写入都经过 KG OS profile 校验或恰好产生一个 Commit。只读连接与内部缓存的衔接、Native 上下文映射尚需集成验证，不能以文本改动宣称完成。
+- 当前合同：[Graph](graph.md#graph)、[执行连接](runtime.md#cypher-执行连接)、[高层内部边界](ontology.md#semantic-graph-的内部边界)、[错误](contracts.md#公共错误合同)、[集成验收](implementation.md#managed-semantic-integration-readiness)。
+
+<a id="d60-automatic-embedding-cache"></a>
+
+### D60 正常查询自动填充 embedding 缓存（2026-09-19）
+
+- 决定：source 与 query text 都先查缓存；miss 调 Embedding API，成功并通过结果校验后自动持久保存。调用方不需要预热；rebuild 是底层维护能力，不是普通查询前置步骤。
+- 依据：用户明确缓存是为减少 API 调用成本而增加的内部逻辑，确认应由 Lithograph 优化，并要求生成独立任务提示词。本次文档同步同时清除与该决定冲突的旧“仅 rebuild 持久填充 / KG OS 预热入口待定”文字。
+- 责任：沿用 Lithograph 的内部表、缓存身份、容量与 FIFO。KG OS 保留 `[cache]` 和 4 GiB 默认预算，不新增缓存数据库、后台预热任务或缓存实现。缓存不进入 State / Commit / Branch；Provider 等待不占 writer，持久发布由底层短事务完成。
+- 备选：要求业务调用方显式预热或用 rebuild 获得跨连接复用；不采用，因为缓存应透明降低调用成本。启用与否、淘汰、Provider 失败和真实只读数据库下的行为继续区分，不把缓存当作业务数据真源。
+- 当前缺口：已核对的 Lithograph 工作树会在物理只读连接上跳过 persistent publish。D59 的只读查询和本条自动持久缓存必须在底层接入中同时满足；具体机制尚未验证，本次不擅自改为可写查询连接、不宣称实现完成。
+- 当前合同：[Runtime 缓存](runtime.md#embedding-result-cache)、[连接与缓存衔接](runtime.md#cypher-执行连接)、[工程验收](implementation.md#managed-semantic-integration-readiness)。
+
+<a id="d61-single-field-semantic"></a>
+
+### D61 首版语义索引只支持单字段（2026-09-19）
+
+- 决定：首版 Semantic Index 只接受一个 `STRING` source Property；多字段文本拼接不在首版实现范围。多个 Definition 共享同名单字段的能力保留。
+- 依据：用户已明确回复“先支持单字段吧”；本次按用户要求把已有决定补齐到设计文档，移除尚需确认是否保留拼接的旧表述。
+- 备选：首版提供 `title + content` 等有序拼接，或由 KG OS 生成隐藏拼接字段；本次不采用。
+- 取舍：首版不能把多个字段合成一次语义检索输入，换取与 Lithograph 单 source 接口直接对应；不影响多字段 Full-text、复合 Range、共享索引或已有 Cypher 联合检索，也不承诺后续拼接方案。
+- 当前合同：[首版范围与联合检索](ontology.md#语义索引的首版范围)、[工程验收](implementation.md#ontology-专项验收)。
+
+<a id="d62-nonempty-definition-properties"></a>
+
+### D62 Ontology 不创建无字段类型（2026-09-19）
+
+- 决定：Node / Relationship Definition 都至少声明一个 Property；创建或修改后仍存在的 Definition 不允许 `properties: []`，不自动添加占位字段。
+- 依据：用户针对空模型创建问题明确决定“那我们就不可以创建无字段的类型”。这项决定替换此前先建立空 Person、以后再加字段的示例。
+- 备选：保留无字段模型并要求 Lithograph 补充相应能力；不采用，不据此增加底层扩展任务。
+- 取舍：调用方创建类型时就需要明确至少一个业务字段；字段仍可为 optional，不因此增加必填、唯一、业务 ID 或实例属性非空要求。至少一个字段属于 KG OS 高层 Definition profile，公共 Graph 继续按 D59 原样执行 Cypher。
+- 当前合同：[Ontology 公共格式](ontology.md#公共可编辑格式)、[编辑示例](ontology.md#编辑示例)、[工程验收](implementation.md#ontology-专项验收)。
