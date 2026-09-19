@@ -170,4 +170,4 @@ P0-01 至 P0-08 已全部闭合，Phase Review finding 已关闭，开发计划�
 - Security：完整 high-level audit 无已知漏洞，Markdown 工具链使用已修复的 `smol-toml@1.8.0`；
 - Linux CI fixture：Lithograph `v0.1.1` linux-x64 release artifact 已重新下载核对，SHA-256 与固定值 `dc73a730c2c8981761258753934b24673506d383b13c53ada332e3fef441c40c` 一致；
 - Cleanup：临时数据库、profile、错误样本、clean-copy 目录和开发/浏览器进程均已清理；
-- Remote：提交 `20d73cdb09947da03e3e222a318c2e61134a2879` 已推送到 `main`；GitHub Actions CI run `35454190185` 的 Ubuntu 24.04 `Validate` job（ID `105926467278`）完整通过，包含 `Validate Phase 0` 与 validation reports 上传，job 用时 2m5s。
+- Remote：提交 `20d73cdb09947da03e3e222a318c2e61134a2879` 已推送到 `main`；GitHub Actions CI run `35454190185` 的 Ubuntu 24.04 `Validate` job（ID `105926467278`）完整通过，闭合 P0-07。后续 review 发现旧版 GitHub Actions runtime 的 Node.js 20 deprecation annotation，已在提交 `896e98c97d22edde358d2bb612a4cec641837d62` 将 checkout / setup-node / upload-artifact 升级到 v7、pnpm/action-setup 升级到 v6；CI run `35454838184` 的 `Validate` job（ID `105928176129`）完整通过，check annotations 为 0。
