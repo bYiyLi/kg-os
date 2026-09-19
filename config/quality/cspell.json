@@ -1,6 +1,7 @@
 {
   "version": "0.2",
   "language": "en,zh-CN",
+  "globRoot": "${cwd}",
   "useGitignore": true,
   "ignorePaths": [
     "node_modules/**",

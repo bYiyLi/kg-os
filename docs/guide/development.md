@@ -8,6 +8,27 @@ Phase 00 提供 TypeScript workspace、`kg` / `kgosd` 可执行入口、同源 W
 
 未实现的 `/api/*` 与 `/control/*` 请求返回 404。开发壳层不读取或创建默认 `KG_HOME`，不会把尚未接入的业务能力伪装成成功。
 
+## 工程目录
+
+仓库根目录只保留包管理、Git、Node.js、TypeScript 基线以及 ESLint / Prettier / Lefthook 这类生态约定较强的入口文件。专项工具配置统一放到 `config/`：
+
+```text
+config/
+├── quality/
+│   ├── cspell.json
+│   ├── dependency-cruiser.cjs
+│   ├── knip.json
+│   ├── markdownlint-cli2.yaml
+│   └── secretlint.json
+└── test/
+    ├── playwright.config.ts
+    ├── tsconfig.test.json
+    ├── tsconfig.type-coverage.json
+    └── vitest.config.ts
+```
+
+`package.json` 中的统一命令显式指定这些配置路径，开发者仍只需要运行 `pnpm lint`、`pnpm test`、`pnpm test:e2e`、`pnpm validate` 等根命令，不需要记住具体配置文件位置。
+
 ## 工具链
 
 | 工具 | 固定版本或要求 |

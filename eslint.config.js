@@ -36,7 +36,11 @@ export default tseslint.config(
       ecmaVersion: "latest",
       sourceType: "module",
       parserOptions: {
-        project: ["./tsconfig.json", "./tsconfig.test.json", "./packages/*/tsconfig.json"],
+        project: [
+          "./tsconfig.json",
+          "./config/test/tsconfig.test.json",
+          "./packages/*/tsconfig.json"
+        ],
         tsconfigRootDir
       }
     },

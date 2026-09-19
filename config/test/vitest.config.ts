@@ -2,16 +2,19 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
+const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+
 export default defineConfig({
+  root: repoRoot,
   resolve: {
     alias: {
-      "@kgos/cli": fileURLToPath(new URL("./packages/cli/src/index.ts", import.meta.url)),
+      "@kgos/cli": fileURLToPath(new URL("../../packages/cli/src/index.ts", import.meta.url)),
       "@kgos/contracts": fileURLToPath(
-        new URL("./packages/contracts/src/index.ts", import.meta.url)
+        new URL("../../packages/contracts/src/index.ts", import.meta.url)
       ),
-      "@kgos/daemon": fileURLToPath(new URL("./packages/daemon/src/index.ts", import.meta.url)),
-      "@kgos/kernel": fileURLToPath(new URL("./packages/kernel/src/index.ts", import.meta.url)),
-      "@kgos/sdk": fileURLToPath(new URL("./packages/sdk/src/index.ts", import.meta.url))
+      "@kgos/daemon": fileURLToPath(new URL("../../packages/daemon/src/index.ts", import.meta.url)),
+      "@kgos/kernel": fileURLToPath(new URL("../../packages/kernel/src/index.ts", import.meta.url)),
+      "@kgos/sdk": fileURLToPath(new URL("../../packages/sdk/src/index.ts", import.meta.url))
     }
   },
   test: {

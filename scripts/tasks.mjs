@@ -16,7 +16,7 @@ const taskCommands = {
   typecheck: [
     ["exec", "tsc", "-b", "--pretty", "false"],
     ["exec", "tsc", "-p", "packages/web/tsconfig.json", "--pretty", "false"],
-    ["exec", "tsc", "-p", "tsconfig.test.json", "--pretty", "false"]
+    ["exec", "tsc", "-p", "config/test/tsconfig.test.json", "--pretty", "false"]
   ],
   validate: [
     ["check:install"],
@@ -31,7 +31,7 @@ const taskCommands = {
     ["check:dedupe"],
     ["build"],
     ["check:exports"],
-    ["exec", "playwright", "test"],
+    ["exec", "playwright", "test", "--config", "config/test/playwright.config.ts"],
     ["test:native"],
     ["check:package"],
     ["check:licenses"],
