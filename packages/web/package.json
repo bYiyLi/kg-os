@@ -1,0 +1,14 @@
+{
+  "name": "@kgos/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "KG OS browser client",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@kgos/sdk": "workspace:*"
+  }
+}

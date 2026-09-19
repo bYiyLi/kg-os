@@ -49,9 +49,9 @@ Web 构建产物随 `kgosd` 同一交付物发布，由 `kgosd` 的 HTTP server 
 
 Web 与 CLI / SDK 在逻辑上都是公共 API 的客户端。服务端 TypeScript 在 Node.js 中运行；Web TypeScript 构建出的浏览器代码经 `kgosd` HTTP 下载后在浏览器执行。这里的“同进程”指页面 / 资源服务与 API 服务由同一个 daemon 承载，不是把浏览器执行并入 Node.js。
 
-前后端代码按 workspace 模块组织，但这不产生第二个部署服务。[Phase 0 开发流程](implementation.md#开发与构建流程)采用 Vite middleware 供开发时页面与热更新使用，复用 kgosd HTTP server 和同一端口；HMR WebSocket 与该 server 一起关闭。交付物使用构建后的静态资源，运行时不依赖 Vite dev server。具体页面框架、布局、API path、client-side routing 与 caching 仍按 Web adapter 的实际需要实现。
+前后端代码按 workspace 模块组织，但这不产生第二个部署服务。[Phase 00 开发宿主](../development/phases/00-engineering-foundation.md#phase00-development-host)采用 Vite middleware 供开发时页面与热更新使用，复用 kgosd HTTP server 和同一端口；HMR WebSocket 与该 server 一起关闭。交付物使用构建后的静态资源，运行时不依赖 Vite dev server。具体页面框架、布局、API path、client-side routing 与 caching 仍按 Web adapter 的实际需要实现。
 
-Phase 0 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemon 的数据库就绪条件，不新增跳过初始化或认证的公共运行模式。开发脚本不得把尚未接入 Knowledge Base 的壳层标成正式 `running`；完整启动仍须通过下文的能力检查与 bootstrap。
+Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemon 的数据库就绪条件，不新增跳过初始化或认证的公共运行模式。开发脚本不得把尚未接入 Knowledge Base 的壳层标成正式 `running`；完整启动仍须通过下文的能力检查与 bootstrap。
 
 ### Web 交互设计状态
 

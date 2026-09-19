@@ -411,7 +411,7 @@ CLI / SDK / Browser / Skill
 
 ### D51 SQLite Extension 统一由 startup source resolver 装配（2026-09-17）
 
-> 后续调整：[D63](#d63-typescript-integrated-web) 将宿主改为 TypeScript / Node.js，显式事务使用 SQL tx_* 封装；原有完整 Native tx_* family 的强制绑定不再作为该事务链路的要求。source resolver、每连接加载和必要 Native adapter 的同一 connection 边界保留；当前 capability 规则见 [Runtime](runtime.md#sqlite-extension-source-resolver)。
+> 后续调整：[D63](#d63-typescript-integrated-web) 将宿主改为 TypeScript / Node.js，显式事务使用 SQL `tx_*` 封装；原有完整 Native `tx_*` family 的强制绑定不再作为该事务链路的要求。source resolver、每连接加载和必要 Native adapter 的同一 connection 边界保留；当前 capability 规则见 [Runtime](runtime.md#sqlite-extension-source-resolver)。
 
 - 决定：`~/.kgosd/config.toml` 使用 ordered `[[sqlite.extensions]]` 作为 **唯一 SQLite loadable-extension 配置入口**。Lithograph 自身、第三方 FTS5 tokenizer 与其它 SQLite extension 都使用同一机制；KG OS 不再把 Lithograph shared library 内嵌进 binary、写死安装路径，也不为“全文插件 / 向量插件 / Lithograph 插件”建立多套 loader。每个 entry 只表达 artifact source 与 SQLite load 参数，不声明业务 `kind/capability`；全部加载完成后由 `kgosd` 单独验证 KG OS 必需的 Lithograph public capability。
 - Source contract：`source` 是 absolute local file path 或 absolute HTTPS URL。Remote source 必须配置 artifact SHA-256；local source 可选配置 expected SHA-256，但 resolver 总会计算实际 content hash。Direct `.so/.dylib/.dll` 直接形成 load artifact；`.tar.gz/.zip` 必须用精确 relative `library` 指出 archive 内要加载的 shared library。`entrypoint` optional，省略时使用 SQLite 标准 resolution。数组顺序就是每个 connection 的加载顺序，所有 entry 都是 required；v1 不增加自动发现、plugin registry、可选插件、任意 download headers 或 package dependency solver。
@@ -474,7 +474,6 @@ CLI / SDK / Browser / Skill
 - Runtime：`enabled=false` 时完全绕过 cache，但不主动删除已有文件；修改 enable/max 后 restart 生效。embedding config 变化自然产生不同 cache namespace，不扫描/迁移旧 cache，也不触发 Knowledge Base migration。Object/Ontology Patch 即使后来因 stale base 未提交，已经成功产生的 input→embedding cache entry 仍可保留供 retry 使用。
 - 授权依据：用户明确要求向量处理增加专用 `cache.db`，随后要求在 runtime config 中提供 cache 配置，最终确认默认开启、默认最大 4 GiB、超过后清理旧数据，并确认 `kgos.db` 与 `cache.db` 都直接位于 `KG_HOME` 根目录、不保留 `data/` 层级。
 - 取舍：每次 cache hit 需要维护 LRU metadata，达到上限时需要 SQLite page reclamation；换取 SemanticText、Backfill、refresh、retry 与 Merge 等重复 embedding 输入可以避免重复远端 I/O、成本与延迟，同时不污染 Knowledge Base 历史。
-
 
 <a id="d57-managed-semantic"></a>
 
@@ -561,11 +560,11 @@ CLI / SDK / Browser / Skill
 
 ### D64 Phase 0 先建立完整开发环境（2026-09-19）
 
-- 决定：进入业务实现前，先完成工程初始化、统一开发启动、内置 Web 构建、调试、完整质量检查、测试、Git hooks、CI 和本地打包验证。Phase 0 的范围与验收统一由 [Implementation](implementation.md#phase-0开发环境搭建)维护。
+- 决定：进入业务实现前，先完成工程初始化、统一开发启动、内置 Web 构建、调试、完整质量检查、测试、Git hooks、CI 和本地打包验证。该阶段现统一编号为 Phase 00，其范围、状态与验收由 [Phase 00 计划](../development/phases/00-engineering-foundation.md)维护。
 - 依据：用户提出第一步搭建开发环境，要求检查 Noven 可参考的做法，随后明确“开发环境尽量全面点”，并要求形成 Phase 0 开发计划和维护设计文档。
 - 工程方案：复用 pnpm workspace、严格 TypeScript、代码 / 依赖检查与打包后实际运行验证；补齐 KG OS 所需的 Web 热更新、浏览器测试和 CI。工具、目录及版本锁定方法是本次按已确认目标制定的工程方案，不表示用户逐项确认了 Noven 的具体版本、忽略项或发布方式。
 - 运行边界：Web 是浏览器客户端；kgosd 提供其页面与资源，同时提供 API。开发和构建使用统一入口，保持同一 daemon 交付；共享 TypeScript 不等于服务端与浏览器共享一个执行环境。
 - 备选：只建立最小空目录，先写业务再补测试 / CI / 交付验证；或复制 Noven 的全部业务结构。前者不满足本轮完整环境目标，后者会引入无关语言工具和运行规则，均不采用。
 - 取舍：前期增加工具配置与验证工作，换取各模块后续在同一基线上开发；壳层、Native smoke、完整数据库适配和业务实现分别验收，不能相互代替。基础环境可独立推进，必要真实扩展或 CI 证据缺失时只报告相应未完成项。
-- 当前状态：仅计划与设计已记录，工程尚未搭建；本次不修改 Object / Graph / Evolution 产品合同，不改变已确认的认证、读写连接、事务或缓存行为。
-- 当前合同：[Phase 0 计划](implementation.md#phase-0开发环境搭建)、[Web hosting](runtime.md#web-hosting)；D63 的 TypeScript 与内置 Web 决定继续有效。
+- 当前状态：Phase 00 已在本地搭建并通过安装、开发联调、质量检查、测试、真实扩展 smoke、构建和本地交付物验证；Lefthook 与 GitHub Actions workflow 已建立。远端 CI job 尚未运行，因此阶段保持 `in_progress`。Phase 00 没有实现或修改 Object / Graph / Evolution 产品合同，也没有改变已确认的认证、读写连接、事务或缓存行为。
+- 当前合同：[Phase 00 计划](../development/phases/00-engineering-foundation.md)、[开发指南](../guide/development.md)、[Web hosting](runtime.md#web-hosting)；D63 的 TypeScript 与内置 Web 决定继续有效。

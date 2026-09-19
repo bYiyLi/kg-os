@@ -1,0 +1,26 @@
+{
+  "name": "@kgos/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "KG OS command-line client",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "kg": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@kgos/sdk": "workspace:*"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@kgos/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "description": "KG OS kernel module boundary",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@kgos/contracts": "workspace:*"
+  }
+}

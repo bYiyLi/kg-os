@@ -2,9 +2,9 @@
 
 ## 当前来源与权限
 
-- 涉及本地事实时，默认通过正式版 Nexum 连接 Yi Mac，打开 `/Users/yi/Code/KGOS`；后续回合按工具要求刷新上下文。工具的项目简介和历史聊天不能代替当前文件、Git 与命令结果。
-- 进入项目先读 [README](README.md) 和 [设计总入口](docs/design.md)。继续同一主题时，必须重新核对 `docs/design/` 中拥有该主题的职责文件；来源不可读时说明未知，不用旧结论补齐。
-- `README.md` 负责产品定义；`docs/design.md` 负责设计导航与职责索引；`docs/design/*.md` 按 `docs/design.md` 的 ownership 表分别维护技术与数据设计唯一真源；本文件负责协作规则。背景、研究与 Noven 只作参考，不自动成为 KG OS 决定。
+- 涉及本地事实时，直接检查当前工作区 `/Users/yi/Code/KGOS`；后续回合重新核对当前文件、Git 与命令结果。项目简介和历史聊天不能代替当前仓库事实。
+- 进入项目先读 [README](README.md) 和 [设计总入口](docs/design.md)。继续同一设计主题时，必须重新核对 `docs/design/` 中拥有该主题的职责文件；继续实现任务时，还要核对 [开发计划](docs/development/README.md)及当前阶段文件。来源不可读时说明未知，不用旧结论补齐。
+- `README.md` 负责产品定义；`docs/design.md` 负责设计导航与职责索引；`docs/design/*.md` 按 `docs/design.md` 的 ownership 表分别维护技术与数据设计唯一真源；`docs/development/README.md` 负责开发路线、状态和共同完成条件，`docs/development/phases/*.md` 负责单阶段范围、Feature、Acceptance、Review 与证据；`docs/guide/*.md` 负责可执行操作步骤，不维护阶段状态；本文件负责协作规则。背景、研究与 Noven 只作参考，不自动成为 KG OS 决定。
 - 讨论、评审默认只读。记录设计、修改文件、实现、提交、推送分别按用户授权执行；历史授权不自动覆盖本次动作。分别授权指每类动作都必须有明确依据，不要求分成多轮对话；同一本次请求可以明确授权多个动作。核对授权不等于再次索取授权。
 - 明确执行请求在已授权范围内推进到修改、必要验证和汇报，不把最小方案汇报设成额外批准节点。新设计仍先获得确认并记录到所属真源，再实现依赖它的代码；只阻塞依赖该决定的工作。Skill 结束后继续本次请求已经授权的剩余步骤。
 

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreDependencies": [
+    "@arethetypeswrong/cli",
+    "@secretlint/secretlint-rule-preset-recommend",
+    "publint"
+  ],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/serve-built-web.mjs"],
+      "project": ["*.ts", "scripts/*.mjs", "tests/**/*.ts"]
+    },
+    "packages/cli": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/contracts": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/daemon": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/kernel": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/sdk": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/web": {
+      "project": ["src/**/*.ts"]
+    }
+  }
+}
