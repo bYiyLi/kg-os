@@ -35,9 +35,9 @@ KG OS 的 `kgosd` 与 Kernel 使用 TypeScript + Node.js，CLI、SDK、Web 同�
 
 ## 当前状态
 
-**Phase 00 开发环境已完成本地实现与验收；KG OS 业务能力尚未实现。** 当前代码提供 workspace、`kg` / `kgosd` 帮助与版本入口、同源 Web 开发壳层、检查、测试、构建和本地打包验证。它不表示 Knowledge Base、认证、daemon 正式生命周期、业务 API 或数据库 adapter 已经可用。
+**Phase 00 Engineering Foundation 已完成并通过本地与 Ubuntu 24.04 GitHub Actions 验收；KG OS 业务能力尚未实现。** 当前代码提供 workspace、`kg` / `kgosd` 帮助与版本入口、同源 Web 开发壳层、检查、测试、构建和本地打包验证。它不表示 Knowledge Base、认证、daemon 正式生命周期、业务 API 或数据库 adapter 已经可用。
 
-开发者从[开发指南](docs/guide/development.md)运行 `pnpm run setup`、`pnpm dev` 和 `pnpm validate`。Phase 00 的范围、状态与验收记录见[阶段计划](docs/development/phases/00-engineering-foundation.md)；GitHub Actions workflow 已建立，远端 job 仍需在提交并推送后核对，因此阶段状态为 `in_progress`。
+开发者从[开发指南](docs/guide/development.md)运行 `pnpm run setup`、`pnpm dev` 和 `pnpm validate`。Phase 00 的范围、状态与验收记录见[阶段计划](docs/development/phases/00-engineering-foundation.md)；提交 `20d73cd` 对应的 GitHub Actions CI run `35454190185` 已在 Ubuntu 24.04 完整通过，因此阶段状态为 `done`。
 
 首版语义索引只支持单字段；Cypher 原样执行和内部自动填充缓存的设计已记录。模型修改、批量 Patch、Merge 与底层连接 / 缓存对接仍需实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 

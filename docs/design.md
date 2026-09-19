@@ -36,7 +36,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 状态 | 范围与入口 |
 | --- | --- |
 | 已确认 | Ontology 渐进读取 / 聚合编辑、Object Patch、Knowledge / Graph、Evolution、单 profile / 单库 / 单 Token runtime；具体规则见上面的 owner 表 |
-| Phase 00 进行中 | [D64 Phase 0](design/decisions.md#d64-phase0-development-environment)：固定工具链、workspace、统一启动、调试、质量检查、测试、Git hooks、CI workflow 与本地交付物已经建立并通过本地验收；远端 CI job 尚未运行，当前状态与证据见 [Phase 00 计划](development/phases/00-engineering-foundation.md) |
+| Phase 00 已完成 | [D64 Phase 0](design/decisions.md#d64-phase0-development-environment)：固定工具链、workspace、统一启动、调试、质量检查、测试、Git hooks、CI workflow 与本地交付物已经建立；本地验收与 Ubuntu 24.04 GitHub Actions 远端门禁均通过，完成证据见 [Phase 00 计划](development/phases/00-engineering-foundation.md) |
 | 已确认调整 | [D59 Cypher 原样执行 / 读写连接](design/decisions.md#d59-cypher-passthrough)、[D60 内部自动填充缓存](design/decisions.md#d60-automatic-embedding-cache)、[D61 首版单字段语义索引](design/decisions.md#d61-single-field-semantic)、[D62 Ontology 不创建无字段类型](design/decisions.md#d62-nonempty-definition-properties)；[D63 TypeScript 与内置 Web](design/decisions.md#d63-typescript-integrated-web)确认 kgosd / Kernel 的语言与单 daemon 交付；D57 的托管职责 / api_key_env 与 D58 的可选顶层 indexes 保留 |
 | 检索范围与限制 | [首版只支持单字段，Cypher 联合检索可组合；托管向量的 filterProperties 与过滤范围内 top-k 限制](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
 | 工程待办 | [TypeScript runtime、SQL 事务封装接入、所需 Native adapter 与内置 Web 交付](design/implementation.md#typescript-运行时与数据库接入)；[模型修改、批量 Patch、Merge 与 adapter 的实现和验证](design/implementation.md#剩余依赖与工程合同)；[只读连接、自动持久缓存、Native 上下文与真实 ABI 集成](design/implementation.md#managed-semantic-integration-readiness)；已有目标行为，无需重新确认核心设计 |

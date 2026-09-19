@@ -49,7 +49,7 @@ Feature 是实现单元，Phase 是默认交付与验收单元。Feature 完成�
 
 ## 4. 当前基线
 
-**Phase 00 当前为 `in_progress`。** TypeScript workspace、CLI / daemon / Web 壳层、质量检查、测试、真实 Lithograph smoke、构建和本地包验证已经在 macOS arm64 完成本地验收。GitHub Actions workflow 已建立，但远端 Linux job 尚未运行，因此 Phase 00 不能标记为 `done`。
+**Phase 00 当前为 `done`。** TypeScript workspace、CLI / daemon / Web 壳层、质量检查、测试、真实 Lithograph smoke、构建和本地包验证已经在 macOS arm64 完成本地验收；提交 `20d73cd` 对应的 GitHub Actions CI run `35454190185` 也已在 Ubuntu 24.04 完整通过。
 
 KG OS 业务能力仍未实现。Knowledge Base bootstrap、认证、正式 daemon lifecycle、SQLite / Lithograph adapter、Ontology / Object / Graph / Evolution、正式 CLI / SDK / Web 交互继续以设计文档为行为真源。
 
@@ -57,7 +57,7 @@ KG OS 业务能力仍未实现。Knowledge Base bootstrap、认证、正式 daem
 
 | Phase | 状态 | 交付结果 | 主要输入 |
 | --- | --- | --- | --- |
-| [00 Engineering Foundation](phases/00-engineering-foundation.md) | `in_progress` | 固定 TypeScript 工具链、workspace、统一开发宿主、质量门禁、测试、CI workflow 与本地交付物 | [D63](../design/decisions.md#d63-typescript-integrated-web)、[D64](../design/decisions.md#d64-phase0-development-environment) |
+| [00 Engineering Foundation](phases/00-engineering-foundation.md) | `done` | 固定 TypeScript 工具链、workspace、统一开发宿主、质量门禁、测试、CI workflow 与本地交付物 | [D63](../design/decisions.md#d63-typescript-integrated-web)、[D64](../design/decisions.md#d64-phase0-development-environment) |
 
 后续业务阶段尚未冻结为独立 Phase。当前设计能够确定的实现依赖顺序是：
 

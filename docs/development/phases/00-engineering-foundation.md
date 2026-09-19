@@ -1,6 +1,6 @@
 # Phase 00：Engineering Foundation
 
-**状态：`in_progress`**
+**状态：`done`**
 
 ## 1. 目标与范围
 
@@ -116,7 +116,7 @@
 | P0-04 | 质量检查真实生效 | 全部门禁通过；`any`、越层 import 与 whitespace 负向样本分别被拒绝 | `done` |
 | P0-05 | 测试与真实扩展 | unit/HTTP/Web、Playwright、临时 profile 与 Lithograph real-load smoke 通过 | `done` |
 | P0-06 | 构建与本地交付物 | exports/types、五包外部安装、CLI/daemon/Web smoke 与 SHA-256 核对通过 | `done` |
-| P0-07 | Git hook 与远端 CI | forced pre-commit 通过；Linux GitHub Actions 必须有实际成功 job | `in_progress` |
+| P0-07 | Git hook 与远端 CI | forced pre-commit 通过；Linux GitHub Actions 必须有实际成功 job | `done` |
 | P0-08 | 文档与最终 Review | Development / Guide / Design 职责分离，链接与状态一致，最终 diff 无已知 finding | `done` |
 
 ## 6. 验证执行计划
@@ -155,7 +155,7 @@ Phase Review 至少检查：
 
 P0-01 至 P0-08 全部为 `done`，Phase Review finding 闭环，开发计划、指南、README、Design 引用和 vlog 同步，并取得 GitHub Actions Linux job 的实际成功结果后，Phase 00 才能改为 `done`。
 
-当前唯一未闭合项是 P0-07 的远端 CI 结果。提交、推送和远端运行尚未执行，不能用本地结果代替。
+P0-01 至 P0-08 已全部闭合，Phase Review finding 已关闭，开发计划、指南、README、Design 引用和 vlog 已同步；提交 `20d73cd` 对应的 Ubuntu 24.04 GitHub Actions CI run `35454190185` 已成功完成，因此 Phase 00 满足本节全部完成条件并标记为 `done`。
 
 ## 9. 当前完成证据
 
@@ -170,4 +170,4 @@ P0-01 至 P0-08 全部为 `done`，Phase Review finding 闭环，开发计划、
 - Security：完整 high-level audit 无已知漏洞，Markdown 工具链使用已修复的 `smol-toml@1.8.0`；
 - Linux CI fixture：Lithograph `v0.1.1` linux-x64 release artifact 已重新下载核对，SHA-256 与固定值 `dc73a730c2c8981761258753934b24673506d383b13c53ada332e3fef441c40c` 一致；
 - Cleanup：临时数据库、profile、错误样本、clean-copy 目录和开发/浏览器进程均已清理；
-- Remote：GitHub Actions workflow 已建立，远端 Linux job 尚无运行证据。
+- Remote：提交 `20d73cdb09947da03e3e222a318c2e61134a2879` 已推送到 `main`；GitHub Actions CI run `35454190185` 的 Ubuntu 24.04 `Validate` job（ID `105926467278`）完整通过，包含 `Validate Phase 0` 与 validation reports 上传，job 用时 2m5s。

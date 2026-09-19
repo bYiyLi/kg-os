@@ -566,5 +566,5 @@ CLI / SDK / Browser / Skill
 - 运行边界：Web 是浏览器客户端；kgosd 提供其页面与资源，同时提供 API。开发和构建使用统一入口，保持同一 daemon 交付；共享 TypeScript 不等于服务端与浏览器共享一个执行环境。
 - 备选：只建立最小空目录，先写业务再补测试 / CI / 交付验证；或复制 Noven 的全部业务结构。前者不满足本轮完整环境目标，后者会引入无关语言工具和运行规则，均不采用。
 - 取舍：前期增加工具配置与验证工作，换取各模块后续在同一基线上开发；壳层、Native smoke、完整数据库适配和业务实现分别验收，不能相互代替。基础环境可独立推进，必要真实扩展或 CI 证据缺失时只报告相应未完成项。
-- 当前状态：Phase 00 已在本地搭建并通过安装、开发联调、质量检查、测试、真实扩展 smoke、构建和本地交付物验证；Lefthook 与 GitHub Actions workflow 已建立。远端 CI job 尚未运行，因此阶段保持 `in_progress`。Phase 00 没有实现或修改 Object / Graph / Evolution 产品合同，也没有改变已确认的认证、读写连接、事务或缓存行为。
+- 当前状态：Phase 00 已完成安装、开发联调、质量检查、测试、真实扩展 smoke、构建、本地交付物与 forced Lefthook 验证；GitHub Actions workflow 已在 Ubuntu 24.04 对提交 `20d73cd` 实际运行并通过，因此阶段为 `done`。Phase 00 没有实现或修改 Object / Graph / Evolution 产品合同，也没有改变已确认的认证、读写连接、事务或缓存行为。
 - 当前合同：[Phase 00 计划](../development/phases/00-engineering-foundation.md)、[开发指南](../guide/development.md)、[Web hosting](runtime.md#web-hosting)；D63 的 TypeScript 与内置 Web 决定继续有效。
