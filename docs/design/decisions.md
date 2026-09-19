@@ -2,7 +2,7 @@
 
 本文件记录 KG OS 架构决策的**决定、依据、备选、取舍与被替换基线**。具体运行行为仍由对应职责设计文件拥有；本文件不建立第二份操作合同。
 
-2026-09-19 的最新调整见 [D59 Cypher 原样执行](#d59-cypher-passthrough) 与 [D60 自动填充 embedding 缓存](#d60-automatic-embedding-cache)。[D57](#d57-managed-semantic) / [D58](#d58-optional-indexes) 及更早条目保留当时的决策依据；被后续决定调整的部分在对应条目下标明，不与当前 owner 文档并行生效。
+2026-09-19 的运行架构调整见 [D63 TypeScript 与内置 Web](#d63-typescript-integrated-web)，工程开工顺序与完整环境范围见 [D64 Phase 0](#d64-phase0-development-environment)；此前 [D59 Cypher 原样执行](#d59-cypher-passthrough)、[D60 自动填充 embedding 缓存](#d60-automatic-embedding-cache)、D61 与 D62 的决定继续有效。[D57](#d57-managed-semantic) / [D58](#d58-optional-indexes) 及更早条目保留当时的决策依据；被后续决定调整的部分在对应条目下标明，不与当前 owner 文档并行生效。
 
 ## 底层架构替换背景
 
@@ -18,17 +18,17 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 → SQLite
 ```
 
-新基线：
+当前基线（含 D63 的语言与 Web 交付调整）：
 
 ```text
-CLI / SDK / Web / Skill (TypeScript / npm)
-→ kgosd (Rust local daemon)
+CLI / SDK / Browser / Skill
+→ kgosd (TypeScript / Node.js，内置 Web + HTTP API + Kernel)
 → Object / Graph / Evolution + Ontology / Knowledge semantics
 → Lithograph public capabilities
 → SQLite
 ```
 
-本次替换不改变 KG OS 的产品核心：AI-first、Graph-first、调用方定义领域模型、Agent 在 Kernel 外部，以及“一切皆可被定义”。它也不改变早期已经确认的 `kgosd` 本地 daemon 与 Rust / TypeScript 上下层分工。改变的是底层责任归属：通用数据库能力回归 Lithograph，KG OS 聚焦知识库语义、编排与交互。
+底层替换保留 KG OS 的产品核心：AI-first、Graph-first、调用方定义领域模型、Agent 在 Kernel 外部，以及“一切皆可被定义”。通用数据库能力回归 Lithograph，KG OS 聚焦知识库语义、编排与交互。`kgosd` 本地 daemon 的职责边界继续保留；旧 Rust / TypeScript 语言分工已由 D63 替换，Web 与 API 由同一 daemon 交付和运行。
 
 本次 Ontology 交互基线修正见 D46；以下决定为修正后的当前结论，不将早期讨论中的提案自动视为已确认行为。
 
@@ -335,6 +335,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D42 KG OS v1 使用 `kgosd` 本地 daemon 与 Rust / TypeScript 分层
 
+> 后续调整：[D63](#d63-typescript-integrated-web) 将 kgosd / Kernel 改为 TypeScript + Node.js，并明确内置 Web。下列 Rust / TypeScript 语言分工仅保留历史依据；daemon ownership 与客户端访问边界继续有效。
+
 - 决定：KG OS v1 采用本地 daemon 形态，`kgosd` 作为统一访问入口并承载 KG OS Kernel。`kgosd`、Kernel、Lithograph host/client、projection/compiler 与 consistency validation 使用 Rust；SDK、CLI、Web 与 Skill / 生态集成使用 TypeScript / npm。上层 client 不直接打开 SQLite 或绕过 `kgosd` 访问 Lithograph。本决定确认 process boundary；具体本地 transport 后续由 D44 冻结。
 - 依据：这套分层在 2026-09-08 的已确认技术架构中已经成立；2026-09-10 引入 Lithograph 时，旧 Graph Engine / FTS5 / sqlite-vec 数据库职责被整体替换，但没有后续 decision 否定 daemon 形态或 Rust / TypeScript 分工。恢复这部分可以重新明确 process ownership、数据库访问边界和上层交付生态，同时与 D1/D6/D37 完全兼容。
 - 备选：让每个 CLI / SDK / Web client 直接加载 Lithograph 并打开 Knowledge Base；把全部上层产品面改为 Rust；把 KG OS v1 改为必须部署的远程 server。
@@ -408,6 +410,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 取舍：用户必须显式知道 model 的实际 output dimension，因为 KG OS 在无远端 health/probe 的启动设计下不能可靠自动发现；换取 config 可离线验证、底层 Index dimension 在首次远端调用前就确定，并避免为了未来假设中的其它 Provider 提前增加 provider 抽象。
 
 ### D51 SQLite Extension 统一由 startup source resolver 装配（2026-09-17）
+
+> 后续调整：[D63](#d63-typescript-integrated-web) 将宿主改为 TypeScript / Node.js，显式事务使用 SQL tx_* 封装；原有完整 Native tx_* family 的强制绑定不再作为该事务链路的要求。source resolver、每连接加载和必要 Native adapter 的同一 connection 边界保留；当前 capability 规则见 [Runtime](runtime.md#sqlite-extension-source-resolver)。
 
 - 决定：`~/.kgosd/config.toml` 使用 ordered `[[sqlite.extensions]]` 作为 **唯一 SQLite loadable-extension 配置入口**。Lithograph 自身、第三方 FTS5 tokenizer 与其它 SQLite extension 都使用同一机制；KG OS 不再把 Lithograph shared library 内嵌进 binary、写死安装路径，也不为“全文插件 / 向量插件 / Lithograph 插件”建立多套 loader。每个 entry 只表达 artifact source 与 SQLite load 参数，不声明业务 `kind/capability`；全部加载完成后由 `kgosd` 单独验证 KG OS 必需的 Lithograph public capability。
 - Source contract：`source` 是 absolute local file path 或 absolute HTTPS URL。Remote source 必须配置 artifact SHA-256；local source 可选配置 expected SHA-256，但 resolver 总会计算实际 content hash。Direct `.so/.dylib/.dll` 直接形成 load artifact；`.tar.gz/.zip` 必须用精确 relative `library` 指出 archive 内要加载的 shared library。`entrypoint` optional，省略时使用 SQLite 标准 resolution。数组顺序就是每个 connection 的加载顺序，所有 entry 都是 required；v1 不增加自动发现、plugin registry、可选插件、任意 download headers 或 package dependency solver。
@@ -540,3 +544,28 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 备选：保留无字段模型并要求 Lithograph 补充相应能力；不采用，不据此增加底层扩展任务。
 - 取舍：调用方创建类型时就需要明确至少一个业务字段；字段仍可为 optional，不因此增加必填、唯一、业务 ID 或实例属性非空要求。至少一个字段属于 KG OS 高层 Definition profile，公共 Graph 继续按 D59 原样执行 Cypher。
 - 当前合同：[Ontology 公共格式](ontology.md#公共可编辑格式)、[编辑示例](ontology.md#编辑示例)、[工程验收](implementation.md#ontology-专项验收)。
+
+<a id="d63-typescript-integrated-web"></a>
+
+### D63 KG OS 统一 TypeScript，kgosd 自带 Web（2026-09-19）
+
+- 决定：`kgosd`、Kernel、SQLite / Lithograph adapter、projection/compiler 与 consistency validation 使用 TypeScript，在 Node.js 上运行。CLI、SDK、Web 继续使用 TypeScript / npm；数据库计算与版本机制仍由 Lithograph 承担。
+- Web 交付：Web 构建产物随 `kgosd` 同一交付物发布，由同一进程、同一 configured host/port 提供页面与 API/control；用户不单独部署或启动 Web 服务。模块划分不改变这项运行边界，客户端仍通过 HTTP 访问 Kernel。
+- 数据库接入：采用 Lithograph SQL `tx_*` 包装保留现有显式事务控制，内部仍由底层开启 / 提交 / 回滚 SQLite；不改成图 Commit 自动绑定外层 SQLite 事务。该包装只解决事务入口，不能推定 Graph streaming、取消、外部 I/O 与 transaction subquery 已经全部转为 SQL。
+- 依据：用户先确认把现有 C API tx_* 包装成 SQL，并在独立会话开发；随后明确同意 KG OS 使用 TypeScript，要求更新设计，并强调 kgosd 自带 Web、不拆开运行。当前 KG OS 尚无业务实现，修改的是待实现设计，不涉及已发布应用的语言迁移。
+- 备选：保留 Rust daemon / Kernel 与 TypeScript client 的语言分工；把 Web 拆成独立服务。前者增加上层多语言维护，后者不符合已经确认的单 daemon 交付目标，均不采用。
+- 取舍与工程边界：统一上层实现语言，便于共享类型和校验；仍需选择并验证 Node.js SQLite driver、所需 Native adapter、长查询 / 流式 / 取消调度和 Web 资源交付。SQL 封装在 Lithograph 的实现与交付、KG OS 的真实接入验收分别核对，不因本决定宣称完成。具体框架、SQLite 驱动与构建工具由后续工程实现依据这些合同选择。
+- 当前合同：[Architecture](architecture.md#v1-运行时与技术分层)、[Runtime Web](runtime.md#web-hosting)、[Lithograph 调用入口](runtime.md#lithograph-调用入口)、[工程接入](implementation.md#typescript-运行时与数据库接入)。D42 的旧语言分工由本条替换；D51 的统一加载规则按当前 Runtime 衔接 SQL / Native capability；Object / Graph / Evolution 的产品语义保持。
+
+<a id="d64-phase0-development-environment"></a>
+
+### D64 Phase 0 先建立完整开发环境（2026-09-19）
+
+- 决定：进入业务实现前，先完成工程初始化、统一开发启动、内置 Web 构建、调试、完整质量检查、测试、Git hooks、CI 和本地打包验证。Phase 0 的范围与验收统一由 [Implementation](implementation.md#phase-0开发环境搭建)维护。
+- 依据：用户提出第一步搭建开发环境，要求检查 Noven 可参考的做法，随后明确“开发环境尽量全面点”，并要求形成 Phase 0 开发计划和维护设计文档。
+- 工程方案：复用 pnpm workspace、严格 TypeScript、代码 / 依赖检查与打包后实际运行验证；补齐 KG OS 所需的 Web 热更新、浏览器测试和 CI。工具、目录及版本锁定方法是本次按已确认目标制定的工程方案，不表示用户逐项确认了 Noven 的具体版本、忽略项或发布方式。
+- 运行边界：Web 是浏览器客户端；kgosd 提供其页面与资源，同时提供 API。开发和构建使用统一入口，保持同一 daemon 交付；共享 TypeScript 不等于服务端与浏览器共享一个执行环境。
+- 备选：只建立最小空目录，先写业务再补测试 / CI / 交付验证；或复制 Noven 的全部业务结构。前者不满足本轮完整环境目标，后者会引入无关语言工具和运行规则，均不采用。
+- 取舍：前期增加工具配置与验证工作，换取各模块后续在同一基线上开发；壳层、Native smoke、完整数据库适配和业务实现分别验收，不能相互代替。基础环境可独立推进，必要真实扩展或 CI 证据缺失时只报告相应未完成项。
+- 当前状态：仅计划与设计已记录，工程尚未搭建；本次不修改 Object / Graph / Evolution 产品合同，不改变已确认的认证、读写连接、事务或缓存行为。
+- 当前合同：[Phase 0 计划](implementation.md#phase-0开发环境搭建)、[Web hosting](runtime.md#web-hosting)；D63 的 TypeScript 与内置 Web 决定继续有效。

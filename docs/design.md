@@ -15,9 +15,9 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
 | [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同 |
 | [cli.md](design/cli.md) | `kg` AI-first CLI command tree、参数、stdin/file、JSON/raw body/streaming、错误与 exit code |
-| [runtime.md](design/runtime.md) | `kgosd` HTTP、`KG_HOME` 单 Knowledge Base profile、`auth.json`/Bearer authentication、Lithograph Embedding cache policy、SQLite Extension source resolver、Full-text / Semantic Index 默认配置与 api_key_env、single-instance lock、daemon lifecycle 与 Web hosting |
-| [decisions.md](design/decisions.md) | D1–D62 的决定、依据、备选和取舍，以及被替换架构记录 |
-| [implementation.md](design/implementation.md) | 实现 readiness、projection/compiler/adapter mapping 与工程实现顺序；不得重新定义产品语义 |
+| [runtime.md](design/runtime.md) | TypeScript / Node.js `kgosd`、内置 Web 与 HTTP、`KG_HOME` 单 Knowledge Base profile、`auth.json`/Bearer authentication、Lithograph Embedding cache policy、SQLite Extension source resolver、Full-text / Semantic Index 默认配置与 api_key_env、single-instance lock、daemon lifecycle 与 Web hosting |
+| [decisions.md](design/decisions.md) | D1–D64 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [implementation.md](design/implementation.md) | Phase 0 开发环境计划、工程工具与模块组织、实现 readiness、projection/compiler/adapter mapping 与工程实现顺序；不得重新定义产品语义 |
 
 ## 从配置到调用
 
@@ -27,16 +27,18 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 使用方怎么定义模型和索引 | [Ontology 公共格式](design/ontology.md#公共可编辑格式)、[完整编辑示例](design/ontology.md#编辑示例) |
 | 调用方怎么保存正文和查询 | [Graph 合同](design/graph.md#graph-公共调用合同)、[CLI query](design/cli.md#query)、[CLI execute](design/cli.md#execute) |
 | 需要实现和验证什么 | [工程待办与验收](design/implementation.md) |
+| 第一阶段怎么搭开发环境 | [Phase 0 计划](design/implementation.md#phase-0开发环境搭建)、[分步任务与验收](design/implementation.md#分步任务与验收)、[完成清单](design/implementation.md#phase-0-完成清单) |
 
 ## 设计状态导航
 
 | 状态 | 范围与入口 |
 | --- | --- |
 | 已确认 | Ontology 渐进读取 / 聚合编辑、Object Patch、Knowledge / Graph、Evolution、单 profile / 单库 / 单 Token runtime；具体规则见上面的 owner 表 |
-| 已确认调整 | [D59 Cypher 原样执行 / 读写连接](design/decisions.md#d59-cypher-passthrough)、[D60 内部自动填充缓存](design/decisions.md#d60-automatic-embedding-cache)、[D61 首版单字段语义索引](design/decisions.md#d61-single-field-semantic)、[D62 Ontology 不创建无字段类型](design/decisions.md#d62-nonempty-definition-properties)；D57 的托管职责 / api_key_env 与 D58 的可选顶层 indexes 保留 |
+| 已记录开发计划，待实施 | [D64 Phase 0](design/decisions.md#d64-phase0-development-environment)：先搭完整开发环境，覆盖统一启动、调试、质量检查、测试、CI 与交付物；具体任务和验收见 [Implementation](design/implementation.md#phase-0开发环境搭建) |
+| 已确认调整 | [D59 Cypher 原样执行 / 读写连接](design/decisions.md#d59-cypher-passthrough)、[D60 内部自动填充缓存](design/decisions.md#d60-automatic-embedding-cache)、[D61 首版单字段语义索引](design/decisions.md#d61-single-field-semantic)、[D62 Ontology 不创建无字段类型](design/decisions.md#d62-nonempty-definition-properties)；[D63 TypeScript 与内置 Web](design/decisions.md#d63-typescript-integrated-web)确认 kgosd / Kernel 的语言与单 daemon 交付；D57 的托管职责 / api_key_env 与 D58 的可选顶层 indexes 保留 |
 | 检索范围与限制 | [首版只支持单字段，Cypher 联合检索可组合；托管向量的 filterProperties 与过滤范围内 top-k 限制](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
-| 工程待办 | [模型修改、批量 Patch、Merge 与 adapter 的实现和验证](design/implementation.md#剩余依赖与工程合同)；[只读连接、自动持久缓存、Native 上下文与真实 ABI 集成](design/implementation.md#managed-semantic-integration-readiness)；已有目标行为，无需重新确认核心设计 |
-| Web 待细化 | [同源服务与共享 Kernel 已定，具体页面布局和交互尚未展开](design/runtime.md#web-交互设计状态)；不阻塞 Kernel、daemon、CLI 或 SDK 的实现 |
+| 工程待办 | [TypeScript runtime、SQL 事务封装接入、所需 Native adapter 与内置 Web 交付](design/implementation.md#typescript-运行时与数据库接入)；[模型修改、批量 Patch、Merge 与 adapter 的实现和验证](design/implementation.md#剩余依赖与工程合同)；[只读连接、自动持久缓存、Native 上下文与真实 ABI 集成](design/implementation.md#managed-semantic-integration-readiness)；已有目标行为，无需重新确认核心设计 |
+| Web 待细化 | [kgosd 内置交付、同源服务与共享 Kernel 已定，具体页面布局和交互尚未展开](design/runtime.md#web-交互设计状态)；不阻塞 Kernel、daemon、CLI 或 SDK 的实现 |
 | 待实现 | KG OS 当前仍只有文档；[实现待办](design/implementation.md#工程实现待办)不是已发布能力 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库与真实 ABI 测试。

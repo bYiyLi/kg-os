@@ -27,6 +27,8 @@ Node / Relationship Definition 一起表达字段、约束和索引。单字段�
 
 托管语义检索由 Lithograph 执行。KG OS 把全局 embedding 默认配置和 Ontology 的文本字段声明编译成 Semantic Index；调用方传普通查询字符串。KG OS 不生成内部向量 Property，不在保存或合并正文时调用模型，也不维护独立 `cache.db`。配置只支持可选 `api_key_env`，实际凭证不进入索引历史。
 
+KG OS 的 `kgosd` 与 Kernel 使用 TypeScript + Node.js，CLI、SDK、Web 同样使用 TypeScript。**`kgosd` 自带 Web**：页面与 API 随同一个 daemon 交付、启动并使用同一端口，不需要单独部署 Web 服务；具体边界见 [运行架构](docs/design/architecture.md#v1-运行时与技术分层)和 [Web hosting](docs/design/runtime.md#web-hosting)。
+
 一个 `KG_HOME`（默认 `~/.kgosd`）对应一个 `kgosd` 和根目录 `kgos.db`；所有 daemon API/control request 使用 Bearer authentication，CLI 从 `KG_TOKEN` 取得 credential。
 
 配置、模型与调用示例，以及设计职责索引，统一从 [设计入口](docs/design.md)进入。本文只维护产品定义，具体配置、数据和接口规则由各 owner 文档维护。
@@ -34,6 +36,8 @@ Node / Relationship Definition 一起表达字段、约束和索引。单字段�
 ## 当前状态
 
 **项目目前仍只有文档，没有业务实现。** 命令和配置示例是设计合同，不是已发布功能。
+
+开发先从 [Phase 0：开发环境搭建](docs/design/implementation.md#phase-0开发环境搭建)开始，建立统一开发启动、构建、调试、质量检查、测试、CI 和交付物验证。计划已记录，尚未实施。
 
 首版语义索引只支持单字段；Cypher 原样执行和内部自动填充缓存的设计已记录。模型修改、批量 Patch、Merge 与底层连接 / 缓存对接仍需实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 

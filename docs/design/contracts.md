@@ -40,7 +40,7 @@ Lithograph `VERSION_NOT_FOUND` 在 KG OS 公共语义中映射为 `STATE_NOT_FOU
 
 SQLite Extension / Full-text 运行时错误固定区分：
 
-- `SQLITE_EXTENSION_ERROR`：`[[sqlite.extensions]]` 配置形状非法，remote source 缺/错 `sha256`，source 不存在/下载失败，hash mismatch，archive 不安全或无法解包，配置的 `library` 不存在，SQLite load/entrypoint 初始化失败，或 resolved libraries 中无法发现**恰好一个完整 Lithograph ABI provider**（零个/多个/partial export family）。`details` 可以包含公开的 extension ordinal、source kind（local/https）、phase（resolve/hash/extract/load/capability）与安全可显示的路径/URL，但不能回显下载 credential（v1 不支持）或 native library 私有诊断中的敏感文本。
+- `SQLITE_EXTENSION_ERROR`：`[[sqlite.extensions]]` 配置形状非法，remote source 缺/错 `sha256`，source 不存在/下载失败，hash mismatch，archive 不安全或无法解包，配置的 `library` 不存在，SQLite load/entrypoint 初始化失败，所需 Lithograph SQL capability 缺失/不兼容，或所需 Native adapter 在 resolved libraries 中无法发现**恰好一个满足其全部调用需求的 Lithograph ABI provider**（零个/多个/缺失所需 symbol）。`details` 可以包含公开的 extension ordinal、source kind（local/https）、phase（resolve/hash/extract/load/capability）与安全可显示的路径/URL，但不能回显下载 credential（v1 不支持）或 native library 私有诊断中的敏感文本。
 - `FULLTEXT_CONFIG_ERROR`：`[fulltext]` 字段未知、`analyzer` 类型错误、空/只含无效分隔内容或含 NUL。省略 `[fulltext]` 不报错，等价 `unicode61`。
 - `FULLTEXT_ANALYZER_UNAVAILABLE`：当前 runtime 在 extension 加载后无法构造 `[fulltext].analyzer`，或实际执行某个历史/当前 Full-text Index query 时，该 IndexDefinition 保存的 analyzer / 显式 query override 当前未注册或不可构造。它不能伪装成零结果；历史索引需要旧 tokenizer 但当前 runtime 没有加载时，只失败该次 Full-text 操作，不把整个 Knowledge Base 判定为损坏。
 

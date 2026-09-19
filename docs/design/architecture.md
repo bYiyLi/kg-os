@@ -76,44 +76,40 @@ Ontology 阅读提供全局 → 可选 Domain → Definition 的明确入口；�
 
 ### v1 运行时与技术分层
 
-KG OS v1 保持早期已经确认的**本地 daemon + client-facing TypeScript/npm** 分层；引入 Lithograph 改变的是数据库核心归属，不改变这一上层运行结构。当前运行时结构为：
+KG OS v1 使用 **TypeScript + Node.js 实现 `kgosd` 与 Kernel**；CLI、SDK、Web 继续使用 TypeScript / npm。`kgosd` 自带 Web，与 API 一起交付和启动；浏览器是访问该 Web 的客户端，不对应另一个 Web 服务。当前运行时结构为：
 
 ```text
-AI / Agent
-    │
-    ▼
-CLI / SDK / Web / Skill
-    TypeScript / npm
-    │
-    │ HTTP
-    ▼
-kgosd
-    Rust local daemon
-    ├── KG OS Kernel
+AI / Agent / Skill → CLI / SDK ── HTTP ──┐
+Browser ─────── Web 页面 + API HTTP ─────┤
+                                        ▼
+kgosd — TypeScript / Node.js，本地服务
+    ├── HTTP API / control
+    ├── 内置 Web（随 kgosd 交付，同进程、同端口）
+    ├── KG OS Kernel（TypeScript）
     │   ├── Object
     │   ├── Graph
     │   └── Evolution
     ├── Ontology / Knowledge semantics
     ├── projection / compiler / consistency
-    └── Lithograph host / client
+    └── SQLite / Lithograph adapter
              │
              ▼
-         Lithograph
+         Lithograph（SQLite loadable extension）
              │
              ▼
            SQLite
 ```
 
 - **`kgosd` 是 KG OS v1 的本地统一访问入口。** 它承载 KG OS Kernel，并负责解析 `KG_HOME`、读取该 profile 的 `config.toml` / `auth.json`、通过 Lithograph 公开 procedure 设置 embedding cache policy、加载 SQLite extensions、打开唯一 Knowledge Base `kgos.db`、维护所需 connection / transaction lifecycle，以及执行 KG OS 到 Lithograph 的 projection / compiler / consistency orchestration。Lithograph 自身也是通过这套通用 SQLite Extension lifecycle 提供，不内嵌进 KG OS binary。
-- **SQLite Extension 只是一层运行时能力装配机制。** KG OS 不按“全文插件 / 向量插件 / Lithograph 插件”建立多套 loader；所有 loadable extension 都从 startup config 的 ordered source list 解析为本地 immutable artifact，再加载到每个 SQLite connection。Extension 可以提供 tokenizer、SQL function、virtual table 或其它 SQLite capability；通用 loader 不理解它们的业务语义。KG OS 在全部加载完成后单独验证 Lithograph public capability，因为 Lithograph 是 KG OS 的数据库基础，而不是因为配置项具有特殊 `kind`。Native execution/transaction 需要的 Lithograph ABI 也从同一批 resolved libraries 自动发现：必须恰好一个 library 暴露完整 ABI 1 symbol family；函数指针绑定不代替该 library 在目标 SQLite connection 上的正常 extension registration。
+- **SQLite Extension 只是一层运行时能力装配机制。** KG OS 不按“全文插件 / 向量插件 / Lithograph 插件”建立多套 loader；所有 loadable extension 都从 startup config 的 ordered source list 解析为本地 immutable artifact，再加载到每个 SQLite connection。Extension 可以提供 tokenizer、SQL function、virtual table 或其它 SQLite capability；通用 loader 不理解它们的业务语义。KG OS 在全部加载完成后单独验证 Lithograph public capability，因为 Lithograph 是 KG OS 的数据库基础，而不是因为配置项具有特殊 `kind`。显式事务使用 Lithograph 的 SQL `tx_*` 封装；其它 execution / streaming 所需 Native 能力仍从同一批 resolved libraries 接入，不能因切换为 TypeScript 就假定全部 Native 依赖消失。具体 SQL / Native capability 与真实 connection 要求由 [Runtime](runtime.md#lithograph-调用入口)负责。
 - **Full-text analyzer 是 `kgosd` 的全局运行配置。** Ontology 只声明 `type: fulltext` 及其真实 index name/targets/properties；per-index tokenizer/analyzer 不是 KG OS v1 的公共模型字段。KG OS 创建或因业务 Schema 变化重建 Full-text IndexDefinition 时使用当前 `[fulltext].analyzer`；已经存在的 Lithograph versioned IndexDefinition 保留自己创建时实际写入的 analyzer，不因 daemon restart 或配置变化被自动改写。第三方 tokenizer 的实现来自当前 SQLite connection 已加载的 extension；KG OS 不根据 analyzer 名字自动寻找或安装插件。
 - **Embedding 交给 Lithograph 与 Provider extension。** `kgosd` 通过同一 SQLite extension loader 装配 Lithograph 和 `lithograph-openai-compatible`，把全局 `[embedding]` 默认值编译进新建 / 必须重建的 Semantic Index。已有索引使用自身 versioned 配置；Ontology 只声明文本字段和真实索引名。KG OS 不实现 Embeddings HTTP client、内部向量 Property、写入/合并后的向量刷新或独立 `cache.db`。配置与凭证见 [Runtime](runtime.md#embedding-配置与索引映射)，模型与查询分别见 [Ontology](ontology.md#托管语义索引) 和 [Graph](graph.md#graph-公共调用合同)。
 - **v1 不提供 Full-text / Embedding 自动配置迁移。** runtime 默认值在 restart 时重新读取，只影响之后新建 / 必须重建的索引；旧索引和历史查询保留各自配置。配置本身随数据库 IndexDefinition 正常版本化，KG OS 不保存第二份 fingerprint/generation，不自动重写历史或全库重算。
-- **Rust 层负责确定性核心。** `kgosd`、Kernel、Lithograph host/client、Object projection / Patch compiler、Evolution projection 与 KG OS consistency validation 使用 Rust 实现；Rust 层不重新实现 Lithograph 已拥有的 Graph Engine、Search Engine、Schema Engine 或 Version Engine。
-- **TypeScript / npm 层负责上层产品面。** SDK、CLI、Web 以及 Skill / 生态集成以 TypeScript / npm 为主要交付形态；它们消费 KG OS 公共 logical contract，不直接打开 SQLite database、加载 Lithograph extension 或依赖 `_lithograph_*` 内部状态。
+- **KG OS 核心使用 TypeScript。** `kgosd` 在 Node.js 上运行，Kernel、SQLite / Lithograph adapter、Object projection / Patch compiler、Evolution projection 与 consistency validation 使用 TypeScript 实现。数据库查询、索引、向量计算与版本机制继续由 Lithograph 执行；KG OS 不重写数据库引擎，也不因这项语言选择修改 Lithograph 的实现语言。
+- **CLI / SDK / 浏览器 Web 消费公共合同。** 它们与服务端可以共享 TypeScript 类型和输入校验，但数据库访问仍由 `kgosd` 统一拥有，客户端不直接打开 SQLite、加载 Lithograph 或依赖 `_lithograph_*` 内部状态。Web 构建产物包含在 `kgosd` 的交付物内，由其 HTTP server 提供；前后端模块可以分目录维护，不拆成独立部署的 Web 服务。
 - **client ↔ `kgosd` 使用 HTTP，默认绑定本机 loopback。** configurable host / port、Web hosting、`KG_HOME`、single-token Bearer authentication 与 credential 边界由 [本地运行时](runtime.md) 唯一负责；所有 data/control API 调用都必须认证。具体业务 HTTP route / metadata carrier 仍由 adapter mapping 决定，但不能改变 Object / Graph / Evolution logical contract。
 
-这套结构是对早期 KG OS 技术架构中 `CLI / SDK / Web / Skill → kgosd → database` 分层的延续。被后续 Lithograph 架构替换的是原先由 KG OS 自己维护的 GraphQLite / FTS5 / sqlite-vec 数据库实现，不是 `kgosd` 的本地服务职责或 Rust / TypeScript 的上下层边界。
+本地 daemon 与 client 的职责边界继续保留；[D63](decisions.md#d63-typescript-integrated-web) 将旧 Rust / TypeScript 语言分工改为 KG OS 统一 TypeScript，并明确 `kgosd` 内置 Web。实现语言一致不改变 client ↔ daemon 的 HTTP 边界。
 
 ## Lithograph 边界
 
@@ -131,9 +127,9 @@ KG OS 可以为承载 Lithograph 做最小 SQLite host 工作，例如：
 
 - 打开／关闭 database connection；
 - 从 [Runtime](runtime.md#sqlite-extension-source-resolver) 冻结的 source resolver 得到本地 immutable artifacts，并按配置顺序加载 SQLite extensions；
-- 只在 connection 初始化阶段通过 SQLite host C API 临时开启 extension loading，完成后立即关闭，不把 SQL `load_extension()` 能力暴露给业务 Cypher；
-- 在所有 extension 加载完成后验证 Lithograph public initialization / ABI capability 与当前 Full-text analyzer runtime capability；
-- 维护 Lithograph Native API 所要求的 connection / autocommit 生命周期，并通过 Lithograph public explicit transaction API 组织需要多个 Cypher execution 的单-State mutation。
+- 只在 connection 初始化阶段通过 SQLite 驱动的 extension-loading API 临时开启加载，完成后立即关闭，不把 SQL `load_extension()` 能力暴露给业务 Cypher；
+- 在所有 extension 加载完成后验证 Lithograph public SQL / 所需 Native capability 与当前 Full-text analyzer runtime capability；
+- 维护同一 SQLite connection / autocommit 生命周期，并通过 Lithograph SQL explicit-transaction 封装组织需要多个 Cypher execution 的单-State mutation；这些 SQL 函数复用底层事务语义，不能另套 SQLite `BEGIN/COMMIT`。
 
 KG OS 不把 caller-owned SQLite `BEGIN/COMMIT` 解释为自己的 Object Patch transaction，也不使用 SQLite 直接建立第二套知识、Ontology、Search、State 或 Evolution 业务表；KG OS 不绕过 Lithograph 用 SQL 修改图数据、Schema 或 version refs。
 

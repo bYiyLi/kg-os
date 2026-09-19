@@ -1,18 +1,22 @@
 # 本地运行时
 
-本文件是 KG OS v1 **`kgosd` 本地服务、HTTP bind、`KG_HOME` runtime profile、单 Knowledge Base、单 Token 认证、Embedding Provider startup config、daemon lifecycle、Web hosting 与默认 endpoint** 的设计真源。Kernel 能力由 [Object](object.md)、[Graph](graph.md) 与 [Evolution](evolution.md) 负责；CLI 命令由 [CLI](cli.md) 负责。
+本文件是 KG OS v1 **TypeScript / Node.js `kgosd` 本地服务、内置 Web 交付、HTTP bind、`KG_HOME` runtime profile、单 Knowledge Base、单 Token 认证、Embedding Provider startup config、daemon lifecycle、Web hosting 与默认 endpoint** 的设计真源。Kernel 能力由 [Object](object.md)、[Graph](graph.md) 与 [Evolution](evolution.md) 负责；CLI 命令由 [CLI](cli.md) 负责。
 
 ## 本地服务模型
 
-KG OS v1 采用一个本地 `kgosd` daemon 作为统一运行时入口：
+KG OS v1 采用一个以 TypeScript 实现、运行在 Node.js 上的本地 `kgosd` daemon，作为 API 与内置 Web 的统一运行时入口。Kernel 与数据库调用编排在该服务内执行：
 
 ```text
-kg CLI ───────────┐
-SDK ──────────────┼── HTTP ──→ kgosd ──→ KG OS Kernel ──→ Lithograph
-Browser Web ──────┘
+kg CLI / SDK ── API HTTP ───┐
+Browser ── 页面 / API HTTP ─┤
+                            ▼
+                 kgosd（TypeScript / Node.js）
+                 ├── 内置 Web
+                 ├── HTTP API / control
+                 └── KG OS Kernel → Lithograph
 ```
 
-`kgosd` 同时承载 API 与 Human-facing Web，因此 CLI、SDK 与 Web 使用同一个 KG OS Kernel 和同一组 Object / Graph / Evolution logical contract。v1 不为 CLI 再建立 Unix socket / Named Pipe / gRPC 私有协议，也不要求另起一个 Web server。
+`kgosd` 同时承载 API 与 Human-facing Web，因此 CLI、SDK 与 Web 使用同一个 KG OS Kernel 和同一组 Object / Graph / Evolution logical contract。部署和启动只需要这个 daemon，不单独安装、部署或启动 Web 服务；Web 与 API 共用进程、配置端口和 lifecycle。v1 不为 CLI 再建立 Unix socket / Named Pipe / gRPC 私有协议。
 
 ## HTTP bind 与默认 endpoint
 
@@ -41,11 +45,17 @@ http://<host>:<port>/          → Web UI
 same origin                    → KG OS API / streaming
 ```
 
-Web 与 API 使用同一个 origin，因此 v1 不需要为了 Web 再设计独立前端 server、反向代理或跨 origin API。Web asset packaging、具体 API path、client-side routing 与 caching 属于实现 / Web adapter 合同。
+Web 构建产物随 `kgosd` 同一交付物发布，由 `kgosd` 的 HTTP server 直接提供页面和资源；执行 `kg daemon start` 后，同一个 configured origin 即可访问 Web 与 API。没有独立 Web 启动命令、第二个服务端口或单独部署步骤。
+
+Web 与 CLI / SDK 在逻辑上都是公共 API 的客户端。服务端 TypeScript 在 Node.js 中运行；Web TypeScript 构建出的浏览器代码经 `kgosd` HTTP 下载后在浏览器执行。这里的“同进程”指页面 / 资源服务与 API 服务由同一个 daemon 承载，不是把浏览器执行并入 Node.js。
+
+前后端代码按 workspace 模块组织，但这不产生第二个部署服务。[Phase 0 开发流程](implementation.md#开发与构建流程)采用 Vite middleware 供开发时页面与热更新使用，复用 kgosd HTTP server 和同一端口；HMR WebSocket 与该 server 一起关闭。交付物使用构建后的静态资源，运行时不依赖 Vite dev server。具体页面框架、布局、API path、client-side routing 与 caching 仍按 Web adapter 的实际需要实现。
+
+Phase 0 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemon 的数据库就绪条件，不新增跳过初始化或认证的公共运行模式。开发脚本不得把尚未接入 Knowledge Base 的壳层标成正式 `running`；完整启动仍须通过下文的能力检查与 bootstrap。
 
 ### Web 交互设计状态
 
-已确认 Web 由 `kgosd` 托管，与 CLI / SDK 共用 Kernel、业务合同和实例认证；人通过 Web 查看、管理和纠正知识。具体页面布局、导航与操作交互尚未细化，需在 Web 实施阶段沿用 Ontology / Object / Graph / Evolution 的现有能力补充。此项不阻塞 Kernel、daemon、CLI 或 SDK 的实现，也不表示 Web 页面设计已经完成。
+已确认 Web 内置于 `kgosd` 的交付与运行流程，与 CLI / SDK 共用 Kernel、业务合同和实例认证；人通过 Web 查看、管理和纠正知识。具体页面布局、导航与操作交互尚未细化，需在 Web 实施阶段沿用 Ontology / Object / Graph / Evolution 的现有能力补充。此项不阻塞 Kernel、daemon、CLI 或 SDK 的实现，也不表示 Web 页面设计已经完成。
 
 ## 单 Token 实例认证
 
@@ -209,13 +219,28 @@ https source -- bounded redirect ┘
 
 archive extraction 必须 fail-closed：拒绝 absolute path、`..` traversal、symlink/hardlink、device/special entry 与越界 `library`；download / decompression / extracted-size 受实现资源上限约束。先写临时文件/目录，hash 与 extraction 全部成功后再原子发布 content-addressed cache。缓存命中时重新确认目标 artifact 与 hash 一致；缓存可删除并从 source 重建，不属于 Knowledge Base history 或 correctness source。远程 cache 已存在且有效时，daemon restart 不要求网络可用。
 
-`kgosd` 对每个新 SQLite connection 使用**同一批已解析的本地 artifacts**：仅在 host C API 层临时允许 extension loading，按配置顺序调用 SQLite extension load API，随后立即关闭该能力；业务 Cypher/SQL 不获得任意 `load_extension()` 权限。任一 configured extension 在任一 connection 加载失败，该 connection 不进入可用池。
+`kgosd` 对每个新 SQLite connection 使用**同一批已解析的本地 artifacts**：仅在宿主 SQLite 驱动的 connection 初始化阶段临时允许 extension loading，按配置顺序调用驱动提供的 extension load API，随后立即关闭该能力；业务 Cypher/SQL 不获得任意 `load_extension()` 权限。任一 configured extension 在任一 connection 加载失败，该 connection 不进入可用池。
 
-KG OS 还需要 Lithograph Native ABI 完成 streaming execution 与 explicit transaction，因此 generic loader 之外必须有一个**自动 capability binding** 步骤，但仍不要求配置 `kind = "lithograph"`：daemon 对同一批 resolved local shared libraries 使用平台 dynamic-loader symbol lookup，只做导出符号发现/函数指针绑定，不通过这条路径再次执行 SQLite extension init；必须恰好有一个 resolved library 暴露 KG OS 当前要求的完整 Lithograph ABI 1 symbol family（`lithograph_v1_execute/validate/tx_begin/tx_execute/tx_commit/tx_abort/free`）。零个、多个候选或只暴露部分 family 都返回 extension capability error。实际调用这些函数前，对应 library 仍必须已经通过 SQLite extension-loading path 在**目标 `sqlite3*` connection** 完成注册；Native ABI binding 不能实例化第二套 SQLite，也不能替代 `.load` 生命周期。
+generic loader 之外仍要验证 Lithograph capability，但不要求配置 `kind = "lithograph"`。对当前实际 connection 检查 Lithograph version / initialization、Managed Semantic 与所需 SQL 函数能力；显式事务检查下面的 SQL `tx_*` 入口，不再为了该事务链路单独绑定 Native `tx_*` symbols。当前 [Graph](graph.md#graph-公共调用合同) 仍采用普通 Native execution；其 execution / streaming adapter 所需 ABI symbols 必须来自同一批 resolved libraries 中唯一匹配的 provider，且完整满足该 adapter 的调用需求；缺失、多个候选或不兼容时拒绝开放 Knowledge Base。
 
-因此“Lithograph 是 KG OS 必需数据库能力”由公开 symbol/capability probe 证明，而不是由 extension 配置中的名字、顺序、文件名或 `kind` 猜测。缺少兼容 Lithograph capability 时 Knowledge Base 不能开放。
+实际 Native 调用仍要求对应 library 已在**目标 SQLite connection** 完成 extension-load 注册，且使用该连接的同一个 `sqlite3*`；绑定不能实例化第二套私有 SQLite，也不能替代 extension-loading lifecycle。SQLite 驱动及所需 Native adapter 的 Node.js 接入属于工程选型与真实集成验证，不因 TypeScript 语言决定就宣称已经完成。Lithograph 身份与能力由公开 probe 证明，不根据配置名字、顺序或文件名猜测。
 
 SQLite Extension 是与 `kgosd` 同权限执行的 native code。配置文件因此属于 operator trust boundary：KG OS 不 sandbox 插件，不根据 Ontology/AI 输入动态添加 extension，也不把 remote headers/token/options bag 暴露给业务调用方。修改 extension source/hash/library/entrypoint 只在下一次 daemon start/restart 生效；它本身不创建 State 或自动执行任何数据 migration。
+
+### Lithograph 调用入口
+
+KG OS 的多语句单-State mutation（例如 Object Patch 与 bootstrap）通过 SQLite 驱动调用 Lithograph 的 SQL 显式事务封装，全部调用使用同一个独占 checkout 的 connection：
+
+| SQL 函数 | KG OS 使用方式 |
+| --- | --- |
+| `lithograph_tx_begin(options_json)` | 传入目标 Branch、expectedHead 与 metadata；底层开启其拥有的 SQLite 事务 |
+| `lithograph_tx_execute(query, params_json, options_json)` | 执行 compiler 生成的 Cypher，并读取当前事务中的结果 |
+| `lithograph_tx_commit()` | 底层完成图 Commit 与 SQLite 提交，返回最终 State；纯读事务不创建新 Commit |
+| `lithograph_tx_abort()` | 显式取消时回滚底层事务；失败已自动 abort 时不再重复结束事务 |
+
+这些函数只改变调用入口，Object Patch 的 strict base、no-op、单-State 与 fail-closed 规则仍由 [Object](object.md#object-公共调用合同)拥有。`tx_commit` 内部包含 SQLite 提交，KG OS 不在外面另套 `BEGIN/COMMIT`，也不把普通 SQLite 事务改成自动合并图 Commit。一次事务的 connection 不能在执行期间借给其它请求。
+
+SQL `tx_*` 封装不等于所有 Lithograph Native 能力都已被 SQL 替代。公共 Graph 的流式执行、取消、外部 I/O 与 transaction subquery 继续遵守 [Graph 合同](graph.md#graph-公共调用合同)；不能把所有查询换成 `lithograph_rows()`，也不能把完整结果缓冲后再输出 NDJSON 当作已验证的底层流式接入。所需 SQL / Native adapter 与 Node.js 的集成必须以实际加载扩展和调用测试验收，见 [工程待办](implementation.md#typescript-运行时与数据库接入)。当前 KG OS 尚无这条调用链的实现或验收结果；底层 SQL 封装的可用版本以 Lithograph 的公开合同与交付证据为准。
 
 ### Full-text 全局配置
 
@@ -357,15 +382,16 @@ resolve KG_HOME (default ~/.kgosd)
 → load existing $KG_HOME/auth.json or securely create it once
 → validate server + cache + sqlite.extensions + fulltext + embedding config
 → resolve every SQLite extension source to immutable local artifacts
-→ discover exactly one complete Lithograph Native ABI provider from those artifacts
 → resolve configured host + port
 → open SQLite connection
 → load the resolved extension set in config order
-→ verify Lithograph Managed Semantic / Native capabilities and Provider registration
+→ verify Lithograph SQL transaction / Managed Semantic capabilities and Provider registration
+→ bind and verify Native Graph execution capabilities on the same SQLite connection
 → validate effective Full-text analyzer on the connection
 → open / bootstrap $KG_HOME/kgos.db and Kernel
 → configure Lithograph embedding cache policy through a standalone maintenance call
-→ bind <host>:<port>
+→ resolve bundled Web assets
+→ bind <host>:<port> for Web + API/control
 → write active local endpoint into kgosd.lock
 → serve Web shell + authenticated API/control
 ```
@@ -433,7 +459,7 @@ exact HTTP control route、background detach 的平台实现、shutdown wait tim
 - `KG_HOME` 是唯一 runtime profile selector；未设置时默认 `~/.kgosd`，一个 profile 只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base；
 - `auth.json` 是该 profile 的持久 server credential；所有 daemon API/control request 使用 Bearer token，CLI 只从 `KG_TOKEN` 取得客户端 credential；
 - v1 只有单 token 全权限认证，不提供 user / role / scope / OAuth / TLS；非 loopback plaintext HTTP 仍不是不可信网络安全模型；
-- Web 与 API 由同一 `kgosd` origin 提供；
+- `kgosd` / Kernel 使用 TypeScript + Node.js；内置 Web 随 daemon 交付，与 API 共用进程、端口和 lifecycle，不单独部署 Web 服务；
 - `config.toml` 不 hot reload；host / port 通过显式 restart 生效；
 - `[[sqlite.extensions]]` 是唯一 SQLite loadable-extension 配置入口；Lithograph 与第三方 tokenizer/其它 SQLite extension 都走同一 resolver/load lifecycle，不由业务请求动态加载；
 - remote extension 必须 SHA-256 pin，最终总是从 daemon-local immutable artifact 加载；每个 SQLite connection 都加载同一解析结果；
