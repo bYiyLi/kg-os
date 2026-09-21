@@ -2,7 +2,7 @@
 
 本文件记录 KG OS 架构决策的**决定、依据、备选、取舍与被替换基线**。具体运行行为仍由对应职责设计文件拥有；本文件不建立第二份操作合同。
 
-2026-09-19 的运行架构调整见 [D63 TypeScript 与内置 Web](#d63-typescript-integrated-web)，工程开工顺序与完整环境范围见 [D64 Phase 0](#d64-phase0-development-environment)；此前 [D59 Cypher 原样执行](#d59-cypher-passthrough)、[D60 自动填充 embedding 缓存](#d60-automatic-embedding-cache)、D61 与 D62 的决定继续有效。[D57](#d57-managed-semantic) / [D58](#d58-optional-indexes) 及更早条目保留当时的决策依据；被后续决定调整的部分在对应条目下标明，不与当前 owner 文档并行生效。
+2026-09-21 的当前运行架构由 [D65 Go runtime](#d65-go-runtime) 与 [D66 Lithograph v0.3.0 SQL-only](#d66-lithograph-v030-sql-only)定义；[D63](#d63-typescript-integrated-web) / [D64](#d64-phase0-development-environment) 保留 TypeScript 工程基线及历史完成证据，但其被 D65/D66 调整的部分不再作为当前合同。此前 D59–D62 与更早条目继续保留仍未被后续决定替换的产品语义。
 
 ## 底层架构替换背景
 
@@ -18,17 +18,17 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 → SQLite
 ```
 
-当前基线（含 D63 的语言与 Web 交付调整）：
+当前基线（含 D65 / D66 的语言、SQL execution 与 Provider cache 调整）：
 
 ```text
-CLI / SDK / Browser / Skill
-→ kgosd (TypeScript / Node.js，内置 Web + HTTP API + Kernel)
+kg CLI (Go) / SDK (TypeScript) / Browser / Skill
+→ kgosd (Go，内置 Web + HTTP API + Kernel)
 → Object / Graph / Evolution + Ontology / Knowledge semantics
 → Lithograph public capabilities
 → SQLite
 ```
 
-底层替换保留 KG OS 的产品核心：AI-first、Graph-first、调用方定义领域模型、Agent 在 Kernel 外部，以及“一切皆可被定义”。通用数据库能力回归 Lithograph，KG OS 聚焦知识库语义、编排与交互。`kgosd` 本地 daemon 的职责边界继续保留；旧 Rust / TypeScript 语言分工已由 D63 替换，Web 与 API 由同一 daemon 交付和运行。
+底层替换保留 KG OS 的产品核心：AI-first、Graph-first、调用方定义领域模型、Agent 在 Kernel 外部，以及“一切皆可被定义”。通用数据库能力回归 Lithograph，KG OS 聚焦知识库语义、编排与交互。`kgosd` 本地 daemon 的职责边界继续保留；服务端与 CLI 当前由 D65 冻结为 Go，SDK / Web 保留 TypeScript；Web 与 API 继续由同一 daemon 交付和运行。
 
 本次 Ontology 交互基线修正见 D46；以下决定为修正后的当前结论，不将早期讨论中的提案自动视为已确认行为。
 
@@ -411,7 +411,7 @@ CLI / SDK / Browser / Skill
 
 ### D51 SQLite Extension 统一由 startup source resolver 装配（2026-09-17）
 
-> 后续调整：[D63](#d63-typescript-integrated-web) 将宿主改为 TypeScript / Node.js，显式事务使用 SQL `tx_*` 封装；原有完整 Native `tx_*` family 的强制绑定不再作为该事务链路的要求。source resolver、每连接加载和必要 Native adapter 的同一 connection 边界保留；当前 capability 规则见 [Runtime](runtime.md#sqlite-extension-source-resolver)。
+> 后续调整：[D63](#d63-typescript-integrated-web) 曾将宿主改为 TypeScript / Node.js；[D65](#d65-go-runtime) 现将服务端 / CLI 改为 Go；[D66](#d66-lithograph-v030-sql-only) 进一步删除 application-facing Native query ABI / `sqlite3*` 要求。source resolver、每 connection 加载同一批 immutable artifacts 与 startup-only extension-loading trust boundary 继续有效。为与当前 Go driver 的公开 extension-loading API 保持确定映射，当前 Runtime 已把 `entrypoint` 从本条历史上的 optional 改为 required non-empty；下文 optional entrypoint 与 Native ABI 描述只保留历史依据，不再是当前配置合同。
 
 - 决定：`~/.kgosd/config.toml` 使用 ordered `[[sqlite.extensions]]` 作为 **唯一 SQLite loadable-extension 配置入口**。Lithograph 自身、第三方 FTS5 tokenizer 与其它 SQLite extension 都使用同一机制；KG OS 不再把 Lithograph shared library 内嵌进 binary、写死安装路径，也不为“全文插件 / 向量插件 / Lithograph 插件”建立多套 loader。每个 entry 只表达 artifact source 与 SQLite load 参数，不声明业务 `kind/capability`；全部加载完成后由 `kgosd` 单独验证 KG OS 必需的 Lithograph public capability。
 - Source contract：`source` 是 absolute local file path 或 absolute HTTPS URL。Remote source 必须配置 artifact SHA-256；local source 可选配置 expected SHA-256，但 resolver 总会计算实际 content hash。Direct `.so/.dylib/.dll` 直接形成 load artifact；`.tar.gz/.zip` 必须用精确 relative `library` 指出 archive 内要加载的 shared library。`entrypoint` optional，省略时使用 SQLite 标准 resolution。数组顺序就是每个 connection 的加载顺序，所有 entry 都是 required；v1 不增加自动发现、plugin registry、可选插件、任意 download headers 或 package dependency solver。
@@ -479,7 +479,7 @@ CLI / SDK / Browser / Skill
 
 ### D57 托管语义检索交给 Lithograph（2026-09-19）
 
-> 后续调整：[D59](#d59-cypher-passthrough) 取消 Graph 的语句 / Vector / identifier 限制与相应 guard 待办；[D60](#d60-automatic-embedding-cache) 以正常查询自动持久填充替换本条 query miss 仅进内存、rebuild 填充与预热入口待定的旧规则；[D61](#d61-single-field-semantic) 确认首版只支持单字段。联合检索可组合及托管接口的具体限制以 [Ontology 当前范围](ontology.md#语义索引的首版范围)为准，下列历史“待定”文字不再作为首版设计确认清单。其余职责与配置决定继续有效。
+> 后续调整：[D59](#d59-cypher-passthrough) 取消 Graph 的语句 / Vector / identifier 限制与相应 guard 待办；[D60](#d60-automatic-embedding-cache) 以正常查询自动持久填充替换本条 query miss 仅进内存、rebuild 填充与预热入口待定的旧规则；[D61](#d61-single-field-semantic) 确认首版只支持单字段；[D66](#d66-lithograph-v030-sql-only) 再把 text -> Vector persistent cache ownership 从 Lithograph Core 下沉到具体 Embedding Provider。联合检索可组合及托管接口的具体限制以 [Ontology 当前范围](ontology.md#语义索引的首版范围)为准，下列历史“待定”文字不再作为首版设计确认清单。其余职责与配置决定继续有效。
 
 - 决定：KG OS 保留 `type: vector` 的简化本体声明，编译为 Lithograph Managed Semantic Index。向量生成、缓存和检索由 Lithograph / OpenAI-compatible Provider extension 承担；KG OS 不实现 Embeddings HTTP client、reserved 向量 Property、source framing 或写入/合并后的向量刷新。
 - 配置与调用：`[embedding]` 作为新建 / 必须重建索引的默认值，完整 provider/config/dimensions/similarity 保存到 Lithograph versioned IndexDefinition；已有索引与历史查询使用自身配置。调用方使用 `db.index.semantic.queryNodes/queryRelationships`，参数是普通 String，移除 `SemanticText` / `$semantic` 转换，不增加 Search DSL。
@@ -507,15 +507,17 @@ CLI / SDK / Browser / Skill
 
 - 决定：Graph `query` 使用只读连接，`execute` 使用读写连接；Cypher 原样交给 Lithograph。KG OS 不解析、重写、按关键字判定语句，不实现 procedure 黑白名单。只读入口中的写操作由底层拒绝，不自动升级到写连接。
 - 依据：用户明确决定“任何 Cypher 都不限制”，语句内部交给 Lithograph，随后授权修正设计文件并记录 vlog。
-- 直接影响：取消 Graph 的 `LOAD CSV` / Schema / Version Procedure 限制、固定 Knowledge Graph View，以及 Graph Vector / `__kgos_` identifier 的输入、结果和提交前检查。参数与结果采用完整 Lithograph JSON；底层的语法、事务、约束和只读规则继续生效。请求上下文不能通过无条件附加不兼容 Native options 变相限制 procedure。
+- 直接影响：取消 Graph 的 `LOAD CSV` / Schema / Version Procedure 限制、固定 Knowledge Graph View，以及 Graph Vector / `__kgos_` identifier 的输入、结果和提交前检查。参数与结果采用完整 Lithograph JSON；底层的语法、事务、约束和只读规则继续生效。请求上下文不能通过无条件附加不兼容 execution options变相限制 procedure；D66现用固定 State-pin / connection-checkout映射满足这一边界。
 - 高层边界：Object / Ontology / Evolution 的聚合模型、Patch 和一致性校验继续有效，但不再约束原始 Graph Cypher。直接变更可能得到无法按高层模型解释的 Snapshot；高层接口据实报错，Graph 可继续执行，不自动修复 Binding。文件 / 网络能力继承宿主权限；此决定不开放 raw SQL 或动态配置 native extension。
 - 备选：在 KG OS 按 statement / procedure / value 增加拦截，或要求底层增加专门的 KG OS 允许列表；均不采用。KG OS 只保留读写连接职责，不复制数据库解析与执行规则。
-- 取舍：普通 Cypher、procedure 与 transaction subquery 按底层各自提交语义执行，不再承诺所有 Graph 写入都经过 KG OS profile 校验或恰好产生一个 Commit。只读连接与内部缓存的衔接、Native 上下文映射尚需集成验证，不能以文本改动宣称完成。
+- 取舍：普通 Cypher、procedure 与 transaction subquery 按底层各自提交语义执行，不再承诺所有 Graph 写入都经过 KG OS profile 校验或恰好产生一个 Commit。只读连接、SQL streaming 与 Provider-owned cache 的真实 Go driver 集成尚需验收；Native 上下文要求已由 D66 取消。
 - 当前合同：[Graph](graph.md#graph)、[执行连接](runtime.md#cypher-执行连接)、[高层内部边界](ontology.md#semantic-graph-的内部边界)、[错误](contracts.md#公共错误合同)、[集成验收](implementation.md#managed-semantic-integration-readiness)。
 
 <a id="d60-automatic-embedding-cache"></a>
 
 ### D60 正常查询自动填充 embedding 缓存（2026-09-19）
+
+> 后续调整：[D66](#d66-lithograph-v030-sql-only) 保留“正常查询透明命中 / 填充缓存、调用方无需预热”的产品目标，但把 persistent text -> Vector cache ownership 改为 Provider-owned；Lithograph Core 不再拥有 cache table / policy / procedure，KG OS 的 `[cache]` 默认值编译进 OpenAI-compatible Provider 的 versioned `providerConfig.cache`。
 
 - 决定：source 与 query text 都先查缓存；miss 调 Embedding API，成功并通过结果校验后自动持久保存。调用方不需要预热；rebuild 是底层维护能力，不是普通查询前置步骤。
 - 依据：用户明确缓存是为减少 API 调用成本而增加的内部逻辑，确认应由 Lithograph 优化，并要求生成独立任务提示词。本次文档同步同时清除与该决定冲突的旧“仅 rebuild 持久填充 / KG OS 预热入口待定”文字。
@@ -548,17 +550,21 @@ CLI / SDK / Browser / Skill
 
 ### D63 KG OS 统一 TypeScript，kgosd 自带 Web（2026-09-19）
 
+> 后续调整：[D65](#d65-go-runtime) 将 `kgosd`、Kernel、CLI 与 SQLite / Lithograph host 改为 Go；TypeScript 继续用于 SDK / Web。本文“Web 随同一 daemon 交付、同进程同端口、不独立部署”的运行边界继续有效。
+
 - 决定：`kgosd`、Kernel、SQLite / Lithograph adapter、projection/compiler 与 consistency validation 使用 TypeScript，在 Node.js 上运行。CLI、SDK、Web 继续使用 TypeScript / npm；数据库计算与版本机制仍由 Lithograph 承担。
 - Web 交付：Web 构建产物随 `kgosd` 同一交付物发布，由同一进程、同一 configured host/port 提供页面与 API/control；用户不单独部署或启动 Web 服务。模块划分不改变这项运行边界，客户端仍通过 HTTP 访问 Kernel。
 - 数据库接入：采用 Lithograph SQL `tx_*` 包装保留现有显式事务控制，内部仍由底层开启 / 提交 / 回滚 SQLite；不改成图 Commit 自动绑定外层 SQLite 事务。该包装只解决事务入口，不能推定 Graph streaming、取消、外部 I/O 与 transaction subquery 已经全部转为 SQL。
 - 依据：用户先确认把现有 C API tx_* 包装成 SQL，并在独立会话开发；随后明确同意 KG OS 使用 TypeScript，要求更新设计，并强调 kgosd 自带 Web、不拆开运行。当前 KG OS 尚无业务实现，修改的是待实现设计，不涉及已发布应用的语言迁移。
 - 备选：保留 Rust daemon / Kernel 与 TypeScript client 的语言分工；把 Web 拆成独立服务。前者增加上层多语言维护，后者不符合已经确认的单 daemon 交付目标，均不采用。
 - 取舍与工程边界：统一上层实现语言，便于共享类型和校验；仍需选择并验证 Node.js SQLite driver、所需 Native adapter、长查询 / 流式 / 取消调度和 Web 资源交付。SQL 封装在 Lithograph 的实现与交付、KG OS 的真实接入验收分别核对，不因本决定宣称完成。具体框架、SQLite 驱动与构建工具由后续工程实现依据这些合同选择。
-- 当前合同：[Architecture](architecture.md#v1-运行时与技术分层)、[Runtime Web](runtime.md#web-hosting)、[Lithograph 调用入口](runtime.md#lithograph-调用入口)、[工程接入](implementation.md#typescript-运行时与数据库接入)。D42 的旧语言分工由本条替换；D51 的统一加载规则按当前 Runtime 衔接 SQL / Native capability；Object / Graph / Evolution 的产品语义保持。
+- 当前合同：[Architecture](architecture.md#v1-运行时与技术分层)、[Runtime Web](runtime.md#web-hosting)、[Lithograph 调用入口](runtime.md#lithograph-调用入口)、[工程接入](implementation.md#go-运行时与数据库接入)。D42 的旧语言分工曾由本条替换，当前服务端/CLI语言与 SQL-only database integration 再由 D65/D66调整；Object / Graph / Evolution 的产品语义保持。
 
 <a id="d64-phase0-development-environment"></a>
 
 ### D64 Phase 0 先建立完整开发环境（2026-09-19）
+
+> 后续调整：[D65](#d65-go-runtime) 改变当前工程基线。原 TypeScript Phase 00 的完成证据作为历史真实记录保留，但不能再作为当前 Go 基线的完成证据；当前 [Phase 00](../development/phases/00-engineering-foundation.md) 重新承担 Go + TypeScript client 的工程基础验收。
 
 - 决定：进入业务实现前，先完成工程初始化、统一开发启动、内置 Web 构建、调试、完整质量检查、测试、Git hooks、CI 和本地打包验证。该阶段现统一编号为 Phase 00，其范围、状态与验收由 [Phase 00 计划](../development/phases/00-engineering-foundation.md)维护。
 - 依据：用户提出第一步搭建开发环境，要求检查 Noven 可参考的做法，随后明确“开发环境尽量全面点”，并要求形成 Phase 0 开发计划和维护设计文档。
@@ -567,4 +573,31 @@ CLI / SDK / Browser / Skill
 - 备选：只建立最小空目录，先写业务再补测试 / CI / 交付验证；或复制 Noven 的全部业务结构。前者不满足本轮完整环境目标，后者会引入无关语言工具和运行规则，均不采用。
 - 取舍：前期增加工具配置与验证工作，换取各模块后续在同一基线上开发；壳层、Native smoke、完整数据库适配和业务实现分别验收，不能相互代替。基础环境可独立推进，必要真实扩展或 CI 证据缺失时只报告相应未完成项。
 - 当前状态：Phase 00 已完成安装、开发联调、质量检查、测试、真实扩展 smoke、构建、本地交付物与 forced Lefthook 验证；GitHub Actions workflow 已在 Ubuntu 24.04 对提交 `20d73cd` 实际运行并通过，因此阶段为 `done`。Phase 00 没有实现或修改 Object / Graph / Evolution 产品合同，也没有改变已确认的认证、读写连接、事务或缓存行为。
-- 当前合同：[Phase 00 计划](../development/phases/00-engineering-foundation.md)、[开发指南](../guide/development.md)、[Web hosting](runtime.md#web-hosting)；D63 的 TypeScript 与内置 Web 决定继续有效。
+- 当前合同：[Phase 00 计划](../development/phases/00-engineering-foundation.md)、[开发指南](../guide/development.md)、[Web hosting](runtime.md#web-hosting)；D65 的 Go runtime 与 D63 保留下来的内置 Web 边界共同构成当前工程基线。
+
+<a id="d65-go-runtime"></a>
+
+### D65 KG OS 服务端与 CLI 改用 Go（2026-09-21）
+
+- 决定：`kgosd`、Kernel、SQLite / Lithograph adapter、Object/Ontology projection/compiler、Evolution projection 与 consistency validation 使用 Go；`kg` CLI 同样使用 Go。TypeScript / npm 继续用于 SDK 与浏览器 Web；Web 构建产物仍随 `kgosd` 一起交付，由同一 daemon、同一 configured host/port 提供页面、静态资源与 API/control。
+- 服务端基线：优先使用 Go 标准库，HTTP 使用 `net/http`，SQLite host 使用 `database/sql` + `github.com/mattn/go-sqlite3`。KG OS 使用 driver 自带的 bundled SQLite amalgamation，不使用 `libsqlite3` 系统库；构建必须启用 `sqlite_fts5`，且不得启用 `sqlite_omit_load_extension`。SQLite driver 必须支持同 connection ordered loadable extension、`context.Context` cancellation、真实 `sqlite3_interrupt()` 路径、只读 / 读写连接和 CGO native build；不再为 SQLite 自建 Node worker/child-process IPC、FFI shim 或第二套 private SQLite runtime。
+- 客户端边界：SDK / Web 继续消费 HTTP 公共合同，不直接打开 SQLite。Go 服务端与 TypeScript client 不因为语言不同而复制第二套产品语义；公共 request/result/error 合同仍由当前 Design owner 定义，跨语言 wire mapping 通过集成测试保持一致，不为了共享源码引入代码生成或新的 schema registry。
+- 交付：`kgosd` 与 `kg` 是 native Go executable；Web 继续 React/Vite/TypeScript 并在构建时进入 daemon 静态资源。具体 repository layout、Go/tool versions 与 lint/test/build commands由 Phase 00工程计划固定；Phase 00只冻结当前工程基线需要的 macOS arm64本地 + Ubuntu 24.04 x64远端 native证据，完整产品 release platform matrix等到实际发布阶段再冻结，不提前制造未承诺平台。
+- 依据：用户在 Lithograph v0.3.0 已完成 SQL-only execution / true streaming 后重新比较 Node、Go、Rust，确认采用 Go，并要求整理新方案及维护设计与开发计划。Go 直接提供 daemon/HTTP/context cancellation 模型，避免 Node `node:sqlite` 同步执行为 long-query cancel 引入 DB worker process/IPC。
+- 备选：继续 TypeScript/Node + DB child process；或使用 Rust + rusqlite/Tokio/Axum。前者为 SQLite cancellation 增加进程与 IPC 复杂度；后者数据库控制更强，但 KG OS 大量上层 orchestration / HTTP / compiler 代码的实现和维护成本更高。当前需求下 Go 是更小的整体方案。
+- 取舍：引入 CGO 与 native C toolchain，跨平台发布需要在目标 OS/arch runner 上实际构建和加载 Lithograph；换取单 daemon、标准 context cancellation、简单 streaming/HTTP 和不依赖 Node native-handle workaround 的数据库宿主。
+- 当前合同：[Architecture](architecture.md#v1-运行时与技术分层)、[Runtime](runtime.md)、[工程接入](implementation.md#go-运行时与数据库接入)、[Phase 00](../development/phases/00-engineering-foundation.md)。
+
+<a id="d66-lithograph-v030-sql-only"></a>
+
+### D66 KG OS 对齐 Lithograph v0.3.0 SQL-only execution 与 Provider-owned cache（2026-09-21）
+
+- 决定：KG OS 的 application-facing Lithograph integration 只使用 SQLite SQL surface：完整结果使用 `lithograph()`，真正流式结果使用 `lithograph_rows()`，校验使用 `lithograph_validate()`；多 execution 单 Commit 使用 `lithograph_tx_begin() -> lithograph()/lithograph_rows()* -> lithograph_tx_commit()/abort()`。不再绑定或探测 application-facing Native query ABI，不要求取得 `sqlite3*`，也不存在 `lithograph_tx_execute()`。
+- Graph 映射：`graph query` 使用物理只读 connection，先通过 `lithograph.commit.get(StateRef)` 解析并 pin exact `commit/...`，再以该 commit 作为 `options.at` 执行原始 Cypher；`graph execute` 使用独占读写 connection，在 SQLite autocommit 状态先执行 `lithograph.branch.checkout(requestedBranch)`，随后不附加 `options.branch` 地执行原始 Cypher。这样 Branch / Tag / Merge 等拥有自身 target 的 procedure 不会被 KG OS 无条件 branch option 破坏，也不需要 procedure-name parser / allowlist。streaming 两者都消费 `lithograph_rows()`，非 streaming 使用 `lithograph()`。
+- Streaming wire：HTTP成功 stream只映射 `columns -> row* -> summary`；如果 daemon在至少一个 event已发送后失败，使用 adapter-only terminal `error` event携带公共 error envelope，`summary` / `error`互斥。transport断开导致 terminal event不可达时 client按 incomplete transport处理。daemon逐 event encode/write/flush后才拉取下一条 SQLite row，避免无界 prefetch并让 request cancellation沿 backpressure路径传播。
+- Cache ownership：Lithograph Core 不再拥有 text -> Vector persistent cache。KG OS 的 `[cache]` 是官方 OpenAI-compatible Provider 的默认 cache mapping：启用时编译为 `providerConfig.cache.enabled/path/max_bytes`，Provider 使用与 `kgos.db` 隔离的独立 SQLite database；Lithograph 仍拥有 graph/vector search 与 TEMP/HNSW derived materialization。Provider cache 不进入 KG OS State、Commit 或 Lithograph storage。
+- Runtime cache path：`[cache].path` 可选；省略时 KG OS 解析为 `$KG_HOME/cache/openai-compatible.db`，相对路径统一相对 effective `KG_HOME` 解析，写入 IndexDefinition 前转成 absolute path。enabled 时 KG OS 在 startup 创建父目录但不预创建或直接读写 Provider cache database；cache 文件由 Provider 自己初始化和维护。修改 `[cache]` 只改变之后新建 / 因业务定义变化必须重建的 Semantic Index 默认 `providerConfig`，不迁移已有或历史 IndexDefinition。
+- Baseline：当前 KG OS 集成目标升级为 Lithograph v0.3.0、storage format 3、`CY25-2026.08` 与 SQLite 3.45.0+；Phase 00 的 v0.1.1 和旧 Phase 01 的 v0.2.1 / format4 / Native ABI 记录只作为历史证据保留。
+- 依据：Lithograph v0.3.0 已完成统一 SQL execution surface、删除 application Native query ABI、删除 Core embedding result cache并把 OpenAI-compatible persistent cache下沉到 Provider；用户要求 KG OS 按新的底层事实重新设计，而不是继续维护旧 FFI / native-handle 方案。
+- 取舍：Provider cache path 与其它 providerConfig 一起进入 versioned IndexDefinition，因此 KG OS 必须使用稳定、明确的 profile-local absolute path并保留历史配置；换取读连接不再因为 embedding cache写入要求修改 Lithograph `main`，以及 KG OS/driver 不再承担 Native ABI / `sqlite3*` 暴露。
+- 当前合同：[Runtime cache / extension / SQL mapping](runtime.md)、[Graph](graph.md#graph-公共调用合同)、[Implementation](implementation.md#go-运行时与数据库接入)、[Phase 01](../development/phases/01-runtime-lithograph-host.md)。

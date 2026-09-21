@@ -147,7 +147,7 @@ Graph `params` 是可选 JSON Map，并且 stdin 可能已经用于 Cypher，因
 
 ### Error 与 exit code
 
-除 Graph `--stream` 已经开始输出的情况外，失败时 stdout 必须为空；stderr 输出一个 [公共错误合同](contracts.md#公共错误合同) JSON envelope，并以 LF 结束。Graph streaming 如果在第一个 event 前失败，stdout 同样为空；一旦已经输出 `columns` / `row` 后才发生 底层执行 / 值编码 / transport failure，既有 stdout 允许保留为 partial NDJSON，但**绝不能输出 final `summary`**，stderr 仍输出 error envelope，进程以非零 exit 结束。默认不在 error envelope 前后输出其它 diagnostics。CLI 参数解析、本地 JSON/YAML/text parse 或文件读取也尽量使用同一公开 category，例如 `INVALID_ARGUMENT`、`PARSE_ERROR`、`IO_ERROR`，但不能伪造成 daemon 已执行请求。
+除 Graph `--stream` 已经开始输出的情况外，失败时 stdout 必须为空；stderr 输出一个 [公共错误合同](contracts.md#公共错误合同) JSON envelope，并以 LF 结束。Graph streaming 如果在第一个 event 前收到 daemon 的普通 non-2xx JSON error，stdout 同样为空并按 daemon public error处理。stream 已经输出 `columns` / `row` 后，daemon 的 terminal NDJSON `error` event **不复制到 stdout**；CLI取出其中的 public error envelope写到 stderr，保留已经输出的 partial stdout，不输出 final `summary`，并以 exit `1`结束。如果 socket/read/EOF发生在没有收到 terminal `summary` 或 `error` 的情况下，CLI生成本地 `IO_ERROR` envelope并以 exit `3`结束；这类 transport failure不能伪造成 daemon已返回业务错误。默认不在 error envelope前后输出其它 diagnostics。CLI 参数解析、本地 JSON/YAML/text parse 或文件读取也尽量使用同一公开 category，例如 `INVALID_ARGUMENT`、`PARSE_ERROR`、`IO_ERROR`，但不能伪造成 daemon 已执行请求。
 
 v1 exit code 只表达粗粒度执行层级，稳定业务分类始终读取 error `code`：
 
@@ -455,11 +455,11 @@ CLI 必须保持 Graph logical contract：`execute` **没有 `--base-state`**。
 {"type":"summary","state":"commit/...","counters":{}}
 ```
 
-`columns` 恰好一次，`row` 零到多次，`summary` 成功时恰好一次并且必须是最后一个 event。stream 中途发生底层执行、编码或 transport failure 时，已经输出的 row 只是 partial result，不输出成功 summary；Vector 是合法的底层值，不再作为中途拒绝的条件。调用方只有在进程 exit 0 且观察到 final `summary` 时才能把整个 stream 视为成功。
+CLI stdout只包含成功路径的 `columns` / `row` / `summary` event：`columns` 恰好一次，`row` 零到多次，`summary` 成功时恰好一次并且必须是最后一个 stdout event。HTTP adapter 的 terminal `error` event由 CLI转换到 stderr，不能混进 stdout NDJSON。stream中途发生底层执行/编码 failure时，已经输出的 row只是 partial result；transport在 terminal event前断开时同样只保留 partial stdout。Vector是合法的底层值，不再作为中途拒绝的条件。调用方只有在进程 exit 0且观察到 final `summary` 时才能把整个 stream视为成功。
 
 对 `graph execute --stream`，final `summary.state` 反映底层完成时的 State。summary 前观察到的 elementId 不能直接当作已确认持久结果；缺少 summary 也不等于没有已提交变更，例如底层 transaction subquery 可能已有成功批次，或提交后传输失败。事务、取消与部分提交行为遵守 Lithograph，KG OS 不承诺任意 Cypher 一律整体回滚，也不自动重放结果未知的写入。
 
-Streaming 只改变 transport framing，不改变 column order、row value encoding、resolved State 或 counter 语义。
+Streaming 只改变 transport framing，不改变 column order、row value encoding、resolved State 或 counter 语义。daemon 的 terminal error framing与逐 event backpressure见 [Runtime](runtime.md#graph-http-streaming-framing)。
 
 ## Evolution CLI
 
@@ -640,7 +640,7 @@ current kgosd
 
 如果没有 active owner，普通业务命令直接使用本文既有 exit `3` transport failure；**不能自动执行 `kg daemon start`**。如果运行中的 daemon 启动后 `config.toml` 被修改，业务命令继续使用 lock 中的 effective endpoint；只有显式 `kg daemon restart` 后才切换到新 startup config。CLI 在 dispatch 前要求 `KG_TOKEN`，但**绝不自动读取** `$KG_HOME/auth.json`；连接失败时也不随机换端口或直接打开 SQLite。
 
-一个 daemon 固定只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base。Lithograph 在该库内部管理 derived embedding cache，不产生第二个 Knowledge Base 或 CLI target。v1 不提供 `base list/use`、`--base` 或其它单-daemon多库选择 surface；需要另一套知识世界时启动另一个 `KG_HOME` profile。
+一个 daemon 固定只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base。OpenAI-compatible Provider 可以使用独立 SQLite cache database，但它只是 derived runtime data，不是第二个 Knowledge Base 或 CLI target；默认位于 `$KG_HOME/cache/openai-compatible.db`。v1 不提供 `base list/use`、`--base` 或其它单-daemon多库选择 surface；需要另一套知识世界时启动另一个 `KG_HOME` profile。
 
 ## 兼容性
 

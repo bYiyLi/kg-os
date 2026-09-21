@@ -49,20 +49,28 @@ Feature 是实现单元，Phase 是默认交付与验收单元。Feature 完成�
 
 ## 4. 当前基线
 
-**Phase 00 当前为 `done`。** TypeScript workspace、CLI / daemon / Web 壳层、质量检查、测试、真实 Lithograph smoke、构建和本地包验证已经在 macOS arm64 完成本地验收；提交 `20d73cd` 对应的 GitHub Actions CI run `35454190185` 也已在 Ubuntu 24.04 完整通过。
+**当前 Phase 00 为 `ready`。** 2026-09-21 的 D65/D66 已把当前工程基线改为 Go `kgosd` / Kernel / `kg` CLI + TypeScript SDK/Web，并升级到 Lithograph v0.3.0 SQL-only integration。Phase 00 现已进一步冻结 Go 1.27.1、`go.mod` tool dependencies、gofmt/vet/Staticcheck/test/race/90% coverage/govulncheck 质量基线，以及统一 `pnpm check:quick` / `pnpm validate` 根入口。新的 Go Phase 00 仍没有实现或验收，因此不能沿用旧 `done` 状态。
 
-KG OS 业务能力仍未实现。Knowledge Base bootstrap、认证、正式 daemon lifecycle、SQLite / Lithograph adapter、Ontology / Object / Graph / Evolution、正式 CLI / SDK / Web 交互继续以设计文档为行为真源。
+2026-09-19 的 TypeScript / Node.js Phase 00 曾真实完成：本地 gates 与提交 `20d73cd` 对应的 Ubuntu 24.04 GitHub Actions run `35454190185` 成功。该证据完整保留在 [Phase 00](phases/00-engineering-foundation.md) 的历史章节，但只证明被 D65 supersede 的旧工程基线。
+
+**Phase 01 当前为 `planned`。** 它依赖新的 Phase 00先达到 `done`。当前计划已经升级为 Go bundled SQLite host + Lithograph v0.3.0 / format 3 / SQL-only execution、确定的 query/execute context映射、`lithograph_rows()` true streaming/context cancellation、Provider-owned cache与新的 explicit transaction lifecycle。
+
+仓库当前仍有尚未提交的旧 Phase 01 TypeScript / `ffi-rs` / bundled SQLite / v0.2.1 实现尝试。它们不满足 D65/D66，且本次用户只授权设计与开发计划维护，因此没有删除或改写这些代码；后续 Phase00/01实现时按当前设计最小化迁移。
+
+KG OS 业务能力仍未实现。Knowledge Base bootstrap、Ontology / Object / Graph / Evolution 与正式 client surface继续以设计文档为行为真源。
 
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |
 | --- | --- | --- | --- |
-| [00 Engineering Foundation](phases/00-engineering-foundation.md) | `done` | 固定 TypeScript 工具链、workspace、统一开发宿主、质量门禁、测试、CI workflow 与本地交付物 | [D63](../design/decisions.md#d63-typescript-integrated-web)、[D64](../design/decisions.md#d64-phase0-development-environment) |
+| [00 Engineering Foundation](phases/00-engineering-foundation.md) | `ready` | Go 1.27.1 daemon/kernel/CLI + TypeScript SDK/Web workspace、pinned Go quality tools、bundled CGO/SQLite+FTS5 baseline、90% coverage/race/security gates、真实 v0.3.0 smoke、macOS arm64 + Ubuntu 24.04 x64 native证据 | [D65](../design/decisions.md#d65-go-runtime)、[D66](../design/decisions.md#d66-lithograph-v030-sql-only) |
+| [01 Runtime & Lithograph Host Foundation](phases/01-runtime-lithograph-host.md) | `planned` | `KG_HOME`、config/credential、extension resolver、Go read/write SQLite host、v0.3.0 SQL execution/stream/cancel、explicit tx、runtime ownership | [Runtime](../design/runtime.md)、[Go 数据库接入](../design/implementation.md#go-运行时与数据库接入) |
 
-后续业务阶段尚未冻结为独立 Phase。当前设计能够确定的实现依赖顺序是：
+当前实现依赖顺序：
 
 ```text
-runtime / KG_HOME / extension loading / Lithograph adapter
+Go Engineering Foundation
+  -> runtime / KG_HOME / extension loading / Lithograph SQL adapter
   -> Ontology and Object projection/read
   -> atomic Object Patch and compiler
   -> Graph query/execute and managed search integration
@@ -70,7 +78,7 @@ runtime / KG_HOME / extension loading / Lithograph adapter
   -> complete CLI / SDK / Web surfaces and release closure
 ```
 
-这条顺序只导航现有[工程映射](../design/implementation.md)，不是已经进入 `ready` 的 Phase 列表。开始下一阶段前，应从对应 Design Inputs 建立独立 Phase 文件，明确范围、Feature、Acceptance 和 Review；不提前为尚未开工的阶段制造空计划。
+Phase 00/01 之外的业务阶段尚未冻结为独立 Phase。开始下一阶段前，从对应 Design Inputs 建立计划与 Acceptance；不提前建立空 Phase。
 
 ## 6. Phase 通用完成标准
 
@@ -89,5 +97,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 ## 7. Development Artifacts
 
 - [Phase 00：Engineering Foundation](phases/00-engineering-foundation.md)
+- [Phase 01：Runtime & Lithograph Host Foundation](phases/01-runtime-lithograph-host.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

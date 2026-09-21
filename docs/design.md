@@ -17,8 +17,8 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
 | [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同 |
 | [cli.md](design/cli.md) | `kg` AI-first CLI command tree、参数、stdin/file、JSON/raw body/streaming、错误与 exit code |
-| [runtime.md](design/runtime.md) | TypeScript / Node.js `kgosd`、内置 Web 与 HTTP、`KG_HOME` 单 Knowledge Base profile、`auth.json`/Bearer authentication、Lithograph Embedding cache policy、SQLite Extension source resolver、Full-text / Semantic Index 默认配置与 api_key_env、single-instance lock、daemon lifecycle 与 Web hosting |
-| [decisions.md](design/decisions.md) | D1–D64 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [runtime.md](design/runtime.md) | Go `kgosd`、内置 Web 与 HTTP、`KG_HOME` 单 Knowledge Base profile、`auth.json`/Bearer authentication、Provider-owned Embedding cache mapping、SQLite Extension source resolver、Full-text / Semantic Index 默认配置与 api_key_env、single-instance lock、daemon lifecycle 与 Web hosting |
+| [decisions.md](design/decisions.md) | D1–D66 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 ## 从配置到调用
@@ -36,14 +36,14 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 状态 | 范围与入口 |
 | --- | --- |
 | 已确认 | Ontology 渐进读取 / 聚合编辑、Object Patch、Knowledge / Graph、Evolution、单 profile / 单库 / 单 Token runtime；具体规则见上面的 owner 表 |
-| Phase 00 已完成 | [D64 Phase 0](design/decisions.md#d64-phase0-development-environment)：固定工具链、workspace、统一启动、调试、质量检查、测试、Git hooks、CI workflow 与本地交付物已经建立；本地验收与 Ubuntu 24.04 GitHub Actions 远端门禁均通过，完成证据见 [Phase 00 计划](development/phases/00-engineering-foundation.md) |
-| 已确认调整 | [D59 Cypher 原样执行 / 读写连接](design/decisions.md#d59-cypher-passthrough)、[D60 内部自动填充缓存](design/decisions.md#d60-automatic-embedding-cache)、[D61 首版单字段语义索引](design/decisions.md#d61-single-field-semantic)、[D62 Ontology 不创建无字段类型](design/decisions.md#d62-nonempty-definition-properties)；[D63 TypeScript 与内置 Web](design/decisions.md#d63-typescript-integrated-web)确认 kgosd / Kernel 的语言与单 daemon 交付；D57 的托管职责 / api_key_env 与 D58 的可选顶层 indexes 保留 |
+| 当前 Phase 00 `ready` | [D65 Go runtime](design/decisions.md#d65-go-runtime) 已替换当前工程语言基线；现 Phase 00 重新验收 Go `kgosd` / Kernel / CLI + TypeScript SDK/Web。旧 TypeScript Phase 00 的本地/CI 成功证据保留在 [Phase 00 计划](development/phases/00-engineering-foundation.md) 的历史基线中，但不作为当前 Go 基线完成证据 |
+| 已确认调整 | [D59 Cypher 原样执行 / 读写连接](design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](design/decisions.md#d61-single-field-semantic)、[D62 Ontology 不创建无字段类型](design/decisions.md#d62-nonempty-definition-properties)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](design/decisions.md#d66-lithograph-v030-sql-only)；D63 仅保留单 daemon 内置 Web 的交付边界，D60 的透明缓存目标由 D66 重新分配 ownership |
 | 检索范围与限制 | [首版只支持单字段，Cypher 联合检索可组合；托管向量的 filterProperties 与过滤范围内 top-k 限制](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
-| 工程待办 | [TypeScript runtime、SQL 事务封装接入、所需 Native adapter 与内置 Web 交付](design/implementation.md#typescript-运行时与数据库接入)；[模型修改、批量 Patch、Merge 与 adapter 的实现和验证](design/implementation.md#剩余依赖与工程合同)；[只读连接、自动持久缓存、Native 上下文与真实 ABI 集成](design/implementation.md#managed-semantic-integration-readiness)；已有目标行为，无需重新确认核心设计 |
+| 工程待办 | [Go runtime、Lithograph v0.3.0 SQL execution/transaction、streaming/cancellation 与内置 Web 交付](design/implementation.md#go-运行时与数据库接入)；[模型修改、批量 Patch、Merge 与 adapter 的实现和验证](design/implementation.md#剩余依赖与工程合同)；[只读 main、Provider-owned cache、SQL streaming 与真实 Go driver 集成](design/implementation.md#managed-semantic-integration-readiness)；已有目标行为，无需重新确认核心设计 |
 | Web 待细化 | [kgosd 内置交付、同源服务与共享 Kernel 已定，具体页面布局和交互尚未展开](design/runtime.md#web-交互设计状态)；不阻塞 Kernel、daemon、CLI 或 SDK 的实现 |
 | 待实现 | Phase 00 壳层不是业务实现；Knowledge Base、认证、正式 daemon lifecycle、数据库 adapter 及 [实现范围映射](design/implementation.md#实现范围映射)仍不是已发布能力 |
 
-**已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库与真实 ABI 测试。
+**已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库、真实 loadable extension、SQL streaming 与 cancellation 集成测试。
 
 ## 阅读顺序
 

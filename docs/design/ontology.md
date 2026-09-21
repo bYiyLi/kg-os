@@ -284,11 +284,11 @@ KG OS 不在 State 中额外保存 analyzer fingerprint/generation，也不在�
 
 - **Index Maintenance**：普通业务写入只提交 source graph data；Full-text 物理维护由 Lithograph / FTS5 负责。Managed Semantic 按查询 Snapshot 的最终 source/target 解释结果，不要求 KG OS 在写事务中生成向量。
 - **Semantic Index Create / Replace**：创建或替换 versioned 索引定义，仅做本地 Provider/config validation，不遍历数据、不调用 embedding 服务。定义变更与同次 Ontology Patch 的其它变化仍原子提交。
-- **Automatic Embedding Cache**：正常查询先查缓存，miss 才调用 Embedding Provider，成功校验后自动持久保存；调用方不需要预热。连接与持久化接入按 [Runtime](runtime.md#embedding-result-cache) 验证。
-- **Embedding cache rebuild**：Lithograph 的 `db.index.semantic.rebuild(name, version)` 是独立维护操作，不创建 State、不移动 Branch，也不是创建索引、保存正文或普通查询的前置条件。KG OS 不新增预热 CLI/API；明确执行维护 Cypher 时使用 Graph `execute`，由 Lithograph 判断参数与事务是否合法。
+- **Automatic Embedding Cache**：OpenAI-compatible Provider 可以按 IndexDefinition 中的 `providerConfig.cache` 透明命中 / 填充自己的独立 SQLite cache；Lithograph / KG OS 不拥有 text→Vector cache，调用方不需要预热。连接与持久化接入按 [Runtime](runtime.md#embedding-result-cache) 验证。
+- **Semantic materialization rebuild**：Lithograph 的 `db.index.semantic.rebuild(name, version)` 只重建目标 Snapshot 的 TEMP Semantic/HNSW materialization，不承担 Provider cache预热；它不创建 State、不移动 Branch，也不是创建索引、保存正文或普通查询的前置条件。KG OS 不新增预热 CLI/API；明确执行维护 Cypher 时使用 Graph `execute`。
 - **Config Migration**：因为运行配置变化而主动重写旧索引或历史 State。KG OS v1 不提供自动配置迁移；修改默认值只影响之后新建 / 必须重建的索引。
 
-业务索引定义的替换与 derived cache 的 rebuild 是两种操作，不能再用“先补齐 managed Property 才能提交”的旧规则把两者绑在一个写事务中。
+业务索引定义的替换、Lithograph TEMP/HNSW materialization 与 Provider-owned text→Vector cache 是三个独立生命周期，不能再用“先补齐 managed Property 才能提交”的旧规则把它们绑在一个写事务中。
 
 KG OS v1 不提供 caller-managed raw Vector Property / Vector Index profile。`type: vector` 只存在于 **Index**，表示上述托管语义索引；它不是 Property type。若绕过 KG OS 直接在 Lithograph Schema 或 public Knowledge data 中建立 caller-owned Vector Property/value，该 Snapshot 超出 KG OS v1 public profile，应按 invalid KG OS State 处理，而不是让 aggregate decoder 把它伪装成可编辑 Ontology。
 
@@ -658,7 +658,7 @@ Relationship Type rename 在底层需要 replacement 时保持端点与 Property
 
 删除聚合时清理只服务被删结构的类型/必填/唯一声明、专属索引、对应 Binding，以及 Definition 的 Domain membership。这是已删除聚合的结构清理，不是删除实际业务数据。涉及其它存活字段/Definition 的 composite/shared 规则必须在同一 Patch 中明确处理，不能凭包含关系级联删除。
 
-删除一条索引只删除其 versioned definition，不删除业务正文。Semantic embedding cache 可被其它索引或历史 State 共享，DROP 不同步清空它。删除 Domain 只移除组织关系。所有删除只改变新 State，历史 State 的结构、语义、索引定义与知识按原 Snapshot 解释。
+删除一条索引只删除其 versioned definition，不删除业务正文。Provider-owned embedding cache独立于 Lithograph Index lifecycle；DROP 不要求 KG OS/Lithograph去扫描或清理 Provider cache。删除 Domain 只移除组织关系。所有删除只改变新 State，历史 State 的结构、语义、索引定义与知识按原 Snapshot 解释。
 
 ### 正反向映射验收
 

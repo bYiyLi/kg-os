@@ -25,9 +25,9 @@ KG OS 独立于 Noven 或任何具体领域；领域语义由调用方表达。
 
 Node / Relationship Definition 一起表达字段、约束和索引。单字段索引放在字段下，复合或跨 Definition 共享索引放在模型顶层；没有顶层索引时省略 `indexes`。Knowledge 保持 Property Graph。Graph 原样执行 Lithograph Cypher，`query` / `execute` 分别选择只读 / 读写连接，KG OS 不审查语句内容；Evolution 提供 State、Branch、History、Diff、Merge 的专用交互。
 
-托管语义检索由 Lithograph 执行。KG OS 把全局 embedding 默认配置和 Ontology 的文本字段声明编译成 Semantic Index；调用方传普通查询字符串。KG OS 不生成内部向量 Property，不在保存或合并正文时调用模型，也不维护独立 `cache.db`。配置只支持可选 `api_key_env`，实际凭证不进入索引历史。
+托管语义检索由 Lithograph 执行。KG OS 把全局 embedding / Provider cache 默认配置和 Ontology 的文本字段声明编译成 Semantic Index；调用方传普通查询字符串。KG OS 不生成内部向量 Property，不在保存或合并正文时调用模型，也不实现 text→Vector cache。OpenAI-compatible Provider 可以按 versioned `providerConfig.cache` 使用独立 SQLite cache database；默认路径位于 `$KG_HOME/cache/`，与 `kgos.db` 隔离。配置只支持可选 `api_key_env`，实际凭证不进入索引历史。
 
-KG OS 的 `kgosd` 与 Kernel 使用 TypeScript + Node.js，CLI、SDK、Web 同样使用 TypeScript。**`kgosd` 自带 Web**：页面与 API 随同一个 daemon 交付、启动并使用同一端口，不需要单独部署 Web 服务；具体边界见 [运行架构](docs/design/architecture.md#v1-运行时与技术分层)和 [Web hosting](docs/design/runtime.md#web-hosting)。
+KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 TypeScript。**`kgosd` 自带 Web**：页面与 API 随同一个 daemon 交付、启动并使用同一端口，不需要单独部署 Web 服务；具体边界见 [运行架构](docs/design/architecture.md#v1-运行时与技术分层)和 [Web hosting](docs/design/runtime.md#web-hosting)。
 
 一个 `KG_HOME`（默认 `~/.kgosd`）对应一个 `kgosd` 和根目录 `kgos.db`；所有 daemon API/control request 使用 Bearer authentication，CLI 从 `KG_TOKEN` 取得 credential。
 
@@ -35,13 +35,13 @@ KG OS 的 `kgosd` 与 Kernel 使用 TypeScript + Node.js，CLI、SDK、Web 同�
 
 ## 当前状态
 
-**Phase 00 Engineering Foundation 已完成并通过本地与 Ubuntu 24.04 GitHub Actions 验收；KG OS 业务能力尚未实现。** 当前代码提供 workspace、`kg` / `kgosd` 帮助与版本入口、同源 Web 开发壳层、检查、测试、构建和本地打包验证。它不表示 Knowledge Base、认证、daemon 正式生命周期、业务 API 或数据库 adapter 已经可用。
+**KG OS 已确认切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；业务能力仍未实现。** 旧 TypeScript Phase 00 曾真实通过本地与 Ubuntu 24.04 CI，但该工程基线已被 D65/D66 替代；当前 Phase 00 重新处于 `ready`，用于建立并验收新的 Go 工程基础。现有工作树仍包含旧 TypeScript 壳层与未提交的旧 Phase 01 实现，它们不能作为新 Go 基线的完成证据。
 
-开发者从[开发指南](docs/guide/development.md)运行 `pnpm run setup`、`pnpm dev` 和 `pnpm validate`。Phase 00 的范围、状态与验收记录见[阶段计划](docs/development/phases/00-engineering-foundation.md)；提交 `20d73cd` 对应的 GitHub Actions CI run `35454190185` 已在 Ubuntu 24.04 完整通过，因此阶段状态为 `done`。
+当前[开发指南](docs/guide/development.md)仍记录仓库**现有** TypeScript 工程壳层的可执行命令；新的 Go 命令、构建与调试步骤只有在 Phase 00 实现后才会写成可执行指南。Phase 00 的当前计划与历史 TypeScript 验收证据都保存在[阶段计划](docs/development/phases/00-engineering-foundation.md)中；旧提交 `20d73cd` / CI `35454190185` 只证明被替换的历史基线。
 
-首版语义索引只支持单字段；Cypher 原样执行和内部自动填充缓存的设计已记录。模型修改、批量 Patch、Merge 与底层连接 / 缓存对接仍需实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
+首版语义索引只支持单字段；Cypher 原样执行、`lithograph_rows()` true streaming、SQL-only execution 与 Provider-owned cache 的设计已记录。模型修改、批量 Patch、Merge 与新的 Go/Lithograph 接入仍需实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
-相关决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D60 自动填充缓存](docs/design/decisions.md#d60-automatic-embedding-cache)和 [D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
+相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go runtime](docs/design/decisions.md#d65-go-runtime)和 [D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
 ## License
 

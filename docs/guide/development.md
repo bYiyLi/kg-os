@@ -4,7 +4,9 @@
 
 ## 当前边界
 
-Phase 00 提供 TypeScript workspace、`kg` / `kgosd` 可执行入口、同源 Web 开发壳层、质量检查、测试、CI 和本地打包验证。当前可执行入口只支持帮助和版本；Web 只证明浏览器资源与 HTTP 宿主可运行。Knowledge Base、认证、daemon 正式生命周期、业务 API 和数据库 adapter 尚未实现。
+> **迁移说明（2026-09-21）**：D65/D66 已把目标工程基线改为 Go `kgosd` / Kernel / `kg` CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration。当前工作树尚未完成这次代码迁移，因此本指南下面的 Node/pnpm 命令只描述**现有可执行的历史 TypeScript 壳层**，不是新 Phase 00 的目标完成状态。Go 版本、命令、调试和构建步骤会在新 Phase 00 真实实现后再写入本指南；阶段状态以[开发计划](../development/README.md)为准。
+
+当前已提交壳层提供 TypeScript workspace、`kg` / `kgosd` 帮助与版本入口、同源 Web 开发壳层、质量检查、测试、CI 和本地打包验证。当前可执行入口只支持帮助和版本；Web 只证明浏览器资源与 HTTP 宿主可运行。Knowledge Base、认证、daemon 正式生命周期、业务 API 和数据库 adapter 尚未实现。
 
 未实现的 `/api/*` 与 `/control/*` 请求返回 404。开发壳层不读取或创建默认 `KG_HOME`，不会把尚未接入的业务能力伪装成成功。
 

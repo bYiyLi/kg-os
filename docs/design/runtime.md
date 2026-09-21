@@ -1,19 +1,19 @@
 # 本地运行时
 
-本文件是 KG OS v1 **TypeScript / Node.js `kgosd` 本地服务、内置 Web 交付、HTTP bind、`KG_HOME` runtime profile、单 Knowledge Base、单 Token 认证、Embedding Provider startup config、daemon lifecycle、Web hosting 与默认 endpoint** 的设计真源。Kernel 能力由 [Object](object.md)、[Graph](graph.md) 与 [Evolution](evolution.md) 负责；CLI 命令由 [CLI](cli.md) 负责。
+本文件是 KG OS v1 **Go `kgosd` 本地服务、内置 Web 交付、HTTP bind、`KG_HOME` runtime profile、单 Knowledge Base、单 Token 认证、Embedding Provider startup config/cache mapping、daemon lifecycle、Web hosting 与默认 endpoint** 的设计真源。Kernel 能力由 [Object](object.md)、[Graph](graph.md) 与 [Evolution](evolution.md) 负责；CLI 命令由 [CLI](cli.md) 负责。
 
 ## 本地服务模型
 
-KG OS v1 采用一个以 TypeScript 实现、运行在 Node.js 上的本地 `kgosd` daemon，作为 API 与内置 Web 的统一运行时入口。Kernel 与数据库调用编排在该服务内执行：
+KG OS v1 采用 Go 实现的本地 `kgosd` daemon，作为 API 与内置 Web 的统一运行时入口。Kernel 与数据库调用编排在该服务内执行：
 
 ```text
-kg CLI / SDK ── API HTTP ───┐
-Browser ── 页面 / API HTTP ─┤
-                            ▼
-                 kgosd（TypeScript / Node.js）
-                 ├── 内置 Web
-                 ├── HTTP API / control
-                 └── KG OS Kernel → Lithograph
+kg CLI (Go) / SDK (TypeScript) ── API HTTP ───┐
+Browser ───────── 页面 / API HTTP ────────────┤
+                                              ▼
+                                      kgosd（Go）
+                                      ├── 内置 Web
+                                      ├── net/http API / control
+                                      └── KG OS Kernel → database/sql → Lithograph
 ```
 
 `kgosd` 同时承载 API 与 Human-facing Web，因此 CLI、SDK 与 Web 使用同一个 KG OS Kernel 和同一组 Object / Graph / Evolution logical contract。部署和启动只需要这个 daemon，不单独安装、部署或启动 Web 服务；Web 与 API 共用进程、配置端口和 lifecycle。v1 不为 CLI 再建立 Unix socket / Named Pipe / gRPC 私有协议。
@@ -36,6 +36,21 @@ default origin = http://127.0.0.1:4765
 
 普通 API request / response 使用 HTTP + JSON；Object body 继续按 Object contract 使用 `application/yaml` 或 `application/json`；Graph streaming 使用 HTTP streaming + NDJSON。具体 HTTP method / route / metadata carrier 仍属于 HTTP adapter mapping，但不得改变 logical contract。
 
+### Graph HTTP streaming framing
+
+Graph HTTP streaming 把底层 `lithograph_rows()` success events 映射为 NDJSON `columns`、`row`、`summary`。HTTP adapter 额外定义一个**只用于流式失败的 terminal `error` event**：
+
+```json
+{"type":"error","error":{"code":"IO_ERROR","message":"...","details":{}}}
+```
+
+- streaming success response 的 Content-Type 为 `application/x-ndjson; charset=utf-8`。daemon在拿到并完成第一个 Lithograph event的 adapter encoding之前不得提前提交 2xx status；如果此时已经失败，使用普通 non-2xx `application/json` public error envelope，response body不进入 NDJSON stream。
+- 一旦 `columns` 或任意 `row` 已经写出，HTTP status 已经不能再表达后续数据库失败；此时成功必须以唯一 terminal `summary` 结束，失败必须尽力以唯一 terminal `error` 结束，二者互斥。`error` 不是 Graph query row，也不改变底层错误 code。
+- 如果 socket/write failure、process termination 或其它 transport failure 导致 daemon 无法发送 terminal `error`，client 只会观察到没有 `summary/error` 的不完整 stream；这必须被解释为 transport failure，而不是成功或“没有副作用”。
+- v1 streaming 使用 pull-based backpressure：daemon 只有在当前 event 已完成 NDJSON encode、写入并 flush 到 HTTP writer 后，才从 SQLite `Rows` 拉取下一个 event；不得用无界 goroutine/channel 预读数据库结果。client disconnect / write failure 取消 request context并关闭 rows，使 driver能够触发 SQLite interrupt / cursor cleanup。
+
+SDK / Web 可以在消费到 partial rows 后报告 terminal daemon error；CLI 的 stdout/stderr/exit 映射由 [CLI](cli.md#error-与-exit-code)定义。
+
 ## Web hosting
 
 `kgosd` 自己提供 Human-facing Web：
@@ -47,9 +62,9 @@ same origin                    → KG OS API / streaming
 
 Web 构建产物随 `kgosd` 同一交付物发布，由 `kgosd` 的 HTTP server 直接提供页面和资源；执行 `kg daemon start` 后，同一个 configured origin 即可访问 Web 与 API。没有独立 Web 启动命令、第二个服务端口或单独部署步骤。
 
-Web 与 CLI / SDK 在逻辑上都是公共 API 的客户端。服务端 TypeScript 在 Node.js 中运行；Web TypeScript 构建出的浏览器代码经 `kgosd` HTTP 下载后在浏览器执行。这里的“同进程”指页面 / 资源服务与 API 服务由同一个 daemon 承载，不是把浏览器执行并入 Node.js。
+Web 与 CLI / SDK 在逻辑上都是公共 API 的客户端。服务端与 `kg` CLI 使用 Go；Web / SDK 使用 TypeScript。Web 构建出的浏览器代码经 `kgosd` HTTP 下载后在浏览器执行；这里的“同进程”只表示页面 / 资源服务与 API 服务由同一个 daemon 承载，不表示浏览器代码在 Go 进程内执行。
 
-前后端代码按 workspace 模块组织，但这不产生第二个部署服务。[Phase 00 开发宿主](../development/phases/00-engineering-foundation.md#phase00-development-host)采用 Vite middleware 供开发时页面与热更新使用，复用 kgosd HTTP server 和同一端口；HMR WebSocket 与该 server 一起关闭。交付物使用构建后的静态资源，运行时不依赖 Vite dev server。具体页面框架、布局、API path、client-side routing 与 caching 仍按 Web adapter 的实际需要实现。
+前后端代码分属 Go 与 TypeScript workspace，但这不产生第二个**产品部署服务**。Phase 00 开发环境可以使用 Vite dev server + proxy/HMR 作为开发工具，不要求把 Vite middleware嵌进 Go `net/http`；生产/本地正式运行的 Web构建产物仍由 `kgosd` 同端口直接提供，运行时不依赖 Vite。具体开发端口属于工程配置，不进入公开 endpoint contract。
 
 Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemon 的数据库就绪条件，不新增跳过初始化或认证的公共运行模式。开发脚本不得把尚未接入 Knowledge Base 的壳层标成正式 `running`；完整启动仍须通过下文的能力检查与 bootstrap。
 
@@ -92,7 +107,7 @@ Authorization: Bearer <token>
 
 ## `KG_HOME` runtime profile
 
-KG OS v1 使用环境变量 `KG_HOME` 选择唯一 runtime profile。未设置时默认使用当前 OS 用户 home 下的 `~/.kgosd`；设置时整个 daemon、CLI target discovery、credential、embedding cache、extension cache、日志与 Knowledge Base 都切换到该目录。`KG_HOME` 自身不写入 `config.toml`，因为它负责定位 `config.toml`；实现必须把 effective `KG_HOME` 解析为明确的绝对目录，不能让不同组件各自解释相对路径。
+KG OS v1 使用环境变量 `KG_HOME` 选择唯一 runtime profile。未设置时默认使用当前 OS 用户 home 下的 `~/.kgosd`；设置时整个 daemon、CLI target discovery、credential、默认 Provider cache path、extension cache、日志与 Knowledge Base 都切换到该目录；显式 absolute Provider cache path仍按配置指向 profile 外位置。`KG_HOME` 自身不写入 `config.toml`，因为它负责定位 `config.toml`；实现必须把 effective `KG_HOME` 解析为明确的绝对目录，不能让不同组件各自解释相对路径。
 
 一个 `KG_HOME` 固定对应：
 
@@ -111,6 +126,7 @@ $KG_HOME/
 ├── auth.json
 ├── kgosd.lock
 ├── kgos.db
+├── cache/
 ├── extensions/
 └── logs/
 ```
@@ -128,6 +144,8 @@ port = 4765
 
 [cache]
 enabled = true
+# 省略 path 时使用 $KG_HOME/cache/openai-compatible.db
+path = "cache/openai-compatible.db"
 max_size_mb = 4096
 
 [[sqlite.extensions]]
@@ -136,13 +154,12 @@ entrypoint = "sqlite3_lithograph_init"
 
 [[sqlite.extensions]]
 source = "/opt/kgos/extensions/liblithograph_openai_compatible.dylib"
+entrypoint = "sqlite3_lithographopenaicompatible_init"
 
-# 其它 SQLite extension 仍使用同一加载机制。
-[[sqlite.extensions]]
-source = "/opt/kgos/extensions/sqlite-jieba.dylib"
+# 其它 SQLite extension 仍使用同一加载机制，但每项都显式提供真实 init symbol。
 
 [fulltext]
-analyzer = "jieba"
+analyzer = "unicode61"
 
 [embedding]
 base_url = "https://api.openai.com/v1"
@@ -156,35 +173,39 @@ api_key_env = "OPENAI_API_KEY"
 
 ### Cypher 执行连接
 
-`kgosd` 根据调用入口选择连接：Graph `query` 使用只读连接，Graph `execute` 使用读写连接。调用方选择入口，KG OS 不解析语句推断类型；写语句进入只读入口时交给底层拒绝，不自动换成读写连接重试。两类连接都加载同一批配置的 extensions，并按请求设置执行上下文，不能把其它请求留下的 checkout 当作默认值。Graph 的语句范围见 [Graph](graph.md#graph)。
+`kgosd` 根据调用入口选择 connection，但不解析用户 Cypher：Graph `query` 使用本次 operation 独占的物理只读 connection；先通过 `lithograph.commit.get(request.at)` 把调用方 StateRef 解析为 exact `commit/<id>`，再以 `options.at=<resolved commit>` 执行原始 Cypher并把同一 commit作为 response `state`。如果某个 Lithograph procedure 本身不允许 `at`，保留其公开错误；KG OS 不根据 procedure name绕过 Snapshot contract。
+
+Graph `execute` 使用本次 operation 独占的读写 connection。进入用户 Cypher 前必须确认 connection 处于 SQLite autocommit / 无 active Lithograph explicit transaction 状态，并先完整执行 `CALL lithograph.branch.checkout($branch)` 建立调用方要求的 connection-local default Branch；随后执行原始 Cypher时**不附加 `options.branch`**。`author/message` 只有调用方显式提供时才作为普通 execution options传入；若目标 procedure不接受这些 options，按 Lithograph公开错误失败。这样 `branch.*` / `tag.*` / Merge Session等自行携带 target的 procedure不需要 KG OS特例表，也不会被无条件 branch option破坏。
+
+用户 Cypher本身可以合法改变 connection checkout。KG OS 不尝试在语句后猜测或恢复原 checkout；任何 connection在下一次 operation使用前都必须按该 operation重新建立或明确覆盖所需 context，绝不能把 pool中残留的 active Branch当作默认值。写语句进入 `query` 时由物理只读 / `at` boundary拒绝，不自动换成读写 connection重试。两类 connection都加载同一批配置的 extensions。Graph 的语句范围见 [Graph](graph.md#graph)。
 
 Bearer token 仍是实例的统一认证。通过认证的调用方可使用 Lithograph 支持的 Cypher；KG OS 不额外禁止 `LOAD CSV` 等文件 / 网络能力。实际文件路径位于运行 `kgosd` 的主机，访问权限由宿主进程和 Lithograph 决定；只读是数据库执行边界，不是无外部 I/O 模式。这里没有开放 raw SQL 或改变 extension 的 startup-only 加载合同。
 
-**只读连接与自动缓存仍需底层衔接验证。** 当前核对的 Lithograph 工作树在 SQLite `main` 物理只读时跳过 persistent embedding cache publish；因此直接使用物理只读连接虽然可以查询，却不能自动保存本次新算出的向量。KG OS 的目标同时保留“查询走只读连接”和“启用缓存时自动持久保存”，具体连接 / 内部缓存写入机制由 Lithograph 解决并提供公开合同。本次不把“可写连接 + `at`”写成只读连接的等价实现，不擅自新增缓存数据库、预热命令或 KG OS 解析逻辑，也不声称该组合已经实现。验收归 [Implementation](implementation.md#managed-semantic-integration-readiness)。
+Lithograph v0.3.0 的 Managed Semantic read 不再要求写 `kgos.db` 来发布 text -> Vector cache，因此 Graph `query` 可以使用物理只读 `main` connection。Provider 若启用自己的独立 cache database，仍可以按 providerConfig 写该 cache；这个写入不改变 Lithograph graph/schema/history/ref，也不把只读 Graph 入口升级成读写 connection。实际 read-only connection、Provider cache 与 cancellation 行为仍必须由 [Implementation](implementation.md#managed-semantic-integration-readiness) 用真实 Go driver + release artifact 验证。
 
 ### Embedding result cache
 
-Embedding cache 交给 Lithograph 管理，KG OS 不再创建独立 `$KG_HOME/cache.db`。source 与 query text 的持久 embedding cache 都保存在 `kgos.db` 的数据库内部派生区，memory cache / TEMP HNSW 由 connection 管理；它们都不属于 State、Commit、Branch 或业务真源。KG OS 不直接读写内部 cache 表。
+KG OS 不实现 text -> Vector cache，也不调用 Lithograph cache procedure。Lithograph v0.3.0 把 persistent embedding result cache 交给具体 Embedding Provider；KG OS 的 `[cache]` 只是**创建 / 因业务定义变化必须重建 OpenAI-compatible Semantic Index 时的默认 providerConfig mapping**。
 
-保留已确认的配置入口与 4 GiB 默认预算：
+配置入口：
 
 ```toml
 [cache]
 enabled = true
+# optional；省略时使用 $KG_HOME/cache/openai-compatible.db
+path = "cache/openai-compatible.db"
 max_size_mb = 4096
 ```
 
-- 省略整段等价上述值；`enabled` 为 Boolean，`max_size_mb` 为正整数，1 MB 仍按 1 MiB 解释。
-- daemon 启动、打开 / bootstrap 数据库后，以独立 maintenance execution 调用 `CALL db.index.semantic.cache.configure({enabled: $enabled, maxBytes: $maxBytes})`，参数分别来自 `enabled` 与 `max_size_mb * 1024 * 1024`，转换须检查整数溢出；不直接改内部表。
-- 显式设置默认值使 KG OS 继续使用 4 GiB，而不是无意采用 Lithograph 自身的 1 GiB 默认值。配置不创建 State；`[cache]` 修改后 restart 生效。
-- 预算约束的是持久 embedding payload，不是整个 `kgos.db` 文件，也不包含 HNSW / query memory / extension artifact cache。Lithograph 按 oldest-entry/FIFO 淘汰，不在 read hit 时写 LRU metadata；删除后 SQLite 页面可复用，但不保证文件立即缩小。旧独立 `cache.db` 的 LRU / 文件收缩规则随责任移交取消，不在 KG OS 补做另一套缓存实现。
-- `enabled=false` 时持久 cache 不读不写，已有 entries 保留；查询仍可用 Provider + TEMP/memory 执行。KG OS 只通过公开 maintenance procedure 配置 / 清理，不能删除 `kgos.db` 来清缓存。
+- 省略整段等价 `enabled=true`、默认 path 与 `max_size_mb=4096`；`enabled` 为 Boolean，`max_size_mb` 为正整数，1 MB 按 1 MiB 解释。
+- `path` optional；省略时使用 `$KG_HOME/cache/openai-compatible.db`。显式 absolute path 原样使用；relative path 统一相对 effective `KG_HOME` 解析，compiler 写入 `providerConfig.cache.path` 前必须得到 absolute path，避免进程 cwd 改变 cache identity / location。
+- enabled 时 `kgosd` 只确保 path 的父目录存在，不预创建、ATTACH、检查内部表或直接维护 cache database；OpenAI-compatible Provider 自己负责 cache marker/schema、lookup、publish、FIFO budget、并发与损坏处理。Provider 必须拒绝把 cache file 指向 `kgos.db`。
+- `max_size_mb` 映射为 Provider `cache.max_bytes = max_size_mb * 1024 * 1024`，转换必须检查整数范围。预算只约束 Provider 定义的 vector payload，不是 cache SQLite 文件物理大小，也不包含 Lithograph HNSW/TEMP materialization 或 extension artifact cache。
+- `enabled=false` 编译为 `providerConfig.cache.enabled=false`；KG OS 不删除已有 Provider cache file。Provider cache hit/miss 对 Lithograph 与 KG OS correctness 不可见，删除 cache 只会增加后续 Provider 调用。
+- `[cache]` 与 `[embedding]` 都是 Semantic Index **创建 / replace 默认值**，不是 daemon 对所有既有索引生效的 live global switch。修改后 restart 只影响之后新建 / 必须重建的 IndexDefinition；已经存在及历史 IndexDefinition 保留它们 versioned 的 providerConfig，包括 cache path/policy。把当前 `[cache].enabled=false` 也不会关闭旧 IndexDefinition 中已经 versioned 的 enabled cache。KG OS 不扫描、迁移或改写历史配置。
+- `db.index.semantic.rebuild` 仍是 Lithograph TEMP Semantic/HNSW maintenance，不是填充 Provider-owned embedding cache 的入口；KG OS 不新增预热 CLI/API、后台 scheduler 或第二套 cache service。
 
-启用缓存时，source 与 query text 都按同一流程处理：先查缓存，miss 才调用 Embedding Provider，成功并通过结果校验后自动保存。缓存存在的目的就是减少重复 API 调用；普通查询是正常填充路径，调用方不需要预热。Provider 等待不持有 SQLite writer；持久发布使用底层短事务，不产生 Commit、不移动 Branch。既有缓存身份、FIFO、容量预算和错误处理继续遵守 Lithograph，不增加 KG OS 自有缓存层。
-
-当前 Lithograph 的自动持久发布要求 `main` 可写；物理只读连接跳过发布的现状及 KG OS 接入缺口见上面的[执行连接](#cypher-执行连接)。不能把 memory/TEMP 命中当作跨连接或重启后持久复用的证明。
-
-`db.index.semantic.rebuild` 保留为底层维护能力，不是正常查询、索引创建或业务写入的前置条件。KG OS 不新增预热 CLI/API、启动全库预热或后台 scheduler。调用方若明确执行维护 Cypher，使用 Graph `execute` 的读写连接，由 Lithograph 判断参数和事务合法性。
+Provider cache database 是 runtime/derived data，不属于 State、Commit、Branch、Lithograph storage format 或 Knowledge Base correctness source。其默认文件在 `$KG_HOME/cache/`，但 operator 显式 absolute path 可以放在 profile 外；因此 profile 删除只承诺清理 profile 内默认路径，不承诺删除外部 Provider cache。由于写入 IndexDefinition 的 cache path 是 versioned absolute path，复制 `kgos.db` 或改变 `KG_HOME` **不会**自动重写既有索引的 recorded path；v1 不提供 cache-path migration。查询旧索引时仍使用该索引自己的 recorded config，enabled cache的路径不可创建/打开时按 Provider公开 I/O/config错误失败。需要迁移时，operator必须保留原路径可用，或通过显式 Graph/Schema操作把目标 Semantic Index替换为使用新 providerConfig的版本；KG OS不会因为 profile移动偷偷改历史或当前 State。
 
 ### SQLite Extension source resolver
 
@@ -194,7 +215,7 @@ max_size_mb = 4096
 
 - `source` **必填**，只能是本机 absolute file path 或 absolute `https://` URL；不接受 relative path、`http://`、其它 scheme、目录或自动按插件名发现/下载。KG OS 不维护插件 registry/package manager。
 - `source` 可以直接指向当前平台可加载的 `.so` / `.dylib` / `.dll`，也可以指向 `.tar.gz` / `.zip` archive。archive 必须额外提供 `library`，它是解包根目录内要交给 SQLite 加载的精确 relative regular-file path；direct library 不提供 `library`。v1 不做 glob、basename 猜测或平台自动选包。
-- `entrypoint` optional；省略时使用 SQLite 标准 entrypoint resolution，提供时把该非空 symbol name 交给 SQLite C API。它只选择 shared library 中的初始化入口，不声明插件类别。
+- `entrypoint` **必填**，必须是非空、无 NUL 的 SQLite extension init symbol。KG OS 把该 symbol 原样交给 driver 的 extension-loading API，不做 filename-derived symbol 猜测。Lithograph 可以使用 `sqlite3_lithograph_init`；OpenAI-compatible Provider 使用其 provider-specific 公开 symbol `sqlite3_lithographopenaicompatible_init`；虽然它也导出 generic `sqlite3_extension_init`，KG OS 示例与官方配置优先使用 provider-specific symbol。其它 extension 必须由 operator填写自身真实 init symbol。
 - `sha256` 对 **远程 source 必填**，必须是 64 位 lowercase hex，校验的是下载得到的原始 artifact bytes；本地 source 可省略，提供时同样必须匹配。无论配置是否显式给出，resolver 都会计算实际 artifact SHA-256，并以内容 hash 固定本次 daemon 使用的 artifact identity。
 
 远程 URL 只作为 artifact location，不是可执行 identity。resolver 可以跟随有界的 **HTTPS → HTTPS** redirect，以支持 GitHub Releases 这类下载；不得降级到 HTTP。`releases/latest/download/...` 可以配置，但仍由 `sha256` 固定本次允许的 bytes：若远端 `latest` 已变化且本地没有旧 hash cache，校验失败而不是自动升级。因此正式可复现部署优先使用带版本号 URL + SHA-256。
@@ -219,11 +240,17 @@ https source -- bounded redirect ┘
 
 archive extraction 必须 fail-closed：拒绝 absolute path、`..` traversal、symlink/hardlink、device/special entry 与越界 `library`；download / decompression / extracted-size 受实现资源上限约束。先写临时文件/目录，hash 与 extraction 全部成功后再原子发布 content-addressed cache。缓存命中时重新确认目标 artifact 与 hash 一致；缓存可删除并从 source 重建，不属于 Knowledge Base history 或 correctness source。远程 cache 已存在且有效时，daemon restart 不要求网络可用。
 
-`kgosd` 对每个新 SQLite connection 使用**同一批已解析的本地 artifacts**：仅在宿主 SQLite 驱动的 connection 初始化阶段临时允许 extension loading，按配置顺序调用驱动提供的 extension load API，随后立即关闭该能力；业务 Cypher/SQL 不获得任意 `load_extension()` 权限。任一 configured extension 在任一 connection 加载失败，该 connection 不进入可用池。
+`kgosd` 对每个新 SQLite connection 使用**同一批已解析的本地 artifacts**：仅在宿主 SQLite 驱动的 connection 初始化阶段临时允许 extension loading，按配置顺序逐项调用可接受显式 `(library, entrypoint)` 的 driver API，随后立即关闭该能力；业务 Cypher/SQL 不获得任意 `load_extension()` 权限。任一 configured extension 在任一 connection 加载失败，该 connection 不进入可用池。Go host通过 process-private registered driver / connection hook把这一步绑定到每个物理 connection 的创建，不能只在 `*sql.DB` 初始 connection加载一次后假设 pool后续 connection自动继承。
 
-generic loader 之外仍要验证 Lithograph capability，但不要求配置 `kind = "lithograph"`。对当前实际 connection 检查 Lithograph version / initialization、Managed Semantic 与所需 SQL 函数能力；显式事务检查下面的 SQL `tx_*` 入口，不再为了该事务链路单独绑定 Native `tx_*` symbols。当前 [Graph](graph.md#graph-公共调用合同) 仍采用普通 Native execution；其 execution / streaming adapter 所需 ABI symbols 必须来自同一批 resolved libraries 中唯一匹配的 provider，且完整满足该 adapter 的调用需求；缺失、多个候选或不兼容时拒绝开放 Knowledge Base。
+Go SQLite runtime固定使用 `go-sqlite3` bundled amalgamation，并以 `sqlite_fts5` build tag构建；不得使用 `libsqlite3` 把 SQLite版本漂移到宿主系统，也不得使用 `sqlite_omit_load_extension` 移除 KG OS 所需的 extension capability。startup仍必须实际 probe `sqlite_version() >= 3.45.0`、FTS5 与 configured extension加载成功，build tag本身不作为运行证据。
 
-实际 Native 调用仍要求对应 library 已在**目标 SQLite connection** 完成 extension-load 注册，且使用该连接的同一个 `sqlite3*`；绑定不能实例化第二套私有 SQLite，也不能替代 extension-loading lifecycle。SQLite 驱动及所需 Native adapter 的 Node.js 接入属于工程选型与真实集成验证，不因 TypeScript 语言决定就宣称已经完成。Lithograph 身份与能力由公开 probe 证明，不根据配置名字、顺序或文件名猜测。
+generic loader之外仍要验证 Lithograph capability，但不要求配置 `kind = "lithograph"`。connection initialization分为两层：**物理 connection 构造**只负责打开目标 database、按顺序加载全部 configured extensions、验证 host SQLite version/FTS5并确认 `lithograph_version()` 可调用；**Lithograph database activation** 必须先由一个独占 read-write bootstrap connection完成。`lithograph_version()` 在尚未初始化的干净 database上返回 `databaseId:null` 与 `storageFormat.current:null`，此时 bootstrap connection执行一次 `lithograph_init()`；已有 database则按返回的 databaseId/storage format/profile做兼容性验证。只有初始化/迁移和 Root/`main`验证成功后，connection才允许进入后续 Lithograph SQL / Provider capability probe。
+
+当前 daemon `[embedding]` / `[cache]` 默认配置在已完成 Lithograph initialization的独占 bootstrap write connection上通过公开 SQL做**可回滚 local validation probe**：`lithograph_tx_begin()` → staged `db.index.semantic.createNodeIndex`（随机 probe index/label/property，使用当前 provider/config/dimensions/similarity）→ `lithograph_tx_abort()`。CREATE只调用 Provider本地 `validate`，不得触发 `embedBatch` / network；probe成功后不得留下 Commit、Schema、Index或 Branch变化。任一 configured extension init失败已经使 connection不可用，因此 Provider extension的 connection-local registration不需要读取 private client-data；缺少 `openai-compatible` registration或当前 config非法时 probe失败并终止 startup。
+
+bootstrap成功后才建立/开放正常 read-only 与 read-write connection set。每个新物理 connection仍经同一个 connection hook加载相同 artifacts并执行 host probe，再以 `lithograph_version()`确认自己看到的 `databaseId`、storage format与启动时 bootstrap结果一致；Full-text analyzer在每个 usable connection上验证。read-only connection不重复 staged Provider write probe，Provider registration由该 extension在该 connection上的 successful init负责，实际 Semantic query仍按目标 IndexDefinition执行 Provider validation。
+
+Go SQLite driver 必须让每个实际 connection 使用同一个 native SQLite runtime 完成 database open、extension registration、SQL execution 与 context cancellation；不得为了扩展加载、Provider cache 或查询取消再实例化第二套 private SQLite runtime。Lithograph 身份与能力只由公开 SQL probe 证明，不根据配置名字、顺序或文件名猜测。
 
 SQLite Extension 是与 `kgosd` 同权限执行的 native code。配置文件因此属于 operator trust boundary：KG OS 不 sandbox 插件，不根据 Ontology/AI 输入动态添加 extension，也不把 remote headers/token/options bag 暴露给业务调用方。修改 extension source/hash/library/entrypoint 只在下一次 daemon start/restart 生效；它本身不创建 State 或自动执行任何数据 migration。
 
@@ -233,14 +260,15 @@ KG OS 的多语句单-State mutation（例如 Object Patch 与 bootstrap）通�
 
 | SQL 函数 | KG OS 使用方式 |
 | --- | --- |
-| `lithograph_tx_begin(options_json)` | 传入目标 Branch、expectedHead 与 metadata；底层开启其拥有的 SQLite 事务 |
-| `lithograph_tx_execute(query, params_json, options_json)` | 执行 compiler 生成的 Cypher，并读取当前事务中的结果 |
-| `lithograph_tx_commit()` | 底层完成图 Commit 与 SQLite 提交，返回最终 State；纯读事务不创建新 Commit |
-| `lithograph_tx_abort()` | 显式取消时回滚底层事务；失败已自动 abort 时不再重复结束事务 |
+| `lithograph_tx_begin(options_json)` | 传入目标 Branch、expectedHead 与 metadata；底层开启其拥有的 SQLite transaction |
+| `lithograph(query, params_json, options_json)` | active transaction 内执行 compiler 生成的 Cypher，自动加入同一 staged state |
+| `lithograph_rows(query, params_json, options_json)` | active transaction 内执行同一 Cypher core，并按 `columns -> row* -> summary` 流式消费结果 |
+| `lithograph_tx_commit()` | finalize 唯一最终 Commit 并提交底层 transaction；pure-read / empty-delta 不虚构新 Commit |
+| `lithograph_tx_abort()` | 显式取消时回滚底层 transaction；失败已自动 abort 时不再重复结束 transaction |
 
-这些函数只改变调用入口，Object Patch 的 strict base、no-op、单-State 与 fail-closed 规则仍由 [Object](object.md#object-公共调用合同)拥有。`tx_commit` 内部包含 SQLite 提交，KG OS 不在外面另套 `BEGIN/COMMIT`，也不把普通 SQLite 事务改成自动合并图 Commit。一次事务的 connection 不能在执行期间借给其它请求。
+Object Patch 的 strict base、no-op、单-State 与 fail-closed 规则仍由 [Object](object.md#object-公共调用合同)拥有。KG OS 不在 `tx_begin/commit` 外另套 SQLite `BEGIN/COMMIT`，不提供 `tx_execute` adapter，也不复制 Lithograph transaction state machine。一次 active transaction 的 connection 在 terminal operation 前保持独占。
 
-SQL `tx_*` 封装不等于所有 Lithograph Native 能力都已被 SQL 替代。公共 Graph 的流式执行、取消、外部 I/O 与 transaction subquery 继续遵守 [Graph 合同](graph.md#graph-公共调用合同)；不能把所有查询换成 `lithograph_rows()`，也不能把完整结果缓冲后再输出 NDJSON 当作已验证的底层流式接入。所需 SQL / Native adapter 与 Node.js 的集成必须以实际加载扩展和调用测试验收，见 [工程待办](implementation.md#typescript-运行时与数据库接入)。当前 KG OS 尚无这条调用链的实现或验收结果；底层 SQL 封装的可用版本以 Lithograph 的公开合同与交付证据为准。
+公共 Graph 同样只使用 SQL surface：非 streaming 使用 `lithograph()`，streaming 使用 `lithograph_rows()`。后者是真正的 Lithograph execution stream，可承载 read/write、external I/O 与 transaction subquery；KG OS 不再需要 Native Graph adapter。Go integration 必须用真实 v0.3.0 extension 验证 streaming、`context.Context` cancellation、early close、partial/durable batch 语义与错误映射，见 [工程待办](implementation.md#go-运行时与数据库接入)。
 
 ### Full-text 全局配置
 
@@ -291,7 +319,12 @@ CALL db.index.semantic.createNodeIndex(
       model: 'text-embedding-3-small',
       api_key_env: 'OPENAI_API_KEY',
       send_dimensions: false,
-      encoding_format: 'float'
+      encoding_format: 'float',
+      cache: {
+        enabled: true,
+        path: '/absolute/KG_HOME/cache/openai-compatible.db',
+        max_bytes: 4294967296
+      }
     },
     dimensions: 1536,
     similarity: 'cosine'
@@ -378,18 +411,21 @@ resolve KG_HOME (default ~/.kgosd)
 → open/create kgosd.lock
 → acquire exclusive OS lock
 → clear stale lock content
+→ ensure runtime-owned directories required by this profile
 → load $KG_HOME/config.toml once
 → load existing $KG_HOME/auth.json or securely create it once
 → validate server + cache + sqlite.extensions + fulltext + embedding config
 → resolve every SQLite extension source to immutable local artifacts
 → resolve configured host + port
-→ open SQLite connection
-→ load the resolved extension set in config order
-→ verify Lithograph SQL transaction / Managed Semantic capabilities and Provider registration
-→ bind and verify Native Graph execution capabilities on the same SQLite connection
-→ validate effective Full-text analyzer on the connection
-→ open / bootstrap $KG_HOME/kgos.db and Kernel
-→ configure Lithograph embedding cache policy through a standalone maintenance call
+→ open one exclusive read-write bootstrap connection to $KG_HOME/kgos.db
+→ connection hook loads the resolved extension set in config order and verifies host SQLite >=3.45 + FTS5
+→ call lithograph_version(); if databaseId/storageFormat.current are null, run lithograph_init(); otherwise verify compatible existing database
+→ verify Root/main and freeze this startup databaseId/storage-format/profile baseline
+→ validate effective Full-text analyzer on the bootstrap connection
+→ run staged Semantic create + tx_abort to validate current openai-compatible provider/config without network or durable Schema
+→ activate normal read-write/read-only connection sets; every physical connection reloads the same artifacts and must match the frozen Lithograph baseline
+→ verify SQL execution / true-stream / context-cancellation primitives on the activated runtime
+→ open / bootstrap-or-validate the KG OS Kernel on the initialized Lithograph database
 → resolve bundled Web assets
 → bind <host>:<port> for Web + API/control
 → write active local endpoint into kgosd.lock
@@ -459,15 +495,15 @@ exact HTTP control route、background detach 的平台实现、shutdown wait tim
 - `KG_HOME` 是唯一 runtime profile selector；未设置时默认 `~/.kgosd`，一个 profile 只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base；
 - `auth.json` 是该 profile 的持久 server credential；所有 daemon API/control request 使用 Bearer token，CLI 只从 `KG_TOKEN` 取得客户端 credential；
 - v1 只有单 token 全权限认证，不提供 user / role / scope / OAuth / TLS；非 loopback plaintext HTTP 仍不是不可信网络安全模型；
-- `kgosd` / Kernel 使用 TypeScript + Node.js；内置 Web 随 daemon 交付，与 API 共用进程、端口和 lifecycle，不单独部署 Web 服务；
+- `kgosd` / Kernel / `kg` CLI 使用 Go；SDK / Web 使用 TypeScript；内置 Web 随 daemon 交付，与 API 共用进程、端口和 lifecycle，不单独部署 Web 服务；
 - `config.toml` 不 hot reload；host / port 通过显式 restart 生效；
 - `[[sqlite.extensions]]` 是唯一 SQLite loadable-extension 配置入口；Lithograph 与第三方 tokenizer/其它 SQLite extension 都走同一 resolver/load lifecycle，不由业务请求动态加载；
 - remote extension 必须 SHA-256 pin，最终总是从 daemon-local immutable artifact 加载；每个 SQLite connection 都加载同一解析结果；
 - `[fulltext].analyzer` 是 KG OS 创建/重建 managed Full-text Index 时使用的 daemon runtime config，缺省 `unicode61`；已有 IndexDefinition 保留其 versioned analyzer；
 - `[embedding]` 是 daemon 必填的 Semantic Index 创建默认值；已有索引与历史 query 使用自身 versioned provider/config；
-- `[cache]` 默认开启、默认 4 GiB，映射到 Lithograph 持久 embedding cache 的 payload 预算，不创建独立 `cache.db`；
+- `[cache]` 默认开启、默认 4 GiB，映射到 OpenAI-compatible Provider 的独立 SQLite cache；省略 path 时使用 `$KG_HOME/cache/openai-compatible.db`，不写 Lithograph `main`；
 - Full-text analyzer 与 Semantic provider/config 正常保存在各自 versioned IndexDefinition；KG OS 不保存第二份 fingerprint/generation，不在 restart 时自动迁移或批量重建；
 - `kgosd.lock` 只承担 single-instance + active-endpoint 定位，不保存 PID 或业务状态；
 - 业务命令不隐式启动 `kgosd`；
 - `$KG_HOME` 是 daemon runtime/config/credential/cache/persistent-data home，但不是 KG OS Knowledge graph 本身的另一套存储模型；
-- Knowledge Base target 仍为 `$KG_HOME/kgos.db`；其中的派生 cache 通过公开 procedure 管理，不作为第二个 Knowledge Base；v1 没有单-daemon多库 selector。
+- Knowledge Base target 仍为 `$KG_HOME/kgos.db`；Provider cache 是独立 derived runtime data，不属于 Knowledge Base storage；v1 没有单-daemon多库 selector。

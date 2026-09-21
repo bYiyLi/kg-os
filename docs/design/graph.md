@@ -69,7 +69,7 @@ graph execute → 读写连接 → Lithograph
 
 公共 Graph 不注入排除 `__kgos_` 的 Knowledge `graphView`，不在参数、结果或提交前按 Vector / reserved identifier 增加 KG OS 检查。否则仍会限制有效 Cypher，或使底层 Schema / Version Procedure 因固定 Graph View 而无法执行。Object / Ontology 的聚合编辑、内部数据投影和一致性检查仍由各自合同负责，不反向变成 Graph 的执行条件。
 
-Semantic query 可能产生模型 I/O，`LOAD CSV` 可能产生文件或网络 I/O，因此公共 Graph 使用普通 Native execution，不使用会拒绝这些能力的 `lithograph_rows()`。KG OS 负责认证、request / parameter 解码、连接与执行上下文、结果传输；语句解析、读写判定、procedure 行为、数据库约束与执行错误由 Lithograph 负责。具体接入证据见 [integration readiness](implementation.md#managed-semantic-integration-readiness)。
+公共 Graph 只使用 Lithograph v0.3.0 的 SQL execution surface：非 streaming request 使用 `lithograph()` 完整 envelope，streaming request 使用真正增量的 `lithograph_rows()` `columns -> row* -> summary` event stream。Semantic query、`LOAD CSV`、graph/schema/version mutation 与 transaction subquery 都不因为 streaming adapter 另设 KG OS 限制；`query` / `execute` 只决定只读 / 读写 connection。KG OS 负责认证、request / parameter 解码、连接与执行上下文、结果传输和 cancellation；语句解析、读写判定、procedure 行为、事务与数据库错误由 Lithograph 负责。具体接入证据见 [integration readiness](implementation.md#managed-semantic-integration-readiness)。
 
 KG OS-managed Full-text 默认使用目标 State 的实际 versioned IndexDefinition 中的 analyzer；全局 `[fulltext].analyzer` 只用于创建或因业务 Schema 变化重建索引。调用方在 Cypher 中显式传入底层 `{analyzer: ...}` 时原样执行，不修改全局配置或已有 IndexDefinition。KG OS 不为此增加解析或重写逻辑。
 
@@ -77,7 +77,7 @@ KG OS-managed Full-text 默认使用目标 State 的实际 versioned IndexDefini
 
 `execute` 直接使用 Lithograph 的执行和提交语义，不再附加 KG OS public-profile candidate validation。普通 graph / schema mutation 的原子性、Branch CAS 与 Commit 行为由底层保证；Version Procedure 与 `CALL ... IN TRANSACTIONS` 等按各自底层合同执行，KG OS 不把任意 Cypher 包装成“恰好一个 Commit”或统一 all-or-nothing 事务，也不追加隐藏修复 Commit。
 
-保存 semantic source / target membership 只写普通 graph data，不触发 KG OS embedding refresh。Semantic query、cache maintenance 与 graph mutation 能否共用 execution / transaction，由 Lithograph 判定；KG OS 不在执行前扫描语句或重复实现这些规则。
+保存 semantic source / target membership 只写普通 graph data，不触发 KG OS embedding refresh。Semantic query、Provider-owned cache 与 graph mutation 的组合及 transaction boundary 由 Lithograph / Provider 各自公开合同决定；KG OS 不在执行前扫描语句或重复实现这些规则。
 
 Ontology / Object / Evolution 仍提供模型聚合、Patch 和版本操作的专用交互，但不是禁止调用对应 Cypher 的理由。直接通过 Graph 修改 Schema、Binding、内部图或 Raw Vector，可能产生不能按 KG OS 高层模型解释的 Snapshot；Graph 仍可按底层合同执行，高层能力按 [Ontology 一致性规则](ontology.md#binding-record-与-schema-locator)报告错误，不自动补 Binding、修复数据或回滚已完成的底层提交。
 
@@ -132,9 +132,9 @@ execute({
 }
 ```
 
-`query.at` 必填：在 operation 开始时解析并 pin immutable State。Semantic query 使用该 Snapshot 的 IndexDefinition 和 provider/config，不以当前 `[embedding]` 覆盖历史配置。KG OS 不生成 query Vector，也不保存第二份配置 fingerprint。
+`query.at` 必填：adapter在 operation开始时使用本次只读 connection调用公开 `lithograph.commit.get(request.at)`，把 Commit / Branch / Tag StateRef解析并 pin成 immutable `commit/<id>`；随后原始用户 Cypher统一带 `options.at=<resolved commit>` 执行，response `state`也返回该 exact commit。KG OS不按语句或 procedure name决定是否附加 Snapshot context；某个底层 procedure若不接受 `at`，就保留 Lithograph公开错误。Semantic query使用该 Snapshot的 IndexDefinition和 provider/config，不以当前 `[embedding]` / `[cache]` 覆盖历史配置。KG OS不生成 query Vector，也不保存第二份配置 fingerprint。
 
-`execute.branch` 必填，用于选择本次调用的默认 Branch 上下文；没有 `baseState`。procedure 若在语句内部显式选择其它 target，按 Lithograph 合同执行，KG OS 不检查或改写它。adapter 必须用公开连接 / execution 能力绑定上下文，不能把 `branch` / `graphView` 等 options 无条件附加到不接受它们的 procedure，也不能依赖其它请求遗留的 checkout。该映射需通过 [集成验收](implementation.md#managed-semantic-integration-readiness)。`author/message` 的适用性与结果 `state/counters` 使用底层公开执行合同；不能为没有生成 Commit 的操作虚构新 State。
+`execute.branch` 必填，用于选择本次调用的默认 Branch 上下文；没有 `baseState`。adapter为每次 execute独占一个 read-write connection，在用户 Cypher开始前先确认 SQLite autocommit / 无 active Lithograph explicit transaction，再完整执行 `CALL lithograph.branch.checkout($branch)`；随后执行用户原始 Cypher时不传 `options.branch`。procedure若在语句内部显式选择或改变其它 target / checkout，完全按 Lithograph合同执行，KG OS不检查或改写它。下一次 operation必须重新建立自己的 context，不能依赖 pool中遗留 checkout。`author/message` 只有调用方提供时才传；不接受这些 options的 procedure按底层公开错误失败。这个固定映射不需要 procedure-name parser / allowlist，并通过 [集成验收](implementation.md#managed-semantic-integration-readiness)验证。结果 `state/counters` 使用底层公开执行合同；不能为没有生成 Commit 的操作虚构新 State。
 
 普通 graph / Full-text read 不调用 embedding service。Semantic query 必须能在当前 connection 解析所需 Provider，即使 cache 已热也不能缺少该扩展；远端服务仅在需要计算缺失 embedding 时被调用。Provider failure / cancellation 不能变成遗漏部分候选的“成功 top-k”。错误分类见 [公共合同](contracts.md#公共错误合同)。
 
@@ -146,7 +146,7 @@ Lithograph Semantic Index 的 embedding 是非图属性派生数据；`RETURN n`
 
 调用方显式计算、传入、返回或存储的 Raw Vector 则遵守 Lithograph 合同，Graph 不拦截。Object / Ontology v1 的简化值模型仍不接受 caller-owned Vector；直接 Cypher 能力与高层 Object 能否解释该状态是两件事，不能用 Object profile 限制 Graph。
 
-大型结果可以按 `columns`、多条 `row`、最终 `summary` 流式传输。streaming 只改变 transport，不改变值编码或底层事务语义；没有最终 summary 表示调用方未获得完整成功结果，不证明任意 Cypher 都没有已提交副作用。
+大型结果可以按 `columns`、多条 `row`、最终 `summary` 流式传输。streaming 只改变 transport，不改变值编码或底层事务语义；没有最终 summary 表示调用方未获得完整成功结果，不证明任意 Cypher 都没有已提交副作用。HTTP adapter在 stream开始后的 daemon failure使用 terminal `error` framing，并以逐 event write/flush 对 SQLite pull施加 backpressure；这些 transport规则由 [Runtime](runtime.md#graph-http-streaming-framing)拥有，不把 `error` 当成 Graph query row。
 
 ### Graph 能力边界
 
