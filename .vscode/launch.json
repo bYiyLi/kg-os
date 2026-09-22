@@ -2,33 +2,39 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "KG OS development host",
-      "type": "node",
+      "name": "KG OS daemon (Go)",
+      "type": "go",
       "request": "launch",
-      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
-      "runtimeArgs": ["packages/daemon/src/dev.ts"],
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/kgosd",
+      "args": ["--phase0-shell", "--host", "127.0.0.1", "--port", "4765"],
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"]
+      "buildFlags": "-tags=sqlite_fts5",
+      "env": {
+        "CGO_ENABLED": "1",
+        "GOTOOLCHAIN": "go1.27.1",
+        "KG_HOME": "${workspaceFolder}/.kgos-dev"
+      }
     },
     {
-      "name": "KG OS CLI",
-      "type": "node",
+      "name": "KG OS CLI (Go)",
+      "type": "go",
       "request": "launch",
-      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/tsx",
-      "runtimeArgs": ["packages/cli/src/bin.ts"],
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/kg",
       "args": ["--help"],
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"]
+      "buildFlags": "-tags=sqlite_fts5",
+      "env": {
+        "CGO_ENABLED": "1",
+        "GOTOOLCHAIN": "go1.27.1"
+      }
     },
     {
       "name": "KG OS Web",
       "type": "pwa-chrome",
       "request": "launch",
-      "url": "http://127.0.0.1:4765",
+      "url": "http://127.0.0.1:5173",
       "webRoot": "${workspaceFolder}/packages/web",
       "sourceMaps": true
     }

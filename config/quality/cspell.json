@@ -103,6 +103,11 @@
     "mattn",
     "rusqlite",
     "staticcheck",
-    "Taskfile"
+    "Taskfile",
+    "buildinfo",
+    "GOROOT",
+    "GOTOOLCHAIN",
+    "lithographtest",
+    "webui"
   ]
 }

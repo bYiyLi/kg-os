@@ -1,10 +1,4 @@
 {
   "files": [],
-  "references": [
-    { "path": "./packages/contracts" },
-    { "path": "./packages/kernel" },
-    { "path": "./packages/daemon" },
-    { "path": "./packages/sdk" },
-    { "path": "./packages/cli" }
-  ]
+  "references": [{ "path": "./packages/sdk" }]
 }

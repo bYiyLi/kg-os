@@ -17,10 +17,6 @@
     "noPropertyAccessFromIndexSignature": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@kgos/cli": ["packages/cli/src/index.ts"],
-      "@kgos/contracts": ["packages/contracts/src/index.ts"],
-      "@kgos/daemon": ["packages/daemon/src/index.ts"],
-      "@kgos/kernel": ["packages/kernel/src/index.ts"],
       "@kgos/sdk": ["packages/sdk/src/index.ts"]
     },
     "resolveJsonModule": true,

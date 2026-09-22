@@ -3,30 +3,20 @@
   "ignoreDependencies": [
     "@arethetypeswrong/cli",
     "@secretlint/secretlint-rule-preset-recommend",
+    "license-checker-rseidelsohn",
+    "secretlint",
     "publint"
   ],
   "workspaces": {
     ".": {
-      "entry": ["scripts/serve-built-web.mjs"],
+      "entry": ["scripts/prepare-lithograph.mjs"],
       "project": ["config/test/*.ts", "scripts/*.mjs", "tests/**/*.ts"]
-    },
-    "packages/cli": {
-      "project": ["src/**/*.ts"]
-    },
-    "packages/contracts": {
-      "project": ["src/**/*.ts"]
-    },
-    "packages/daemon": {
-      "project": ["src/**/*.ts"]
-    },
-    "packages/kernel": {
-      "project": ["src/**/*.ts"]
     },
     "packages/sdk": {
       "project": ["src/**/*.ts"]
     },
     "packages/web": {
-      "project": ["src/**/*.ts"]
+      "project": ["src/**/*.tsx"]
     }
   }
 }

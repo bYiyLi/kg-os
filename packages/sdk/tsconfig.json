@@ -7,6 +7,5 @@
     "tsBuildInfoFile": "../../.cache/tsbuildinfo/sdk.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"],
-  "references": [{ "path": "../contracts" }]
+  "exclude": ["src/**/*.test.ts"]
 }

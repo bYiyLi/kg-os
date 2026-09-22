@@ -81,7 +81,7 @@ export default tseslint.config(
     }
   },
   {
-    files: ["packages/web/**/*.ts", "tests/e2e/**/*.ts"],
+    files: ["packages/web/**/*.{ts,tsx}", "tests/e2e/**/*.ts"],
     languageOptions: { globals: globals.browser }
   },
   {

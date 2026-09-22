@@ -3,9 +3,10 @@
   "compilerOptions": {
     "declaration": false,
     "declarationMap": false,
+    "jsx": "react-jsx",
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["../../packages/*/src/**/*.ts"],
-  "exclude": ["../../packages/**/*.test.ts"]
+  "include": ["../../packages/*/src/**/*.ts", "../../packages/*/src/**/*.tsx"],
+  "exclude": ["../../packages/**/*.test.ts", "../../packages/**/*.test.tsx"]
 }

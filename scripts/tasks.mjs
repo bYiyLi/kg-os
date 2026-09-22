@@ -12,7 +12,7 @@ const taskCommands = {
     ["check:spelling"],
     ["check:secrets"]
   ],
-  quick: [["typecheck"], ["lint"], ["test"]],
+  quick: [["check:go"], ["typecheck"], ["lint"], ["test"]],
   typecheck: [
     ["exec", "tsc", "-b", "--pretty", "false"],
     ["exec", "tsc", "-p", "packages/web/tsconfig.json", "--pretty", "false"],
@@ -21,8 +21,12 @@ const taskCommands = {
   validate: [
     ["check:install"],
     ["check:dependencies"],
+    ["check:go"],
     ["typecheck"],
     ["lint"],
+    ["test:go:race"],
+    ["test:go:coverage"],
+    ["check:go:security"],
     ["test:coverage"],
     ["check:type-coverage"],
     ["check:duplicates"],
@@ -41,10 +45,10 @@ const taskCommands = {
 };
 
 if (!(task in taskCommands)) {
-  throw new Error(`Unknown task sequence: ${String(task)}`);
+  throw new Error("Unknown task sequence: " + String(task));
 }
 
 for (const args of taskCommands[task]) {
-  process.stdout.write(`\n> pnpm ${args.join(" ")}\n`);
+  process.stdout.write("\n> pnpm " + args.join(" ") + "\n");
   await run("pnpm", args);
 }

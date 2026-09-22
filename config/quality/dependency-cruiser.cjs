@@ -14,34 +14,10 @@ module.exports = {
       to: { couldNotResolve: true }
     },
     {
-      name: "contracts-stays-independent",
-      severity: "error",
-      from: { path: "^packages/contracts/" },
-      to: { path: "^packages/(?:kernel|daemon|sdk|cli|web)/" }
-    },
-    {
-      name: "kernel-only-depends-on-contracts",
-      severity: "error",
-      from: { path: "^packages/kernel/" },
-      to: { path: "^packages/(?:daemon|sdk|cli|web)/" }
-    },
-    {
-      name: "daemon-does-not-depend-on-clients",
-      severity: "error",
-      from: { path: "^packages/daemon/" },
-      to: { path: "^packages/(?:sdk|cli|web)/" }
-    },
-    {
-      name: "sdk-does-not-depend-on-server",
+      name: "sdk-stays-client-independent",
       severity: "error",
       from: { path: "^packages/sdk/" },
-      to: { path: "^packages/(?:kernel|daemon|cli|web)/" }
-    },
-    {
-      name: "clients-do-not-depend-on-server",
-      severity: "error",
-      from: { path: "^packages/(?:cli|web)/" },
-      to: { path: "^packages/(?:kernel|daemon)/" }
+      to: { path: "^packages/web/" }
     }
   ],
   options: {

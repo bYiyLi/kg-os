@@ -26,7 +26,7 @@ export default defineConfig({
     trace: "retain-on-failure"
   },
   webServer: {
-    command: "node scripts/serve-built-web.mjs --port 4173",
+    command: "artifacts/build/kgosd --phase0-shell --host 127.0.0.1 --port 4173",
     cwd: repoRoot,
     reuseExistingServer: false,
     timeout: 30_000,

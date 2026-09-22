@@ -8,12 +8,6 @@ export default defineConfig({
   root: repoRoot,
   resolve: {
     alias: {
-      "@kgos/cli": fileURLToPath(new URL("../../packages/cli/src/index.ts", import.meta.url)),
-      "@kgos/contracts": fileURLToPath(
-        new URL("../../packages/contracts/src/index.ts", import.meta.url)
-      ),
-      "@kgos/daemon": fileURLToPath(new URL("../../packages/daemon/src/index.ts", import.meta.url)),
-      "@kgos/kernel": fileURLToPath(new URL("../../packages/kernel/src/index.ts", import.meta.url)),
       "@kgos/sdk": fileURLToPath(new URL("../../packages/sdk/src/index.ts", import.meta.url))
     }
   },
@@ -24,10 +18,10 @@ export default defineConfig({
         // Thin process/browser entrypoints delegate to covered modules.
         "**/src/bin.ts",
         "**/src/dev.ts",
-        "packages/web/src/main.ts",
+        "packages/web/src/main.tsx",
         "**/dist/**"
       ],
-      include: ["packages/{cli,contracts,daemon,kernel,sdk,web}/src/**/*.ts"],
+      include: ["packages/{sdk,web}/src/**/*.{ts,tsx}"],
       provider: "v8",
       thresholds: {
         branches: 90,
@@ -36,6 +30,6 @@ export default defineConfig({
         statements: 90
       }
     },
-    exclude: ["**/node_modules/**", "**/dist/**", "**/coverage/**", "tests/e2e/**"]
+    exclude: ["**/node_modules/**", "**/dist/**", "**/coverage/**", ".cache/**", "tests/e2e/**"]
   }
 });

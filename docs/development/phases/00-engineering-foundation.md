@@ -1,6 +1,6 @@
 # Phase 00：Engineering Foundation
 
-**状态：`ready`**
+**状态：`in_progress`**
 
 ## 1. 当前目标与范围
 
@@ -36,14 +36,14 @@ TypeScript / npm
 
 ## 3. 固定工程基线
 
-- Go `1.27.1` 作为当前服务端 / CLI 工具链基线；仓库使用 `go.mod` 固定 minimum/toolchain 要求，CI 与 Phase 00 本地平台验收都必须实际报告 `go1.27.1`，不能把本机其它 Go 版本的成功结果当作当前基线证据。
+- Go `1.27.1` 作为当前服务端 / CLI 工具链基线；`go.mod` 的 `go 1.27.1` 固定 module language/toolchain minimum，仓库 Go task 同时显式设置 `GOTOOLCHAIN=go1.27.1`，CI 使用 setup-go 选择同一精确版本。Phase 00 本地与 CI 验收都必须实际报告 `go1.27.1`，不能把本机其它 Go 版本的成功结果当作当前基线证据。
 - SQLite driver 使用 `github.com/mattn/go-sqlite3` bundled SQLite；Phase 实现时固定精确 module version 并提交 `go.sum`。必须启用 CGO 与 `sqlite_fts5` build tag，不使用 `libsqlite3` 系统 SQLite，也不得启用 `sqlite_omit_load_extension`。同一个 bundled native SQLite runtime负责 KG OS main connection 与 Lithograph loadable extension host。
 - Node.js / pnpm 继续只为 SDK/Web 与 repository tooling 服务；现有 Node `24.15.0`、pnpm `10.34.5` 可作为迁移起点，Phase 完成时由实际 lock/tool config 冻结。
 - Web 使用 React/Vite/TypeScript；生产构建产物进入 `kgosd` binary/交付物并由 Go `net/http` 同端口提供。开发 HMR 可以使用 Vite dev tooling 与代理，不把开发服务器当成产品第二服务。
 - Lithograph integration baseline 为 **v0.3.0**、storage format `3`、Cypher profile `CY25-2026.08`、SQLite `3.45.0+`；只验证 SQL surface，不验证已删除的 application Native query ABI。
 - 当前 Phase 00 的平台证据冻结为：本地 **macOS arm64** 与远端 **Ubuntu 24.04 x64** GitHub Actions；两边都必须 native CGO build并真实加载对应 Lithograph v0.3.0 artifact。其它 OS / arch 的正式支持矩阵留到 release Phase在真实目标确定后冻结，不把尚未承诺的平台变成当前 Phase blocker。
 
-仓库当前仍存在上一版 TypeScript daemon / kernel / CLI 工程壳层及未提交的旧 Phase 01 代码。它们是迁移输入，不属于当前 Phase 00 完成证据；实现本 Phase 时才按最小范围删除/替换，不在本次文档任务中修改代码。
+当前工作树已经完成 D65/D66 所需的工程迁移：旧 TypeScript daemon / kernel / CLI、`ffi-rs` SQLite host、自制 SQLite runtime 与旧 v0.2.x Phase 01 实现尝试已经从现行代码清理。Phase 00 只保留 test-only 的 `go-sqlite3` / Lithograph v0.3.0真实 load smoke；正式 Runtime database host 继续由 Phase 01 拥有。
 
 ### 3.1 Go 开发工具
 
@@ -86,7 +86,7 @@ loadable extension: enabled
 
 | 根命令 | 目标 |
 | --- | --- |
-| `pnpm setup` | 检查/准备 Go 1.27.1 + C compiler、下载 Go/npm dependencies 与固定开发工具、准备浏览器和 Lithograph fixture；不全局安装 Go tool |
+| `pnpm run setup` | 检查/准备 Go 1.27.1 + C compiler、下载 Go/npm dependencies 与固定开发工具、验证 bundled SQLite `sqlite_fts5` / load-extension build profile、准备浏览器和 Lithograph fixture；不全局安装 Go tool |
 | `pnpm check:go` | gofmt check + module verify/tidy-clean + vet + Staticcheck + 快速 Go tests |
 | `pnpm test:go` | 当前 Go unit/integration tests；完整验收以 uncached `-count=1` 运行 |
 | `pnpm test:go:race` | uncached race detector |
@@ -167,14 +167,14 @@ loadable extension: enabled
 
 | ID | 验收场景 | 判定 | 当前状态 |
 | --- | --- | --- | --- |
-| P0-01 | 固定工具链与 clean setup | Go 1.27.1、go.mod/go.sum + pinned tool dependencies、CGO bundled SQLite、`sqlite_fts5`、loadable-extension profile、Node/pnpm、lockfiles、真实 fixture在无缓存源码副本可复现；不要求全局 Go linter/security tool | 未验收 |
-| P0-02 | 模块、类型与构建边界 | Go daemon / kernel / CLI 与 TS SDK / Web 依赖方向、build、真实版本入口通过 | 未验收 |
-| P0-03 | 开发联调与调试 | Go daemon + Web HMR、`.kgos-dev`隔离、调试和退出清理通过 | 未验收 |
-| P0-04 | 质量检查真实生效 | Go format/mod/vet/Staticcheck/test/race/>=90% statement coverage/govulncheck 与 TS/docs/security/diff 门禁全部通过；受控负向样本逐项证明 gate 能失败后删除 | 未验收 |
-| P0-05 | 测试与真实扩展 | unit/HTTP/Web、Playwright、test-only SQLite>=3.45 + FTS5 + explicit-entrypoint Lithograph v0.3.0 SQL/rows/cancel smoke通过；不宣称正式 Runtime host | 未验收 |
-| P0-06 | 构建与本地交付物 | native `kgosd`/`kg`、embedded Web和workspace 外 smoke/manifest通过 | 未验收 |
-| P0-07 | Git hook 与平台 CI | forced pre-commit只走统一 quick gate；本地 macOS arm64与 Ubuntu 24.04 x64 GitHub Actions都用 Go 1.27.1 + native CGO runtime运行完整 validate并完成当前 Go基线验证 | 未验收 |
-| P0-08 | 文档与最终 Review | 当前文档不再把历史 TypeScript/Native/cache 合同当作现行基线；final diff 无finding | 未验收 |
+| P0-01 | 固定工具链与 clean setup | Go 1.27.1、go.mod/go.sum + pinned tool dependencies、CGO bundled SQLite、`sqlite_fts5`、loadable-extension profile、Node/pnpm、lockfiles、真实 fixture在无缓存源码副本可复现；不要求全局 Go linter/security tool | 本地已验收 |
+| P0-02 | 模块、类型与构建边界 | Go daemon / kernel / CLI 与 TS SDK / Web 依赖方向、build、真实版本入口通过 | 本地已验收 |
+| P0-03 | 开发联调与调试 | Go daemon + Web HMR、`.kgos-dev`隔离、调试和退出清理通过 | 本地已验收 |
+| P0-04 | 质量检查真实生效 | Go format/mod/vet/Staticcheck/test/race/>=90% statement coverage/govulncheck 与 TS/docs/security/diff 门禁全部通过；受控负向样本逐项证明 gate 能失败后删除 | 本地已验收 |
+| P0-05 | 测试与真实扩展 | unit/HTTP/Web、Playwright、test-only SQLite>=3.45 + FTS5 + explicit-entrypoint Lithograph v0.3.0 SQL/rows/cancel smoke通过；不宣称正式 Runtime host | 本地已验收 |
+| P0-06 | 构建与本地交付物 | native `kgosd`/`kg`、embedded Web和workspace 外 smoke/manifest通过 | 本地已验收 |
+| P0-07 | Git hook 与平台 CI | forced pre-commit只走统一 quick gate；本地 macOS arm64与 Ubuntu 24.04 x64 GitHub Actions都用 Go 1.27.1 + native CGO runtime运行完整 validate并完成当前 Go基线验证 | 本地已验收；Ubuntu CI 待最终推送 SHA |
+| P0-08 | 文档与最终 Review | 当前文档不再把历史 TypeScript/Native/cache 合同当作现行基线；final diff 无finding | 本地已验收 |
 
 ## 6. 验证执行计划
 
@@ -194,7 +194,7 @@ local macOS arm64 + Ubuntu 24.04 x64 native CGO validation
 git diff --check
 ```
 
-统一根命令已经在本计划冻结为 `pnpm setup`、`pnpm check:go`、`pnpm test:go*`、`pnpm check:go:security`、`pnpm check:quick` 与 `pnpm validate`。本 Phase 实现这些命令并把**实际可执行步骤**写入开发指南；计划不假装当前工作树已经存在这些 Go command。
+统一根命令为 `pnpm run setup`、`pnpm check:go`、`pnpm test:go*`、`pnpm check:go:security`、`pnpm check:quick` 与 `pnpm validate`。必须使用 `pnpm run setup`，因为裸 `pnpm setup` 是 pnpm 自身命令，不会执行仓库 setup script。
 
 ## 7. Phase Review
 
@@ -211,9 +211,21 @@ git diff --check
 - 当前质量 / coverage / CI 是否因语言迁移被弱化；
 - 历史 TypeScript Phase 00 证据是否保留但没有被误用为当前完成证据。
 
+### 2026-09-22 当前工作树验收证据
+
+- 本地 macOS arm64 使用实际 Go `1.27.1`、Node `24.15.0`、pnpm `10.34.5` 与 Apple Clang；`pnpm run setup` 成功验证 Go tools、CGO、bundled SQLite `sqlite_fts5` / load-extension profile、Lefthook、Chromium 与 Lithograph v0.3.0 fixture。
+- `/tmp` 下独立初始化的 fresh-source Git repo 在没有主工作树 `node_modules` / build artifact / cache 的前提下完成 `pnpm run setup`，随后完整 `pnpm validate` 通过；CSpell 实际扫描 75 个文件。此前放在主仓库 ignored `.cache/` 下的副本因 CSpell `useGitignore` 只检查 0 个文件，Review 中识别为无效 freshness 证据并弃用。该复验同时确认裸 `pnpm setup` 与 pnpm 内置命令冲突，因此开发指南固定使用 `pnpm run setup`。
+- 当前工作树完整 `pnpm validate` 通过；Go race、govulncheck（含 test-reachable code）、Go total statement coverage `90.6%`、TypeScript/V8 coverage `100%`、type coverage `100%`、dependency/duplicate/unused/license/audit/diff 等门禁通过。npm audit 曾真实阻断 `smol-toml <=1.7.0` high 漏洞，恢复精确 `1.8.0` override 后复验为无已知漏洞。
+- 受控 disposable 负向样本证明 gofmt、`go mod tidy`、vet、Staticcheck、Go test/race、90% coverage、TypeScript typecheck、ESLint/Prettier、依赖精确版本、Markdown、CSpell、模块边界、Secretlint、Go license、artifact 与 whitespace/diff gate 会失败；另以缺失 `secretlint.json` 的独立样本确认 fail-closed wrapper 会直接失败。所有负向样本均在 disposable 副本中执行并已删除。
+- `pnpm dev` 已验证 Vite HMR `5173`、Go shell `4765`、`.kgos-dev` 隔离、`/api` proxy 404；向顶层开发进程发送 SIGINT 后，Go/Vite 子进程与两个 listener 均无残留。VS Code Go/Browser debug entry 已同步。
+- `pnpm test:native` 使用 Go bundled SQLite 真实加载 Lithograph v0.3.0主扩展与 OpenAI-compatible Provider explicit entrypoint，验证 SQLite >=3.45、FTS5、storage format 3、`CY25-2026.08`、`lithograph()`、`lithograph_rows()` 事件流，以及 `context.Context` 对真实长 `lithograph_rows()` 执行的取消。
+- `pnpm check:package` / `pnpm pack:release` 已在 workspace 外运行 native `kgosd` / `kg` 与 embedded Web smoke，并生成本地 manifest；未执行发布。
+- 旧 TypeScript daemon/kernel/CLI、`ffi-rs`、`sqlite-source`、旧 Native smoke / SQLite shim 与旧 Phase 01 runtime source 已从当前工程基线清理；现行 source/scripts stale scan 无对应引用。
+- 当前唯一阶段级缺口是 **最终推送 revision 的 Ubuntu 24.04 x64 GitHub Actions**。本次没有 commit/push 授权，因此不能生成该远端证据。
+
 ## 8. 完成条件
 
-P0-01 至 P0-08 全部取得当前 Go 基线的真实证据、Phase Review finding 闭环、文档同步且当前最终推送 SHA的 Ubuntu 24.04 x64 CI成功且本地 macOS arm64 native验证通过后，Phase 00 才能从 `ready/in_progress` 标记 `done`。本次仅设计/计划维护，不包含代码迁移、commit或push。
+P0-01 至 P0-08 全部取得当前 Go 基线的真实证据、Phase Review finding 闭环、文档同步且当前最终推送 SHA的 Ubuntu 24.04 x64 CI成功且本地 macOS arm64 native验证通过后，Phase 00 才能从 `ready/in_progress` 标记 `done`。当前本地实现、验收与 Review 已闭环；由于尚未提交/推送，缺少最终 SHA 的 Ubuntu CI 证据，因此保持 `in_progress`。
 
 ## 9. 历史 TypeScript Phase 00 基线（已被 D65 supersede）
 
@@ -222,4 +234,4 @@ P0-01 至 P0-08 全部取得当前 Go 基线的真实证据、Phase Review findi
 - 提交 `20d73cdb09947da03e3e222a318c2e61134a2879` 曾完成 Node/pnpm workspace、TypeScript package、Web shell、质量门禁、真实 Lithograph v0.1.1 smoke、构建/打包与 Ubuntu CI；GitHub Actions run `35454190185` 成功。
 - 后续 `896e98c97d22edde358d2bb612a4cec641837d62` 更新 Actions runtime，CI run `35454838184` 成功。
 - 这些证据只证明当时的 TypeScript 工程基线，不证明当前 D65 Go runtime、D66 Lithograph v0.3.0 SQL-only integration 或当前 Phase 00 acceptance。
-- 当前代码仍以该历史工程壳层为已提交基底；新的 Phase 00 实现完成后，开发指南与构建/测试命令再切换到 Go 基线。
+- 当前工作树已经用新的 Go Phase 00 工程基线替换该历史壳层；旧提交和 CI 结果仅作为历史证据保留，不参与当前完成判定。

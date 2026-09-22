@@ -18,10 +18,13 @@ async function validCache() {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     const archive = await readFile(join(artifact.cacheDirectory, artifact.archive));
     const library = await readFile(join(artifact.cacheDirectory, artifact.library));
+    const providerLibrary = await readFile(join(artifact.cacheDirectory, artifact.providerLibrary));
     return (
       manifest.version === LITHOGRAPH_VERSION &&
       manifest.sourceSha256 === artifact.sha256 &&
       manifest.librarySha256 === sha256(library) &&
+      manifest.providerLibrary === artifact.providerLibrary &&
+      manifest.providerLibrarySha256 === sha256(providerLibrary) &&
       sha256(archive) === artifact.sha256
     );
   } catch {
@@ -39,6 +42,12 @@ function validateArchiveEntries(listing) {
   }
   if (!entries.includes(artifact.library)) {
     throw new Error(`Lithograph release archive does not contain ${artifact.library}`);
+  }
+  if (!entries.includes(artifact.providerLibrary)) {
+    throw new Error(`Lithograph release archive does not contain ${artifact.providerLibrary}`);
+  }
+  if (!entries.includes("VERSION")) {
+    throw new Error("Lithograph release archive does not contain VERSION");
   }
 }
 
@@ -67,8 +76,14 @@ async function prepare() {
     validateArchiveEntries(listing.stdout);
     await run("tar", ["-xzf", archivePath, "-C", staging]);
     await access(join(staging, artifact.library));
+    await access(join(staging, artifact.providerLibrary));
+    const version = (await readFile(join(staging, "VERSION"), "utf8")).trim();
+    if (version !== LITHOGRAPH_VERSION) {
+      throw new Error("Lithograph release archive VERSION does not match the pinned release");
+    }
 
     const library = await readFile(join(staging, artifact.library));
+    const providerLibrary = await readFile(join(staging, artifact.providerLibrary));
     await writeFile(
       join(staging, "manifest.json"),
       `${JSON.stringify(
@@ -76,6 +91,8 @@ async function prepare() {
           archive: artifact.archive,
           library: artifact.library,
           librarySha256: sha256(library),
+          providerLibrary: artifact.providerLibrary,
+          providerLibrarySha256: sha256(providerLibrary),
           platform: artifact.key,
           source: artifact.url,
           sourceSha256: artifact.sha256,

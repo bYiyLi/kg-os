@@ -1,27 +1,31 @@
 import { resolve } from "node:path";
 
-export const LITHOGRAPH_VERSION = "0.1.1";
+export const LITHOGRAPH_VERSION = "0.3.0";
 
 const artifacts = {
   "darwin-arm64": {
     archive: "lithograph-macos-arm64.tar.gz",
     library: "lithograph.dylib",
-    sha256: "28311fef687377d08583129be4ac26b1cb9962d6442f46590579723a4ac48d5b"
+    providerLibrary: "lithograph-openai-compatible.dylib",
+    sha256: "ac3328caf35b928400a9138e23c1ef8c1bd3d465aa0daf1c14cb0ed805db26e5"
   },
   "darwin-x64": {
     archive: "lithograph-macos-x64.tar.gz",
     library: "lithograph.dylib",
-    sha256: "4df9631a553be4d4418f07ebb3adb6dfc1f95c8e861c6453f44a65a6ba671fda"
+    providerLibrary: "lithograph-openai-compatible.dylib",
+    sha256: "b99fbc70c257687bfea18ba75c82721e7f05d22c6644d4628053b3e769ef961e"
   },
   "linux-arm64": {
     archive: "lithograph-linux-arm64.tar.gz",
     library: "lithograph.so",
-    sha256: "72ccb548d857288096a567523110eda21a1868dae0d8b91a36a9c9096d573c71"
+    providerLibrary: "lithograph-openai-compatible.so",
+    sha256: "319ad0dc22a3f43b71d790a2bf4b43af37391dc229e53e065c14d73d236003ca"
   },
   "linux-x64": {
     archive: "lithograph-linux-x64.tar.gz",
     library: "lithograph.so",
-    sha256: "dc73a730c2c8981761258753934b24673506d383b13c53ada332e3fef441c40c"
+    providerLibrary: "lithograph-openai-compatible.so",
+    sha256: "0a14828ae87e1643d693fdb60306342bb45ad0eb2a79d5f98956c9bfd9b1450b"
   }
 };
 
@@ -30,7 +34,7 @@ export function currentLithographArtifact(root) {
   const artifact = artifacts[key];
   if (artifact === undefined) {
     throw new Error(
-      `No Phase 0 Lithograph artifact for ${key}; supported targets are macOS/Linux x64/arm64`
+      `No KG OS Lithograph artifact for ${key}; supported targets are macOS/Linux x64/arm64`
     );
   }
 

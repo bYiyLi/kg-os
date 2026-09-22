@@ -1,10 +1,6 @@
-export {
-  CLI_NAME,
-  evaluatePhase0Command,
-  KGOS_VERSION,
-  PRODUCT_NAME,
-  type JsonPrimitive,
-  type JsonValue,
-  type Phase0CommandConfig,
-  type Phase0CommandResult
-} from "@kgos/contracts";
+export const KGOS_VERSION = "0.0.0";
+export const PRODUCT_NAME = "KG OS";
+
+export type JsonPrimitive = boolean | null | number | string;
+export type JsonValue =
+  JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };

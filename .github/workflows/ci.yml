@@ -35,13 +35,28 @@ jobs:
           cache: pnpm
           node-version-file: .node-version
 
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          cache-dependency-path: go.sum
+          go-version: 1.27.1
+
+      - name: Install CGO toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc
+          go version
+          cc --version
+          test "$(go env GOVERSION)" = "go1.27.1"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps --only-shell chromium
 
-      - name: Validate Phase 0
+      - name: Validate KG OS
         run: pnpm validate
 
       - name: Upload validation reports

@@ -2,6 +2,7 @@
   "recommendations": [
     "dbaeumer.vscode-eslint",
     "esbenp.prettier-vscode",
+    "golang.go",
     "streetsidesoftware.code-spell-checker"
   ]
 }
