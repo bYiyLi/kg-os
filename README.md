@@ -35,9 +35,11 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 ## 当前状态
 
-**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；业务能力仍未实现。** Phase 00 工程基线已经完成；当前 Phase 01 工作树进一步实现了 `KG_HOME` / config / credential、SQLite Extension resolver、正式 Go/Lithograph Host、SQL query / execute / true streaming / cancellation、Semantic Provider readiness/cache mapping、explicit transaction、single-instance lock 与 daemon shutdown lifecycle，并清理旧 TypeScript daemon/kernel/CLI、`ffi-rs` SQLite host、旧 v0.2.x runtime 与 Phase 00 shell 启动路径。当前 macOS arm64 本地完整 validation 与 fresh-source validation已通过，Phase 01仍等待最终推送 revision 的 Ubuntu 24.04 x64 CI。
+**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；业务能力仍未实现。** Phase 00 工程基线与 Phase 01 Runtime & Lithograph Host Foundation 均已完成。`KG_HOME` / config / credential、SQLite Extension resolver、正式 Go/Lithograph Host、SQL query / execute / true streaming / cancellation、Semantic Provider readiness/cache mapping、explicit transaction、single-instance lock 与 daemon shutdown lifecycle已经实现，并完成 macOS arm64本地验收、fresh-source validation与Ubuntu 24.04 x64远端 CI。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
+
+**Phase 01 已完成。** Runtime & Lithograph Host 实现提交 `f7f679e0601c7ecd16f5409f58c9c3483796948f` 已推送到 `main`，本地完整 validation / fresh-source validation 与 Ubuntu 24.04 x64 GitHub Actions run `35687991251` 均成功；P1-01–P1-10 和 Phase Review 已闭环。
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已在 Phase 01 当前工作树实现并完成本地验收。Knowledge Base bootstrap、Ontology / Object 模型修改、批量 Patch、Graph业务接口、Merge 与正式 client surface仍需后续 Phase实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
