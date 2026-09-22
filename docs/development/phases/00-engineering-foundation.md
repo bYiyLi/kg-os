@@ -1,6 +1,6 @@
 # Phase 00：Engineering Foundation
 
-**状态：`in_progress`**
+**状态：`done`**
 
 ## 1. 当前目标与范围
 
@@ -173,7 +173,7 @@ loadable extension: enabled
 | P0-04 | 质量检查真实生效 | Go format/mod/vet/Staticcheck/test/race/>=90% statement coverage/govulncheck 与 TS/docs/security/diff 门禁全部通过；受控负向样本逐项证明 gate 能失败后删除 | 本地已验收 |
 | P0-05 | 测试与真实扩展 | unit/HTTP/Web、Playwright、test-only SQLite>=3.45 + FTS5 + explicit-entrypoint Lithograph v0.3.0 SQL/rows/cancel smoke通过；不宣称正式 Runtime host | 本地已验收 |
 | P0-06 | 构建与本地交付物 | native `kgosd`/`kg`、embedded Web和workspace 外 smoke/manifest通过 | 本地已验收 |
-| P0-07 | Git hook 与平台 CI | forced pre-commit只走统一 quick gate；本地 macOS arm64与 Ubuntu 24.04 x64 GitHub Actions都用 Go 1.27.1 + native CGO runtime运行完整 validate并完成当前 Go基线验证 | 本地已验收；Ubuntu CI 待最终推送 SHA |
+| P0-07 | Git hook 与平台 CI | forced pre-commit只走统一 quick gate；本地 macOS arm64与 Ubuntu 24.04 x64 GitHub Actions都用 Go 1.27.1 + native CGO runtime运行完整 validate并完成当前 Go基线验证 | 已验收 |
 | P0-08 | 文档与最终 Review | 当前文档不再把历史 TypeScript/Native/cache 合同当作现行基线；final diff 无finding | 本地已验收 |
 
 ## 6. 验证执行计划
@@ -221,11 +221,11 @@ git diff --check
 - `pnpm test:native` 使用 Go bundled SQLite 真实加载 Lithograph v0.3.0主扩展与 OpenAI-compatible Provider explicit entrypoint，验证 SQLite >=3.45、FTS5、storage format 3、`CY25-2026.08`、`lithograph()`、`lithograph_rows()` 事件流，以及 `context.Context` 对真实长 `lithograph_rows()` 执行的取消。
 - `pnpm check:package` / `pnpm pack:release` 已在 workspace 外运行 native `kgosd` / `kg` 与 embedded Web smoke，并生成本地 manifest；未执行发布。
 - 旧 TypeScript daemon/kernel/CLI、`ffi-rs`、`sqlite-source`、旧 Native smoke / SQLite shim 与旧 Phase 01 runtime source 已从当前工程基线清理；现行 source/scripts stale scan 无对应引用。
-- 当前唯一阶段级缺口是 **最终推送 revision 的 Ubuntu 24.04 x64 GitHub Actions**。本次没有 commit/push 授权，因此不能生成该远端证据。
+- Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`；Ubuntu 24.04 x64 GitHub Actions CI run `35672012795` / Validate job `106570343405` 均以 `success` 完成，远端 native CGO gate 已闭环。
 
 ## 8. 完成条件
 
-P0-01 至 P0-08 全部取得当前 Go 基线的真实证据、Phase Review finding 闭环、文档同步且当前最终推送 SHA的 Ubuntu 24.04 x64 CI成功且本地 macOS arm64 native验证通过后，Phase 00 才能从 `ready/in_progress` 标记 `done`。当前本地实现、验收与 Review 已闭环；由于尚未提交/推送，缺少最终 SHA 的 Ubuntu CI 证据，因此保持 `in_progress`。
+P0-01 至 P0-08 已全部取得当前 Go 基线的真实证据，Phase Review finding、文档同步、final diff、本地 macOS arm64 native验证与 Ubuntu 24.04 x64 CI均已闭环。Phase 00 当前为 `done`。
 
 ## 9. 历史 TypeScript Phase 00 基线（已被 D65 supersede）
 

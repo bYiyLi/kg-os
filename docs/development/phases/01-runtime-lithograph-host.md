@@ -1,6 +1,6 @@
 # Phase 01：Runtime & Lithograph Host Foundation
 
-**状态：`planned`**
+**状态：`ready`**
 
 ## 1. 目标与范围
 
@@ -30,7 +30,7 @@ Phase 01 可以对新数据库执行 `lithograph_init()` 并验证 Root / `main`
 
 ### 3.1 前置依赖
 
-- 当前 [Phase 00](00-engineering-foundation.md) 必须先达到 `done`；因此本 Phase 当前为 `planned`。
+- 当前 [Phase 00](00-engineering-foundation.md) 已达到 `done`；本 Phase 的前置工程依赖已满足，因此当前为 `ready`。
 - Go / CGO / `database/sql` + `go-sqlite3`、TypeScript client / Web、统一质量和 CI 入口由 Phase 00 提供。
 - Phase 01 不依赖尚未建立的 Ontology / Object / Graph / Evolution 业务实现。
 
@@ -210,4 +210,4 @@ P1-01–P1-10 全部取得真实证据、Phase 00 依赖已`done`、review findi
 
 2026-09-21 本计划更新时，仓库存在尚未提交的旧 Phase 01 TypeScript / `ffi-rs` / bundled SQLite / Lithograph v0.2.1实现尝试。它们解决的是D65 / D66 之前的旧合同，本计划不把它们视为当前实现或验收证据；本次用户只授权设计与开发计划维护，因此没有删除、重写或提交这些代码。后续实施Phase 00 / 01 时按当前设计最小化迁移并保留无关用户修改。
 
-2026-09-22 的新 Go Phase 00 实现已经删除上述旧 TypeScript / FFI / 自制 SQLite runtime 尝试；当前仓库只保留 Phase 00 的 test-only `go-sqlite3` + Lithograph v0.3.0 real-load probe。该 probe 只证明工程 build profile 与底层 release 可加载，不实现本 Phase 的 `KG_HOME`、extension resolver、正式 connection lifecycle、read/write execution 或 explicit transaction，因此 Phase 01 仍为 `planned`。
+2026-09-22 的新 Go Phase 00 实现已经删除上述旧 TypeScript / FFI / 自制 SQLite runtime 尝试；当前仓库只保留 Phase 00 的 test-only `go-sqlite3` + Lithograph v0.3.0 real-load probe。该 probe 只证明工程 build profile 与底层 release 可加载，不实现本 Phase 的 `KG_HOME`、extension resolver、正式 connection lifecycle、read/write execution 或 explicit transaction。Phase 00 已完成，且本计划的 Design Inputs、Feature 顺序与 Acceptance 已齐全，因此 Phase 01 当前为 `ready`。

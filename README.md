@@ -37,7 +37,7 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 **KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；业务能力仍未实现。** 当前工作树已经建立新的 Go Phase 00 工程基线并清理旧 TypeScript daemon/kernel/CLI、`ffi-rs` SQLite host 与旧 v0.2.x runtime 尝试；Go/TypeScript/Web、本地 macOS arm64 的真实 Lithograph v0.3.0 smoke、质量门禁和 native artifact 已取得本地证据。
 
-当前 Phase 00 保持 `in_progress`：本地实现、验收与 Phase Review 已闭环，但阶段完成条件还要求当前最终**推送 SHA** 的 Ubuntu 24.04 x64 GitHub Actions 成功。本轮尚未提交或推送，因此不能把旧 TypeScript Phase 00 的历史 CI 结果当作当前 Go 基线的远端证据。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，当前验收状态与历史证据见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
+**Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
 首版语义索引只支持单字段；Cypher 原样执行、`lithograph_rows()` true streaming、SQL-only execution 与 Provider-owned cache 的设计已记录。模型修改、批量 Patch、Merge 与新的 Go/Lithograph 接入仍需实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
