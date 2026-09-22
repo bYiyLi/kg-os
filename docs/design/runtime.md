@@ -181,7 +181,7 @@ Graph `execute` 使用本次 operation 独占的读写 connection。进入用户
 
 Bearer token 仍是实例的统一认证。通过认证的调用方可使用 Lithograph 支持的 Cypher；KG OS 不额外禁止 `LOAD CSV` 等文件 / 网络能力。实际文件路径位于运行 `kgosd` 的主机，访问权限由宿主进程和 Lithograph 决定；只读是数据库执行边界，不是无外部 I/O 模式。这里没有开放 raw SQL 或改变 extension 的 startup-only 加载合同。
 
-Lithograph v0.3.0 的 Managed Semantic read 不再要求写 `kgos.db` 来发布 text -> Vector cache，因此 Graph `query` 可以使用物理只读 `main` connection。Provider 若启用自己的独立 cache database，仍可以按 providerConfig 写该 cache；这个写入不改变 Lithograph graph/schema/history/ref，也不把只读 Graph 入口升级成读写 connection。实际 read-only connection、Provider cache 与 cancellation 行为仍必须由 [Implementation](implementation.md#managed-semantic-integration-readiness) 用真实 Go driver + release artifact 验证。
+Lithograph v0.3.0 的 Managed Semantic read 不再要求写 `kgos.db` 来发布 text -> Vector cache，因此 Graph `query` 可以使用物理只读 `main` connection。Provider 若启用自己的独立 cache database，仍可以按 providerConfig 写该 cache；这个写入不改变 Lithograph graph/schema/history/ref，也不把只读 Graph 入口升级成读写 connection。Phase 01 已用真实 Go driver + release artifact 完成 read-only/write connection、Provider readiness/cache mapping 与 cancellation 的 host-level integration 验证；公共 Graph HTTP surface 实现后仍须按 [Implementation](implementation.md#managed-semantic-integration-readiness) 做端到端验证。
 
 ### Embedding result cache
 

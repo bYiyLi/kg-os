@@ -55,9 +55,9 @@ Feature 是实现单元，Phase 是默认交付与验收单元。Feature 完成�
 
 **Phase 01 当前为 `done`。** `KG_HOME` / config / credential、extension resolver、Go bundled SQLite + Lithograph v0.3.0 host、query/execute context、`lithograph_rows()` true streaming/context cancellation、Provider readiness/cache mapping、SQL explicit transaction、single-instance lock 与 shutdown lifecycle均已实现并完成本地/远端验收。实现提交 `f7f679e0601c7ecd16f5409f58c9c3483796948f` 已推送到 `main`，Ubuntu 24.04 x64 GitHub Actions run `35687991251` / Validate job `106618819461` 成功。业务 API / Knowledge Base bootstrap 仍不属于本 Phase。
 
-旧 Phase 01 TypeScript / `ffi-rs` / 自制 SQLite runtime / v0.2.x 实现尝试已经从当前工程基线清理；原 Phase 00 重复 Lithograph execution smoke也已在 Phase 01实现时删除，`internal/lithographtest`只保留 bundled SQLite build-profile测试。正式 bundled SQLite connection lifecycle、Runtime host与transaction adapter现在由 Phase 01当前工作树实现；业务数据库语义与Knowledge Base bootstrap仍由后续 Phase拥有。
+旧 Phase 01 TypeScript / `ffi-rs` / 自制 SQLite runtime / v0.2.x 实现尝试已经从当前工程基线清理；原 Phase 00 重复 Lithograph execution smoke也已在 Phase 01实现时删除，`internal/lithographtest`只保留 bundled SQLite build-profile测试。正式 bundled SQLite connection lifecycle、Runtime host与transaction adapter已经进入当前 `main` 基线；业务数据库语义与Knowledge Base bootstrap仍由后续 Phase拥有。
 
-KG OS 业务能力仍未实现。Knowledge Base bootstrap、Ontology / Object / Graph / Evolution 与正式 client surface继续以设计文档为行为真源。
+KG OS 业务能力仍未实现。Phase 01 的 credential 范围是 `auth.json` 生成/读取与 runtime secret ownership，不代表公共 HTTP Bearer middleware、API/control routes 或 `kg daemon start/status/stop/restart` 已完成；这些能力与 Knowledge Base bootstrap、Ontology / Object / Graph / Evolution 及正式 client surface继续以设计文档为行为真源。
 
 ## 5. 路线总览
 
@@ -71,6 +71,7 @@ KG OS 业务能力仍未实现。Knowledge Base bootstrap、Ontology / Object / 
 ```text
 Go Engineering Foundation
   -> runtime / KG_HOME / extension loading / Lithograph SQL adapter
+  -> Knowledge Base bootstrap / reserved schema / semantic graph / Binding
   -> Ontology and Object projection/read
   -> atomic Object Patch and compiler
   -> Graph query/execute and managed search integration

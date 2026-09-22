@@ -6,18 +6,18 @@
 
 Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能因为仍需实现 compiler，就把它退回“模型尚未设计”或要求 AI 操作单独的 Property/Constraint/Index。逻辑字段和行为只在各 owner 文档维护。
 
-[模型修改](ontology.md#patch-到真实变化)、[批量 Object Patch](object.md#object-公共调用合同)与 [Merge Session](evolution.md#evolution-公共调用合同)的产品规则已经确定，剩余工作是 compiler、底层事务与冲突映射的实现和验证。[只读 connection、Provider-owned cache、SQL streaming 与 cancellation](#managed-semantic-integration-readiness)同样已有目标行为，尚缺 KG OS Go adapter 接入证据。这些工程待办不表示需要重新确认对应核心设计；Web 页面细化单独见 [Runtime](runtime.md#web-交互设计状态)。
+[模型修改](ontology.md#patch-到真实变化)、[批量 Object Patch](object.md#object-公共调用合同)与 [Merge Session](evolution.md#evolution-公共调用合同)的产品规则已经确定，剩余工作是 compiler、业务 projection、冲突映射与公共 surface 的实现和验证。Phase 01 已为[只读 / 读写 connection、Provider-owned cache mapping、SQL streaming、cancellation 与 explicit transaction](#managed-semantic-integration-readiness)建立真实 Go adapter 和 native integration 基线；后续业务实现必须复用这些 primitive，而不是再建立第二套数据库 host。这些工程待办不表示需要重新确认对应核心设计；Web 页面细化单独见 [Runtime](runtime.md#web-交互设计状态)。
 
 | 已确认的合同 | 工程工作 |
 | --- | --- |
 | Ontology Overview → 可选 Domain → Definition，无 search；1..100 Ref batch read | 单次 State pin、输入顺序、per-Domain cursor、batch all-or-nothing、描述缺省提示与有界图预览 |
 | Node/Relationship 聚合 Property、required/unique、Constraint/Index | 从公开 Graph Type/SHOW 与 semantic graph 反向构建逻辑值；编译到数据库，不建立 owner-only 公共 structure AST |
 | Domain/Definition canonical YAML + 唯一 Object Patch | 标准 YAML/Git parser、exact apply、input-only renameFrom、语义差异、共享资源去重和冲突定位 |
-| 单 State、strict base、无隐式数据损失 | SQL `tx_*` 封装接入 Lithograph explicit transaction；验证 DDL/DML 顺序、即时约束、引用改写、Knowledge data rewrite 与 index maintenance |
+| 单 State、strict base、无隐式数据损失 | 复用已验收的 SQL explicit-transaction adapter；实现并验证 DDL/DML 顺序、即时约束、引用改写、Knowledge data rewrite 与 index maintenance |
 | Binding / Object Graph View / reserved identifier | 空库 bootstrap、Object / Ontology 的双向覆盖与内部数据投影校验；不作为公共 Graph Cypher 的执行条件 |
-| 通用 SQLite Extension startup runtime | local/HTTPS source resolve、SHA-256 pin、safe archive extract、content-addressed cache、ordered per-connection load、Lithograph capability validation；不按插件用途建 loader |
+| 通用 SQLite Extension startup runtime | Phase 01 已完成 resolver、content-addressed cache、ordered per-connection load 与 Lithograph capability validation；后续 bootstrap / 业务代码直接复用，不按插件用途重建 loader |
 | 全局 Full-text analyzer + 简化 Ontology | `type: fulltext` 只编译业务 targets/properties；新建/业务重建时写当前 `[fulltext].analyzer` + `eventually_consistent=false`，已有 versioned analyzer 保留，connection probe 当前 analyzer；不做 config migration |
-| Lithograph Managed Semantic + 简化 Ontology | Provider extension 装配、`[embedding]` + `[cache]` 默认配置到 versioned IndexDefinition / providerConfig 的映射、String query、读写连接选择；不实现 embedding HTTP client、Provider cache内部逻辑、向量 Property或写入/合并刷新 |
+| Lithograph Managed Semantic + 简化 Ontology | Phase 01 已完成 Provider extension 装配、startup readiness、`[embedding]` + `[cache]` 默认 mapping 与连接基线；后续 Ontology compiler 生成 versioned IndexDefinition / providerConfig，Graph 公共 surface 直接使用 String query；不实现 embedding HTTP client、Provider cache内部逻辑、向量 Property或写入/合并刷新 |
 | Evolution 统一历史与 Merge Session | Definition 内字段级历史；shared resource 单次 conflict 投影；固定 revision 的 candidate 检查 |
 | CLI / SDK / Web 共享合同 | `KG_HOME` target discovery、Bearer authentication / `AUTHENTICATION_FAILED` mapping、ontology batch Markdown、batch --edit YAML multi-document stream、ontology scoped patch、Object JSON、Graph NDJSON、HTTP metadata 与错误映射 |
 
@@ -57,6 +57,8 @@ Embedding compiler校验当前 `[embedding]`，按 [Runtime 映射](runtime.md#e
 
 语言与交付边界已由 [Architecture](architecture.md#v1-运行时与技术分层)及 [Runtime](runtime.md#web-hosting)确定；以下是工程工作，不要求重新确认 Go / TypeScript 分工或 Web 是否独立部署：
 
+Phase 01 已实现并验收本节的数据库/runtime foundation：Go SQLite host、统一 extension lifecycle、Lithograph v0.3.0 SQL execution、true streaming / cancellation、explicit transaction、Provider readiness/cache mapping、single-instance lock 和进程 shutdown。下面的规则继续作为后续代码必须保持的工程约束。尚未完成的是 Knowledge Base bootstrap、公共 API/control Bearer middleware、Graph HTTP framing / client-disconnect 语义、daemon control CLI，以及 Ontology / Object / Graph / Evolution 与正式 SDK/Web 业务 surface。
+
 1. **Go SQLite driver / adapter**：使用 `database/sql` + `github.com/mattn/go-sqlite3` bundled SQLite；固定 CGO build启用 `sqlite_fts5`，不使用 `libsqlite3`，不启用 `sqlite_omit_load_extension`。运行时仍实际验证 SQLite >= 3.45、FTS5、ordered explicit-entrypoint extension loading、只读 / 读写 connection、参数 / 错误映射与连接清理。每个物理 connection按 startup-resolved artifact set加载同一批 extensions；不绑定 Native query ABI、不暴露 `sqlite3*`、不建立第二套 SQLite runtime。
 2. **SQL execution 与 explicit transaction**：普通完整结果使用 `lithograph()`，streaming 使用 `lithograph_rows()`；Object Patch 等多 execution 单 Commit 使用 `lithograph_tx_begin -> lithograph()/lithograph_rows()* -> commit/abort`。验证 expectedHead、staged visibility、single Commit、empty delta、失败自动 abort 与 connection exclusive ownership，不复制 Lithograph transaction state machine。
 3. **执行、streaming 与 cancellation**：Graph streaming必须逐 event消费 `lithograph_rows()`，每个 event完成 NDJSON write + flush后才能拉取下一行，不能用无界 goroutine/channel预读或先收集完整结果。第一个 event准备完成前不得提前提交 2xx；pre-event failure使用普通 non-2xx JSON error，开始后 daemon failure使用 terminal `error` event，transport断开导致 terminal event不可达时由 client按 incomplete transport处理。HTTP request / daemon shutdown的 `context.Context`要通过 driver真实触发 SQLite interrupt，验证普通长查询、Semantic Provider wait、write stream、`IN TRANSACTIONS`、early close、client disconnect与 result-delivery failure的底层语义；不能用进程 kill / IPC代替正常 query cancellation。
@@ -68,12 +70,14 @@ Go 与 TypeScript client 不共享服务端源码。公共 request/result/error 
 
 采用 Phase 13 后，旧方案中的 managed Property 隔离、mutation/merge 向量刷新、writer 外预计算向量再提交，不再是 KG OS 的实现前置条件。embedding 不属于图属性或 Commit，纯业务写入不访问模型服务。
 
-本轮已确认 Graph 不审查 Cypher 内容；旧的 procedure 白名单、Graph caller-owned Vector / reserved identifier 提交前检查不再是实现前置条件。仍须完成以下工程验证，不能把文档决定当作接入已完成：
+本轮已确认 Graph 不审查 Cypher 内容；旧的 procedure 白名单、Graph caller-owned Vector / reserved identifier 提交前检查不再是实现前置条件。Phase 01 已用真实 Go driver + Lithograph v0.3.0 release artifact 验证 read/write connection、StateRef pin / Branch checkout、Provider staged readiness、Provider-owned cache mapping、`lithograph_rows()` true streaming、`context.Context` cancellation 与 explicit transaction；这些不再是缺失的 Go adapter。
 
-1. **读写连接与 context 映射**：Graph `query`在独占只读 connection先用 `lithograph.commit.get(StateRef)`解析 exact Commit，再统一以 `options.at=<commit>`执行原始 Cypher；`execute`在独占读写 connection的 autocommit状态先完整执行 `branch.checkout(requestedBranch)`，随后不附加 `options.branch`执行原始 Cypher。以真实 adapter证明 read-only/write boundary、Branch/Tag/Merge procedure兼容和 pool checkout reset；KG OS不解析 Cypher、不维护 procedure白名单，也不把失败自动重试到另一类 connection。streaming统一使用 `lithograph_rows()`。
-2. **只读 main 与 Provider cache**：在 read-only `kgos.db` 上执行真实 Semantic query，验证 OpenAI-compatible Provider 可以只写独立 cache database而不反向写 Lithograph `main`。用 Provider 调用次数与 cache file 重开证明跨 connection / daemon restart复用，同时证明 graph/schema/history/ref未改变；cache disabled / missing / eviction只影响性能与外部调用，不成为 KG OS correctness source。
-3. **原样 Cypher 与请求上下文**：公共 Graph不附加排除内部节点的 `graphView`，完整传递 Lithograph JSON值。验证 query的 StateRef→exact Commit→`options.at`、execute的 connection checkout→无 `options.branch`原样执行，以及调用方显式 `author/message`在不接受它们的 procedure上按底层错误失败；不按 procedure名维护 KG OS特例表。用户 Cypher改变 checkout后，下一 operation必须重新建立自身 context。transaction subquery的partial durability与普通 write/explicit transaction不得被上层伪装成统一单 Commit。
-4. **真实扩展、Provider readiness、streaming 与 cancellation**：在各实际 Go connection上加载同一批 Lithograph v0.3.0与 configured extensions；用 write connection staged Semantic create + abort证明当前 `openai-compatible` provider/config本地可验证且零 durable side effect，再通过 SQL-only adapter验证 query、`lithograph_rows()` columns/row/summary顺序、历史配置保留、`context.Context` -> SQLite interrupt、early close、错误/值映射及 Provider cache行为。只有 SQL function存在、extension文件已load或文档声明不能证明 Go integration通过。
+后续公共 Graph surface 接入时仍须端到端复验以下不变量，不能用 Phase 01 的 host-level 证据替代公共 request/response 合同：
+
+1. **公共读写入口与认证**：Graph `query` / `execute` 通过已验收 adapter 建立 StateRef pin / Branch checkout，公共 HTTP route 统一执行 Bearer authentication，不增加 raw SQL、procedure 白名单或自动换 connection 重试。
+2. **原样 Cypher 与值/错误映射**：公共 Graph 不附加排除内部节点的 `graphView`，完整传递 Lithograph JSON value、底层 error 与调用方显式 execution options；用户 Cypher 改变 checkout 后，下一 operation 必须重新建立自身 context。
+3. **HTTP streaming 与 transport failure**：把底层 `columns -> row* -> summary` 映射为 NDJSON，逐 event write + flush 后再拉取下一行；验证 pre-event failure、terminal `error`、client disconnect、socket/write failure、incomplete stream 与 request-context cancellation，不把 transport failure 或 transaction-subquery partial durability伪装成全量 rollback。
+4. **Semantic public path**：通过只读 Graph request 执行真实 Semantic query，证明 Provider cache 只写独立 cache database、跨 connection / restart 复用不改变 graph/schema/history/ref，并保持历史 IndexDefinition 的 provider/config。
 
 Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；`filterProperties` 与过滤范围内 top-k 的实际边界见 [owner 范围](ontology.md#语义索引的首版范围)。不增加未确认的底层过滤接口；缓存自动填充已经确认，不再列为需要用户设计的预热入口。
 
@@ -81,14 +85,14 @@ Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；
 
 ## 实现范围映射
 
-实现前检查 Lithograph 实际文件与测试，不复制它的 Phase 状态为 KG OS 真源。当前 KG OS 已有 Phase 00 工程壳层；以下内容只映射已确认设计产生的实现范围，不表示阶段顺序或状态。具体拆分由[开发计划](../development/README.md)维护。
+实现前检查 Lithograph 实际文件与测试，不复制它的 Phase 状态为 KG OS 真源。当前 KG OS 已具备 Phase 00 工程基线与 Phase 01 Runtime / Lithograph Host foundation；以下内容映射已确认设计产生的剩余业务范围以及后续必须复用的基础 primitive，不在本文件维护阶段顺序或状态。具体拆分由[开发计划](../development/README.md)维护。
 
-- **Runtime / SQLite host**：使用 Go 实现 `KG_HOME`、`auth.json`、Bearer middleware、根目录 `kgos.db`、统一 extension resolver / per-connection loading、Lithograph v0.3.0 SQL execution/transaction、read/write connection、streaming/cancellation 与 Managed Semantic Provider readiness，再完成 empty-database bootstrap。同一 `net/http` server 承载 API / control 与内置 Web 资源。
+- **Runtime / SQLite host**：Phase 01 已实现 `KG_HOME`、`auth.json` credential lifecycle、根目录 `kgos.db`、统一 extension resolver / per-connection loading、Lithograph v0.3.0 SQL execution/transaction、read/write connection、streaming/cancellation、Managed Semantic Provider readiness、lock 与 shutdown。剩余 runtime 工作是 KG OS empty-database bootstrap、API/control Bearer middleware 与正式 control/public routes；同一 `net/http` server 承载 API / control 与内置 Web 资源。
 - **Ontology storage mapping**：实现 semantic graph、Binding coverage、Schema Locator 与 Object / Ontology Graph View；高层 Object / Ontology 输入保留 reserved identifier 校验，公共 Graph 不复用该限制。
 - **Object representation**：实现五种公共 Object Ref、aggregate decoder 与 Knowledge 原生 Object value；canonical YAML / JSON 省略空的顶层 `indexes`，保留非空复合 / 共享索引。
 - **Read paths**：实现 Ontology read 的全局 / Domain / Definition 展开与 1..100 Ref batch，同一次请求只 pin 一个 resolved State；实现 Object read / list，Object search 限定 Knowledge，不为 Ontology 加旁路搜索。
 - **Mutation compiler**：实现共享 Object Patch compiler，覆盖聚合内字段 / 规则 / 索引、多 aggregate 原子修改、alias、显式 rename、no-op、冲突与 rollback；不实现单独 Schema resource CRUD。
-- **Graph execution**：实现 Graph query / execute，选择只读 / 读写连接并原样传递 Cypher 与 Lithograph JSON 值；不设 procedure、Vector 或 reserved identifier 检查。完成连接、上下文与缓存集成验收后再报告可用。
+- **Graph execution**：复用 Phase 01 已有 query / execute adapter，完成公共 Graph HTTP contract、Bearer middleware、NDJSON framing、transport cancellation 及 client integration；继续原样传递 Cypher 与 Lithograph JSON 值，不设 procedure、Vector 或 reserved identifier 检查。只有 public end-to-end 验收通过后才报告 Graph 能力可用。
 - **Evolution**：实现 read / state / ref / history / diff / merge，内部 schema slot 转为 aggregate 字段，固定 candidate revision 检查一致性后 finalize。
 - **Client surfaces**：按 CLI / Runtime 文档实现 Go `kg` CLI、TypeScript SDK / Web、Ontology batch Markdown / batch-edit YAML stream / scoped patch、YAML / JSON / NDJSON 输出与 daemon lifecycle，并把 Web 页面构建产物接入同一 `kgosd` 交付 / 启动流程；提供 Skill / SDK / Web 使用文档。
 

@@ -30,7 +30,7 @@ Phase 01 可以对新数据库执行 `lithograph_init()` 并验证 Root / `main`
 
 ### 3.1 前置依赖
 
-- 当前 [Phase 00](00-engineering-foundation.md) 已达到 `done`；本 Phase 的前置工程依赖已满足，因此当前为 `ready`。
+- 当前 [Phase 00](00-engineering-foundation.md) 已达到 `done`；本 Phase 的前置工程依赖已满足，且 P1-01–P1-10、Phase Review 与远端 CI 已闭环，因此当前为 `done`。
 - Go / CGO / `database/sql` + `go-sqlite3`、TypeScript client / Web、统一质量和 CI 入口由 Phase 00 提供。
 - Phase 01 不依赖尚未建立的 Ontology / Object / Graph / Evolution 业务实现。
 
@@ -206,7 +206,7 @@ git diff --check
 
 P1-01–P1-10 全部取得真实证据、Phase 00 依赖已`done`、review finding闭环、文档同步、final diff 通过且最终推送 SHA的 Ubuntu 24.04 x64 native CGO CI成功且本地 macOS arm64 native regression通过后，Phase 01 才标记`done`。Commit/push/release/deploy继续分别授权。
 
-## 10. 当前工作树说明
+## 10. 实施与状态说明
 
 2026-09-21 本计划更新时，仓库存在尚未提交的旧 Phase 01 TypeScript / `ffi-rs` / bundled SQLite / Lithograph v0.2.1实现尝试。它们解决的是D65 / D66 之前的旧合同，本计划不把它们视为当前实现或验收证据；本次用户只授权设计与开发计划维护，因此没有删除、重写或提交这些代码。后续实施Phase 00 / 01 时按当前设计最小化迁移并保留无关用户修改。
 
@@ -216,7 +216,7 @@ P1-01–P1-10 全部取得真实证据、Phase 00 依赖已`done`、review findi
 
 ## 11. 验收证据
 
-2026-09-22 当前工作树已验证：
+2026-09-22 Phase 01 最终实现提交与对应验收已验证：
 
 - `pnpm check:quick`通过；
 - `pnpm validate`完整通过，包括 Go race、Go statement coverage **90.1%**、govulncheck、TypeScript/V8 coverage 100%、type coverage 100%、lint / spelling / secret / duplicate / unused / dedupe、build、Playwright E2E、真实 Lithograph v0.3.0 native regression、workspace-external package smoke、license、npm audit与diff gate；

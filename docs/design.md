@@ -36,12 +36,11 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 状态 | 范围与入口 |
 | --- | --- |
 | 已确认 | Ontology 渐进读取 / 聚合编辑、Object Patch、Knowledge / Graph、Evolution、单 profile / 单库 / 单 Token runtime；具体规则见上面的 owner 表 |
-| 当前 Phase 00 `ready` | [D65 Go runtime](design/decisions.md#d65-go-runtime) 已替换当前工程语言基线；现 Phase 00 重新验收 Go `kgosd` / Kernel / CLI + TypeScript SDK/Web。旧 TypeScript Phase 00 的本地/CI 成功证据保留在 [Phase 00 计划](development/phases/00-engineering-foundation.md) 的历史基线中，但不作为当前 Go 基线完成证据 |
+| 当前实现基线 | Phase 00 Engineering Foundation 与 Phase 01 Runtime & Lithograph Host Foundation 均已完成；当前已具备 Go 工程基线、`KG_HOME` / config / credential、SQLite Extension resolver、Go/Lithograph v0.3.0 host、SQL buffered / true streaming / cancellation、Provider readiness/cache mapping、explicit transaction、single-instance lock 与进程 shutdown。阶段状态与完成证据由[开发计划](development/README.md)及对应 Phase 文件维护 |
 | 已确认调整 | [D59 Cypher 原样执行 / 读写连接](design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](design/decisions.md#d61-single-field-semantic)、[D62 Ontology 不创建无字段类型](design/decisions.md#d62-nonempty-definition-properties)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](design/decisions.md#d66-lithograph-v030-sql-only)；D63 仅保留单 daemon 内置 Web 的交付边界，D60 的透明缓存目标由 D66 重新分配 ownership |
 | 检索范围与限制 | [首版只支持单字段，Cypher 联合检索可组合；托管向量的 filterProperties 与过滤范围内 top-k 限制](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
-| 工程待办 | [Go runtime、Lithograph v0.3.0 SQL execution/transaction、streaming/cancellation 与内置 Web 交付](design/implementation.md#go-运行时与数据库接入)；[模型修改、批量 Patch、Merge 与 adapter 的实现和验证](design/implementation.md#剩余依赖与工程合同)；[只读 main、Provider-owned cache、SQL streaming 与真实 Go driver 集成](design/implementation.md#managed-semantic-integration-readiness)；已有目标行为，无需重新确认核心设计 |
+| 工程待办 | 在已完成 Runtime Host 基础上继续实现 Knowledge Base bootstrap、Ontology / Object projection/read、Object Patch compiler、Graph 公共 HTTP surface、API/control Bearer middleware 与 daemon control/client lifecycle、Evolution / Merge 及完整 CLI / SDK / Web；具体复用边界与验收见[工程映射](design/implementation.md) |
 | Web 待细化 | [kgosd 内置交付、同源服务与共享 Kernel 已定，具体页面布局和交互尚未展开](design/runtime.md#web-交互设计状态)；不阻塞 Kernel、daemon、CLI 或 SDK 的实现 |
-| 待实现 | Phase 00 壳层不是业务实现；Knowledge Base、认证、正式 daemon lifecycle、数据库 adapter 及 [实现范围映射](design/implementation.md#实现范围映射)仍不是已发布能力 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库、真实 loadable extension、SQL streaming 与 cancellation 集成测试。
 
