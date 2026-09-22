@@ -59,27 +59,30 @@ Feature 是实现单元，Phase 是默认交付与验收单元。Feature 完成�
 
 KG OS 业务能力仍未实现。Phase 01 的 credential 范围是 `auth.json` 生成/读取与 runtime secret ownership，不代表公共 HTTP Bearer middleware、API/control routes 或 `kg daemon start/status/stop/restart` 已完成；这些能力与 Knowledge Base bootstrap、Ontology / Object / Graph / Evolution 及正式 client surface继续以设计文档为行为真源。
 
+**Phase 02 当前为 `ready`。** 本阶段把 Knowledge Base bootstrap、internal semantic graph / Binding、Ontology read/edit、Ontology-scoped Object Patch、Schema/Constraint/Index compiler 与正式 authenticated `kg ontology` CLI作为一个完整交付单元。Phase 02 完成后调用方可以定义和维护自己的数据模型；普通 Knowledge 数据 CRUD、Graph、Evolution、SDK/Web/Skill 与 daemon control仍属于后续阶段。当前没有 Phase 02 实现证据。
+
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |
 | --- | --- | --- | --- |
 | [00 Engineering Foundation](phases/00-engineering-foundation.md) | `done` | Go 1.27.1 daemon/kernel/CLI + TypeScript SDK/Web workspace、pinned Go quality tools、bundled CGO/SQLite+FTS5 baseline、90% coverage/race/security gates、真实 v0.3.0 smoke、macOS arm64 + Ubuntu 24.04 x64 native证据 | [D65](../design/decisions.md#d65-go-runtime)、[D66](../design/decisions.md#d66-lithograph-v030-sql-only) |
 | [01 Runtime & Lithograph Host Foundation](phases/01-runtime-lithograph-host.md) | `done` | `KG_HOME`、config/credential、extension resolver、Go read/write SQLite host、v0.3.0 SQL execution/stream/cancel、explicit tx、runtime ownership | [Runtime](../design/runtime.md)、[Go 数据库接入](../design/implementation.md#go-运行时与数据库接入) |
+| [02 Ontology](phases/02-ontology.md) | `ready` | KG OS bootstrap、internal semantic graph / Binding、Ontology read/edit/Patch、Schema/Constraint/Index compiler、authenticated HTTP + `kg ontology` | [Ontology](../design/ontology.md)、[Object Patch](../design/object.md#object-公共调用合同)、[Bootstrap](../design/architecture.md#knowledge-base-bootstrap) |
 
 当前实现依赖顺序：
 
 ```text
 Go Engineering Foundation
   -> runtime / KG_HOME / extension loading / Lithograph SQL adapter
-  -> Knowledge Base bootstrap / reserved schema / semantic graph / Binding
-  -> Ontology and Object projection/read
-  -> atomic Object Patch and compiler
+  -> Phase 02: Knowledge Base bootstrap + complete Ontology
+       (reserved schema / semantic graph / Binding / read / edit / Patch / compiler)
+  -> Knowledge Object data + general Object surface
   -> Graph query/execute and managed search integration
   -> Evolution and Merge
-  -> complete CLI / SDK / Web surfaces and release closure
+  -> complete CLI / SDK / Web / Skill / daemon-control surfaces and release closure
 ```
 
-Phase 00/01 之外的业务阶段尚未冻结为独立 Phase。开始下一阶段前，从对应 Design Inputs 建立计划与 Acceptance；不提前建立空 Phase。
+Phase 02 已冻结为当前下一开发阶段。Phase 03 及之后仍不提前建立空 Phase；开始后续阶段前，再从对应 Design Inputs 建立计划与 Acceptance。
 
 ## 6. Phase 通用完成标准
 
@@ -99,5 +102,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 
 - [Phase 00：Engineering Foundation](phases/00-engineering-foundation.md)
 - [Phase 01：Runtime & Lithograph Host Foundation](phases/01-runtime-lithograph-host.md)
+- [Phase 02：Ontology](phases/02-ontology.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

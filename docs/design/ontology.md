@@ -213,11 +213,11 @@ Property:
 Constraint:
   name?, type, properties?, valueType?
 Index:
-  name, type, targets?, properties?, filterProperties?, options?
+  name, type, targets?, properties?
 ```
 
 - `name` 是当前定位名称；Domain name 在 State 内唯一；Node / Relationship 分别在各自类型内唯一。`node:Person` 与 `relationship:Person` 可以同时存在，因此 Ref 必须带 kind 前缀，不能只把单词当永久身份。
-- Node 的 `name` 是 identifying Label；`labels` 为附加必须具有的 Label 集合，缺省为空，不重复 `name`。不隐式创建继承、领域隔离或额外 Node identity。普通 Knowledge Node 仍可有多个 Label。
+- Node 的 `name` 是 identifying Label；`labels` 为附加必须具有的 Label 集合，缺省为空，不重复 `name`。不隐式创建继承、领域隔离或额外 Node identity。普通 Knowledge Node 仍可有多个 Label。修改 Definition 的 `labels` 是模型约束变化，**不自动给已有 Knowledge Node 添加或移除业务 Label**；已有覆盖 Node 若不满足目标 Graph Type，Ontology-scoped Patch 整体失败。未来通用 Object Patch 可以在同一原子请求中显式改 Knowledge Node 后再完成模型变化。
 - Relationship 的 `name` 是 identifying Relationship Type。`from/to` 为 Node Definition Ref，或 `null` 表示这一端不限制类型。具名端点表示该类型关系的对应节点必须符合该 Node Definition；Node 定义必须存在。它不是 Node 实例 Ref，也不表示关系数量限制。
 - v1 常规关系按 Relationship Type 识别，`from/to` 约束端点，不把端点作为隐藏的另一套匹配范围。底层 compiler 选择实现该语义的 Graph Type pattern。关系端点变化是模型约束变化，不能自行把现有边迁往另一节点。
 - `properties` 是必填、非空的完整 Property 声明列表，按 name 唯一。**Node / Relationship Definition 都必须至少声明一个字段**；创建无字段类型，或修改后让仍存在的类型没有字段，在编译前返回 `INVALID_ARGUMENT`。附加 Label、关系端点或索引不能代替字段声明，KG OS 不自动添加占位字段。
@@ -226,15 +226,17 @@ Index:
 - `type` 最外层存在性只由 `required` 表达；输入最外层 `NOT NULL` 归一到 required，若显式 `required:false` 与之冲突则拒绝。List 元素的 `NOT NULL` 保留在 type 中，不能误当整个字段必填。
 - 顶层 `properties` 必须输出且非空；`constraints` 与 Domain `includes` 即使为空也输出。Definition 顶层 `indexes` 为可选集合：缺省与 `[]` 都表示没有顶层索引，canonical YAML / JSON 为空时省略；非空时输出完整声明。Property 内的 `indexes` 及其它 optional collection 同样为空时省略。未知字段报错，不忽略。title/description 保持 optional，不把自然语言中的“必须”“唯一”等字样解释成 Schema 规则。
 
+`labels`、Domain `includes` 与 Index `targets` 是 **set-like collection**：输入不得出现重复 logical name / typed Ref，canonical 输出按 UTF-8 bytes 升序；重复项是非法 Object Value，而不是“自动去重后继续”。`properties`、复合 Constraint 的 property list 与 Index `properties` 则保持其各自已定义的 name uniqueness / 有序语义，不能因为 renderer 会排序其它集合而重排复合字段。
+
 至少一个字段的要求属于 Ontology / Object 的 Definition profile，也参与高层 State 一致性检查；公共 Graph 仍原样执行 Lithograph Cypher，不增加该检查。模型有字段声明不等于每个 Knowledge 实例都必须填写该字段；实例的必填规则仍由 `required` 或相应 Constraint 决定。
 
 此模型直接表达当前需要的节点、关系、约束和检索能力，不是“完整 Lithograph Schema 管理工具”。Graph Type 命令组织、lookup 等数据库管理资源不因此升级为 Ontology 顶层对象。对于超出当前可表达 profile 的 Schema，不能以不完整 YAML 假装可无损编辑；必须明确诊断。以后补充真实需要的结构时扩充对应聚合字段，不恢复 raw `structure` 或大量独立 API。
 
 ### Property、Constraint 与 Index 的组织
 
-只作用于当前 Definition 单个 Property 的额外约束 / 索引放在该 Property 下；同一 Definition 的多字段规则放在 Definition 下。Property 内不再重复 `properties: [自身名称]`。涉及多个 Definition 的共享索引放在参与 Definition 的顶层，并显示**完整 targets、properties 与配置**。
+只作用于当前 Definition 单个 Property 的额外约束 / 索引放在该 Property 下；同一 Definition 的多字段规则放在 Definition 下。Property 内不再重复 `properties: [自身名称]`。涉及多个 Definition 的共享 Full-text / Managed Semantic Index 放在参与 Definition 的顶层，并显示**完整 targets 与 properties**；底层 hidden versioned config 必须由 decoder/compiler 保留，但不进入公共 YAML。
 
-顶层 `indexes` 可省略不等于取消多字段或共享索引。复合 Range、多字段 Full-text、跨 Definition 共享索引仍在顶层表达；不能拆成多个单字段索引后声称等价。输入空数组归一成省略只影响表示，不产生 Schema delta；从非空顶层集合删除声明仍按正常索引删除 / 共享资源规则处理。
+顶层 `indexes` 可省略不等于取消多字段或共享索引。复合 Range、多字段 Full-text，以及当前底层能够表达的跨 Definition Full-text / Managed Semantic 共享索引仍在顶层表达；不能拆成多个单字段索引后声称等价。输入空数组归一成省略只影响表示，不产生 Schema delta；从非空顶层集合删除声明仍按正常索引删除 / 共享资源规则处理。
 
 简单的存在性与单字段唯一性优先使用 `required/unique`；需要显式命名或组合规则时使用 `constraints`：`type` 为 `unique | key | not_null | type`。`key` 表示字段组合必填且联合唯一；`type` constraint 必须带 `valueType`，并与 Property `type` 使用同一个 KG OS public type profile，因此同样不能声明 `VECTOR<...>`。顶层 Constraint 的 `properties` 必填非空，Property 内由所在字段确定目标。联合唯一不是每个字段分别唯一，索引也不能拆成多个单字段后声称等价。
 
@@ -242,7 +244,11 @@ Index:
 
 Constraint 名称可省略，由 KG OS 创建时确定；explicit named Constraint 读取时保留真实名称。匿名 standalone Constraint 所需名称使用 `kgos_c_` 加其 canonical `{kind, targetRefs, type, properties, valueType?}` UTF-8 JSON 的 SHA-256 hex（kind 为 node/relationship，targetRefs 按 UTF-8 bytes 排序，properties 保序，键按上述顺序，JSON 无空白、直接 UTF-8 且不转义非 ASCII；缺省 valueType 不输出），创建后读回真实名称；若该名称已被不同资源占用则报冲突，不覆盖。创建后已存在的资源名称不因字段或 Definition 改名而重新计算。简单 required/unique 的底层内生资源名称不成为 AI 必须管理的对象。来源归并与派生 backing index 的区别由 compiler 从当前公开 Schema 读取，不能丢弃原有显式约束名称。
 
-Index 的 `name` 必填，是之后查询真实使用的名称，不是显示别名。`type` 为 `range | text | point | fulltext | vector`；名字冲突按底层同一 Schema 的规则检测，不能以 Domain 当 namespace。`range/text/point` 继续表示对调用方业务 Property 的直接数据库索引，只有这些类型可以在当前 KG OS profile 中携带对应公开 `options`。`fulltext` 与 `vector` 是 KG OS v1 主动收窄后的托管检索能力，不接受 per-index `options`。
+Index 的 `name` 必填，是之后查询真实使用的名称，不是显示别名。`type` 为 `range | text | point | fulltext | vector`；名字冲突按底层同一 Schema 的规则检测，不能以 Domain 当 namespace。`range/text/point` 表示对调用方业务 Property 的直接数据库索引：Range 接受一个或多个有序 Property，Text / Point 恰好一个 Property；它们在当前 Lithograph v0.3.0 contract 中没有 versioned Index configuration，因此 KG OS v1 **不暴露 per-index `options`**。Full-text 与 `vector` 同样不暴露 per-index 配置：前者由 daemon Full-text 默认值编译，后者由 Managed Semantic runtime 默认值编译并保留目标 State 中已有的 hidden versioned config。
+
+`targets` 只用于当前底层确实支持多 target 的 Full-text / Managed Semantic Index；省略表示当前 Definition。`range/text/point` 是 Definition-local Index，公共输入不得为它们声明跨 Definition `targets`，canonical read 也不输出这类伪共享范围。Full-text / Managed Semantic 的共享 targets 必须全部是同 kind Definition。KG OS 不为标准 Index 拆出多个底层资源后伪装成一个共享 Index。
+
+当前公共 `Index` 也**不包含 `filterProperties`**。Lithograph v0.3.0 Managed Semantic create/query surface 尚不能把它表达为“先在结构化过滤范围内取 top-k”的索引定义；KG OS 不保留一个无法正确实现的声明字段，也不静默忽略输入。未来底层出现等价能力时再通过新的设计修订扩展公共 Index shape。
 
 `fulltext` 只表达“这些业务 String 字段需要全文检索”，不要求 AI/调用方理解 FTS5 tokenizer、`fulltext.analyzer`、`eventually_consistent` 或 SQLite extension。Property-local `type: fulltext` 以所在 `STRING` Property 为唯一字段；Definition-level Full-text Index 使用非空 `properties`，所有 source Property 必须是目标 Definition 上可解释的 `STRING` 字段。KG OS compiler 新建或因业务定义变化重建 Lithograph Full-text Index 时，把**当前 daemon `[fulltext].analyzer` 的值**写入 IndexDefinition，并固定 `fulltext.eventually_consistent = false`；不是去修改 `config.toml`，也不是批量改写已有 IndexDefinition。Analyzer 的实际 tokenizer implementation 由 `[[sqlite.extensions]]` 在每个 SQLite connection 上提供；Ontology 不保存插件路径、下载 URL、entrypoint 或 tokenizer 参数 registry。
 
@@ -266,7 +272,7 @@ KG OS 不在 State 中额外保存 analyzer fingerprint/generation，也不在�
 
 共享语义索引的每个 target Definition 都必须声明这个同名 `STRING` source Property。语义输入为 source 的**原始 UTF-8 字符串**，不添加字段名前缀、不拼接、不截断或切块。缺失/null source 不参与索引；已声明的类型约束仍由 Lithograph 执行。原来单字段的 `propertyName:\nvalue` framing 随 KG OS 自行生成向量的方案一起取消。
 
-`options` 由 compiler 按 [Runtime 的配置映射](runtime.md#embedding-配置与索引映射)产生：新建或因业务定义变化必须重建索引时，使用当前 `[embedding]`；已有且未重建的索引保留完整 versioned provider/config/dimensions/similarity。Ontology 不增加 per-index 模型、维度或 provider 选项，也不把这些运行参数复制到 KG OS metadata。Decoder 保留它们的底层来源，不能因为公共 YAML 隐藏了配置就用当前 runtime 覆盖。不同创建配置本身不构成 KG OS consistency violation；不属于已支持映射的底层参数仍必须明确诊断。
+底层 Semantic create procedure 的 `options` 由 compiler 按 [Runtime 的配置映射](runtime.md#embedding-配置与索引映射)产生：新建或因业务定义变化必须重建索引时，使用当前 `[embedding]`；已有且未重建的索引保留完整 versioned provider/config/dimensions/similarity。Ontology 不增加 per-index 模型、维度或 provider 选项，也不把这些运行参数复制到 KG OS metadata。Decoder 保留它们的底层来源，不能因为公共 YAML 隐藏了配置就用当前 runtime 覆盖。不同创建配置本身不构成 KG OS consistency violation；不属于已支持映射的底层参数仍必须明确诊断。
 
 ### 语义索引的首版范围
 
@@ -274,9 +280,9 @@ KG OS 不在 State 中额外保存 analyzer fingerprint/generation，也不在�
 
 **结构化检索、图遍历、全文与向量检索可以通过 Cypher 组合。** KG OS 原样执行，实际语法和执行顺序由 Lithograph 决定；这一能力不需要在 KG OS 新建查询语言或解析器。
 
-当前 Managed Semantic 的具体限制是：`filterProperties` 尚不能映射到该接口；`queryNodes/queryRelationships` 的内部 `limit` 会先限制返回数量，之后的 `WHERE` 只筛选已返回结果，不能保证得到结构化过滤范围内最相似的 top-k。该限制不等于联合检索不可用。KG OS 不静默忽略声明，不切回自行生成 raw Vector 的旧实现，也不把“省略内部 limit”等未采纳方案写成已支持行为；调用边界见 [Graph](graph.md#graph-公共调用合同)。
+当前 Managed Semantic 的具体限制是：公共 Index 不提供 `filterProperties`；`queryNodes/queryRelationships` 的内部 `limit` 会先限制返回数量，之后的 `WHERE` 只筛选已返回结果，不能保证得到结构化过滤范围内最相似的 top-k。该限制不等于联合检索不可用。KG OS 不切回自行生成 raw Vector 的旧实现，也不把“省略内部 limit”等未采纳方案写成已支持行为；调用边界见 [Graph](graph.md#graph-公共调用合同)。
 
-多字段 Full-text、复合 Range 及共享索引继续按各自既有规则实现。首版单字段语义范围不要求取消这些能力，也不承诺多字段语义索引的后续实现方式。
+多字段 Full-text、复合 Range，以及跨 Definition Full-text / Managed Semantic 共享索引继续按各自既有规则实现。首版单字段语义范围不要求取消这些能力，也不承诺多字段语义索引的后续实现方式。
 
 ### 检索维护术语
 
@@ -290,13 +296,15 @@ KG OS 不在 State 中额外保存 analyzer fingerprint/generation，也不在�
 
 业务索引定义的替换、Lithograph TEMP/HNSW materialization 与 Provider-owned text→Vector cache 是三个独立生命周期，不能再用“先补齐 managed Property 才能提交”的旧规则把它们绑在一个写事务中。
 
-KG OS v1 不提供 caller-managed raw Vector Property / Vector Index profile。`type: vector` 只存在于 **Index**，表示上述托管语义索引；它不是 Property type。若绕过 KG OS 直接在 Lithograph Schema 或 public Knowledge data 中建立 caller-owned Vector Property/value，该 Snapshot 超出 KG OS v1 public profile，应按 invalid KG OS State 处理，而不是让 aggregate decoder 把它伪装成可编辑 Ontology。
+KG OS v1 不提供 caller-managed raw Vector Property / Vector Index profile。`type: vector` 只存在于 **Index**，表示上述托管语义索引；它不是 Property type。若绕过 KG OS 直接在 Lithograph **Schema** 中建立 caller-owned Vector Property type / type Constraint / raw Vector Index，Schema introspection无法无损映射到当前公共 Ontology profile，该 Snapshot 对 Ontology 高层能力属于 consistency-invalid，不能由 aggregate decoder伪装成可编辑定义。
+
+纯 graph data 中由公共 Graph 原样写入的 caller-owned Vector value则遵守 D59：Ontology startup/read **不扫描全部 Knowledge value**来把整个 Snapshot升级为 invalid。未来 Knowledge Object read/patch若实际寻址到含 Vector 的 Object，由 Object value profile在该 operation上返回既有 `UNSUPPORTED_OPERATION`；Graph仍可按 Lithograph合同读取/修改这些数据。Schema-level不可解释结构与 addressed Object value限制必须分开，不能为了 Object简化模型恢复全图 commit guard。
 
 `properties` 中复合字段顺序有意义，不能排序为另一种索引。Full-text 多目标表示底层允许的任一 Label/Type 匹配与多字段检索，不把它改成“所有 Label 必须同时出现”；新建/业务重建时的分词策略来自当前 runtime config，已有 Index 继续由自身 versioned analyzer 决定。Semantic 首版只使用一个 source，范围与联合检索边界见上文。调用方不编排 DDL、SQLite extension 或 embedding API。
 
 ### 共享资源与聚合编辑
 
-同一数据库索引可能出现在多个 Definition 中，**不等于多份存储、多个 Index 或多个独立编辑 owner**。程序根据真实资源名与 baseState 识别同一资源，完整显示 targets。AI 可从任一参与 Definition 修改它，不必先读取 `index:...`。
+当前可以跨 Definition 的 Full-text / Managed Semantic Index 可能出现在多个 Definition 中，**不等于多份存储、多个 Index 或多个独立编辑 owner**。程序根据真实资源名与 baseState 识别同一资源，完整显示 targets。AI 可从任一参与 Definition 修改它，不必先读取 `index:...`。Range / Text / Point 不具备这一跨 Definition 共享语义。
 
 一次 Patch 先从每个 aggregate 的 before/after 取得显式变化，再按底层逻辑资源/字段归一化：
 
@@ -488,7 +496,9 @@ KG OS 的 `title/description` 解释 Definition 和 Property 的含义，Domain/
 
 Domain、`INCLUDES` 与 Schema semantic metadata 和普通 Knowledge 共存在同一个 Lithograph versioned graph 中，但 KG OS 必须能明确区分自身内部 Ontology semantic graph 与调用方 Knowledge：
 
-KG OS v1 为所有 KG OS-owned internal graph / Schema identifier 保留 exact UTF-8 prefix `__kgos_`。调用方创建或修改的 Label、Relationship Type、Property key、Graph Type resource name、Constraint name、Index name 等只要以该 prefix 开头，都在 Object / Ontology Patch boundary 返回 `RESERVED_IDENTIFIER`；比较按 Lithograph identifier 的实际 name semantics，不额外做 Unicode normalization。这个 namespace 只服务 KG OS 基础设施，不进入调用方 Ontology 语义。Graph 是原始 Cypher 执行入口，不按该 prefix 拦截；直接 Cypher 与高层模型校验的边界见 [Graph](graph.md#graph)。
+KG OS v1 为所有 **KG OS 显式命名**的 internal graph / Schema identifier 保留 exact UTF-8 prefix `__kgos_`。调用方创建或修改的 Label、Relationship Type、Property key、Graph Type resource name、Constraint name、Index name 等只要以该 prefix 开头，都在 Object / Ontology Patch boundary 返回 `RESERVED_IDENTIFIER`；比较按 Lithograph identifier 的实际 name semantics，不额外做 Unicode normalization。这个 namespace 只服务 KG OS 基础设施，不进入调用方 Ontology 语义。Graph 是原始 Cypher 执行入口，不按该 prefix 拦截；直接 Cypher 与高层模型校验的边界见 [Graph](graph.md#graph)。
+
+Lithograph 因 Graph Type / Constraint 自动派生的 dependent Constraint / backing Index 是数据库生成资源，不属于 KG OS 自己选择名称的 identifier，因此它们**不要求**使用 `__kgos_` 前缀。KG OS 必须通过公开 Schema introspection 的 owner/origin/classification识别这类资源，并把 D68 reserved Graph Type 派生的规则视为 reserved Schema组成部分；不能仅靠名字前缀分类，也不能把 `graph_constraint_*` 等数据库生成名称投影成调用方可编辑 Constraint。反过来，任何额外 standalone Constraint / Index 只要 target指向 reserved internal Label/Type/Property，即使其名称没有 `__kgos_`，也不属于调用方 Ontology，且在 D68 未冻结时使 State consistency-invalid。
 
 v1 internal semantic graph 的最小持久化编码固定为：
 
@@ -513,6 +523,26 @@ Property keys
 Definition Binding 的当前 Schema Locator 由 `__kgos_kind + __kgos_name` 表达；Property Binding 的 locator 由自身 `__kgos_name` 加 `__kgos_property_of` 指向的 Definition Binding 当前 locator 组成。这样 rename 只更新对应 Binding Record 的当前 locator component，stable internal Node identity 与 Domain / Property ownership edge 不重建。Domain 使用 `__kgos_name` 作为当前公共 name；`title` / `description` 都是 optional。KG OS 不再为 locator 保存 JSON blob、第二套 Schema AST 或额外 UUID。
 
 这些 exact identifier 是 KG OS internal persistence-format constant；未来修改必须通过显式 KG OS migration 保持已有 State 可解释，不能在普通软件升级中静默改名。internal Graph Type / Constraint 只声明上述真实所需 element/property legality；没有已验证性能或完整性需求时不提前增加 internal Index / Constraint，Binding coverage、Domain/Definition/Property uniqueness 与 kind/locator consistency 继续由本文定义的 KG OS consistency validation 保证。
+
+v1 reserved Graph Type 的**精确逻辑 profile**固定如下；它是 bootstrap 与后续 consistency validation 的共同输入，不由实现自行发挥：
+
+| Internal element | Graph Type / property legality |
+| --- | --- |
+| `__kgos_definition_binding` Node | identifying Label 为 `__kgos_definition_binding`，同时必须带 implied marker Label `__kgos_internal`；`__kgos_kind: STRING NOT NULL`、`__kgos_name: STRING NOT NULL`；`__kgos_title: STRING`、`__kgos_description: STRING` 可选 |
+| `__kgos_property_binding` Node | identifying Label 为 `__kgos_property_binding`，同时必须带 `__kgos_internal`；`__kgos_name: STRING NOT NULL`；`__kgos_title: STRING`、`__kgos_description: STRING` 可选 |
+| `__kgos_domain` Node | identifying Label 为 `__kgos_domain`，同时必须带 `__kgos_internal`；`__kgos_name: STRING NOT NULL`；`__kgos_title: STRING`、`__kgos_description: STRING` 可选 |
+| `__kgos_property_of` Relationship | source 必须匹配 `__kgos_property_binding`，target 必须匹配 `__kgos_definition_binding`；两端都是 non-identifying Label constraint；不定义 Relationship Property |
+| `__kgos_includes` Relationship | source 必须匹配 `__kgos_domain`，target 至少必须带 `__kgos_internal`；两端都是 non-identifying Label constraint；不定义 Relationship Property |
+
+`__kgos_internal` 只是所有 internal Node 的共同 marker / implied Label，不单独创建一个空 Graph Node Type。`__kgos_includes` 的 target 之所以在底层只约束到 `__kgos_internal`，是因为当前 Lithograph 一个 Relationship Type 只有一组 endpoint Label 约束，无法把 `Domain | Definition Binding` 表达成 endpoint union；KG OS consistency validation 进一步要求它的 target **只能是 `__kgos_domain` 或 `__kgos_definition_binding`，不能是 `__kgos_property_binding` 或其它 internal Node**。这不是放宽公共 Domain 语义，而是把数据库可表达的基础合法性与 KG OS 上层 invariant 分层。
+
+Definition Binding 的 `__kgos_kind` 值域固定为 `node | relationship`，由 KG OS consistency validation 校验；不为这两个字符串额外建立数据库 enum 类型。Domain name、Definition locator、Property name 的唯一性与 Binding 双向覆盖继续由 KG OS validation保证，因此 v1 bootstrap **不新增 standalone internal UNIQUE/KEY Index/Constraint，也不新增 internal Index**。Graph Type 自身为上述 Property type / NOT NULL 与 endpoint legality产生的数据库 Schema rule不属于额外业务资源。
+
+KG OS-valid State 对 **reserved Schema + internal marker subgraph** 采用 closed profile：任何带 `__kgos_internal` 的 Node 必须恰好属于 `__kgos_domain | __kgos_definition_binding | __kgos_property_binding` 三类之一，不能零类、不能多类，也不能带未冻结的额外 Label / Property；这三类 Node 也不能缺 marker。D68 已冻结的 reserved Label / Relationship Type 在 internal boundary 内必须按其定义使用。
+
+任何 **至少一个 endpoint 是 internal Node** 的 Relationship 都属于 internal boundary，必须是 `__kgos_property_of | __kgos_includes` 两种 type之一、两个 endpoint 都是 internal Node且没有 Relationship Property；反过来，这两种 reserved Relationship Type 也不得连接普通 Knowledge Node。每个 Property Binding 必须恰好有一条 `__kgos_property_of` 指向唯一 Definition Binding，Domain 对同一 target 最多一条 `__kgos_includes`。reserved internal Schema 必须精确匹配 D68 Graph Type及其 Lithograph-dependent rules，不允许额外 standalone Constraint / Index target internal elements。internal marker subgraph 中出现未知 / 错位 reserved identifier、未预期的 internal-target Schema resource、重复平行 internal edge、unclassified marker Node、cross-boundary edge 或额外 internal payload 都是 consistency error，decoder不能静默忽略后继续输出一个“看似正常”的 Ontology。
+
+因此 startup / Ontology read 的 consistency validation 必须以 Schema introspection、`__kgos_internal` marker集合及其 incident Relationships 为边界，**不扫描 marker subgraph之外的全部 Knowledge 来寻找 reserved-looking Label / Relationship Type / Property key**。raw Graph 在纯 Knowledge element 上写入这类名称时，它们不因此被解释为 internal metadata；未来 Knowledge Object read/patch 对本次 addressed Object / candidate target执行 reserved-identifier边界，KG OS自己的 Object mutation仍不能创建或维持非法 reserved target。这与公共 Graph 可以原样读写任意 Cypher 的 D59 边界一致。
 
 - 所有 KG OS Ontology 内部 Node 都必须携带 reserved marker Label `__kgos_internal`；它属于已冻结 internal persistence encoding，不进入公共 Object representation；Graph 显式查询可读取该 marker；
 - KG OS 内部 Relationship 只连接 KG OS internal Node，不通过普通 graph edge 直接连接调用方 Knowledge Node；
@@ -625,7 +655,7 @@ tx_commit → 一个新 State
 
 只修改描述不执行 Schema/Index DDL。底层资源名、现有选项和没有被显式修改的字段必须保持；默认值规范化不能重置配置。共享资源显式变化遵守前文归一化规则。
 
-单个请求可以跨多个 aggregate，并包含为结构变化明确给出的 Knowledge Object 改写。已有数据不满足新的类型、必填、唯一或端点规则时，若同一请求没有明确解决则整体失败；不填造默认值、不丢弃重复记录、不删除边、不靠“最终检查”掩盖非法中间 statement。
+单个请求可以跨多个 aggregate，并包含为结构变化明确给出的 Knowledge Object 改写。已有数据不满足新的附加 Label、类型、必填、唯一或端点规则时，若同一请求没有明确解决则整体失败；不自动增删业务 Label、不填造默认值、不丢弃重复记录、不删除边、不靠“最终检查”掩盖非法中间 statement。Definition / Property rename 的 mandatory identity-preserving rewrite 仍按 Rename 小节处理，不因此把其它模型变化升级为隐式数据迁移。
 
 compiler 必须按 Lithograph immediate constraint semantics 安排 DDL/DML；必要的临时 Schema 替换只存在同一 transaction 内。任一 statement/validation/commit 失败整体 rollback，不允许先提交中间状态再 squash。Branch 前进返回 STALE_BASE_STATE；纯格式变化或语义无变化在 strict base check 后返回原 State，不建立 transaction。
 

@@ -15,6 +15,8 @@ Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能
 | Domain/Definition canonical YAML + 唯一 Object Patch | 标准 YAML/Git parser、exact apply、input-only renameFrom、语义差异、共享资源去重和冲突定位 |
 | 单 State、strict base、无隐式数据损失 | 复用已验收的 SQL explicit-transaction adapter；实现并验证 DDL/DML 顺序、即时约束、引用改写、Knowledge data rewrite 与 index maintenance |
 | Binding / Object Graph View / reserved identifier | 空库 bootstrap、Object / Ontology 的双向覆盖与内部数据投影校验；不作为公共 Graph Cypher 的执行条件 |
+| D68 reserved Ontology Schema | bootstrap 精确创建三类 internal Node Graph Type 与两类 internal Relationship Type；三类 Node imply `__kgos_internal`；`property_of` 精确 Property Binding → Definition Binding，`includes` 底层 Domain → `__kgos_internal` 并由 consistency 收紧 target union；不额外创建 sentinel、standalone internal UNIQUE/KEY 或 Index；Graph Type 自动派生 Constraint/backing资源按公开 origin/classification归属 internal Schema，不按名称前缀误投影成调用方资源 |
+| Internal closed profile | consistency scan以 Schema introspection + `__kgos_internal` marker集合 + incident Relationships 为边界，拒绝 unclassified/multi-class marker Node、internal endpoint上的非法/cross-boundary Relationship、额外 internal payload、Property Binding owner edge缺失/重复、重复 Domain membership edge，以及任何未由 D68 Graph Type派生的 internal-target standalone Constraint/Index；不全图扫描 marker subgraph之外的普通 Knowledge寻找 reserved-looking Label/Type/Property，也不能靠 decoder过滤隐藏 internal 多余状态 |
 | 通用 SQLite Extension startup runtime | Phase 01 已完成 resolver、content-addressed cache、ordered per-connection load 与 Lithograph capability validation；后续 bootstrap / 业务代码直接复用，不按插件用途重建 loader |
 | 全局 Full-text analyzer + 简化 Ontology | `type: fulltext` 只编译业务 targets/properties；新建/业务重建时写当前 `[fulltext].analyzer` + `eventually_consistent=false`，已有 versioned analyzer 保留，connection probe 当前 analyzer；不做 config migration |
 | Lithograph Managed Semantic + 简化 Ontology | Phase 01 已完成 Provider extension 装配、startup readiness、`[embedding]` + `[cache]` 默认 mapping 与连接基线；后续 Ontology compiler 生成 versioned IndexDefinition / providerConfig，Graph 公共 surface 直接使用 String query；不实现 embedding HTTP client、Provider cache内部逻辑、向量 Property或写入/合并刷新 |
@@ -33,13 +35,15 @@ Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能
 
 ### Mutation planning
 
-执行链路复用 Object contract：parse → exact apply → 公共值 → explicit delta → shared-resource normalization → derived reference / maintenance → conflict/dependency check → SQL `lithograph_tx_begin(expectedHead)` → 同一 connection 上用普通 `lithograph()` / 必要时 `lithograph_rows()` 执行标准 Cypher → SQL `lithograph_tx_commit`。这里的 expectedHead 属于 begin 的 JSON options；active transaction 内普通 execution 自动加入同一 staged state，不存在 `lithograph_tx_execute()`。具体参数与 connection 边界见 [Runtime 调用入口](runtime.md#lithograph-调用入口)。
+执行链路复用 Object contract：parse → exact apply → 公共值 → explicit delta → shared-resource normalization → derived reference / maintenance → conflict/dependency check → SQL `lithograph_tx_begin(options_json)`（其中 `branch=targetBranch`、`expectedHead=baseState`）→ 同一 connection 上用普通 `lithograph()` / 必要时 `lithograph_rows()` 执行标准 Cypher → SQL `lithograph_tx_commit()`。active transaction 内普通 execution 自动加入同一 staged state，不存在 `lithograph_tx_execute()`。具体参数与 connection 边界见 [Runtime 调用入口](runtime.md#lithograph-调用入口)。
 
 实现必须证明中间每条 statement 符合 Lithograph immediate semantics，不能只比较最终 Schema。对合法上层目标可采用同 transaction 内受控 drop/recreate 或先改写受影响数据再施加约束；语义保持要求仍由公共合同约束。新 alias result capture、顶层 Ref transition 与 Property Binding continuity 都在这一个边界内完成。Semantic source 写入不做 embedding；Semantic definition 新建 / 改变只执行本地 Provider/config validation，因此 Patch 不再需要在 writer 外预计算向量再回填内部 Property。
 
 ### Adapter 与运行时
 
 Ontology batch read 在 daemon/kernel 层先解析一次 State，再读取全部 refs；adapter 不能通过循环读取 `branch/...` 模拟 batch，否则 Branch 移动会产生跨 State 结果。Batch `--edit` 要先取得并验证全部 Object bodies，再一次性写 stdout；任一失败不得留下半个 stream。单个 body 继续使用 Object canonical renderer，multi-document marker/comment 由 CLI framing 层添加。`ontology patch` 与 `object patch` 只有一套 request/result/compiler，前者只做 kind scope validation。不得让 CLI、Web、SDK 对缺失字段、删除、rename、shared resource、baseState 产生不同解释。Knowledge 保持直接 Cypher，不文件化。
+
+共享 Object Patch 的实现可以先交付 Ontology-scoped adapter，再在后续能力中开放 Knowledge Object adapter；这不允许建立第二套 parser、logical delta、transaction 或 concurrency semantics。Ontology-scoped 实现仍必须支持模型变化必需的 derived Knowledge maintenance，例如 Definition / Property rename 对已有 Label / Property / Relationship Type 的安全 rewrite，以及新增 Constraint 前对已有数据的真实验证；但它不因此开放调用方任意 Knowledge CRUD。
 
 **`kgosd` runtime implementation**：`kgosd`、Kernel 与 `kg` CLI 使用 Go，SDK / Web 使用 TypeScript。Web 构建产物随 daemon 交付，由同一进程与端口提供页面、API 和 control。v1 已确认 IPv4 HTTP、`KG_HOME` profile、根目录 `kgos.db` 单库、persistent `auth.json` 与客户端 `KG_TOKEN` Bearer authentication、显式 daemon lifecycle。SQLite host 使用 `database/sql` + `go-sqlite3`，按统一 resolver 装配 Lithograph、OpenAI-compatible Provider 和其它扩展；由 Runtime owner 定义 Full-text / Embedding 与 Provider cache 默认映射。
 
@@ -79,7 +83,7 @@ Go 与 TypeScript client 不共享服务端源码。公共 request/result/error 
 3. **HTTP streaming 与 transport failure**：把底层 `columns -> row* -> summary` 映射为 NDJSON，逐 event write + flush 后再拉取下一行；验证 pre-event failure、terminal `error`、client disconnect、socket/write failure、incomplete stream 与 request-context cancellation，不把 transport failure 或 transaction-subquery partial durability伪装成全量 rollback。
 4. **Semantic public path**：通过只读 Graph request 执行真实 Semantic query，证明 Provider cache 只写独立 cache database、跨 connection / restart 复用不改变 graph/schema/history/ref，并保持历史 IndexDefinition 的 provider/config。
 
-Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；`filterProperties` 与过滤范围内 top-k 的实际边界见 [owner 范围](ontology.md#语义索引的首版范围)。不增加未确认的底层过滤接口；缓存自动填充已经确认，不再列为需要用户设计的预热入口。
+Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；公共 Index 不暴露 `filterProperties`，post-YIELD 过滤与过滤范围内 top-k 的实际边界见 [owner 范围](ontology.md#语义索引的首版范围)。不增加底层不存在的过滤接口；缓存自动填充已经确认，不再列为需要用户设计的预热入口。
 
 `KG_HOME`、单库、认证和通用 extension loader 的已确认边界保持；Object / Ontology / Evolution 的高层一致性校验保留，不能把它们重新挂到 Graph 透传路径。
 
@@ -89,6 +93,7 @@ Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；
 
 - **Runtime / SQLite host**：Phase 01 已实现 `KG_HOME`、`auth.json` credential lifecycle、根目录 `kgos.db`、统一 extension resolver / per-connection loading、Lithograph v0.3.0 SQL execution/transaction、read/write connection、streaming/cancellation、Managed Semantic Provider readiness、lock 与 shutdown。剩余 runtime 工作是 KG OS empty-database bootstrap、API/control Bearer middleware 与正式 control/public routes；同一 `net/http` server 承载 API / control 与内置 Web 资源。
 - **Ontology storage mapping**：实现 semantic graph、Binding coverage、Schema Locator 与 Object / Ontology Graph View；高层 Object / Ontology 输入保留 reserved identifier 校验，公共 Graph 不复用该限制。
+- **Reserved Ontology Schema**：按 D68 建立最小 Graph Type profile；Graph Type 负责 internal Node marker、字段 type/required 与基础 endpoint legality，KG OS consistency validation 负责 kind 枚举、name uniqueness、Binding coverage 和 `includes` 的 Domain-or-Definition target，不增加第二套 Schema/constraint engine。
 - **Object representation**：实现五种公共 Object Ref、aggregate decoder 与 Knowledge 原生 Object value；canonical YAML / JSON 省略空的顶层 `indexes`，保留非空复合 / 共享索引。
 - **Read paths**：实现 Ontology read 的全局 / Domain / Definition 展开与 1..100 Ref batch，同一次请求只 pin 一个 resolved State；实现 Object read / list，Object search 限定 Knowledge，不为 Ontology 加旁路搜索。
 - **Mutation compiler**：实现共享 Object Patch compiler，覆盖聚合内字段 / 规则 / 索引、多 aggregate 原子修改、alias、显式 rename、no-op、冲突与 rollback；不实现单独 Schema resource CRUD。
@@ -111,8 +116,9 @@ Web 还需细化页面布局、导航与具体操作交互，状态由 [Runtime]
 | batch Domain pagination | limit 对各 Domain 独立生效，各自 cursor 可用同一 resolved State + 单 Ref 继续；多 Ref 请求不能提交单个 cursor |
 | Definition 普通 read 与 --edit | 阅读有真实查询信息；编辑正文与 Object read canonical YAML 相同 |
 | Definition 至少一个字段 | Node / Relationship Definition 的空 properties，或删除最后一个字段后仍保留类型的 Patch，在编译前返回 INVALID_ARGUMENT；不自动补字段，不把声明字段等同于实例必填，不把该检查施加到公共 Graph |
-| 标准 YAML 无损往返 | 使用标准库，以原始逻辑值验证 parse(render(value)) 相等；覆盖行首/行内/行尾空格、普通多行、空字符串、纯空白/换行、CR/LF、转义字符与 Unicode，并验证相同值输出确定；YAML 格式缩进不作为 String 内容比较 |
+| 标准 YAML 无损往返 | 使用标准兼容的 YAML 1.2 parser / renderer，以原始逻辑值验证 parse(render(value)) 相等；覆盖 duplicate key拒绝、anchors/aliases有界展开、行首/行内/行尾空格、普通多行、空字符串、纯空白/换行、CR/LF、转义字符与 Unicode，并验证相同值输出确定；YAML 格式缩进不作为 String 内容比较 |
 | 顶层 indexes 可选 | 缺省与 [] 逻辑等价且 canonical 均省略；空数组规范化不产生 Commit；非空复合/共享索引不丢失 |
+| set-like collection | `labels/includes/targets` 重复项在 logical parse/validation阶段拒绝；canonical按 UTF-8 bytes 排序；不得静默去重导致底层/公共值漂移 |
 | 多 Ref batch --edit | 输出是合法 YAML 1.2 multi-document stream；每个 document body 与单独 canonical YAML 逐字一致，顺序与请求一致；state/ref framing 不进入 Object Value / Git hunk；任一目标失败时 stdout 为空 |
 | ontology patch scope | 多 Definition/Domain Patch 与 object patch 得到相同 Ontology 结果；出现 Knowledge target 时在执行前整体拒绝；不建立第二 transaction/compiler |
 | Document 新建及全文/语义索引 | aggregate 只声明业务 source fields；不出现 caller-managed embedding Property/model/dimension，真实 fulltext/semantic Index name 均可查询 |

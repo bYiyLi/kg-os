@@ -268,12 +268,13 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D33 KG OS v1 只 bootstrap 空 Lithograph Knowledge Base
 
-> 后续调整：[D59](#d59-cypher-passthrough) 允许启动完成后的 Graph 直接访问底层 Snapshot，不再把 pre-KGOS / invalid 历史一律限定为 Evolution 诊断；空库 bootstrap 与不自动 adoption 的规则不变。
+> 后续调整：[D59](#d59-cypher-passthrough) 允许启动完成后的 Graph 直接访问底层 Snapshot，不再把 pre-KGOS / invalid 历史一律限定为 Evolution 诊断；[D68](#d68-reserved-ontology-schema) 进一步冻结 bootstrap 的 exact reserved Graph Type，并明确空 Ontology 不创建 sentinel / Domain / Binding data，因此本条“semantic graph 初始状态”只表示允许为空的内部数据状态。空库 bootstrap 与不自动 adoption 的规则不变。
 
-- 决定：KG OS v1 只在 Lithograph empty Root State 上 bootstrap 自己需要的 reserved internal Schema resources 与 semantic graph 初始状态；bootstrap 必须在一个 Lithograph explicit transaction 中以 Root Commit 为 `expectedHead` 完成，并只产生一个新的 KG OS-valid Commit。KG OS 从该 State 开放公共业务能力；不自动 adoption 已经存在调用方 graph / Schema history 的任意 Lithograph database。正常 v1 bootstrap 不产生 durable intermediate invalid Commit，pre-KGOS Root 只按 D31 诊断可见。
+- 决定：KG OS v1 只在 Lithograph empty Root State 上 bootstrap 自己需要的 reserved internal Schema resources；空 Ontology 的 internal semantic graph可以为空。bootstrap 必须在一个 Lithograph explicit transaction 中以 Root Commit 为 `expectedHead` 完成，并只产生一个新的 KG OS-valid Commit。KG OS 从该 State 开放公共业务能力；不自动 adoption 已经存在调用方 graph / Schema history 的任意 Lithograph database。正常 v1 bootstrap 不产生 durable intermediate invalid Commit，pre-KGOS Root 只按 D31 诊断可见。
+- Bootstrap Commit metadata：system bootstrap不传 `author/message`、不写 State Data，最终首个 KG OS-valid Commit 的 `author/message` 为 `null`；不使用 OS user、host、daemon version或固定伪用户填充调用方 metadata。
 - 依据：Definition / Property Binding coverage 与 reserved internal Schema 是 KG OS-valid State 的硬不变量；自动接管已有数据库必须决定如何为既有 Schema 生成 Binding、如何解释已有业务语义和历史连续性，这不是启动时可以确定性猜测的事情。
 - 备选：首次打开时自动为所有已有 Schema element 创建 Binding；允许没有 Binding 的 Schema 逐步懒迁移；直接把现有 database 一律视为有效 KG OS State。
-- 取舍：已有 Lithograph 数据库不能在 v1 被无配置直接“挂载”为 KG OS，需要未来显式 migration / import 设计；bootstrap 会短暂持有 Lithograph explicit transaction 的 single-writer reservation，但换取所有公开 KG OS State 从第一个 Commit 起满足当前一致性不变量。
+- 取舍：任意已有 Lithograph 数据库不能由 KG OS 自动补 Schema/Binding后“挂载”为 KG OS，需要未来显式 migration / import 设计；但 v1 不保存 provenance sentinel，若一个已有 `main` Snapshot 已经由外部工具显式构造成完全满足当前 KG OS-valid persistence invariants，启动只做 validation并可按既有 KG OS State打开，不需要也不执行 adoption。bootstrap 会短暂持有 Lithograph explicit transaction 的 single-writer reservation，但换取所有由 KG OS bootstrap 产生的公开 State 从第一个 Commit 起满足当前一致性不变量。
 
 ### D34 Object 使用单一 logical value、canonical YAML 与 JSON representation
 
@@ -305,9 +306,9 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D38 `__kgos_` 是 v1 reserved internal persistence namespace
 
-> 后续调整：[D59](#d59-cypher-passthrough) 保留内部持久化名称和 Object / Ontology reserved 检查，但 Graph 不按该 prefix 拦截输入、输出或写入。
+> 后续调整：[D59](#d59-cypher-passthrough) 保留内部持久化名称和 Object / Ontology reserved 检查，但 Graph 不按该 prefix 拦截输入、输出或写入。[D68](#d68-reserved-ontology-schema) 明确 prefix 约束的是 KG OS **显式命名**的 internal identifier；Lithograph 因 reserved Graph Type 自动派生的 dependent Constraint / backing资源按 owner/origin/classification识别，不要求重命名为 `__kgos_`。
 
-- 决定：KG OS-owned internal graph / Schema identifiers 统一保留 exact UTF-8 prefix `__kgos_`，并使用本文冻结的 marker / Binding / Domain / Relationship / Property key 编码。调用方公共 mutation 不能创建或修改该 namespace；命中时返回 `RESERVED_IDENTIFIER`。这些名字是持久化格式的一部分，未来改名必须显式 migration。
+- 决定：KG OS 显式命名的 internal graph / Schema identifiers 统一保留 exact UTF-8 prefix `__kgos_`，并使用本文冻结的 marker / Binding / Domain / Relationship / Property key 编码。调用方公共 mutation 不能创建或修改该 namespace；命中时返回 `RESERVED_IDENTIFIER`。这些 KG OS-chosen 名字是持久化格式的一部分，未来改名必须显式 migration。Lithograph 自动派生 resource name 不属于 KG OS-chosen namespace，仍按其公开 ownership metadata 归类。
 - 依据：internal Ontology semantic graph 与调用方 Knowledge 共存在同一 Lithograph graph / Schema，需要一个确定、可在 mutation 前拒绝冲突且可由 `graphView` 隔离的持久化 namespace；如果只写“实现时任选内部名”，不同版本会无法稳定解释历史 State。
 - 备选：每次启动随机前缀；仅依赖隐藏 element ID；把 internal semantics 放 SQLite side table；把具体名字长期留给实现自行选择。
 - 取舍：调用方不能使用 `__kgos_` 开头的 Schema / graph identifier；换取 internal history、Graph View isolation、Schema bootstrap 与 migration 有稳定编码，同时不建立第二套数据库或绕过 Lithograph。
@@ -391,7 +392,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D49 KG OS v1 不公开 caller-owned Vector 数据类型（2026-09-16）
 
-> 后续调整：本条 reserved embedding Property、SemanticText 与 mandatory refresh 由 [D57](#d57-managed-semantic) 替换。[D59](#d59-cypher-passthrough) 进一步取消 Graph 的 Vector / identifier 输入、输出和 commit 前检查；Vector 简化模型限制只保留在 Ontology / Object 及相关高层一致性合同中。
+> 后续调整：本条 reserved embedding Property、SemanticText 与 mandatory refresh 由 [D57](#d57-managed-semantic) 替换。[D59](#d59-cypher-passthrough) 进一步取消 Graph 的 Vector / identifier 输入、输出和 commit 前检查；当前 Ontology owner只把不可映射的 caller-owned Vector **Schema/Index**视为 Ontology consistency-invalid，不为纯 Knowledge Vector value做 startup全图扫描；Object在实际寻址含Vector的值时按自身profile拒绝。下列旧“整个 Snapshot一律invalid / Graph staged guard”不再是现行合同。
 
 - 决定：KG OS v1 的 caller-owned Ontology / Knowledge / Graph public value profile 排除 Vector。`VECTOR<...>` 不能作为 Property `type` 或 type constraint `valueType`，Object/Knowledge 不能保存 caller-owned Vector value，Graph 不接受 raw Vector parameter，也不返回 Vector result；`type: vector` 只作为 Index type 表示 KG OS 托管 semantic index。Vector 仍由 Lithograph 完整支持，并仅在 KG OS reserved managed materialization 与 SemanticText 解析后的内部 query parameter 中使用。
 - 授权依据：用户明确指出 Ontology 中不需要 `VECTOR<FLOAT32>(...)` 这类业务字段，并要求重新整理、优化和深度 review；此前已经确认向量模型与 query vector 不应成为外部使用者负担。
@@ -479,7 +480,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D57 托管语义检索交给 Lithograph（2026-09-19）
 
-> 后续调整：[D59](#d59-cypher-passthrough) 取消 Graph 的语句 / Vector / identifier 限制与相应 guard 待办；[D60](#d60-automatic-embedding-cache) 以正常查询自动持久填充替换本条 query miss 仅进内存、rebuild 填充与预热入口待定的旧规则；[D61](#d61-single-field-semantic) 确认首版只支持单字段；[D66](#d66-lithograph-v030-sql-only) 再把 text -> Vector persistent cache ownership 从 Lithograph Core 下沉到具体 Embedding Provider。联合检索可组合及托管接口的具体限制以 [Ontology 当前范围](ontology.md#语义索引的首版范围)为准，下列历史“待定”文字不再作为首版设计确认清单。其余职责与配置决定继续有效。
+> 后续调整：[D59](#d59-cypher-passthrough) 取消 Graph 的语句 / Vector / identifier 限制与相应 guard 待办；[D60](#d60-automatic-embedding-cache) 以正常查询自动持久填充替换本条 query miss 仅进内存、rebuild 填充与预热入口待定的旧规则；[D61](#d61-single-field-semantic) 确认首版只支持单字段；[D66](#d66-lithograph-v030-sql-only) 再把 text -> Vector persistent cache ownership 从 Lithograph Core 下沉到具体 Embedding Provider；[D67](#d67-ontology-index-profile) 明确首版公共 Index 不暴露 `filterProperties/options`。联合检索可组合及托管接口的具体限制以 [Ontology 当前范围](ontology.md#语义索引的首版范围)为准，下列历史“待定”文字不再作为首版设计确认清单。其余职责与配置决定继续有效。
 
 - 决定：KG OS 保留 `type: vector` 的简化本体声明，编译为 Lithograph Managed Semantic Index。向量生成、缓存和检索由 Lithograph / OpenAI-compatible Provider extension 承担；KG OS 不实现 Embeddings HTTP client、reserved 向量 Property、source framing 或写入/合并后的向量刷新。
 - 配置与调用：`[embedding]` 作为新建 / 必须重建索引的默认值，完整 provider/config/dimensions/similarity 保存到 Lithograph versioned IndexDefinition；已有索引与历史查询使用自身配置。调用方使用 `db.index.semantic.queryNodes/queryRelationships`，参数是普通 String，移除 `SemanticText` / `$semantic` 转换，不增加 Search DSL。
@@ -494,9 +495,9 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D58 顶层 indexes 可选，保留复合与共享索引（2026-09-19）
 
-> 后续调整：[D62](#d62-nonempty-definition-properties) 要求 Node / Relationship Definition 的 `properties` 非空；本条末尾对 properties 空集合的旧说明不再适用。`indexes` 可选与空集合规范化的决定继续有效。
+> 后续调整：[D62](#d62-nonempty-definition-properties) 要求 Node / Relationship Definition 的 `properties` 非空；本条末尾对 properties 空集合的旧说明不再适用。[D67](#d67-ontology-index-profile) 将“跨 Definition 共享索引”收窄为当前底层可正确表达的 Full-text / Managed Semantic；Range / Text / Point 保持 Definition-local。`indexes` 可选与空集合规范化、多字段规则放在 Definition 顶层的决定继续有效。
 
-- 决定：只作用于当前 Definition 单个字段的索引放在 Property 内；多字段索引与跨 Definition 共享索引保留在 Definition 顶层。顶层 `indexes` 缺省与 `[]` 逻辑等价，canonical YAML / JSON 为空时省略，非空时完整输出。
+- 决定：只作用于当前 Definition 单个字段的索引放在 Property 内；多字段索引与当前支持的跨 Definition 共享索引保留在 Definition 顶层。顶层 `indexes` 缺省与 `[]` 逻辑等价，canonical YAML / JSON 为空时省略，非空时完整输出。
 - 依据：用户提出把索引统一放到字段层；核对已有多字段 Full-text、复合 Range 与共享索引后，用户确认“单字段放字段下、多字段/共享留顶层、空数组省略”的方案并要求写入设计。
 - 取舍：减少普通单字段模型的空字段噪声，同时不删除已有多字段能力，也不把一个组合索引拆成多个不等价的索引。只规范化空集合不产生 Schema delta；删除非空声明仍按原共享资源 / Patch 语义执行。
 - 当前合同：[Ontology 公共格式与索引组织](ontology.md#公共可编辑格式)、[Object representation](object.md#object-value-与-representation)。`properties/constraints` 的空集合输出规则不变。
@@ -601,3 +602,26 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 - 依据：Lithograph v0.3.0 已完成统一 SQL execution surface、删除 application Native query ABI、删除 Core embedding result cache并把 OpenAI-compatible persistent cache下沉到 Provider；用户要求 KG OS 按新的底层事实重新设计，而不是继续维护旧 FFI / native-handle 方案。
 - 取舍：Provider cache path 与其它 providerConfig 一起进入 versioned IndexDefinition，因此 KG OS 必须使用稳定、明确的 profile-local absolute path并保留历史配置；换取读连接不再因为 embedding cache写入要求修改 Lithograph `main`，以及 KG OS/driver 不再承担 Native ABI / `sqlite3*` 暴露。
 - 当前合同：[Runtime cache / extension / SQL mapping](runtime.md)、[Graph](graph.md#graph-公共调用合同)、[Implementation](implementation.md#go-运行时与数据库接入)、[Phase 01](../development/phases/01-runtime-lithograph-host.md)。
+
+<a id="d67-ontology-index-profile"></a>
+
+### D67 Ontology Index profile 只暴露当前可正确表达的声明（2026-09-22）
+
+- 决定：KG OS v1 公共 Index Value 固定为 `name/type/targets?/properties?`，不暴露 `options` 或 `filterProperties`。Range 接受一个或多个有序 Property；Text / Point 恰好一个 Property，并且都是 Definition-local，不支持跨 Definition `targets`。Full-text 与 Managed Semantic 可以使用同 kind 的多 Definition `targets`；Full-text 可以多字段，Managed Semantic 继续按 D61 只允许单个 `STRING` source Property。
+- 配置边界：Lithograph v0.3.0 的 Range / Text / Point IndexDefinition 没有 versioned configuration；Full-text 与 Managed Semantic 的实际 versioned config 继续由 KG OS compiler 从 runtime defaults产生，并在读取已有 State 时保留底层真实配置，但不暴露为 Ontology per-index字段。
+- 依据：当前 Lithograph v0.3.0 Standard Index target 对 Range / Text / Point 只接受一个 Label / Relationship Type，且 configuration parser只为 Full-text / Vector family产生配置；Full-text与Managed Semantic公开接口能够表达多 target。KG OS 不应在公共 Ontology 中保留底层无法等价实现的“伪共享”或无实际合法值的配置字段。
+- 备选：保留通用 `options/filterProperties` bag并在实现时按 Index family选择性忽略或报错；把一个跨 Definition Standard Index拆成多个真实 Index再伪装成一个 logical Index。本次均不采用。
+- 取舍：v1 Index shape更小，但每个可声明字段都能稳定 round-trip到当前数据库合同；未来 Lithograph出现等价 Standard Index config或过滤范围内 top-k定义能力时，再显式扩展 Ontology，而不是提前冻结猜测中的字段。
+- 当前合同：[Ontology Index 组织](ontology.md#propertyconstraint-与-index-的组织)、[语义索引首版范围](ontology.md#语义索引的首版范围)、[Phase 02](../development/phases/02-ontology.md)。
+
+<a id="d68-reserved-ontology-schema"></a>
+
+### D68 KG OS reserved Ontology Schema 使用最小 Graph Type profile（2026-09-22）
+
+- 决定：bootstrap 只建立 Ontology owner冻结的三类 internal Node Graph Type与两类 internal Relationship Type。三类 Node都 implied `__kgos_internal` marker；Definition Binding要求 `kind/name`，Property Binding与Domain要求 `name`，title/description可选。`property_of` 精确约束 Property Binding → Definition Binding；`includes` 在数据库层约束 Domain → `__kgos_internal`，再由 KG OS consistency把 target收紧为 Domain或Definition Binding；这两类 Relationship 的 endpoint Label都只是 non-identifying constraint，不引入额外 endpoint identity语义。
+- 约束分工：`__kgos_kind` 的 `node | relationship` 值域、Domain/Definition/Property名称唯一性、Binding双向一一覆盖与 `includes` target union由 KG OS validation承担。v1不为这些规则增加 standalone internal UNIQUE/KEY Constraint、Index、sentinel或第二份 Schema；Graph Type自动产生的Property type/NOT NULL与endpoint rule属于同一 reserved Schema。
+- Closed profile：State-level consistency只闭合 reserved Schema 与 `__kgos_internal` marker subgraph。marker Node必须恰好属于 Domain / Definition Binding / Property Binding之一且只携带冻结的 internal fields；任一endpoint是internal Node的Relationship都必须是合法 `property_of/includes`、两端都internal且无Property；reserved Relationship同样不得跨到Knowledge。Property Binding恰好一个 owner edge，Domain→target membership不允许重复平行 edge。reserved Schema只允许 D68 Graph Type及其 Lithograph自动派生 dependent rules；这些数据库生成 Constraint/backing资源按公开 owner/origin/classification识别，不要求 `__kgos_` 名称，也不进入公共 Ontology。startup/Ontology read不全图扫描 marker subgraph之外的普通 Knowledge去寻找 reserved-looking Label/Type/Property；高层 Knowledge Object操作在本次 addressed Object/candidate上执行 reserved identifier边界。internal subgraph中的未知/错位 identifier、cross-boundary edge、额外 internal-target standalone Schema resource、额外payload或重复internal edge使目标 Snapshot consistency-invalid。
+- 依据：Lithograph v0.3.0 的 Graph Type能表达 implied Label、可选/必填 Property与单组 Relationship endpoint Label，但一个 Relationship Type不能声明 target Label union。使用共同 `__kgos_internal` marker可在底层继续保证 internal-only endpoint，再由已有 KG OS invariant精确区分 Domain/Definition/Property Binding。
+- 备选：为 Domain→Domain 与 Domain→Definition 创建两个不同 Relationship Type；给 Lithograph增加 union endpoint语法；增加 standalone Constraint/Index或bootstrap sentinel。本次均没有当前必要性，且会扩大 persistence format或修改底层数据库合同。
+- 取舍：部分 Ontology invariant不由数据库 Schema单独证明，但所有 KG OS高层入口仍必须在同一 target State上执行 consistency validation；换取不修改 Lithograph、不过度增加 internal resources，并保持 semantic graph最小。
+- 当前合同：[Semantic graph 内部边界](ontology.md#semantic-graph-的内部边界)、[Knowledge Base bootstrap](architecture.md#knowledge-base-bootstrap)、[Phase 02](../development/phases/02-ontology.md)。

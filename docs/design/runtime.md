@@ -385,7 +385,7 @@ KG OS 只保留 `api_key_env` 认证输入，不增加内联密钥的转接层�
 
 v1 Knowledge Base 的唯一 target 固定为 `$KG_HOME/kgos.db`，不再增加 `data/` 中间目录。daemon 重启不能把 `kgos.db` 当作临时状态清理。`kgosd` 不在一个 profile 内维护 Knowledge Base name、registry、selector 或多库 connection target，`kg` 也不提供 `base list/use` 或 `--base`。
 
-如果 `$KG_HOME/kgos.db` 不存在，daemon startup 创建新的 SQLite database、初始化 Lithograph，并按 [Architecture](architecture.md#knowledge-base-bootstrap) 完成 KG OS bootstrap；如果已经存在，则按当前 public capability 与 KG OS consistency contract 打开/验证。切换 `KG_HOME` 就是切换整个 runtime profile 与 Knowledge Base，不在运行中的 daemon 内切库。
+如果 `$KG_HOME/kgos.db` 不存在，daemon startup 创建新的 SQLite database、初始化 Lithograph，并按 [Architecture](architecture.md#knowledge-base-bootstrap) 完成 KG OS bootstrap；如果已经存在，则先解析 `branch/main` 当前 head。该 head 已满足当前 KG OS consistency contract 时按既有 Knowledge Base 打开，**不要求 startup 扫描并证明所有历史 Commit、Branch 或 Tag 都是 KG OS-valid**；invalid history仍按高层接口/Graph既有诊断边界处理。只有当前 `main` 不是 KG OS-valid 时才检查是否满足 Architecture 定义的 fresh Root baseline：满足则执行首次 bootstrap，否则拒绝自动 adoption。切换 `KG_HOME` 就是切换整个 runtime profile 与 Knowledge Base，不在运行中的 daemon 内切库。
 
 ## Daemon lifecycle
 
@@ -425,7 +425,8 @@ resolve KG_HOME (default ~/.kgosd)
 → run staged Semantic create + tx_abort to validate current openai-compatible provider/config without network or durable Schema
 → activate normal read-write/read-only connection sets; every physical connection reloads the same artifacts and must match the frozen Lithograph baseline
 → verify SQL execution / true-stream / context-cancellation primitives on the activated runtime
-→ open / bootstrap-or-validate the KG OS Kernel on the initialized Lithograph database
+→ resolve branch/main and open existing KG OS-valid head, or bootstrap only a fresh Root baseline; otherwise fail closed
+→ validate the D68 reserved Ontology Schema + internal-marker subgraph invariants required by the main head, without a full Knowledge-data scan
 → resolve bundled Web assets
 → bind <host>:<port> for Web + API/control
 → write active local endpoint into kgosd.lock

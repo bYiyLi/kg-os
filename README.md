@@ -23,7 +23,7 @@ KG OS 独立于 Noven 或任何具体领域；领域语义由调用方表达。
 
 通过 **Ontology 全局概览 → 可选 Domain → Definition 详情**理解模型；已知 Ref 可以直接读取，也可以 batch 读取同一 State 下的一组模型。`--edit` 取得 canonical YAML，`kg ontology patch` 提交局部变化；跨 Ontology + Knowledge 的原子修改使用同一个 Object Patch。
 
-Node / Relationship Definition 一起表达字段、约束和索引。单字段索引放在字段下，复合或跨 Definition 共享索引放在模型顶层；没有顶层索引时省略 `indexes`。Knowledge 保持 Property Graph。Graph 原样执行 Lithograph Cypher，`query` / `execute` 分别选择只读 / 读写连接，KG OS 不审查语句内容；Evolution 提供 State、Branch、History、Diff、Merge 的专用交互。
+Node / Relationship Definition 一起表达字段、约束和索引。单字段索引放在字段下，复合索引放在模型顶层；当前只有 Full-text / Managed Semantic 支持跨 Definition 共享 `targets`，Range / Text / Point 保持 Definition-local。没有顶层索引时省略 `indexes`。Knowledge 保持 Property Graph。Graph 原样执行 Lithograph Cypher，`query` / `execute` 分别选择只读 / 读写连接，KG OS 不审查语句内容；Evolution 提供 State、Branch、History、Diff、Merge 的专用交互。
 
 托管语义检索由 Lithograph 执行。KG OS 把全局 embedding / Provider cache 默认配置和 Ontology 的文本字段声明编译成 Semantic Index；调用方传普通查询字符串。KG OS 不生成内部向量 Property，不在保存或合并正文时调用模型，也不实现 text→Vector cache。OpenAI-compatible Provider 可以按 versioned `providerConfig.cache` 使用独立 SQLite cache database；默认路径位于 `$KG_HOME/cache/`，与 `kgos.db` 隔离。配置只支持可选 `api_key_env`，实际凭证不进入索引历史。
 
@@ -41,9 +41,11 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 **Phase 01 已完成。** Runtime & Lithograph Host 实现提交 `f7f679e0601c7ecd16f5409f58c9c3483796948f` 已推送到 `main`，本地完整 validation / fresh-source validation 与 Ubuntu 24.04 x64 GitHub Actions run `35687991251` 均成功；P1-01–P1-10 和 Phase Review 已闭环。
 
-首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。Knowledge Base bootstrap、Ontology / Object 模型修改、批量 Patch、Graph 公共 HTTP/API、Bearer middleware 与 daemon control/client lifecycle、Merge 和正式 client surface仍需后续 Phase实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
+**Phase 02 Ontology 已完成开发计划并处于 `ready`。** 本阶段将实现 Knowledge Base bootstrap、KG OS Internal Graph / Binding、完整 Ontology read/edit/Patch、Schema/Constraint/Index compiler，以及正式 authenticated `kg ontology` CLI。完成后调用方可以定义和维护自己的 Domain / Node / Relationship / Property / Constraint / Index 数据模型，但普通 Knowledge 数据 CRUD、Graph、Evolution、SDK/Web/Skill 和 daemon control仍未实现。
 
-相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go runtime](docs/design/decisions.md#d65-go-runtime)和 [D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
+首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
+
+相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、[D67 Ontology Index profile](docs/design/decisions.md#d67-ontology-index-profile)和 [D68 reserved Ontology Schema](docs/design/decisions.md#d68-reserved-ontology-schema)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
 ## License
 
@@ -64,5 +66,6 @@ KG OS 采用双许可模式：
 - [开发计划](docs/development/README.md)：开发路线、阶段状态、共同完成条件与阶段入口。
 - [Phase 00 计划](docs/development/phases/00-engineering-foundation.md)：工程基础的范围、Feature、验收项、Review 和证据。
 - [Phase 01 计划](docs/development/phases/01-runtime-lithograph-host.md)：本地 Runtime / Lithograph Host 的范围、Feature、验收与当前状态。
+- [Phase 02 计划](docs/development/phases/02-ontology.md)：Knowledge Base bootstrap 与完整 Ontology 能力的范围、Feature、验收和 Review。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

@@ -34,7 +34,7 @@ FULLTEXT_ANALYZER_UNAVAILABLE
 EMBEDDING_CONFIG_ERROR
 ```
 
-Lithograph `VERSION_NOT_FOUND` 在 KG OS 公共语义中映射为 `STATE_NOT_FOUND`；Object Patch 的 `tx_begin(expectedHead=baseState)` mismatch 或 no-op strict-head check mismatch 映射为 `STALE_BASE_STATE`；Git hunk 无法精确应用到 `baseState` 重新生成的 canonical YAML 时返回 `PATCH_BASE_MISMATCH`，不能 fuzzy/offset apply，也不能误报为 Branch stale；高层 Ontology / Object / Evolution 的 Binding coverage、reserved internal graph/schema 等 KG OS invariants 失败映射为 `CONSISTENCY_ERROR`；Graph 不以这项检查拦截底层执行。HTTP status 与 SDK exception class 仍属于各 adapter mapping；CLI 的 stdout/stderr 与 coarse exit-code mapping 由 [CLI](cli.md#error-与-exit-code) 冻结，但都不能改变上述稳定 error `code`。
+Lithograph explicit-transaction begin options 中 `expectedHead=baseState` 的 mismatch，或 no-op strict-head check mismatch，在 KG OS 公共语义中映射为 `STALE_BASE_STATE`；Lithograph `VERSION_NOT_FOUND` 映射为 `STATE_NOT_FOUND`。Git hunk 无法精确应用到 `baseState` 重新生成的 canonical YAML 时返回 `PATCH_BASE_MISMATCH`，不能 fuzzy/offset apply，也不能误报为 Branch stale；高层 Ontology / Object / Evolution 的 Binding coverage、reserved internal graph/schema 等 KG OS invariants 失败映射为 `CONSISTENCY_ERROR`；Graph 不以这项检查拦截底层执行。HTTP status 与 SDK exception class 仍属于各 adapter mapping；CLI 的 stdout/stderr 与 coarse exit-code mapping 由 [CLI](cli.md#error-与-exit-code) 冻结，但都不能改变上述稳定 error `code`。
 
 `AUTHENTICATION_FAILED` 是 `kgosd` single-token authentication 的唯一失败类别：HTTP API/control request 缺少 Bearer credential、header malformed、token 为空或 token 与 `$KG_HOME/auth.json` 不匹配都返回同一 code；HTTP adapter 使用 `401 Unauthorized`，`message/details` 不区分“missing”与“wrong”也不回显任何 secret。CLI 在需要 active daemon 的命令 dispatch 前发现 `KG_TOKEN` 缺失/空时，同样使用该稳定 code 作为本地 pre-dispatch error，但按 CLI 合同返回 exit `2`；请求已发送而被 daemon 拒绝时返回 exit `1`。认证只判断是否持有实例 token，不建立 user/role/scope authorization。
 
@@ -57,7 +57,7 @@ Object Patch 的错误归类固定为：
 - Git Extended Diff / YAML **语法无法解析** → `PARSE_ERROR`；
 - Git form 语法合法但不在 KG OS v1 profile（combined diff、binary、copy、mode-only 等）→ `UNSUPPORTED_OPERATION`；
 - malformed / non-canonical Object Ref、StateRef、cursor、alias，unknown alias，duplicate `(kind, alias)`，或 request field 组合非法 → `INVALID_ARGUMENT`；
-- YAML 可解析但未知字段、字段类型、Lithograph tagged value 或 Object Value shape 不合法 → `TYPE_ERROR`；
+- YAML 可解析但未知字段、字段类型、Lithograph tagged value、重复 set-like member（如 `labels/includes/targets`）或 Object Value shape 不合法 → `TYPE_ERROR`；
 - exact hunk 与 regenerated base canonical YAML 不匹配 → `PATCH_BASE_MISMATCH`；
 - existing target 不存在 → `OBJECT_NOT_FOUND`；
 - duplicate Add target/name、共享资源显式 slot 冲突、explicit-vs-derived slot 冲突、rename target 与显式 `name` 不一致 → `OBJECT_CONFLICT`；
