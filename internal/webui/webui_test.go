@@ -1,14 +1,12 @@
 package webui
 
 import (
-	"context"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"testing/fstest"
-	"time"
 )
 
 func testFiles() fs.FS {
@@ -75,30 +73,22 @@ func TestShellHandlesFilesystemFailure(t *testing.T) {
 	}
 }
 
+func TestEmbeddedHandlerUsesBundledFilesystem(t *testing.T) {
+	t.Parallel()
+	handler, err := EmbeddedHandler()
+	if err != nil {
+		t.Fatalf("open embedded handler: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/status", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("reserved embedded API status = %d, want 404", response.Code)
+	}
+}
+
 type errorFS struct{}
 
 func (errorFS) Open(string) (fs.File, error) {
 	return nil, fs.ErrInvalid
-}
-
-func TestServePhase0StopsWithContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	var output strings.Builder
-	err := ServePhase0(ctx, "127.0.0.1", 0, &output)
-	if err != nil {
-		t.Fatalf("ServePhase0 returned error: %v", err)
-	}
-	if !strings.Contains(output.String(), "KG OS Phase 00 shell: http://127.0.0.1:") {
-		t.Fatalf("unexpected output: %q", output.String())
-	}
-}
-
-func TestServePhase0RejectsInvalidBind(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	if err := ServePhase0(ctx, "not a host", 0, &strings.Builder{}); err == nil {
-		t.Fatal("ServePhase0 accepted an invalid host")
-	}
 }

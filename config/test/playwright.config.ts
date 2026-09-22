@@ -26,7 +26,7 @@ export default defineConfig({
     trace: "retain-on-failure"
   },
   webServer: {
-    command: "artifacts/build/kgosd --phase0-shell --host 127.0.0.1 --port 4173",
+    command: "pnpm serve:e2e",
     cwd: repoRoot,
     reuseExistingServer: false,
     timeout: 30_000,

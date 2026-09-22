@@ -1,6 +1,6 @@
 # Phase 01：Runtime & Lithograph Host Foundation
 
-**状态：`ready`**
+**状态：`in_progress`**
 
 ## 1. 目标与范围
 
@@ -46,7 +46,7 @@ Phase 01 可以对新数据库执行 `lithograph_init()` 并验证 Root / `main`
 - application-facing execution **SQL-only**；
 - 完整结果：`lithograph()`；
 - true streaming：`lithograph_rows()` 的 `ordinal,event,data` / `columns -> row* -> summary`；
-- validation：`lithograph_validate()`；
+- validation：`lithograph_validate(query)`；
 - explicit transaction：`lithograph_tx_begin()` → 普通 `lithograph()` / `lithograph_rows()` → `lithograph_tx_commit()` / `lithograph_tx_abort()`；
 - **没有** `lithograph_tx_execute()`，**没有** application Native query ABI。
 
@@ -102,7 +102,7 @@ Phase 00 冻结的 Go SQLite host 在本 Phase必须证明：
 
 - 在 bootstrap connection真实执行 `lithograph_version()`；`databaseId/storageFormat.current`均为 null表示干净未初始化库，此时执行 `lithograph_init()`；已有库按 version结果验证兼容性。初始化/迁移完成后验证 Root / main，并冻结本次 startup的 databaseId/storage-format/Cypher profile baseline；close/reopen后再次验证。
 - 要求 v0.3.0、format 3、CY25 profile与当前 SQL function/virtual table capability；不探测 Native ABI。
-- 在已初始化 bootstrap connection验证 `lithograph()`、`lithograph_rows()`、`lithograph_validate()`、`lithograph_tx_begin/commit/abort`和当前 Full-text analyzer。
+- 在已初始化 bootstrap connection验证 `lithograph()`、`lithograph_rows()`、`lithograph_validate(query)`、`lithograph_tx_begin/commit/abort`和当前 Full-text analyzer。
 - Provider readiness只走公开 SQL local validation：在同一个已初始化 bootstrap write connection内 `tx_begin`，用随机 probe index/label/property执行 staged `db.index.semantic.createNodeIndex`和当前 `[embedding]` / `[cache]`编译结果，成功后 `tx_abort`；验证没有 Commit/Schema/Index/ref残留，且全程不触发 `embedBatch` / network。missing provider或 config validation failure使 startup失败。
 - bootstrap完成后才激活正常 read-write/read-only connection set。每个新物理 connection必须重新加载同一 artifacts、通过 host probe，并用 `lithograph_version()`证明 databaseId/storage-format/profile与 frozen baseline一致；每个 usable connection验证当前 Full-text analyzer。read-only connection不重复 staged Provider write probe。
 - `[cache]`不再调用 Lithograph maintenance procedure；验证 compiler / runtime能形成 OpenAI-compatible `providerConfig.cache` default、父目录安全可用，并覆盖 current `[cache]`只影响未来 create/replace、不改写既有 versioned config的边界。
@@ -151,16 +151,16 @@ lithograph_tx_begin(options)
 
 | ID | 验收场景 | 判定 | 当前状态 |
 | --- | --- | --- | --- |
-| P1-01 | Go SQLite Host | 真实 Go process / bundled CGO SQLite以 `sqlite_fts5` + loadable-extension profile加载 Lithograph v0.3.0，version/FTS5/explicit entrypoint/read-write/cancel符合 Design | 未验收 |
-| P1-02 | KG_HOME profile | 默认 / 显式 path、cache / extensions / logs / db目录职责与 profile隔离正确 | 未验收 |
-| P1-03 | Config / Auth | 当前config / default / cache path fail-closed；credential 原子创建/权限 / 复用 / secret hygiene通过 | 未验收 |
-| P1-04 | Extension Resolver | local/HTTPS/SHA/archive/redirect/content cache、required explicit entrypoint与攻击路径通过 | 未验收 |
-| P1-05 | Provisioning / Connection Activation | bootstrap RW connection先 init/verify并冻结 database baseline；之后才激活 read/write connections；每个 connection加载相同 artifacts、baseline/FTS probe一致，staged Provider readiness零 durable side effect | 未验收 |
-| P1-06 | Lithograph Capability / Reopen | uninitialized version→init、Root/main/reopen、v0.3.0 / format 3 / CY25 / SQL-only capability通过；无 Native / cache.configure假设 | 未验收 |
-| P1-07 | SQL Context / Stream / Cancel | query StateRef pin、execute checkout/no-branch-option、lithograph/rows true stream、read-only/write/external I/O/transaction subquery/context cancel/early-close通过；不冒充 HTTP surface验收 | 未验收 |
-| P1-08 | Explicit Transaction | single Commit、staged visibility、expectedHead、abort / failure / incomplete stream与misuse 通过 | 未验收 |
-| P1-09 | Lock / Shutdown / Fresh Regression | single owner、startup failure / shutdown cleanup、fresh setup / full validation通过 | 未验收 |
-| P1-10 | CI / Review Closure | 当前 Phase最终 SHA的 Ubuntu 24.04 x64 native CGO CI成功，本地 macOS arm64 native regression通过，finding / docs / final diff闭环 | 未验收 |
+| P1-01 | Go SQLite Host | 真实 Go process / bundled CGO SQLite以 `sqlite_fts5` + loadable-extension profile加载 Lithograph v0.3.0，version/FTS5/explicit entrypoint/read-write/cancel符合 Design | 本地通过 |
+| P1-02 | KG_HOME profile | 默认 / 显式 path、cache / extensions / logs / db目录职责与 profile隔离正确 | 本地通过 |
+| P1-03 | Config / Auth | 当前config / default / cache path fail-closed；credential 原子创建/权限 / 复用 / secret hygiene通过 | 本地通过 |
+| P1-04 | Extension Resolver | local/HTTPS/SHA/archive/redirect/content cache、required explicit entrypoint与攻击路径通过 | 本地通过 |
+| P1-05 | Provisioning / Connection Activation | bootstrap RW connection先 init/verify并冻结 database baseline；之后才激活 read/write connections；每个 connection加载相同 artifacts、baseline/FTS probe一致，staged Provider readiness零 durable side effect | 本地通过 |
+| P1-06 | Lithograph Capability / Reopen | uninitialized version→init、Root/main/reopen、v0.3.0 / format 3 / CY25 / SQL-only capability通过；无 Native / cache.configure假设 | 本地通过 |
+| P1-07 | SQL Context / Stream / Cancel | query StateRef pin、execute checkout/no-branch-option、lithograph/rows true stream、read-only/write/external I/O/transaction subquery/context cancel/early-close通过；不冒充 HTTP surface验收 | 本地通过 |
+| P1-08 | Explicit Transaction | single Commit、staged visibility、expectedHead、abort / failure / incomplete stream与misuse 通过 | 本地通过 |
+| P1-09 | Lock / Shutdown / Fresh Regression | single owner、startup failure / shutdown cleanup、fresh setup / full validation通过 | 本地通过 |
+| P1-10 | CI / Review Closure | 当前 Phase最终 SHA的 Ubuntu 24.04 x64 native CGO CI成功，本地 macOS arm64 native regression通过，finding / docs / final diff闭环 | 本地通过；远端待验收 |
 
 ## 6. 关键失败路径
 
@@ -210,4 +210,18 @@ P1-01–P1-10 全部取得真实证据、Phase 00 依赖已`done`、review findi
 
 2026-09-21 本计划更新时，仓库存在尚未提交的旧 Phase 01 TypeScript / `ffi-rs` / bundled SQLite / Lithograph v0.2.1实现尝试。它们解决的是D65 / D66 之前的旧合同，本计划不把它们视为当前实现或验收证据；本次用户只授权设计与开发计划维护，因此没有删除、重写或提交这些代码。后续实施Phase 00 / 01 时按当前设计最小化迁移并保留无关用户修改。
 
-2026-09-22 的新 Go Phase 00 实现已经删除上述旧 TypeScript / FFI / 自制 SQLite runtime 尝试；当前仓库只保留 Phase 00 的 test-only `go-sqlite3` + Lithograph v0.3.0 real-load probe。该 probe 只证明工程 build profile 与底层 release 可加载，不实现本 Phase 的 `KG_HOME`、extension resolver、正式 connection lifecycle、read/write execution 或 explicit transaction。Phase 00 已完成，且本计划的 Design Inputs、Feature 顺序与 Acceptance 已齐全，因此 Phase 01 当前为 `ready`。
+2026-09-22 当前未提交工作树已经实现本 Phase 的 `KG_HOME` / config / credential、content-addressed extension resolver、Go bundled SQLite connection lifecycle、Lithograph v0.3.0 provisioning / activation、SQL query / execute / true streaming / cancellation、Provider readiness与Provider-owned cache mapping、SQL explicit transaction、single-instance lock / shutdown，以及对应 unit / failure-path / real native integration tests。旧 Phase 00 `--phase0-shell` 启动参数、重复 Lithograph smoke和旧 TypeScript / FFI / 自制 SQLite runtime 路径已经从现行实现与开发入口清理；`internal/lithographtest`只保留 bundled SQLite build-profile 测试。
+
+本地 macOS arm64 已取得 P1-01–P1-09 证据；P1-10 的本地 review / validation 部分也已通过，但本 Phase完成条件仍要求**最终推送 SHA**的 Ubuntu 24.04 x64 native CGO CI成功。本次任务尚未执行 commit / push，因此 Phase 01保持 `in_progress`，不能标记 `done`。
+
+## 11. 当前本地验收证据
+
+2026-09-22 当前工作树已验证：
+
+- `pnpm check:quick`通过；
+- `pnpm validate`完整通过，包括 Go race、Go statement coverage **90.1%**、govulncheck、TypeScript/V8 coverage 100%、type coverage 100%、lint / spelling / secret / duplicate / unused / dedupe、build、Playwright E2E、真实 Lithograph v0.3.0 native regression、workspace-external package smoke、license、npm audit与diff gate；
+- 真实 native suite覆盖v0.3.0 / storage format 3 / `CY25-2026.08`、`lithograph_validate(query)`、buffered / true streaming、StateRef pin、Branch checkout、read-only/write boundary、Semantic Provider readiness与cache、context cancel、ordinary stream early-close rollback、transaction-subquery已 durable batch、explicit transaction single-Commit / staged visibility / pure-read / abort / fail-closed、Host shutdown与reopen；
+- 独立 `/tmp` fresh-source Git repo在不复用主工作树 `node_modules` / cache / build artifact的前提下完成 `pnpm run setup` 与完整 `pnpm validate`；
+- Go runtime/test-native依赖许可证门禁覆盖 `BurntSushi/toml`（MIT）、`go-sqlite3`（MIT）和 `golang.org/x/sys`（BSD-3-Clause）。
+
+最终 pushed revision 的 Ubuntu CI与对应 SHA证据尚未取得。

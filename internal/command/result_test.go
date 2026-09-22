@@ -45,16 +45,14 @@ func TestEvaluateKGOSD(t *testing.T) {
 		mode DaemonMode
 		code int
 	}{
-		{name: "default help", mode: DaemonModeResult},
+		{name: "run daemon", mode: DaemonModeRun},
 		{name: "help", args: []string{"--help"}, mode: DaemonModeResult},
 		{name: "version", args: []string{"--version"}, mode: DaemonModeResult},
-		{name: "shell", args: []string{"--phase0-shell"}, mode: DaemonModePhase0Shell},
-		{name: "ephemeral shell", args: []string{"--phase0-shell", "--port", "0"}, mode: DaemonModePhase0Shell},
-		{name: "missing shell mode", args: []string{"--port", "0"}, mode: DaemonModeResult, code: 2},
+		{name: "old phase0 shell rejected", args: []string{"--phase0-shell"}, mode: DaemonModeResult, code: 2},
+		{name: "old host override rejected", args: []string{"--host", "127.0.0.1"}, mode: DaemonModeResult, code: 2},
+		{name: "old port override rejected", args: []string{"--port", "4173"}, mode: DaemonModeResult, code: 2},
 		{name: "unknown flag", args: []string{"--unknown"}, mode: DaemonModeResult, code: 2},
-		{name: "positional", args: []string{"--phase0-shell", "extra"}, mode: DaemonModeResult, code: 2},
-		{name: "empty host", args: []string{"--phase0-shell", "--host", ""}, mode: DaemonModeResult, code: 2},
-		{name: "invalid port", args: []string{"--phase0-shell", "--port", "70000"}, mode: DaemonModeResult, code: 2},
+		{name: "positional", args: []string{"extra"}, mode: DaemonModeResult, code: 2},
 	} {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
@@ -67,10 +65,5 @@ func TestEvaluateKGOSD(t *testing.T) {
 				t.Fatalf("exit code = %d, want %d", result.Result.ExitCode, test.code)
 			}
 		})
-	}
-
-	shell := EvaluateKGOSD([]string{"--phase0-shell", "--host", "127.0.0.1", "--port", "4173"})
-	if shell.Host != "127.0.0.1" || shell.Port != 4173 {
-		t.Fatalf("unexpected shell bind: %#v", shell)
 	}
 }

@@ -39,6 +39,7 @@
     "format": "node scripts/go-task.mjs format && prettier --write . --ignore-unknown",
     "lint": "node scripts/tasks.mjs lint",
     "pack:release": "pnpm build && node scripts/pack-release.mjs --output artifacts/release",
+    "serve:e2e": "node scripts/serve-built-runtime.mjs --port 4173",
     "setup": "node scripts/setup.mjs",
     "test": "vitest run --config config/test/vitest.config.ts",
     "test:coverage": "vitest run --coverage --config config/test/vitest.config.ts",

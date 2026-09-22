@@ -48,4 +48,4 @@ await run("pnpm", ["exec", "playwright", "install", "--only-shell", "chromium"],
 });
 await run("node", ["scripts/prepare-lithograph.mjs"], { cwd: root });
 
-process.stdout.write("KG OS Phase 00 development environment is ready.\n");
+process.stdout.write("KG OS development environment is ready.\n");

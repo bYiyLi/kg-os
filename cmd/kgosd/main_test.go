@@ -1,51 +1,52 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
 )
 
-func TestRunResultModes(t *testing.T) {
-	t.Parallel()
-	for _, args := range [][]string{{"--help"}, {"--version"}, {"unsupported"}} {
-		var stdout strings.Builder
-		var stderr strings.Builder
-		code := run(context.Background(), args, &stdout, &stderr)
-		if args[0] == "unsupported" {
-			if code != 2 || stderr.Len() == 0 {
-				t.Fatalf("unsupported result = %d, %q", code, stderr.String())
+func TestRunMetadataModes(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantCode   int
+		wantStdout string
+		wantStderr string
+	}{
+		{name: "help", args: []string{"--help"}, wantStdout: "KG OS daemon"},
+		{name: "version", args: []string{"--version"}, wantStdout: "0.0.0"},
+		{name: "unsupported", args: []string{"--phase0-shell"}, wantCode: 2, wantStderr: "unsupported"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			code := run(context.Background(), test.args, &stdout, &stderr)
+			if code != test.wantCode {
+				t.Fatalf("exit code = %d, want %d", code, test.wantCode)
 			}
-			continue
-		}
-		if code != 0 || stdout.Len() == 0 {
-			t.Fatalf("result for %v = %d, %q", args, code, stdout.String())
-		}
+			if test.wantStdout != "" && !strings.Contains(stdout.String(), test.wantStdout) {
+				t.Fatalf("stdout = %q", stdout.String())
+			}
+			if test.wantStderr != "" && !strings.Contains(stderr.String(), test.wantStderr) {
+				t.Fatalf("stderr = %q", stderr.String())
+			}
+		})
 	}
 }
 
-func TestRunPhase0ShellStops(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	var stdout strings.Builder
-	var stderr strings.Builder
-	code := run(ctx, []string{"--phase0-shell", "--port", "0"}, &stdout, &stderr)
-	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "Phase 00 shell") {
-		t.Fatalf("run = code %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+func TestRunReportsRuntimeStartupFailure(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("KG_HOME", home)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run(context.Background(), nil, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
 	}
-}
-
-func TestRunPhase0ShellReportsBindFailure(t *testing.T) {
-	t.Parallel()
-	var stdout strings.Builder
-	var stderr strings.Builder
-	code := run(
-		context.Background(),
-		[]string{"--phase0-shell", "--host", "not a host", "--port", "0"},
-		&stdout,
-		&stderr,
-	)
-	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "listen for Phase 00 shell") {
-		t.Fatalf("run = code %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	if !strings.Contains(stderr.String(), "config.toml") {
+		t.Fatalf("stderr = %q", stderr.String())
 	}
 }

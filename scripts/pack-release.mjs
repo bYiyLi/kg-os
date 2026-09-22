@@ -1,10 +1,12 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { runCapture } from "./process.mjs";
+import { prepareRuntimeProfile } from "./runtime-profile.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const outputIndex = process.argv.indexOf("--output");
@@ -84,6 +86,24 @@ async function stop(child) {
   await new Promise((resolveExit) => child.once("exit", resolveExit));
 }
 
+async function freeLoopbackPort() {
+  const server = createServer();
+  await new Promise((resolveListen, rejectListen) => {
+    server.once("error", rejectListen);
+    server.listen(0, "127.0.0.1", resolveListen);
+  });
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    server.close();
+    throw new Error("failed to allocate a loopback port for kgosd smoke");
+  }
+  const port = address.port;
+  await new Promise((resolveClose, rejectClose) => {
+    server.close((error) => (error === undefined ? resolveClose() : rejectClose(error)));
+  });
+  return port;
+}
+
 async function verifyWorkspaceExternalArtifact() {
   await copyBinaries(smokeDirectory);
   const kg = resolve(smokeDirectory, "kg" + suffix);
@@ -94,9 +114,17 @@ async function verifyWorkspaceExternalArtifact() {
     throw new Error("built kg/kgosd returned the wrong version");
   }
 
-  const child = spawn(daemon, ["--phase0-shell", "--host", "127.0.0.1", "--port", "0"], {
+  const home = resolve(smokeDirectory, "home");
+  const port = await freeLoopbackPort();
+  await prepareRuntimeProfile({
+    root,
+    home,
+    host: "127.0.0.1",
+    port
+  });
+  const child = spawn(daemon, [], {
     cwd: smokeDirectory,
-    env: { ...process.env, KG_HOME: resolve(smokeDirectory, "home") },
+    env: { ...process.env, KG_HOME: home },
     stdio: ["ignore", "pipe", "pipe"]
   });
   try {
@@ -116,7 +144,7 @@ async function verifyWorkspaceExternalArtifact() {
     }
     const api = await fetch(origin + "/api/status");
     if (api.status !== 404) {
-      throw new Error("Phase 00 artifact exposed an unexpected API readiness path");
+      throw new Error("Phase 01 artifact exposed an unexpected business API path");
     }
   } finally {
     await stop(child);

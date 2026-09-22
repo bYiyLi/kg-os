@@ -108,6 +108,7 @@
     "GOROOT",
     "GOTOOLCHAIN",
     "lithographtest",
+    "runtimeprofile",
     "webui"
   ]
 }

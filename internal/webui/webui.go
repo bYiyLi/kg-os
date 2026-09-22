@@ -1,18 +1,15 @@
 package webui
 
 import (
-	"context"
 	"embed"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"mime"
-	"net"
 	"net/http"
 	"path"
 	"strings"
-	"time"
 )
 
 //go:embed all:dist
@@ -116,46 +113,4 @@ func writeText(response http.ResponseWriter, status int, text string) {
 	response.Header().Set("X-Content-Type-Options", "nosniff")
 	response.WriteHeader(status)
 	_, _ = io.WriteString(response, text)
-}
-
-func ServePhase0(ctx context.Context, host string, port int, output io.Writer) error {
-	handler, err := EmbeddedHandler()
-	if err != nil {
-		return err
-	}
-	listener, err := net.Listen("tcp4", fmt.Sprintf("%s:%d", host, port))
-	if err != nil {
-		return fmt.Errorf("listen for Phase 00 shell: %w", err)
-	}
-
-	server := &http.Server{
-		Handler:           handler,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-	serverErrors := make(chan error, 1)
-	go func() {
-		serverErrors <- server.Serve(listener)
-	}()
-
-	address := listener.Addr().(*net.TCPAddr)
-	_, _ = fmt.Fprintf(output, "KG OS Phase 00 shell: http://%s:%d\n", host, address.Port)
-
-	select {
-	case err := <-serverErrors:
-		if errors.Is(err, http.ErrServerClosed) {
-			return nil
-		}
-		return fmt.Errorf("serve Phase 00 shell: %w", err)
-	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			return fmt.Errorf("stop Phase 00 shell: %w", err)
-		}
-		err := <-serverErrors
-		if !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("serve Phase 00 shell: %w", err)
-		}
-		return nil
-	}
 }

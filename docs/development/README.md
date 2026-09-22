@@ -53,9 +53,9 @@ Feature 是实现单元，Phase 是默认交付与验收单元。Feature 完成�
 
 2026-09-19 的 TypeScript / Node.js Phase 00 曾真实完成：本地 gates 与提交 `20d73cd` 对应的 Ubuntu 24.04 GitHub Actions run `35454190185` 成功。该证据完整保留在 [Phase 00](phases/00-engineering-foundation.md) 的历史章节，但只证明被 D65 supersede 的旧工程基线。
 
-**Phase 01 当前为 `ready`。** Phase 00 前置依赖已经达到 `done`；Phase 01 的 Design Inputs、Feature 顺序与 Acceptance 已齐全，可以开始实现。当前计划为 Go bundled SQLite host + Lithograph v0.3.0 / format 3 / SQL-only execution、确定的 query/execute context映射、`lithograph_rows()` true streaming/context cancellation、Provider-owned cache与新的 explicit transaction lifecycle。
+**Phase 01 当前为 `in_progress`。** Phase 00 前置依赖已经达到 `done`；当前工作树已经实现 `KG_HOME` / config / credential、extension resolver、Go bundled SQLite + Lithograph v0.3.0 host、query/execute context、`lithograph_rows()` true streaming/context cancellation、Provider readiness/cache mapping、SQL explicit transaction、single-instance lock 与 shutdown lifecycle。P1-01–P1-09 已取得本地证据，P1-10 的本地 validation / review 也已通过；尚缺当前 Phase **最终推送 SHA** 的 Ubuntu 24.04 x64 native CGO CI，因此不能标记 `done`。业务 API / Knowledge Base bootstrap 仍不属于本 Phase。
 
-旧 Phase 01 TypeScript / `ffi-rs` / 自制 SQLite runtime / v0.2.x 实现尝试已经从当前工程基线清理；Phase 00 只保留 test-only 的真实 Lithograph v0.3.0 load smoke。正式 bundled SQLite connection lifecycle、Runtime host、transaction adapter 与业务数据库接入仍由 Phase 01 拥有，不能由 Phase 00 smoke 推导为已经实现。
+旧 Phase 01 TypeScript / `ffi-rs` / 自制 SQLite runtime / v0.2.x 实现尝试已经从当前工程基线清理；原 Phase 00 重复 Lithograph execution smoke也已在 Phase 01实现时删除，`internal/lithographtest`只保留 bundled SQLite build-profile测试。正式 bundled SQLite connection lifecycle、Runtime host与transaction adapter现在由 Phase 01当前工作树实现；业务数据库语义与Knowledge Base bootstrap仍由后续 Phase拥有。
 
 KG OS 业务能力仍未实现。Knowledge Base bootstrap、Ontology / Object / Graph / Evolution 与正式 client surface继续以设计文档为行为真源。
 
@@ -64,7 +64,7 @@ KG OS 业务能力仍未实现。Knowledge Base bootstrap、Ontology / Object / 
 | Phase | 状态 | 交付结果 | 主要输入 |
 | --- | --- | --- | --- |
 | [00 Engineering Foundation](phases/00-engineering-foundation.md) | `done` | Go 1.27.1 daemon/kernel/CLI + TypeScript SDK/Web workspace、pinned Go quality tools、bundled CGO/SQLite+FTS5 baseline、90% coverage/race/security gates、真实 v0.3.0 smoke、macOS arm64 + Ubuntu 24.04 x64 native证据 | [D65](../design/decisions.md#d65-go-runtime)、[D66](../design/decisions.md#d66-lithograph-v030-sql-only) |
-| [01 Runtime & Lithograph Host Foundation](phases/01-runtime-lithograph-host.md) | `ready` | `KG_HOME`、config/credential、extension resolver、Go read/write SQLite host、v0.3.0 SQL execution/stream/cancel、explicit tx、runtime ownership | [Runtime](../design/runtime.md)、[Go 数据库接入](../design/implementation.md#go-运行时与数据库接入) |
+| [01 Runtime & Lithograph Host Foundation](phases/01-runtime-lithograph-host.md) | `in_progress` | `KG_HOME`、config/credential、extension resolver、Go read/write SQLite host、v0.3.0 SQL execution/stream/cancel、explicit tx、runtime ownership | [Runtime](../design/runtime.md)、[Go 数据库接入](../design/implementation.md#go-运行时与数据库接入) |
 
 当前实现依赖顺序：
 

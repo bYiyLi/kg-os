@@ -9,6 +9,8 @@ import (
 	"syscall"
 
 	"github.com/bYiyLi/kg-os/internal/command"
+	"github.com/bYiyLi/kg-os/internal/daemon"
+	runtimehost "github.com/bYiyLi/kg-os/internal/runtime"
 	"github.com/bYiyLi/kg-os/internal/webui"
 )
 
@@ -19,7 +21,22 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		_, _ = io.WriteString(stderr, evaluation.Result.Stderr)
 		return evaluation.Result.ExitCode
 	}
-	if err := webui.ServePhase0(ctx, evaluation.Host, evaluation.Port, stdout); err != nil {
+	runtime, err := runtimehost.Open(ctx, os.Getenv("KG_HOME"), nil)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "kgosd: %v\n", err)
+		return 1
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			_, _ = fmt.Fprintf(stderr, "kgosd: %v\n", err)
+		}
+	}()
+	handler, err := webui.EmbeddedHandler()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "kgosd: %v\n", err)
+		return 1
+	}
+	if err := daemon.Serve(ctx, runtime, handler, stdout); err != nil {
 		_, _ = fmt.Fprintf(stderr, "kgosd: %v\n", err)
 		return 1
 	}

@@ -7,8 +7,9 @@
       "request": "launch",
       "mode": "debug",
       "program": "${workspaceFolder}/cmd/kgosd",
-      "args": ["--phase0-shell", "--host", "127.0.0.1", "--port", "4765"],
+      "args": [],
       "cwd": "${workspaceFolder}",
+      "preLaunchTask": "KG OS: prepare runtime",
       "buildFlags": "-tags=sqlite_fts5",
       "env": {
         "CGO_ENABLED": "1",

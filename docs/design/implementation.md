@@ -169,7 +169,7 @@ Web 还需细化页面布局、导航与具体操作交互，状态由 [Runtime]
 
 ## 参考证据
 
-2026-09-21 重新核对 Lithograph 当前 `main` / v0.3.0：application-facing execution 已收敛为 `lithograph()` / `lithograph_rows()` / `lithograph_validate()` 与 SQL explicit-transaction lifecycle，Native query ABI和Core text→Vector cache已删除；OpenAI-compatible Provider cache使用独立 SQLite database。Lithograph Phase 15 / v0.3.0已有自身发布证据，但这只证明底层产品已交付，**不证明 KG OS Go adapter 已完成**；本文件的 Go driver、stream/cancel、read-only main + Provider cache仍需 KG OS Phase00/01真实验收。
+2026-09-21 重新核对 Lithograph 当前 `main` / v0.3.0：application-facing execution 已收敛为 `lithograph()` / `lithograph_rows()` / `lithograph_validate(query)` 与 SQL explicit-transaction lifecycle，Native query ABI和Core text→Vector cache已删除；OpenAI-compatible Provider cache使用独立 SQLite database。Lithograph Phase 15 / v0.3.0已有自身发布证据，但这只证明底层产品已交付；KG OS Go adapter 是否完成由对应 Phase 的真实验收证据决定，不能由底层发布状态推导。
 
 公开语言参考（2026-09-15 核对；Lithograph 冻结 profile 而非未来网页变化决定实际支持范围）：[Constraints](https://neo4j.com/docs/cypher-manual/current/schema/constraints/)、[Full-text indexes](https://neo4j.com/docs/cypher-manual/current/indexes/semantic-indexes/full-text-indexes/)、[Vector indexes](https://neo4j.com/docs/cypher-manual/current/indexes/semantic-indexes/vector-indexes/)。研究证据不覆盖 ontology.md 的上层产品决定。
 

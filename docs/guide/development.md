@@ -1,6 +1,6 @@
 # 本地开发 KG OS
 
-本文帮助 KG OS 开发者完成本地安装、开发启动、调试、检查、测试、构建和本地候选交付物验证。阶段顺序与完成状态见[开发计划](../development/README.md)，Phase 00 的范围和验收见[阶段计划](../development/phases/00-engineering-foundation.md)；产品与运行时边界仍以[设计入口](../design.md)为准。
+本文帮助 KG OS 开发者完成本地安装、开发启动、调试、检查、测试、构建和本地候选交付物验证。阶段顺序与完成状态见[开发计划](../development/README.md)，工程基线见 [Phase 00](../development/phases/00-engineering-foundation.md)，当前 Runtime / Lithograph Host 见 [Phase 01](../development/phases/01-runtime-lithograph-host.md)；产品与运行时边界仍以[设计入口](../design.md)为准。
 
 ## 当前边界
 
@@ -19,7 +19,7 @@ TypeScript
 
 `kgosd`、Kernel 与 `kg` CLI 不再使用旧 TypeScript 实现。产品运行时不依赖 Node.js；Node/pnpm 只用于 SDK、Web 和仓库工程工具。
 
-Phase 00 只提供工程壳层：`kg` / `kgosd` 支持帮助和版本入口，`kgosd --phase0-shell` 只用于验证内嵌 Web 的工程链路。Knowledge Base bootstrap、认证、正式 daemon lifecycle、Ontology / Object / Graph / Evolution 与正式业务 API 属于后续 Phase。当前 `/api/*` 与 `/control/*` 不会被 Phase 00 Web 壳层伪装成可用业务接口。
+Phase 01 已把 `kgosd` 从工程壳层推进为真实本地 Runtime / Lithograph Host：启动时读取唯一 `KG_HOME` profile，解析 `config.toml` / `auth.json`、取得 single-instance lock、解析 SQLite extensions、打开 `kgos.db` 并验证 Lithograph v0.3.0 SQL capability。Knowledge Base bootstrap、Ontology / Object / Graph / Evolution 与正式业务 API 仍属于后续 Phase；当前 `/api/*` 与 `/control/*` 继续返回 404，不会用 mock readiness 冒充业务能力。
 
 ## 工程目录
 
@@ -31,8 +31,12 @@ cmd/
 internal/
 ├── buildinfo/
 ├── command/
+├── daemon/
 ├── kernel/
+├── lithograph/
 ├── lithographtest/
+├── runtime/
+├── runtimeprofile/
 └── webui/
 
 packages/
@@ -40,7 +44,7 @@ packages/
 └── web/
 ```
 
-`internal/lithographtest` 只承载 Phase 00 的 SQLite/Lithograph 测试探针，不是正式 Runtime adapter。正式 connection lifecycle、extension resolver、`KG_HOME` runtime、transaction adapter 与数据库 host 由 Phase 01 实现。
+`internal/lithograph` 是正式 Lithograph SQL host / execution / explicit-transaction adapter，`internal/runtimeprofile` 负责 `KG_HOME`、config、credential、lock 与 extension resolver，`internal/runtime` 组合 profile 与 database host，`internal/daemon` 拥有 HTTP listener lifecycle。`internal/lithographtest` 只保留 bundled SQLite build-profile 测试，不是第二套数据库 adapter。
 
 ## 工具链
 
@@ -94,12 +98,12 @@ pnpm dev
 
 开发入口同时启动：
 
-- Go Phase 00 shell：`http://127.0.0.1:4765`
+- Go Phase 01 runtime：`http://127.0.0.1:4765`
 - Vite/React HMR：`http://127.0.0.1:5173`
 
-浏览器开发时访问 `5173`。Vite 把 `/api` 与 `/control` 代理到 Go 进程；Phase 00 未实现的接口当前返回 404。
+浏览器开发时访问 `5173`。Vite 把 `/api` 与 `/control` 代理到 Go 进程；尚未进入后续业务 Phase 的接口当前返回 404。
 
-`pnpm dev` 强制把 `KG_HOME` 指向仓库内已忽略的 `.kgos-dev/`，不污染默认 `~/.kgosd`。Web 源码修改由 Vite HMR 处理；Go 源码修改后重新启动 `pnpm dev`。Ctrl-C/SIGTERM 会联动停止 Go 与 Vite 子进程，正常退出后不应保留 `4765` / `5173` listener。
+`pnpm dev` 强制把 `KG_HOME` 指向仓库内已忽略的 `.kgos-dev/`，先用真实 Lithograph v0.3.0 fixture 生成 Phase 01 `config.toml`，再启动无额外兼容参数的 `kgosd`，因此不污染默认 `~/.kgosd`。Web 源码修改由 Vite HMR 处理；Go 源码修改后重新启动 `pnpm dev`。Ctrl-C/SIGTERM 会联动停止 Go 与 Vite 子进程，正常退出后不应保留 `4765` / `5173` listener。
 
 Vite 只是开发工具，不改变产品边界：生产/本地正式交付仍只有一个 `kgosd`，Web 静态产物直接嵌入 Go binary。
 
@@ -107,7 +111,7 @@ Vite 只是开发工具，不改变产品边界：生产/本地正式交付仍�
 
 [`.vscode/launch.json`](../../.vscode/launch.json)提供：
 
-- `KG OS daemon (Go)`：以 `sqlite_fts5` build tag 启动 Phase 00 Go shell，并使用 `.kgos-dev`；
+- `KG OS daemon (Go)`：先运行 `KG OS: prepare runtime` 生成 `.kgos-dev/config.toml`，再以 `sqlite_fts5` build tag、无旧兼容参数启动 Phase 01 daemon；
 - `KG OS CLI (Go)`：以 `--help` 启动 Go CLI；
 - `KG OS Web`：打开 Vite `5173` 页面调试浏览器代码。
 
@@ -133,7 +137,7 @@ VS Code 推荐安装 Go、ESLint、Prettier 与 CSpell 扩展。
 
 `coverage/`、`playwright-report/`、`test-results/` 与 `artifacts/` 都是生成物，不提交 Git。
 
-Secret scan 由 `scripts/check-secrets.mjs` 先确认 Secretlint 配置可读，再执行扫描；配置缺失不能静默通过。npm production license gate 实际扫描 Web workspace 的 React/ReactDOM 依赖，Go license gate 单独覆盖 `go-sqlite3`。
+Secret scan 由 `scripts/check-secrets.mjs` 先确认 Secretlint 配置可读，再执行扫描；配置缺失不能静默通过。npm production license gate 实际扫描 Web workspace 的 React/ReactDOM 依赖；Go runtime/test-native license gate固定审查 `BurntSushi/toml`（MIT）、`go-sqlite3`（MIT）与 `golang.org/x/sys`（BSD-3-Clause）及其 pinned version。
 
 ## Lithograph v0.3.0 fixture
 
@@ -146,9 +150,7 @@ sqlite3_lithograph_init
 sqlite3_lithographopenaicompatible_init
 ```
 
-smoke 验证 SQLite >= 3.45、FTS5、Lithograph `0.3.0` / `CY25-2026.08` / storage format 3、`lithograph()`、`lithograph_rows()` 的 `columns -> row -> summary` 流，以及 `context.Context` 对真实 `lithograph_rows()` 长执行的取消。
-
-这是 **test-only** integration evidence，不代表 Phase 01 的正式 Runtime host、connection pool、extension resolver 或 transaction lifecycle 已实现。
+native suite 真实覆盖 SQLite >= 3.45、FTS5、Lithograph `0.3.0` / `CY25-2026.08` / storage format 3、`lithograph_validate(query)`、`lithograph()`、`lithograph_rows()`、query/execute context、Semantic Provider readiness/cache、explicit transaction、context cancellation、early-close rollback、shutdown cleanup 与 reopen。它与普通 unit/failure-path tests共同组成 Phase 01 的本地数据库集成证据；最终 Phase 状态仍以 Phase Acceptance 和要求的远端 CI 为准。
 
 ## 构建与本地候选交付物
 

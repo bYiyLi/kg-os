@@ -35,11 +35,11 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 ## 当前状态
 
-**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；业务能力仍未实现。** 当前工作树已经建立新的 Go Phase 00 工程基线并清理旧 TypeScript daemon/kernel/CLI、`ffi-rs` SQLite host 与旧 v0.2.x runtime 尝试；Go/TypeScript/Web、本地 macOS arm64 的真实 Lithograph v0.3.0 smoke、质量门禁和 native artifact 已取得本地证据。
+**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；业务能力仍未实现。** Phase 00 工程基线已经完成；当前 Phase 01 工作树进一步实现了 `KG_HOME` / config / credential、SQLite Extension resolver、正式 Go/Lithograph Host、SQL query / execute / true streaming / cancellation、Semantic Provider readiness/cache mapping、explicit transaction、single-instance lock 与 daemon shutdown lifecycle，并清理旧 TypeScript daemon/kernel/CLI、`ffi-rs` SQLite host、旧 v0.2.x runtime 与 Phase 00 shell 启动路径。当前 macOS arm64 本地完整 validation 与 fresh-source validation已通过，Phase 01仍等待最终推送 revision 的 Ubuntu 24.04 x64 CI。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
-首版语义索引只支持单字段；Cypher 原样执行、`lithograph_rows()` true streaming、SQL-only execution 与 Provider-owned cache 的设计已记录。模型修改、批量 Patch、Merge 与新的 Go/Lithograph 接入仍需实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
+首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已在 Phase 01 当前工作树实现并完成本地验收。Knowledge Base bootstrap、Ontology / Object 模型修改、批量 Patch、Graph业务接口、Merge 与正式 client surface仍需后续 Phase实现和验证；Web 具体页面交互尚未细化，不阻塞核心实现。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
 相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go runtime](docs/design/decisions.md#d65-go-runtime)和 [D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
@@ -61,5 +61,6 @@ KG OS 采用双许可模式：
 - [设计](docs/design.md)：设计总入口与职责导航；详细规则按职责位于 `docs/design/`。
 - [开发计划](docs/development/README.md)：开发路线、阶段状态、共同完成条件与阶段入口。
 - [Phase 00 计划](docs/development/phases/00-engineering-foundation.md)：工程基础的范围、Feature、验收项、Review 和证据。
+- [Phase 01 计划](docs/development/phases/01-runtime-lithograph-host.md)：本地 Runtime / Lithograph Host 的范围、Feature、验收与当前状态。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

@@ -1,6 +1,7 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
+import { currentLithographArtifact } from "./lithograph-artifacts.mjs";
 import { run, runCapture } from "./process.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -11,6 +12,17 @@ const goEnv = {
   GOTOOLCHAIN: "go1.27.1"
 };
 const sqliteTags = "sqlite_fts5";
+const nativeTags = "sqlite_fts5,lithograph_smoke";
+
+async function nativeEnvironment() {
+  await run("node", ["scripts/prepare-lithograph.mjs"], { cwd: root, env: goEnv });
+  const artifact = currentLithographArtifact(root);
+  return {
+    ...goEnv,
+    KGOS_LITHOGRAPH_LIBRARY: resolve(artifact.cacheDirectory, artifact.library),
+    KGOS_LITHOGRAPH_PROVIDER_LIBRARY: resolve(artifact.cacheDirectory, artifact.providerLibrary)
+  };
+}
 
 async function requireGo1271() {
   const result = await runCapture("go", ["version"], { cwd: root, env: goEnv });
@@ -77,19 +89,20 @@ async function test(extraArguments = []) {
 
 async function coverage() {
   await requireGo1271();
+  const env = await nativeEnvironment();
   await mkdir(resolve(root, "coverage"), { recursive: true });
   await run(
     "go",
     [
       "test",
-      "-tags=" + sqliteTags,
+      "-tags=" + nativeTags,
       "-count=1",
       "-coverpkg=./...",
       "-covermode=atomic",
       "-coverprofile=coverage/go.out",
       "./..."
     ],
-    { cwd: root, env: goEnv }
+    { cwd: root, env }
   );
   const result = await runCapture("go", ["tool", "cover", "-func=coverage/go.out"], {
     cwd: root,
@@ -100,6 +113,15 @@ async function coverage() {
   if (match === null || Number(match[1]) < 90) {
     throw new Error("Go statement coverage must remain at or above 90%");
   }
+}
+
+async function race() {
+  await requireGo1271();
+  const env = await nativeEnvironment();
+  await run("go", ["test", "-tags=" + nativeTags, "-count=1", "-race", "./..."], {
+    cwd: root,
+    env
+  });
 }
 
 async function security() {
@@ -126,7 +148,7 @@ switch (task) {
     await gofmt(true);
     break;
   case "race":
-    await test(["-race"]);
+    await race();
     break;
   case "security":
     await security();

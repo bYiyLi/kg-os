@@ -2,9 +2,17 @@ import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { prepareRuntimeProfile } from "./runtime-profile.mjs";
+
 const root = resolve(import.meta.dirname, "..");
 const kgHome = resolve(root, ".kgos-dev");
 await mkdir(kgHome, { recursive: true });
+await prepareRuntimeProfile({
+  root,
+  home: kgHome,
+  host: "127.0.0.1",
+  port: 4765
+});
 
 const env = {
   ...process.env,
@@ -27,16 +35,7 @@ function start(label, command, args) {
 }
 
 const children = [
-  start("Go daemon", "go", [
-    "run",
-    "-tags=sqlite_fts5",
-    "./cmd/kgosd",
-    "--phase0-shell",
-    "--host",
-    "127.0.0.1",
-    "--port",
-    "4765"
-  ]),
+  start("Go daemon", "go", ["run", "-tags=sqlite_fts5", "./cmd/kgosd"]),
   start("Vite", "pnpm", [
     "--filter",
     "@kgos/web",
@@ -50,7 +49,7 @@ const children = [
   ])
 ];
 
-process.stdout.write("KG OS Web dev shell: http://127.0.0.1:5173\n");
+process.stdout.write("KG OS Web dev: http://127.0.0.1:5173\n");
 
 let stopping = false;
 function stopAll(signal) {

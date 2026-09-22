@@ -17,6 +17,13 @@ const env = {
 
 await run(
   "go",
-  ["test", "-tags=sqlite_fts5,lithograph_smoke", "-count=1", "./internal/lithographtest"],
+  [
+    "test",
+    "-tags=sqlite_fts5,lithograph_smoke",
+    "-count=1",
+    "./internal/lithograph",
+    "./internal/runtime",
+    "./internal/lithographtest"
+  ],
   { cwd: root, env }
 );
