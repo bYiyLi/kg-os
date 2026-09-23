@@ -21,7 +21,7 @@ Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能
 | 初始化 Full-text analyzer + 简化 Ontology | `type: fulltext` 只编译业务 targets/properties；`kg install` 必须显式取得 `[fulltext].analyzer` 并提示初始化后禁止修改；新建/业务重建时写当前 analyzer + `eventually_consistent=false`，已有 versioned analyzer 保留；不做 config fingerprint / migration |
 | Lithograph Managed Semantic + 简化 Ontology | Phase 01 已完成 Provider extension 装配、startup readiness与连接基线；`kg install` 必须显式取得完整 `[embedding]` 与始终启用的 `[cache].path/max_size_mb`，后续 Ontology compiler 生成 versioned IndexDefinition / providerConfig，Graph 公共 surface 直接使用 String query；不实现 embedding HTTP client、Provider cache内部逻辑、向量 Property或写入/合并刷新 |
 | Evolution 统一历史与 Merge Session | Definition 内字段级历史；shared resource 单次 conflict 投影；固定 revision 的 candidate 检查 |
-| CLI / SDK / Web 共享合同 | `KG_HOME` target discovery、Bearer authentication / `AUTHENTICATION_FAILED` mapping、本机 CLI `KG_TOKEN -> auth.json` credential resolution、`doctor/install`、业务 Runtime ensure、ontology batch Markdown、batch --edit YAML multi-document stream、ontology scoped patch、Object JSON、Graph NDJSON、HTTP metadata 与错误映射 |
+| CLI / SDK / Web 共享合同 | `KG_HOME` target discovery、Bearer authentication / `AUTHENTICATION_FAILED` mapping、本机 CLI `KG_TOKEN -> auth.json` credential resolution、`doctor/install`、业务 Runtime ensure、ontology batch Markdown、batch --edit YAML multi-document stream、ontology scoped patch、Object batch read / patch、Graph NDJSON、HTTP metadata 与错误映射 |
 
 ### Ontology compiler / decoder
 
@@ -43,7 +43,21 @@ Lithograph v0.3.0 的 identifying Graph Type 上，Property type / required 是 
 
 ### Adapter 与运行时
 
-Ontology batch read 在 daemon/kernel 层先解析一次 State，再读取全部 refs；adapter 不能通过循环读取 `branch/...` 模拟 batch，否则 Branch 移动会产生跨 State 结果。Batch `--edit` 要先取得并验证全部 Object bodies，再一次性写 stdout；任一失败不得留下半个 stream。单个 body 继续使用 Object canonical renderer，multi-document marker/comment 由 CLI framing 层添加。`ontology patch` 与 `object patch` 只有一套 request/result/compiler，前者只做 kind scope validation。不得让 CLI、Web、SDK 对缺失字段、删除、rename、shared resource、baseState 产生不同解释。Knowledge 保持直接 Cypher，不文件化。
+Ontology batch read 与通用 Object batch read 都必须在 daemon/kernel 层先解析一次 State，再读取全部 refs；adapter 不能通过循环读取 `branch/...` 模拟 batch，否则 Branch 移动会产生跨 State 结果。Object read 1..100 Ref、重复 Ref拒绝、输入顺序、all-or-nothing与响应资源上限在共享 read primitive执行；CLI positional/file/stdin 只负责形成同一个 refs 数组。Batch editable output 要先取得并验证全部 Object Value，再用共享 canonical renderer一次性写 stdout；任一失败不得留下半个 stream。multi-document marker/comment 只属于 CLI framing。`ontology patch` 与 `object patch` 只有一套 request/result/compiler，前者只做 kind scope validation。不得让 CLI、Web、SDK 对缺失字段、删除、rename、shared resource、baseState 产生不同解释。Knowledge discovery / 条件查询保持 Graph Cypher，不通过 Object list/search建立第二条发现路径。
+
+Phase 04 的通用 HTTP adapter mapping 固定为：
+
+```text
+POST /api/v1/object/read
+  request  = { at, refs[] }
+  response = ObjectReadResult
+
+POST /api/v1/object/patch
+  request  = PatchRequest
+  response = PatchResult
+```
+
+两个 route 都使用现有 Bearer authentication、JSON request limit、public error envelope 与 request `context.Context`。read route一次把完整 `refs[]` 交给 Kernel；CLI 的 YAML / raw JSON body presentation在客户端使用同仓库共享 Object renderer处理 daemon 返回的 Object Value，不得为每个 Ref重新请求 daemon。现有 Ontology read/edit/patch surface 继续保持 Phase 02 已验收行为；实现可以让它们复用新的共享 read / patch primitive，但本 Phase 不以新增通用 Object route 为理由删除或改变既有 Ontology route / CLI 行为。
 
 共享 Object Patch 的实现可以先交付 Ontology-scoped adapter，再在后续能力中开放 Knowledge Object adapter；这不允许建立第二套 parser、logical delta、transaction 或 concurrency semantics。Ontology-scoped 实现仍必须支持模型变化必需的 derived Knowledge maintenance，例如 Definition / Property rename 对已有 Label / Property / Relationship Type 的安全 rewrite，以及新增 Constraint 前对已有数据的真实验证；但它不因此开放调用方任意 Knowledge CRUD。
 
@@ -63,7 +77,7 @@ Embedding compiler校验当前 `[embedding]`，按 [Runtime 映射](runtime.md#e
 
 语言与交付边界已由 [Architecture](architecture.md#v1-运行时与技术分层)及 [Runtime](runtime.md#web-hosting)确定；以下是工程工作，不要求重新确认 Go / TypeScript 分工或 Web 是否独立部署：
 
-Phase 01 已实现并验收数据库/runtime foundation；Phase 02 已在其上完成 Knowledge Base bootstrap、公共 Bearer middleware 与 Ontology HTTP/CLI。下面的规则继续作为后续代码必须保持的工程约束。当前新增的 Runtime/CLI 工作是完整 profile installer、doctor、i18n、本机 credential fallback 与业务命令 auto-start；Graph HTTP framing / client-disconnect、Object / Graph / Evolution 与完整 SDK/Web 业务 surface仍属于后续能力。
+Phase 01 已实现并验收数据库/runtime foundation；Phase 02 已在其上完成 Knowledge Base bootstrap、公共 Bearer middleware 与 Ontology HTTP/CLI；Phase 03 已完成 installer / doctor / i18n / 本机 credential fallback 与业务命令 auto-start。下面的规则继续作为后续代码必须保持的工程约束。通用 Object batch read / patch 是当前下一阶段；Graph HTTP framing / client-disconnect、Evolution 与完整 SDK/Web 业务 surface仍属于后续能力。
 
 1. **Go SQLite driver / adapter**：使用 `database/sql` + `github.com/mattn/go-sqlite3` bundled SQLite；固定 CGO build启用 `sqlite_fts5`，不使用 `libsqlite3`，不启用 `sqlite_omit_load_extension`。运行时仍实际验证 SQLite >= 3.45、FTS5、ordered explicit-entrypoint extension loading、只读 / 读写 connection、参数 / 错误映射与连接清理。每个物理 connection按 startup-resolved artifact set加载同一批 extensions；不绑定 Native query ABI、不暴露 `sqlite3*`、不建立第二套 SQLite runtime。
 2. **SQL execution 与 explicit transaction**：普通完整结果使用 `lithograph()`，streaming 使用 `lithograph_rows()`；Object Patch 等多 execution 单 Commit 使用 `lithograph_tx_begin -> lithograph()/lithograph_rows()* -> commit/abort`。验证 expectedHead、staged visibility、single Commit、empty delta、失败自动 abort 与 connection exclusive ownership，不复制 Lithograph transaction state machine。
@@ -97,8 +111,8 @@ Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；
 - **Ontology storage mapping**：实现 semantic graph、Binding coverage、Schema Locator 与 Object / Ontology Graph View；高层 Object / Ontology 输入保留 reserved identifier 校验，公共 Graph 不复用该限制。
 - **Reserved Ontology Schema**：按 D68 建立最小 Graph Type profile；Graph Type 负责 internal Node marker、字段 type/required 与基础 endpoint legality，KG OS consistency validation 负责 kind 枚举、name uniqueness、Binding coverage 和 `includes` 的 Domain-or-Definition target，不增加第二套 Schema/constraint engine。
 - **Object representation**：实现五种公共 Object Ref、aggregate decoder 与 Knowledge 原生 Object value；canonical YAML / JSON 省略空的顶层 `indexes`，保留非空复合 / 共享索引。
-- **Read paths**：实现 Ontology read 的全局 / Domain / Definition 展开与 1..100 Ref batch，同一次请求只 pin 一个 resolved State；实现 Object read / list，Object search 限定 Knowledge，不为 Ontology 加旁路搜索。
-- **Mutation compiler**：实现共享 Object Patch compiler，覆盖聚合内字段 / 规则 / 索引、多 aggregate 原子修改、alias、显式 rename、no-op、冲突与 rollback；不实现单独 Schema resource CRUD。
+- **Read paths**：Ontology read 的全局 / Domain / Definition 展开与 1..100 Ref batch已进入 Phase 02；通用 Object read继续使用1..100明确 Ref、一次 resolved State pin、输入顺序和all-or-nothing，覆盖 Domain / Definition / Knowledge Node / Knowledge Relationship。Object不提供 list/search；Knowledge发现交给 Graph。
+- **Mutation compiler**：Phase 02 已实现 Ontology-scoped共享 Object Patch compiler；后续在同一 parser / logical delta / explicit transaction上开放 Knowledge Node / Relationship create/update/delete/restructure、request-local alias、Ref transition 与 Ontology+Knowledge多 Object原子 Patch，不实现第二套 CRUD 或单独 Schema resource API。
 - **Graph execution**：复用 Phase 01 已有 query / execute adapter，完成公共 Graph HTTP contract、Bearer middleware、NDJSON framing、transport cancellation 及 client integration；继续原样传递 Cypher 与 Lithograph JSON 值，不设 procedure、Vector 或 reserved identifier 检查。只有 public end-to-end 验收通过后才报告 Graph 能力可用。
 - **Evolution**：实现 read / state / ref / history / diff / merge，内部 schema slot 转为 aggregate 字段，固定 candidate revision 检查一致性后 finalize。
 - **Client surfaces**：按 CLI / Runtime 文档实现 Go `kg` 的 doctor / install / Runtime ensure 与后续 Object / Graph / Evolution surface，TypeScript SDK / Web继续消费同一 HTTP contract；Ontology batch Markdown / batch-edit YAML stream / scoped patch 已进入 Phase 02基线。Web 页面构建产物继续由同一 `kgosd` 交付；后续提供 Skill / SDK / Web 使用文档。

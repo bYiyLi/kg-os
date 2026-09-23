@@ -87,7 +87,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D8 Ontology 通过全局地图与明确引用渐进加载
 
-- 决定：Ontology read 提供全局 Overview、可选 Domain 展开与 Definition 详情；每个导航项有语义说明和准确 Ref。Ontology 不提供 search，也不通过 Object search 绕过。
+- 决定：Ontology read 提供全局 Overview、可选 Domain 展开与 Definition 详情；每个导航项有语义说明和准确 Ref。Ontology 不提供 search，Object 也不承担 Ontology discovery。
 - 依据：来源是已知、可导航的模型，不需要用巨型 Markdown 的文本检索替代模型组织。
 - 备选：旧 Object list/search 拼资源方案，或全库可编辑文档/虚拟文件系统。
 - 取舍：Overview 只读；详情可取得 canonical YAML 后用共享 Patch 编辑。无 Domain 时直接导航 Definition，大结果保持有界与显式 continuation。
@@ -278,10 +278,12 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D34 Object 使用单一 logical value、canonical YAML 与 JSON representation
 
-- 决定：每个 Object 在目标 State 中只有一份逻辑 Object Value。v1 对外支持 `application/yaml` 与 `application/json` 两种 serialization；YAML 是唯一 canonical editable representation 和 Object Patch base，JSON 是同一 Object Value 的等价结构化 representation。KG OS 不定义自己的 YAML 方言：标准 YAML 输入只要能无歧义解析并映射到合法 Object Value 即可接受，后续读取再由 KG OS renderer 规范化为 canonical YAML。HTTP adapter 使用标准 `Accept` / `Content-Type` 做 representation negotiation，不增加 `representation.mode/format` 之类业务字段；SDK 中的 structured Object 只是 JSON / Object Value 的语言内解析结果，不是第三种 wire format。
+> 后续调整：[D73](#d73-object-read-patch-surface) 将通用 Object read 收敛为 batch structured result：HTTP adapter 传输 `ObjectReadResult` JSON，canonical YAML / raw JSON body 由 CLI/SDK 对同一次 read 得到的 Object Value 做 presentation。下文关于单一 logical value、YAML/JSON 两种 serialization 与 YAML 作为唯一 Patch base 的决定继续有效；旧的 per-object HTTP `Accept` negotiation 不再定义当前通用 Object read。
+
+- 决定：每个 Object 在目标 State 中只有一份逻辑 Object Value。v1 对外支持 canonical YAML 与 equivalent JSON 两种 serialization；YAML 是唯一 canonical editable representation 和 Object Patch base，JSON 是同一 Object Value 的等价结构化 representation。KG OS 不定义自己的 YAML 方言：标准 YAML 输入只要能无歧义解析并映射到合法 Object Value 即可接受，后续读取再由 KG OS renderer 规范化为 canonical YAML。调用方 presentation 不增加 `representation.mode/format` 之类业务字段；SDK 中的 structured Object 只是 JSON / Object Value 的语言内解析结果，不是第三种 wire format。
 - 依据：YAML 对自然语言长文本和 AI 局部编辑更友好，Git Extended Diff 需要唯一稳定文本基线；JSON 则是程序、SDK 与 Web 的成熟结构化交换格式。把二者都映射到同一 Object Value 可以同时满足 AI-first 编辑与普通 API 消费，而不建立两套对象模型或要求 Patch 携带 serializer selector。
 - 备选：只提供 JSON；让 YAML / JSON 都成为 Patch base；自定义 `representation` request object；定义 KG OS-specific YAML subset / dialect。
-- 取舍：KG OS 需要 deterministic canonical YAML renderer，并同时维护 JSON serializer；调用方以非 canonical 标准 YAML 表达同一值时可以写入，但下一次 `read` 会被规范化。HTTP 的具体 route、metadata envelope / header、CLI command 与 SDK method 仍属于 transport contract，不由本决定冻结。
+- 取舍：KG OS 需要 deterministic canonical YAML renderer，并同时维护 JSON serializer；调用方以非 canonical 标准 YAML 表达同一值时可以写入，但下一次 `read` 会被规范化。HTTP 的具体 route / batch envelope、CLI command 与 SDK method 仍属于 transport contract，不由本决定冻结。
 
 ### D35 公共 StateRef 直接复用 Lithograph Version Descriptor
 
@@ -679,3 +681,16 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 - 替换：本决定替换 D55 的“CLI 只从 `KG_TOKEN` 取得 credential”部分，替换此前公开 `kg daemon ...` 与业务命令不得隐式启动 daemon 的 lifecycle surface，并替换 D53 / D52 中把 Full-text / Embedding runtime defaults 作为正常可变配置使用的产品约定。D51 的通用 extension loader、D54 的单 `KG_HOME` / 单 `kgos.db`、D55 的单 Token Bearer 服务端认证、D66 的 Provider-owned cache 与 SQL-only integration继续有效。
 - 取舍：用户侧首次流程从“配置文件 + daemon + token 搬运”收敛为“doctor → install → 业务命令”，同时不引入 profile registry、credential manager、配置历史或 daemon supervisor 产品面。代价是 `kg` 增加本地 Runtime ensure/spawn、安装向导与 i18n 责任；这些都只服务当前单机 Runtime 使用问题。
 - 当前合同：[CLI](cli.md)、[Runtime](runtime.md)、[Architecture](architecture.md#v1-运行时与技术分层)、[工程映射](implementation.md)、[Phase 03](../development/phases/03-installation-runtime-onboarding.md)。
+
+<a id="d73-object-read-patch-surface"></a>
+
+### D73 Object surface 收敛为 batch read + batch patch（2026-09-23）
+
+- 决定：KG OS v1 通用 Object public surface 只保留 `read` 与 `patch`，删除尚未发布的 `object list` / `object search`。Ontology 的发现与渐进理解继续由 `kg ontology` 负责；Knowledge 的发现、条件查询、全文、语义检索与遍历统一由 Graph Cypher负责。已知准确 Object Ref 后才进入 Object read / patch。
+- Batch read：一次 request 接受 1..100 个五类公共 Object Ref，重复 Ref拒绝；daemon/kernel只解析一次 StateRef并固定一个 immutable State，结果按请求顺序返回。任一 Ref非法、不存在、不可解释或整体超过响应资源限制时整批失败，不返回 partial success。CLI支持 positional Ref 文本、`--refs-file` 与 implicit stdin 三种互斥输入；文件/stdin每个非空行一个 Ref。默认输出统一为 `{state, results[]}`，单 Ref也不改变 shape。
+- Editable read：`object read --body` 继续使用唯一 canonical YAML editable representation。单 Ref输出纯 canonical YAML；多 Ref输出标准 YAML 1.2 multi-document stream，State/Ref只作为 CLI framing comment。JSON body在单 Ref时输出一个 Object Value，多 Ref时输出按请求顺序的 Object Value array。所有 canonical YAML都使用共享 renderer，不允许 CLI另建一套 serialization或逐 Ref重新读取 Branch模拟 batch。
+- Batch patch：一个 `object patch` 的 Git Extended Diff 可以包含多个 Object entry，覆盖 Ontology与Knowledge。CLI继续支持 `--patch` inline text、`--patch-file` 与 implicit stdin 三种互斥来源。整个 Patch共享一个 immutable `baseState` 与目标 Branch，统一校验后进入一个 Lithograph explicit transaction；任一 entry失败整体回滚，no-op、strict base、alias、transition与单 Commit规则继续由D10/Object合同拥有。
+- 依据：大规模 Knowledge 不能靠分页枚举成为 AI discovery机制；已知 `n:/r:` Ref 时 exact search 又等价于直接 read。保留 list/search只会复制 Graph的查询职责并扩大长期 API 面。相反，batch read / patch直接服务 AI 在一组明确对象上建立一致上下文和原子修改，是当前真实使用需求。
+- 备选：保留 Object list作为管理枚举；保留 exact-Ref search；为 Knowledge新增 create/update/delete命令或第二套 CRUD JSON API。本次均不采用。
+- 取舍：Object surface更小，调用方必须通过 Ontology/Graph获得未知对象的 Ref；换取 discovery/query/mutation职责清晰、无需维护无界枚举与重复搜索语义，并让单个 Object batch操作共享明确的 State / transaction边界。
+- 当前合同：[Object](object.md#object-公共调用合同)、[CLI Object](cli.md#object-cli)、[工程映射](implementation.md)、[Phase 04](../development/phases/04-object.md)。

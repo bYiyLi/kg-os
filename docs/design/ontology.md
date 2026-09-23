@@ -550,13 +550,13 @@ KG OS-valid State 对 **reserved Schema + internal marker subgraph** 采用 clos
 
 - 所有 KG OS Ontology 内部 Node 都必须携带 reserved marker Label `__kgos_internal`；它属于已冻结 internal persistence encoding，不进入公共 Object representation；Graph 显式查询可读取该 marker；
 - KG OS 内部 Relationship 只连接 KG OS internal Node，不通过普通 graph edge 直接连接调用方 Knowledge Node；
-- 面向普通 Knowledge 的 Object `list` / `search` / `read` / `patch` 必须由 KG OS 构造 Lithograph execution options，并使用公开 `graphView` 排除 reserved internal marker；此规则只服务 Object 投影，不注入公共 Graph `query` / `execute`；
+- 面向普通 Knowledge 的 Object `read` / `patch` 必须由 KG OS 构造 Lithograph execution options，并使用公开 `graphView` 排除 reserved internal marker；此规则只服务明确 Ref 的 Object 投影与修改，不注入公共 Graph `query` / `execute`；
 - Object Knowledge mutation 的 **candidate target state** 也必须保持在公共 Graph View 内：Object Patch 不得给普通 Node 添加 reserved internal marker，不得创建 / 改造成 KG OS-owned internal Relationship Type，也不得设置 KG OS-owned reserved internal Property key。即使调用方猜到具体内部字符串，mutation boundary 也必须 reject，不能先写入再依靠读取过滤隐藏；
 - Ontology semantic graph 的内部读取使用相反的 Graph View，只允许 KG OS internal Node 进入本次 Cypher 的可见 Property Subgraph；
 - 这种隔离必须在 Lithograph Planner / Executor / Search / mutation boundary 生效，不能由 KG OS 对查询结果事后过滤，也不能通过直接访问 `_lithograph_*` 实现；
 - Lithograph `graphView` 不是认证系统。公共 Graph 按底层合同访问完整 graph，可读取或修改内部 semantic graph；上面的隔离保证只适用于 Ontology / Object 高层能力，不构成 Cypher 执行限制。
 
-KG OS internal graph 使用普通 Lithograph graph data，因此仍受目标 Snapshot 的 Lithograph Schema / Constraint 约束。为保证调用方 Definition 约束与内部 semantic graph 同时合法，KG OS 必须在**同一份 Lithograph versioned Schema** 中维护自身运行所需的 reserved internal element types / properties，以及当前实现真实需要的 internal Constraint / Index definition。这些内部 Schema resources 不是调用方 Ontology Structure，不创建调用方 Binding Record，也不参与 Domain organization；它们不能通过 Object `list` / `search` 被发现，不能通过普通 Object `read` / `patch` 访问；通过 Graph 原始 Cypher 访问则按 Lithograph 合同执行。KG OS 不为它们建立第二套 Schema。若 Lithograph 的公开 Schema 能力无法同时表达调用方结构与这些必要 internal resources，则该 KG OS 实现路径视为依赖能力不足，不能退回直接 SQL 或旁路存储。
+KG OS internal graph 使用普通 Lithograph graph data，因此仍受目标 Snapshot 的 Lithograph Schema / Constraint 约束。为保证调用方 Definition 约束与内部 semantic graph 同时合法，KG OS 必须在**同一份 Lithograph versioned Schema** 中维护自身运行所需的 reserved internal element types / properties，以及当前实现真实需要的 internal Constraint / Index definition。这些内部 Schema resources 不是调用方 Ontology Structure，不创建调用方 Binding Record，也不参与 Domain organization；它们没有公共 Object Ref，不能通过普通 Object `read` / `patch` 访问；通过 Graph 原始 Cypher 访问则按 Lithograph 合同执行。KG OS 不为它们建立第二套 Schema。若 Lithograph 的公开 Schema 能力无法同时表达调用方结构与这些必要 internal resources，则该 KG OS 实现路径视为依赖能力不足，不能退回直接 SQL 或旁路存储。
 
 隔离同时作用于**输入 target**，而不是只过滤输出：调用方通过 Domain / Definition aggregate Patch 创建或修改 Ontology 时，任何直接定义 reserved internal identifier、与其发生命名冲突、或让调用方 Constraint / Index target 指向 reserved internal Schema resource 的目标状态都必须在编译前 reject。调用方不能通过知道内部名字来跨越 Object visibility boundary；Graph 不使用这项 target 检查。
 
@@ -633,7 +633,7 @@ KG OS 不要求 Lithograph 为 Node element type、Relationship element type 或
 
 如果通过 Graph 原始 Cypher 或直接访问 Lithograph 修改 Schema，导致上述双向 Binding 覆盖不成立，高层 Ontology / Object 能力必须把该 Snapshot 判定为 **Ontology consistency error**：不猜测 rename target、不自动创建或改写 metadata、不静默删除 Binding Record。历史 KG OS-valid Snapshot 仍按各自当时的 Binding Record + Schema Locator 正常解析。
 
-Consistency-invalid Lithograph Commit 仍然存在于底层 DAG，KG OS 不篡改历史把它“修掉”。Evolution `overview` / `get` / `ancestry` 可以为了诊断暴露该 Commit / ref 的轻量 identity、topology、State Data 与一致性状态，但不能把它伪装成正常可解释 Snapshot。Ontology read、Object `list` / `search` / `read` / `patch` 以及会创建新 State 或把 Branch / Tag 指向目标 Snapshot 的高层 Evolution mutation 仍要求相关 base / target State 满足当前 KG OS consistency invariants；否则返回 consistency error。Graph `query` / `execute` 不运行这项 KG OS 检查，可继续按 Lithograph 合同诊断或显式修改底层状态；KG OS 不自动为这些直接变更修复 Binding 或保证高层 aggregate 可解释。
+Consistency-invalid Lithograph Commit 仍然存在于底层 DAG，KG OS 不篡改历史把它“修掉”。Evolution `overview` / `get` / `ancestry` 可以为了诊断暴露该 Commit / ref 的轻量 identity、topology、State Data 与一致性状态，但不能把它伪装成正常可解释 Snapshot。Ontology read、Object `read` / `patch` 以及会创建新 State 或把 Branch / Tag 指向目标 Snapshot 的高层 Evolution mutation 仍要求相关 base / target State 满足当前 KG OS consistency invariants；否则返回 consistency error。Graph `query` / `execute` 不运行这项 KG OS 检查，可继续按 Lithograph 合同诊断或显式修改底层状态；KG OS 不自动为这些直接变更修复 Binding 或保证高层 aggregate 可解释。
 
 ## Patch 到真实变化
 

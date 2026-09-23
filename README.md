@@ -35,19 +35,21 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 ## 当前状态
 
-**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 00–03 均已完成。** 当前完成基线已经具备 `KG_HOME` / config / credential、SQLite Extension resolver、正式 Go/Lithograph Host、SQL query / execute / true streaming / cancellation、Semantic Provider readiness/cache mapping、explicit transaction、single-instance lock、daemon shutdown lifecycle、完整 Ontology，以及 D72 的 `doctor/install`、完整显式配置、en/zh、本机 credential fallback 与业务 Runtime auto-start。
+**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 00–03 均已完成，Phase 04 General Object Read & Patch 已完成设计与计划并处于 `ready`。** 当前完成基线已经具备 `KG_HOME` / config / credential、SQLite Extension resolver、正式 Go/Lithograph Host、SQL query / execute / true streaming / cancellation、Semantic Provider readiness/cache mapping、explicit transaction、single-instance lock、daemon shutdown lifecycle、完整 Ontology，以及 D72 的 `doctor/install`、完整显式配置、en/zh、本机 credential fallback 与业务 Runtime auto-start。Phase 04 尚未实现，不把计划状态写成代码完成。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
 **Phase 01 已完成。** Runtime & Lithograph Host 实现提交 `f7f679e0601c7ecd16f5409f58c9c3483796948f` 已推送到 `main`，本地完整 validation / fresh-source validation 与 Ubuntu 24.04 x64 GitHub Actions run `35687991251` 均成功；P1-01–P1-10 和 Phase Review 已闭环。
 
-**Phase 02 Ontology 当前为 `done`。** Knowledge Base bootstrap、KG OS Internal Graph / Binding、Ontology read/edit/Patch、Schema/Constraint/Index compiler、authenticated HTTP 与正式 `kg ontology` CLI均已实现；P2-01–P2-12 全部取得真实验收证据。实现提交 `8e776043337bcda24a271f84af1c04fc0da515cc` 已推送到 `main`，主工作树完整 `pnpm validate`、独立 fresh-source setup + full validation、forced pre-commit、final diff/review 与真实 Lithograph v0.3.0 native suite均已通过，Ubuntu 24.04 x64 GitHub Actions run `35804756510` / Validate job `107002937680` 成功。普通 Knowledge 数据 CRUD、Graph、Evolution、SDK/Web/Skill仍未实现。
+**Phase 02 Ontology 当前为 `done`。** Knowledge Base bootstrap、KG OS Internal Graph / Binding、Ontology read/edit/Patch、Schema/Constraint/Index compiler、authenticated HTTP 与正式 `kg ontology` CLI均已实现；P2-01–P2-12 全部取得真实验收证据。实现提交 `8e776043337bcda24a271f84af1c04fc0da515cc` 已推送到 `main`，主工作树完整 `pnpm validate`、独立 fresh-source setup + full validation、forced pre-commit、final diff/review 与真实 Lithograph v0.3.0 native suite均已通过，Ubuntu 24.04 x64 GitHub Actions run `35804756510` / Validate job `107002937680` 成功。通用 Knowledge Object read/patch、Graph、Evolution、SDK/Web/Skill仍未实现。
 
 **Phase 03 Installation & Runtime Onboarding 当前为 `done`。** `kg doctor -> kg install -> kg ontology ...` 首次流程、正式 package artifact discovery/integrity、完整显式配置、中英文交互、本机 credential fallback 与并发安全的 Runtime auto-start 已实现并完成本地/远端验收。实现提交 `c15a6c062ea457c7a72c90a59f46b77b4ae5c053` 已推送到 `main`；最终主工作树 validation、独立 fresh-source、真实 PTY、真实 Lithograph 首次/并发 auto-start 与 Ubuntu 24.04 x64 GitHub Actions run `35834430037` / Validate job `107094383436` 均成功。
 
+**Phase 04 General Object Read & Patch 当前为 `ready`。** 已确认通用 Object surface 只保留 batch `read` 与 batch `patch`：一次 read 接受 1..100 个明确 Ref并固定同一 State；CLI支持 positional text、refs file与stdin；一个 Git Extended Diff可以原子修改多个 Ontology / Knowledge Object，并继续支持 inline patch、patch file与stdin。尚未开始代码实现，因此没有实现、测试或远端 CI 完成证据。
+
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
-相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、[D67 Ontology Index profile](docs/design/decisions.md#d67-ontology-index-profile)、[D68 reserved Ontology Schema](docs/design/decisions.md#d68-reserved-ontology-schema)、[D69 Ontology Constraint profile](docs/design/decisions.md#d69-ontology-constraint-profile)、[D70 bootstrap orphan-history boundary](docs/design/decisions.md#d70-bootstrap-orphan-history)、[D71 generated Constraint identity](docs/design/decisions.md#d71-lithograph-generated-constraint-identity) 与 [D72 Local install / Runtime onboarding](docs/design/decisions.md#d72-local-install-runtime-onboarding)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
+相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、[D67 Ontology Index profile](docs/design/decisions.md#d67-ontology-index-profile)、[D68 reserved Ontology Schema](docs/design/decisions.md#d68-reserved-ontology-schema)、[D69 Ontology Constraint profile](docs/design/decisions.md#d69-ontology-constraint-profile)、[D70 bootstrap orphan-history boundary](docs/design/decisions.md#d70-bootstrap-orphan-history)、[D71 generated Constraint identity](docs/design/decisions.md#d71-lithograph-generated-constraint-identity)、[D72 Local install / Runtime onboarding](docs/design/decisions.md#d72-local-install-runtime-onboarding) 与 [D73 Object batch read / patch surface](docs/design/decisions.md#d73-object-read-patch-surface)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
 ## License
 
@@ -70,5 +72,6 @@ KG OS 采用双许可模式：
 - [Phase 01 计划](docs/development/phases/01-runtime-lithograph-host.md)：本地 Runtime / Lithograph Host 的范围、Feature、验收与当前状态。
 - [Phase 02 计划](docs/development/phases/02-ontology.md)：Knowledge Base bootstrap 与完整 Ontology 能力的范围、Feature、验收和 Review。
 - [Phase 03 计划](docs/development/phases/03-installation-runtime-onboarding.md)：doctor / install、完整配置、i18n、本机认证与 Runtime auto-start 的范围和验收。
+- [Phase 04 计划](docs/development/phases/04-object.md)：通用 Object batch read、Knowledge Node/Relationship 与 batch Patch 的范围和验收。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

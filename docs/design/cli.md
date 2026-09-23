@@ -42,8 +42,6 @@ kg
 │   └── patch                    # Ontology-scoped Object Patch
 │
 ├── object
-│   ├── list
-│   ├── search
 │   ├── read
 │   └── patch
 │
@@ -304,71 +302,54 @@ kg ontology patch --base-state <resolved-state> --branch main --patch-file chang
 
 ## Object CLI
 
-### list
-
-```text
-kg object list
-  --at <StateRef>
-  [--kind <ObjectKind>]
-  [--scope all|ontology|knowledge]
-  [--limit <n>]
-  [--cursor <token>]
-```
-
-`--at` 必填。stdout 就是 `Page<ObjectSummary>` JSON，不增加 CLI-specific item wrapper。
-
-示例：
-
-```bash
-kg object list --at branch/main --scope knowledge --limit 50
-```
-
-### search
-
-```text
-kg object search <query>
-  --at <StateRef>
-  [--kind knowledge-node|knowledge-relationship]
-  [--scope knowledge]
-  [--limit <n>]
-  [--cursor <token>]
-```
-
-此处只保留 Object 已有的 Knowledge exact-Ref 定位行为。scope 缺省为 knowledge；ontology/all 或 Ontology kind 是非法参数。Ontology 导航使用 `kg ontology`，Knowledge 属性搜索使用 Graph Cypher，不隐藏增加第二套搜索语言。
-
 ### read
 
-默认模式同时需要 metadata 和程序可读 Object Value，因此输出一个 CLI adapter envelope：
+Object read 原生支持 batch。Ref 输入三选一：
 
 ```text
-kg object read <ObjectRef> --at <StateRef>
-
-→ {
-    state: ResolvedState,
-    kind: ObjectKind,
-    ref: ObjectRef,
-    value: ObjectValue       # equivalent JSON representation
-  }
+kg object read <ObjectRef>... --at <StateRef>
+kg object read --refs-file <path> --at <StateRef>
+cat refs.txt | kg object read --at <StateRef>
 ```
 
-`value` 只是把 logical body 的 `application/json` representation 放进 CLI envelope，不是新的 Object schema。
+一次接受 1..100 个 Ref，重复 Ref 返回 `INVALID_ARGUMENT`。positional refs、`--refs-file` 与 implicit stdin 互斥；文件 / stdin 是 UTF-8 文本，每个非空行一个 canonical Object Ref，空行忽略，不定义 comment 或其它列表语法。没有 positional refs / `--refs-file` 且 stdin 是 TTY 时返回 usage error。
+
+CLI 把整个 refs 数组作为**一次**业务请求发送给 daemon；daemon/kernel 只解析一次 `--at` 并固定一个 immutable State。CLI 不允许循环逐 Ref 请求来模拟 batch。
+
+默认 stdout 统一输出：
+
+```text
+{
+  state: ResolvedState,
+  results: [
+    { kind: ObjectKind, ref: ObjectRef, value: ObjectValue },
+    ...
+  ]
+}
+```
+
+单 Ref 也使用相同 `results[]` shape；顺序与输入 Ref 一致。任一 Ref 失败时 stdout 为空，整个 batch 按统一错误合同失败，不输出 partial success。
 
 需要**纯 Object body**时使用：
 
 ```text
-kg object read <ObjectRef>
+kg object read <ObjectRef>...
   --at <StateRef>
   --body
   [--format yaml|json]
 ```
 
-`--body` 默认 `--format yaml`，stdout 只包含 canonical YAML；`--format json` 则只包含 equivalent JSON Object Value。`--format` 只在 `--body` 模式合法；默认 `read` 始终返回上面的 JSON envelope。raw body 模式不混入 `state/kind/ref` metadata，也不接受 `--pretty` 与 YAML 组合；JSON raw body 可以使用 `--pretty`。
+`--body` 默认 `--format yaml`。单 Ref YAML stdout 只包含该 Object 的 canonical YAML；多 Ref YAML 使用标准 YAML 1.2 multi-document stream，顶部写一次 `# kgos-state: <ResolvedState>`，每个 document 以 `--- # kgos-ref: <ObjectRef>` framing，document body 与该 Object 单独 canonical render 的 bytes 一致。Framing comment 不属于 Object Value 或 Git hunk。
+
+`--format json` 时，单 Ref stdout 是 equivalent JSON Object Value；多 Ref stdout 是按输入顺序排列的 JSON Object Value array。需要 ref/kind/state association 的程序化调用方应使用默认 JSON envelope。`--format` 只在 `--body` 模式合法；raw body 模式不混入 JSON metadata wrapper。YAML 不接受 `--pretty`，JSON body 与默认 JSON envelope可以使用 `--pretty`。
+
+canonical YAML 由与 daemon/kernel 共用的 Object renderer 产生；CLI 不复制 serialization 规则。整个 batch 在输出前必须先取得并验证全部结果，任一失败时不得留下半个 YAML stream / JSON body。
 
 因为 Patch 必须基于准确 immutable State，推荐 AI 编辑流程是：先用默认 `read` 取得 resolved `state`，再对该 `commit/...` 执行 `read --body` 取得 canonical YAML，而不是第二次仍读取可能已经移动的 Branch：
 
 ```text
 kg object read node:Person --at branch/main
-→ state = commit/abc...
+→ state = commit/abc... in the JSON envelope
 
 kg object read node:Person --at commit/abc... --body
 → canonical YAML
@@ -386,6 +367,8 @@ kg object patch
 ```
 
 `--base-state` 只接受 canonical `commit/<id>`；CLI 不接受 Branch / Tag shorthand，也不先替调用方解析成 Commit 后偷偷改变请求。Patch text 原样遵守 Object 的 Git Extended Diff profile。CLI 不增加 `--force`、`--rebase`、`--merge`、`--upsert` 或 `--dry-run`；这些行为没有独立 logical capability。
+
+一个 Patch text 可以包含多个 `diff --git` Object entry，因此 `object patch` 原生就是 batch mutation。`--patch`、`--patch-file` 与 implicit stdin 是三种互斥正文来源；无论来源如何，整个 Patch 使用同一个 `baseState` / Branch、一次 logical validation 与一个 Lithograph explicit transaction，任一 entry 失败时整个请求回滚。CLI 不按 entry 拆成多次 daemon request。
 
 stdout 原样映射：
 
@@ -599,8 +582,8 @@ understand Ontology
 → optional Domain
 → Definition detail
 
-discover Knowledge Object
-→ object list / graph query
+discover / query Knowledge
+→ graph query
 
 read exact Object
 → object read
@@ -639,7 +622,7 @@ KG OS CLI 不单独维护 human-only 命令树。人类与 AI 使用相同 comma
 
 - `--help` 提供短说明、required flags 和可复制示例；
 - `--pretty` 让 JSON 更适合终端查看；
-- `ontology` 提供可读概览/详情；`ontology <ref>... --edit` 提供单对象 canonical YAML 或多对象 YAML stream，`object read --body` 提供单对象 canonical body；
+- `ontology` 提供可读概览/详情；`ontology <ref>... --edit` 和 `object read <ref>... --body` 都支持单对象 canonical YAML 或多对象 YAML stream；
 - shell redirect、pipe 和普通 JSON 工具完成保存、过滤与进一步展示。
 
 这样避免“AI API”与“人类 CLI”行为漂移。未来只有真实用户需求证明 table、interactive TUI、shell completion 或其它 human convenience 值得维护时，才作为兼容 convenience 增加；不能改变当前默认 JSON / non-interactive contract。
@@ -663,7 +646,7 @@ daemon ready 后，CLI 使用非空 `KG_TOKEN` 或当前 profile 的 `auth.json`
 
 ## 兼容性
 
-本文命令名、required flag、flag meaning、默认 JSON result shape、Ontology Markdown/--edit、raw body / streaming framing 与 exit-code category 构成 v1 CLI public adapter contract。实现可以增加新的可选命令 / flag，但不能让已有 canonical invocation 改变业务语义；删除 / 改名已有 command 或 required flag、改变默认输出类型、引入隐藏 current Branch / auto-page / interactive confirmation，都属于 CLI breaking change，需要新的设计决定。
+本文命令名、required flag、flag meaning、默认 JSON result shape、Ontology Markdown/--edit、raw body / streaming framing 与 exit-code category 构成 v1 CLI public adapter contract。实现可以增加新的可选命令 / flag，但不能让已有 canonical invocation 改变业务语义；删除 / 改名已有已发布 command 或 required flag、改变默认输出类型、引入隐藏 current Branch / auto-page / interactive confirmation，都属于 CLI breaking change，需要新的设计决定。D73 在通用 Object surface 发布前删除旧设计中的 `object list/search`，因此不产生已发布兼容层。
 
 CLI 的 JSON 内部 Object / Graph / Evolution field 继续由对应 logical contract 拥有；如果 logical contract 合法增加 optional field，CLI 可以原样增加该 field，不需要再复制一条 CLI-specific data-model decision。
 

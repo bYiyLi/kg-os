@@ -21,7 +21,7 @@
 - 单 Ref / batch `--edit` canonical YAML；
 - 多 aggregate 原子 Patch。
 
-本 Phase **不开放普通 Knowledge 数据 CRUD**。它不实现公共 `kg object list/search/read/patch`、Graph query/execute、Evolution、SDK/Web/Skill 业务交互或完整 `kg daemon start/status/stop/restart`。Phase 02 的“完整 Ontology”指 Kernel + authenticated HTTP + AI-facing `kg ontology` CLI 已能完整读取和维护 Ontology 逻辑模型，不表示所有 client surface 都已交付。Ontology compiler 为保持结构正确性而执行的 mandatory Knowledge data rewrite / dependency validation 属于模型 mutation 的完整性维护，不等于开放通用 Knowledge mutation surface。
+本 Phase **不开放普通 Knowledge 数据 CRUD**。它不实现通用 Object、Graph query/execute、Evolution、SDK/Web/Skill 业务交互或完整 `kg daemon start/status/stop/restart`。当时规划的通用 Object surface 后续已由 [D73](../../design/decisions.md#d73-object-read-patch-surface) 收敛为 batch `read/patch`，`list/search` 不再属于当前产品合同。Phase 02 的“完整 Ontology”指 Kernel + authenticated HTTP + AI-facing `kg ontology` CLI 已能完整读取和维护 Ontology 逻辑模型，不表示所有 client surface 都已交付。Ontology compiler 为保持结构正确性而执行的 mandatory Knowledge data rewrite / dependency validation 属于模型 mutation 的完整性维护，不等于开放通用 Knowledge mutation surface。
 
 ## 2. Design Inputs
 

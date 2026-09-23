@@ -31,13 +31,11 @@ Object 提供明确对象的稳定读取和统一局部修改，不强迫 AI 逐
 ### Object 能力面
 
 ```text
-list    → 枚举公共 aggregate / Knowledge 对象的摘要
-search  → 仅保留 Knowledge 范围的既有定位能力
-read    → 同一对象的 canonical YAML / equivalent JSON
-patch   → 统一 Add / Update / Delete / Rename / Restructure
+read   → 已知 Ref 后稳定读取一个或一组 Object
+patch  → 统一 Add / Update / Delete / Rename / Restructure
 ```
 
-Ontology 首次发现与渐进理解使用 [Ontology read](ontology.md#ontology-read-合同)，不是 Object search。Ontology 不支持关键字搜索，也不能通过 `scope=all` 或省略 scope 间接搜索 Ontology。普通 Knowledge 的属性全文、托管语义检索、条件与遍历仍用 Graph Cypher；Vector 本身不是 KG OS v1 caller-owned Object 能力。
+Object 不承担发现或枚举。Ontology 首次发现与渐进理解使用 [Ontology read](ontology.md#ontology-read-合同)；普通 Knowledge 的定位、属性条件、全文、托管语义检索和遍历使用 Graph Cypher。KG OS v1 不提供 `object list` 或 `object search`，也不建立另一套 Search DSL。Vector 本身不是 KG OS v1 caller-owned Object 能力。
 
 写入始终只有一套 **canonical YAML + Git Extended Diff textual Patch**。不为 Domain、Node Definition、Relationship Definition、Property、Constraint、Index 分别建立 create/update/save API，也不新增 full-object PUT / upsert。聚合 Patch 可以编排多个底层资源，底层 ownership 不决定公共 API 的粒度。
 
@@ -75,8 +73,8 @@ Object Value
 - **JSON 是同一 Object Value 的等价结构化 representation。** JSON wire 继续复用适用的 Lithograph JSON typed-value encoding，不为 Integer64、Temporal、Point、UUID 等 KG OS public Object value 再建立第二套类型编码；Vector 不属于 v1 caller-owned Object Value；SDK / Web 可以把 `application/json` payload 解析成语言内 Object / Map，这不构成另一种 wire format；
 - KG OS **不定义自己的 YAML 方言或 YAML 子语言**。调用方提交的 YAML 只要能由标准 YAML 1.2 parser 解析，并能无歧义映射为目标 Object 的合法 logical value，就可以进入后续 Object schema / type validation；同义但非 canonical 的 YAML 写法不会因为格式不同而被拒绝。Parser 必须在构造普通 Map/List/String/value tree 前拒绝 duplicate mapping key；anchors / aliases 可以使用，但展开后必须是有限、无循环并可映射到普通 Object Value；unknown/custom tag 只有在能按 KG OS/Lithograph 已知 value encoding 无歧义解释时才合法，否则返回 `INVALID_ARGUMENT`。resource/depth/alias-expansion limit 命中返回 `RESOURCE_ERROR`，而不是由 KG OS 猜测或截断输入；
 - canonical YAML 是 Git Extended Diff 的唯一文本 base。JSON 可以作为文本或结构化数据读取，但 v1 Object Patch 不以 JSON serialization 作为 diff base，因此 Patch request 不需要额外携带 `yaml | json` patch-format selector；
-- 核心 Object 合同不发明 `representation: {mode, format}` 之类参数。HTTP adapter 使用标准 content negotiation：客户端通过 `Accept: application/yaml` 或 `Accept: application/json` 请求 representation，响应通过对应 `Content-Type` 声明实际媒体类型。CLI / SDK 可以提供 `--format`、`readText`、`readObject` 等便利接口，但它们只是同一 Object Value / serialization contract 的适配，不建立新的数据模型；
-- State、Object Ref、请求时使用的 Branch / Tag 等定位上下文仍属于 read result metadata，不是可编辑 Object Value。具体 HTTP header / response envelope、CLI 输出包装和 SDK method shape 仍由 transport contract 冻结。
+- 核心 Object 合同不发明 `representation: {mode, format}` 之类参数。通用 batch read 的程序化 transport 直接承载 `ObjectReadResult` 结构化值；CLI / SDK 可以提供 `--body`、`--format`、`readText`、`readObject` 等便利呈现，但必须从同一次 read 得到的 Object Value 使用共享 renderer生成，不能为获取 YAML 再逐 Ref 重新读取 State，也不能建立新的数据模型；
+- State、Object Ref、请求时使用的 Branch / Tag 等定位上下文仍属于 read result metadata，不是可编辑 Object Value。具体 HTTP route / JSON envelope、CLI 输出包装和 SDK method shape 属于 adapter mapping，不得改变本文件的 logical contract。
 
 批量 editable presentation 不建立第三种 Object serialization。多个 canonical YAML Object body 需要在同一 stdout 中返回时，CLI 使用标准 YAML 1.2 **multi-document stream**：每个 document 的 mapping/list/scalar 内容必须与该 Object 单独 canonical render 的 bytes 一致；document-start marker 以及 marker/stream 上的 `kgos-state` / `kgos-ref` comment 属于 adapter framing，不属于 document 的 Object Value。Framing comment 被标准 YAML parser 丢弃不影响任何业务值；程序化 target association 使用请求顺序与结构化 metadata，不把 comment 当成持久 identity。v1 不建立自动拆文件、目录结构或 `{ref, value}` YAML wrapper，因为这些都会改变 Patch base 或重新引入文件身份。
 
@@ -106,43 +104,33 @@ String rendering 使用标准 YAML 1.2 序列化与解析实现，并保证 `par
 ```text
 ObjectKind = domain | node-definition | relationship-definition |
              knowledge-node | knowledge-relationship
-ObjectSummary = { kind, ref, name?, title?, description? }
-Page<T> = { state: ResolvedState, items: T[], cursor: string? }
+ObjectReadItem = { kind: ObjectKind, ref: ObjectRef, value: ObjectValue }
+ObjectReadResult = { state: ResolvedState, results: ObjectReadItem[] }
 ```
 
 Ontology `renameFrom` 是唯一已确认的内嵌 input-only rename 字段；解析 Patch 后先验证并提取该指令再生成正式 Object Value，不把它当未知持久字段，也不存入下一次 read。
 
-StateRef / ResolvedState 引用 [Evolution State reference](evolution.md#state-reference)。分页默认 limit=100，接受 1..1000；cursor 绑定 operation、resolved State 和 filters。不能解析或改写 cursor，参数不匹配返回 INVALID_ARGUMENT。
-
-`list`：
-
-```text
-request  = { at: StateRef, kind?, scope?: all|ontology|knowledge, limit?, cursor? }
-response = Page<ObjectSummary>
-```
-
-按 kind、canonical Ref 的 UTF-8 bytes 升序排列。`scope=ontology` 只列 Domain / Node Definition / Relationship Definition；`scope=knowledge` 只列 Knowledge Node / Relationship；缺省为 all。kind 与 scope 不一致报 INVALID_ARGUMENT。它是程序化枚举，不替代带业务说明和明确下一步入口的 Ontology read。
-
-`search`：
-
-```text
-request  = { at: StateRef, query: string,
-             kind?: knowledge-node|knowledge-relationship,
-             scope?: knowledge, limit?, cursor? }
-response = Page<ObjectSummary>
-```
-
-scope 省略等价 knowledge；ontology/all 或 Ontology kind 均拒绝。维持既有 Knowledge 最小定位语义：query 是非空 String，仅 canonical n:/r: Ref 完全相等时命中；不增加语义排序、属性文本匹配或另一套 Search DSL。Knowledge 内容检索使用 Graph。返回仍按 kind/ref 排序分页。
+StateRef / ResolvedState 引用 [Evolution State reference](evolution.md#state-reference)。
 
 `read`：
 
 ```text
-request = { at: StateRef, ref: ObjectRef }
-metadata = { state: ResolvedState, kind: ObjectKind, ref: ObjectRef }
-body = canonical YAML | equivalent JSON Object Value
+request = {
+  at: StateRef,
+  refs: ObjectRef[]       # 1..100
+}
+response = {
+  state: ResolvedState,
+  results: [
+    { kind: ObjectKind, ref: ObjectRef, value: ObjectValue },
+    ...
+  ]
+}
 ```
 
-body 只包含公共逻辑值。Metadata 由 adapter 独立携带，不能混入 editable YAML。JSON 与 YAML 等价，默认 Markdown Ontology read 是另一个只读呈现，不是 Patch base。
+一次 read 接受 1..100 个明确 Object Ref，覆盖五种公共 ObjectKind；重复 Ref 返回 `INVALID_ARGUMENT`。KG OS 在 daemon/kernel 层只解析一次 `at` 并 pin 为一个 immutable ResolvedState，随后在该 State 中按请求顺序读取全部目标。任一 Ref 非法、不存在、无法按公共 Object profile解释，或整个 batch 超过响应资源限制时，整次 read 失败，不返回 partial results。单 Ref 与多 Ref 使用同一 response shape。
+
+`value` 是公共逻辑值的 equivalent JSON representation；canonical YAML 仍是唯一 editable representation。Adapter 需要纯 body 时，从同一次 batch read 的 Object Value 使用共享 canonical renderer 生成，不允许通过逐 Ref 重新读取 Branch、重新解析 State或复制第二套 renderer。多个 YAML body 的 CLI framing 继续使用上文定义的标准 YAML 1.2 multi-document stream；单个 body 保持纯 canonical YAML。
 
 `patch`：
 
@@ -232,14 +220,14 @@ KG OS 的 Object Patch 不是 raw Lithograph Structural Patch。非 no-op Object
 
 KG OS 不使用 Lithograph Structural Patch 解决普通 Object mutation，不使用 caller-owned SQLite transaction 合并 Commit，也不建立自己的 hidden transaction / version layer。Structural Patch 仍属于 Lithograph 的版本 delta/replay 能力；KG OS 只在 Evolution diff/merge 等底层版本操作确实需要时通过 Lithograph 已有 Version capability 消费其结果，而不把 raw Patch 暴露为 Object wire。
 
-Object `list` / `search` / `read` 使用统一 State reference semantics。Branch / Tag 在读取开始时解析并 pin 到 immutable State，并返回 resolved State identity。Object `patch` 不接受模糊的“当前最新版本”作为文本 base：调用方必须提供明确 immutable `baseState` 与目标 Branch。成功写入返回本文 `patch` response 中的最终 State、`created` 与 `transitions`。对调用方**直接寻址并修改**后发生 identity replacement / rename 的 Object，结果必须返回旧 Ref → 新 Ref transition。Definition-level Relationship Type rename 可能派生出大量 Relationship replacement；这类 derived replacement 不承诺永久的一对一 Ref transition mapping，旧 Relationship Ref 在新 State 中失效，调用方通过 Graph 在新 State 中重新发现 Relationship，新旧集合变化通过 Evolution diff/history 审计。
+Object `read` 使用统一 State reference semantics。Branch / Tag 在读取开始时解析并 pin 到 immutable State，并返回 resolved State identity。Object `patch` 不接受模糊的“当前最新版本”作为文本 base：调用方必须提供明确 immutable `baseState` 与目标 Branch。成功写入返回本文 `patch` response 中的最终 State、`created` 与 `transitions`。对调用方**直接寻址并修改**后发生 identity replacement / rename 的 Object，结果必须返回旧 Ref → 新 Ref transition。Definition-level Relationship Type rename 可能派生出大量 Relationship replacement；这类 derived replacement 不承诺永久的一对一 Ref transition mapping，旧 Relationship Ref 在新 State 中失效，调用方通过 Graph 在新 State 中重新发现 Relationship，新旧集合变化通过 Evolution diff/history 审计。
 
 ### Object 能力边界
 
 - 不建立虚拟文件系统或第二套路径 identity；Git file entry 只是 textual Patch framing。
 - Object 统一 KG OS 业务 aggregate 的维护，不把每个底层 Schema resource 提升为公共对象。Ontology 聚合字段只在 ontology.md 定义。
 - 不另建 save/create/update/upsert、各 Property/Constraint/Index CRUD 或平行 Ontology Patch engine；`kg ontology patch` 只是本 Patch 的 kind-scoped CLI adapter。
-- Ontology discovery 使用渐进式读取，无 Ontology search；Knowledge 查询/批量写保持 Graph Cypher。
+- Object 不提供 list/search；Ontology discovery 使用渐进式 Ontology read，Knowledge discovery / 查询 / 条件批量写使用 Graph Cypher。
 - State Data、Branch、Tag、Merge 等 sidecar/ref 由 Evolution 负责，不套 Object 身份。
 - Object 不暴露 Binding Record、Schema Locator 或 reserved internal graph/Schema，不绕过其 Knowledge Graph View；公共 Graph 原始 Cypher 不受这项 Object 投影限制。
 - 不把 Lithograph raw Structural Patch 当作 Object wire；一次 logical Patch 由 KG OS 编译为一次真实 transaction。
