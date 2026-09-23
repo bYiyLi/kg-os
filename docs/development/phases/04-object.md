@@ -1,6 +1,6 @@
 # Phase 04：General Object Read & Patch
 
-**状态：`in_progress`**
+**状态：`done`**
 
 ## 1. 目标与范围
 
@@ -61,7 +61,7 @@ kg object patch
 - Phase 03 已有 business-command Runtime ensure、本机 credential resolution与稳定 `kg` HTTP client路径；
 - D73 已冻结通用 Object只保留 batch read / patch，设计上不存在 list/search implementation dependency。
 
-Design Inputs、依赖顺序与Acceptance已经齐全；当前本地实现、Review 与本地验收均已完成，仍待最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate 成功，因此 Phase状态为 `in_progress`。
+Design Inputs、依赖顺序与Acceptance已经齐全；当前实现、Review、本地/ fresh-source验收与最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate均已完成，因此 Phase状态为 `done`。
 
 ### 3.2 Lithograph baseline
 
@@ -310,7 +310,7 @@ Phase 04只有同时满足以下条件才能进入 `done`：
 | F Update / restructure | Node labels/properties、Relationship properties/type/endpoints、replacement transition 与 property/definition rename maintenance 有真实 integration 证据 | 本地通过 |
 | G Delete safety | Node incident Relationship 检查、显式 Relationship delete/restructure、非 DETACH 行为与 staged data-safety 有自动/真实数据库证据 | 本地通过 |
 | H Atomicity / concurrency | Ontology + Knowledge 共用 explicit transaction；strict base、no-op、constraint/data-safety failure、abort 与 staged validation 均在真实 Lithograph 路径验证 | 本地通过 |
-| I Regression / delivery | 主工作树与独立 fresh-source `pnpm validate` 均通过；Go statement coverage **90.2%**、race、govulncheck、TS/V8 + type coverage 100%、jscpd 0 clones、unused/build/Playwright/native/package/license/audit/diff 全绿；未发现 `object list/search` 实现。最终 pushed SHA 的 Ubuntu CI 尚未执行 | 本地通过，远端待完成 |
+| I Regression / delivery | 主工作树与独立 fresh-source `pnpm validate` 均通过；Go statement coverage **90.2%**、race、govulncheck、TS/V8 + type coverage 100%、jscpd 0 clones、unused/build/Playwright/native/package/license/audit/diff 全绿；未发现 `object list/search` 实现。实现提交 `d1b4d8ccd792d009496596141520e0a930ae9ef3` 已推送到 `main`，Ubuntu 24.04 x64 GitHub Actions run `35870467442` / Validate job `107212896176` 成功 | 已通过 |
 
 ### Phase Review
 
@@ -324,4 +324,4 @@ Phase 04只有同时满足以下条件才能进入 `done`：
 - 主工作树完整 `pnpm validate` 已通过；独立 `/tmp` fresh-source Git repo 在不复用主树 `node_modules` / cache / build artifact 的条件下执行 `pnpm run setup && pnpm validate` 同样通过。
 - `git diff --check` 通过；当前工作树没有 secret、database fixture、extension cache 或生成 artifact 进入版本状态。
 
-当前 reviewed local scope 没有剩余 task-affecting implementation finding。Phase 04 仍保持 `in_progress`，唯一未闭环的 Phase 完成条件是：提交并推送最终 revision 后，其 Ubuntu 24.04 x64 GitHub Actions Validate 必须真实成功。当前用户尚未授权 commit / push，因此本轮未执行远端门禁，也不把 Phase 标记为 `done`。
+当前 reviewed scope 没有剩余 task-affecting implementation finding。Phase 04 的 04.1–04.8、A–I Acceptance、Phase Review、主工作树完整 validation、独立 fresh-source validation 与实现提交 `d1b4d8ccd792d009496596141520e0a930ae9ef3` 对应的 Ubuntu 24.04 x64 GitHub Actions run `35870467442` / Validate job `107212896176` 已全部闭环，阶段进入 `done`。

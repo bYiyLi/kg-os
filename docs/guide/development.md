@@ -19,7 +19,7 @@ TypeScript
 
 `kgosd`、Kernel 与 `kg` CLI 不再使用旧 TypeScript 实现。产品运行时不依赖 Node.js；Node/pnpm 只用于 SDK、Web 和仓库工程工具。
 
-Phase 01 已把 `kgosd` 从工程壳层推进为真实本地 Runtime / Lithograph Host；Phase 02 已完成 Knowledge Base bootstrap / reopen validation、authenticated Ontology routes 与 `kg ontology`；Phase 03 已完成 `kg doctor`、`kg install`、本机 credential fallback 与业务命令 Runtime auto-start。当前工作树还实现了 Phase 04 的 `/api/v1/object/read`、`/api/v1/object/patch` 与 `kg object read/patch`，支持五类 Object 的 batch read 和 Knowledge Node/Relationship mutation。Graph / Evolution、SDK/Web/Skill 业务交互仍属于后续 Phase；Object不提供 list/search或第二套 CRUD。
+Phase 01 已把 `kgosd` 从工程壳层推进为真实本地 Runtime / Lithograph Host；Phase 02 已完成 Knowledge Base bootstrap / reopen validation、authenticated Ontology routes 与 `kg ontology`；Phase 03 已完成 `kg doctor`、`kg install`、本机 credential fallback 与业务命令 Runtime auto-start；Phase 04 已完成 `/api/v1/object/read`、`/api/v1/object/patch` 与 `kg object read/patch`，支持五类 Object 的 batch read 和 Knowledge Node/Relationship mutation。Graph / Evolution、SDK/Web/Skill 业务交互仍属于后续 Phase；Object不提供 list/search或第二套 CRUD。
 
 ## 工程目录
 
@@ -180,7 +180,7 @@ sqlite3_lithograph_init
 sqlite3_lithographopenaicompatible_init
 ```
 
-native suite 真实覆盖 SQLite >= 3.45、FTS5、Lithograph `0.3.0` / `CY25-2026.08` / storage format 3、`lithograph_validate(query)`、`lithograph()`、`lithograph_rows()`、query/execute context、Semantic Provider readiness/cache、explicit transaction、context cancellation、early-close rollback、shutdown cleanup 与 reopen；Phase 02 的 Kernel bootstrap/decoder/compiler、Ontology Patch/data-safety、HTTP auth和真实 daemon + `kg ontology` E2E，以及当前工作树 Phase 04 的 Knowledge Object read/patch、mixed Ontology+Knowledge transaction 与 Object daemon/CLI integration均进入同一 native gate。最终 Phase 状态仍以对应 Phase Acceptance 和要求的远端 CI 为准。
+native suite 真实覆盖 SQLite >= 3.45、FTS5、Lithograph `0.3.0` / `CY25-2026.08` / storage format 3、`lithograph_validate(query)`、`lithograph()`、`lithograph_rows()`、query/execute context、Semantic Provider readiness/cache、explicit transaction、context cancellation、early-close rollback、shutdown cleanup 与 reopen；Phase 02 的 Kernel bootstrap/decoder/compiler、Ontology Patch/data-safety、HTTP auth和真实 daemon + `kg ontology` E2E，以及 Phase 04 的 Knowledge Object read/patch、mixed Ontology+Knowledge transaction 与 Object daemon/CLI integration均进入同一 native gate。最终 Phase 状态仍以对应 Phase Acceptance 和要求的远端 CI 为准。
 
 ## 构建与本地候选交付物
 

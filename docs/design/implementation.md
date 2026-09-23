@@ -105,17 +105,17 @@ Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；
 
 ## 实现范围映射
 
-实现前检查 Lithograph 实际文件与测试，不复制它的 Phase 状态为 KG OS 真源。当前可复用基线来自已完成的 Phase 00–03 与当前工作树已实现的 Phase 04 Object primitive；实际阶段状态仍由[开发计划](../development/README.md)维护。以下内容只映射已确认设计产生的业务范围以及后续必须复用的基础 primitive，不在本文件维护阶段顺序或完成证据。
+实现前检查 Lithograph 实际文件与测试，不复制它的 Phase 状态为 KG OS 真源。当前可复用基线来自已完成的 Phase 00–04；实际阶段状态仍由[开发计划](../development/README.md)维护。以下内容只映射已确认设计产生的业务范围以及后续必须复用的基础 primitive，不在本文件维护阶段顺序或完成证据。
 
-- **Runtime / SQLite host**：Phase 01 已实现 `KG_HOME`、`auth.json` credential lifecycle、根目录 `kgos.db`、统一 extension resolver / per-connection loading、Lithograph v0.3.0 SQL execution/transaction、read/write connection、streaming/cancellation、Managed Semantic Provider readiness、lock 与 shutdown；Phase 02 已完成 empty-database bootstrap 与 authenticated Ontology routes；Phase 03 已完成 install / doctor /完整显式 config / credential fallback / business-command Runtime ensure 与 distribution artifact discovery；当前工作树的 Phase 04 Object routes继续复用同一 `net/http` server、认证、Runtime ensure 与 explicit transaction。阶段状态与远端门禁仍由开发计划维护。
+- **Runtime / SQLite host**：Phase 01 已实现 `KG_HOME`、`auth.json` credential lifecycle、根目录 `kgos.db`、统一 extension resolver / per-connection loading、Lithograph v0.3.0 SQL execution/transaction、read/write connection、streaming/cancellation、Managed Semantic Provider readiness、lock 与 shutdown；Phase 02 已完成 empty-database bootstrap 与 authenticated Ontology routes；Phase 03 已完成 install / doctor /完整显式 config / credential fallback / business-command Runtime ensure 与 distribution artifact discovery；Phase 04 Object routes继续复用同一 `net/http` server、认证、Runtime ensure 与 explicit transaction。阶段状态与远端门禁仍由开发计划维护。
 - **Ontology storage mapping**：实现 semantic graph、Binding coverage、Schema Locator 与 Object / Ontology Graph View；高层 Object / Ontology 输入保留 reserved identifier 校验，公共 Graph 不复用该限制。
 - **Reserved Ontology Schema**：按 D68 建立最小 Graph Type profile；Graph Type 负责 internal Node marker、字段 type/required 与基础 endpoint legality，KG OS consistency validation 负责 kind 枚举、name uniqueness、Binding coverage 和 `includes` 的 Domain-or-Definition target，不增加第二套 Schema/constraint engine。
 - **Object representation**：实现五种公共 Object Ref、aggregate decoder 与 Knowledge 原生 Object value；canonical YAML / JSON 省略空的顶层 `indexes`，保留非空复合 / 共享索引。
-- **Read paths**：Ontology read 的全局 / Domain / Definition 展开与 1..100 Ref batch已进入 Phase 02；当前工作树的通用 Object read已复用同一模型，实现1..100明确 Ref、一次 resolved State pin、输入顺序和all-or-nothing，覆盖 Domain / Definition / Knowledge Node / Knowledge Relationship。Object不提供 list/search；Knowledge发现交给 Graph。
-- **Mutation compiler**：Phase 02 已实现 Ontology-scoped共享 Object Patch compiler；当前工作树已在同一 parser / logical delta / explicit transaction上开放 Knowledge Node / Relationship create/update/delete/restructure、request-local alias、Ref transition 与 Ontology+Knowledge多 Object原子 Patch，没有第二套 CRUD 或单独 Schema resource API。
+- **Read paths**：Ontology read 的全局 / Domain / Definition 展开与 1..100 Ref batch已进入 Phase 02；Phase 04 通用 Object read已复用同一模型，实现1..100明确 Ref、一次 resolved State pin、输入顺序和all-or-nothing，覆盖 Domain / Definition / Knowledge Node / Knowledge Relationship。Object不提供 list/search；Knowledge发现交给 Graph。
+- **Mutation compiler**：Phase 02 已实现 Ontology-scoped共享 Object Patch compiler；Phase 04 已在同一 parser / logical delta / explicit transaction上开放 Knowledge Node / Relationship create/update/delete/restructure、request-local alias、Ref transition 与 Ontology+Knowledge多 Object原子 Patch，没有第二套 CRUD 或单独 Schema resource API。
 - **Graph execution**：复用 Phase 01 已有 query / execute adapter，完成公共 Graph HTTP contract、Bearer middleware、NDJSON framing、transport cancellation 及 client integration；继续原样传递 Cypher 与 Lithograph JSON 值，不设 procedure、Vector 或 reserved identifier 检查。只有 public end-to-end 验收通过后才报告 Graph 能力可用。
 - **Evolution**：实现 read / state / ref / history / diff / merge，内部 schema slot 转为 aggregate 字段，固定 candidate revision 检查一致性后 finalize。
-- **Client surfaces**：Go `kg` 已具备 doctor / install / Runtime ensure、Ontology 与当前工作树的 Object read/patch；后续继续实现 Graph / Evolution surface。TypeScript SDK / Web继续消费同一 HTTP contract；Web 页面构建产物继续由同一 `kgosd` 交付，后续提供 Skill / SDK / Web 使用文档。
+- **Client surfaces**：Go `kg` 已具备 doctor / install / Runtime ensure、Ontology 与 Phase 04 Object read/patch；后续继续实现 Graph / Evolution surface。TypeScript SDK / Web继续消费同一 HTTP contract；Web 页面构建产物继续由同一 `kgosd` 交付，后续提供 Skill / SDK / Web 使用文档。
 
 Web 还需细化页面布局、导航与具体操作交互，状态由 [Runtime](runtime.md#web-交互设计状态)记录。页面细化是同一产品的前端工作，不产生单独部署的 Web 服务，也不是上面 Kernel、daemon、CLI 或 SDK 开工的前置条件；当前文档不把尚未细化的页面标为已设计完成。
 
