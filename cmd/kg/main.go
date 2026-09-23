@@ -25,6 +25,8 @@ func run(
 		return 0
 	}
 	switch args[0] {
+	case "object":
+		return runObject(ctx, args[1:], stdin, stdinIsTTY, stdout, stderr)
 	case "ontology":
 		return runOntology(ctx, args[1:], stdin, stdinIsTTY, stdout, stderr)
 	case "install":

@@ -111,42 +111,39 @@ func runOntologyEdit(
 	if code != 0 {
 		return code
 	}
-	type objectBody struct {
-		Ref  string
-		Body []byte
+	body, _, publicErr, transportErr := doAPIRequest(
+		ctx,
+		target.Endpoint,
+		target.Token,
+		"/api/v1/object/read",
+		"application/json",
+		kernel.ObjectReadRequest{At: input.At, Refs: input.Refs},
+	)
+	if transportErr != nil {
+		return writeLocalCLIError(stderr, kernel.CodeIO, "daemon transport failed", 3)
 	}
-	objects := make([]objectBody, 0, len(input.Refs))
-	for _, ref := range input.Refs {
-		body, headers, publicErr, transportErr := doAPIRequest(
-			ctx,
-			target.Endpoint,
-			target.Token,
-			"/api/v1/ontology/object",
-			"application/yaml",
-			map[string]any{"at": input.At, "ref": ref},
-		)
-		if transportErr != nil {
-			return writeLocalCLIError(stderr, kernel.CodeIO, "daemon transport failed", 3)
-		}
-		if publicErr != nil {
-			return writePublicCLIError(stderr, publicErr, 1)
-		}
-		if headers.Get("X-KGOS-State") != input.At || headers.Get("X-KGOS-Ref") != ref {
+	if publicErr != nil {
+		return writePublicCLIError(stderr, publicErr, 1)
+	}
+	var result kernel.ObjectReadResult
+	if err := json.Unmarshal(body, &result); err != nil {
+		return writeLocalCLIError(stderr, kernel.CodeIO, "daemon returned an invalid Object response", 3)
+	}
+	if result.State != input.At || len(result.Results) != len(input.Refs) {
+		return writeLocalCLIError(stderr, kernel.CodeIO, "daemon returned mismatched Object metadata", 3)
+	}
+	for index, item := range result.Results {
+		if item.Ref != input.Refs[index] ||
+			(item.Kind != kernel.KindDomain && item.Kind != kernel.KindNodeDefinition &&
+				item.Kind != kernel.KindRelationshipDefinition) {
 			return writeLocalCLIError(stderr, kernel.CodeIO, "daemon returned mismatched Object metadata", 3)
 		}
-		objects = append(objects, objectBody{Ref: ref, Body: body})
 	}
-	if len(objects) == 1 {
-		_, _ = stdout.Write(objects[0].Body)
-		return 0
+	output, err := formatObjectReadCLI(result, objectReadCLI{Body: true, Format: "yaml"})
+	if err != nil {
+		return writeLocalCLIError(stderr, kernel.CodeIO, err.Error(), 3)
 	}
-	var output bytes.Buffer
-	fmt.Fprintf(&output, "# kgos-state: %s\n", input.At)
-	for _, object := range objects {
-		fmt.Fprintf(&output, "--- # kgos-ref: %s\n", object.Ref)
-		output.Write(object.Body)
-	}
-	_, _ = stdout.Write(output.Bytes())
+	_, _ = stdout.Write(output)
 	return 0
 }
 
@@ -158,9 +155,32 @@ func runOntologyPatch(
 	stdout io.Writer,
 	stderr io.Writer,
 ) int {
+	return runPatchCommand(
+		ctx,
+		args,
+		stdin,
+		stdinIsTTY,
+		stdout,
+		stderr,
+		"/api/v1/ontology/patch",
+		"ontology patch",
+	)
+}
+
+func runPatchCommand(
+	ctx context.Context,
+	args []string,
+	stdin io.Reader,
+	stdinIsTTY bool,
+	stdout io.Writer,
+	stderr io.Writer,
+	endpoint string,
+	commandName string,
+) int {
 	input, err := parseOntologyPatchCLI(args)
 	if err != nil {
-		return writeLocalCLIError(stderr, kernel.CodeInvalidArgument, err.Error(), 2)
+		message := strings.ReplaceAll(err.Error(), "ontology patch", commandName)
+		return writeLocalCLIError(stderr, kernel.CodeInvalidArgument, message, 2)
 	}
 	if !isResolvedState(input.BaseState) {
 		return writeLocalCLIError(stderr, kernel.CodeInvalidArgument, "--base-state must be commit/<64-hex>", 2)
@@ -181,7 +201,7 @@ func runOntologyPatch(
 		Message:   input.Message,
 	}
 	body, _, publicErr, transportErr := doAPIRequest(
-		ctx, target.Endpoint, target.Token, "/api/v1/ontology/patch", "application/json", request,
+		ctx, target.Endpoint, target.Token, endpoint, "application/json", request,
 	)
 	if transportErr != nil {
 		return writeLocalCLIError(stderr, kernel.CodeIO, "daemon transport failed", 3)
@@ -204,12 +224,9 @@ func parseOntologyReadCLI(args []string) (ontologyReadCLI, error) {
 		arg := args[index]
 		switch arg {
 		case "--at":
-			value, next, err := nextCLIValue(args, index, "--at")
+			value, next, err := nextUniqueCLIValue(args, index, "--at", input.At)
 			if err != nil {
 				return input, err
-			}
-			if input.At != "" {
-				return input, fmt.Errorf("--at may be provided only once")
 			}
 			input.At = value
 			index = next
@@ -399,6 +416,22 @@ func nextCLIValue(args []string, index int, name string) (string, int, error) {
 		return "", index, fmt.Errorf("%s requires a value", name)
 	}
 	return args[index+1], index + 1, nil
+}
+
+func nextUniqueCLIValue(
+	args []string,
+	index int,
+	name string,
+	current string,
+) (string, int, error) {
+	value, next, err := nextCLIValue(args, index, name)
+	if err != nil {
+		return "", index, err
+	}
+	if current != "" {
+		return "", index, fmt.Errorf("%s may be provided only once", name)
+	}
+	return value, next, nil
 }
 
 type cliTarget struct {

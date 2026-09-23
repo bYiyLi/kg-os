@@ -2,7 +2,6 @@ package kernel
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -10,12 +9,16 @@ import (
 	"github.com/bYiyLi/kg-os/internal/lithograph"
 )
 
-func (service *Service) validateDataSafety(ctx context.Context, plan *plannedState) error {
+func (service *Service) validateStagedDataSafety(
+	ctx context.Context,
+	transaction *lithograph.Transaction,
+	plan *plannedState,
+) error {
 	continuity := plan.continuityByBaseRef()
 	for baseRef, baseRecord := range plan.Base.Definitions {
 		entry, survives := continuity[baseRef.String()]
 		if !survives {
-			count, err := service.countDefinitionElements(ctx, plan.Base.State, baseRef)
+			count, err := service.countDefinitionElements(ctx, transaction, baseRef)
 			if err != nil {
 				return err
 			}
@@ -30,7 +33,7 @@ func (service *Service) validateDataSafety(ctx context.Context, plan *plannedSta
 		targetRef := entry.Ref
 		targetObject := entry.Object
 		if targetRef != baseRef {
-			count, err := service.countDefinitionElements(ctx, plan.Base.State, targetRef)
+			count, err := service.countDefinitionElements(ctx, transaction, targetRef)
 			if err != nil {
 				return err
 			}
@@ -55,7 +58,7 @@ func (service *Service) validateDataSafety(ctx context.Context, plan *plannedSta
 			if _, ok := continuingProperties[propertyName]; ok {
 				continue
 			}
-			count, err := service.countPropertyValues(ctx, plan.Base.State, baseRef, propertyName)
+			count, err := service.countPropertyValues(ctx, transaction, baseRef, propertyName)
 			if err != nil {
 				return err
 			}
@@ -79,7 +82,7 @@ func (service *Service) validateDataSafety(ctx context.Context, plan *plannedSta
 			if _, preservedBySameRenameSet := renameSources[newName]; preservedBySameRenameSet {
 				continue
 			}
-			count, err := service.countPropertyTargetValues(ctx, plan.Base.State, baseRef, newName)
+			count, err := service.countPropertyTargetValues(ctx, transaction, baseRef, newName)
 			if err != nil {
 				return err
 			}
@@ -92,7 +95,13 @@ func (service *Service) validateDataSafety(ctx context.Context, plan *plannedSta
 				)
 			}
 			if baseRef.Kind == KindNodeDefinition {
-				if err := service.validateNodePropertyRenameOverlap(ctx, plan, baseRef, oldName); err != nil {
+				if err := service.validateNodePropertyRenameOverlap(
+					ctx,
+					plan,
+					transaction,
+					baseRef,
+					oldName,
+				); err != nil {
 					return err
 				}
 			}
@@ -104,6 +113,7 @@ func (service *Service) validateDataSafety(ctx context.Context, plan *plannedSta
 func (service *Service) validateNodePropertyRenameOverlap(
 	ctx context.Context,
 	plan *plannedState,
+	transaction *lithograph.Transaction,
 	owner OntologyRef,
 	sourceProperty string,
 ) error {
@@ -129,9 +139,9 @@ func (service *Service) validateNodePropertyRenameOverlap(
 		if !keepsSource {
 			continue
 		}
-		count, err := service.queryCount(
+		count, err := transactionCount(
 			ctx,
-			plan.Base.State,
+			transaction,
 			"MATCH (n:$($owner):$($other)) WHERE n[$property] IS NOT NULL RETURN count(n) AS count",
 			map[string]any{
 				"owner":    owner.Name,
@@ -182,7 +192,7 @@ func (plan *plannedState) continuityByBaseRef() map[string]struct {
 
 func (service *Service) countDefinitionElements(
 	ctx context.Context,
-	state string,
+	transaction *lithograph.Transaction,
 	ref OntologyRef,
 ) (int64, error) {
 	var cypher string
@@ -197,12 +207,12 @@ func (service *Service) countDefinitionElements(
 	default:
 		return 0, publicError(CodeType, "Definition data count requires a Definition Ref", nil)
 	}
-	return service.queryCount(ctx, state, cypher, params)
+	return transactionCount(ctx, transaction, cypher, params)
 }
 
 func (service *Service) countPropertyValues(
 	ctx context.Context,
-	state string,
+	transaction *lithograph.Transaction,
 	ref OntologyRef,
 	property string,
 ) (int64, error) {
@@ -218,12 +228,12 @@ func (service *Service) countPropertyValues(
 	default:
 		return 0, publicError(CodeType, "Property data count requires a Definition Ref", nil)
 	}
-	return service.queryCount(ctx, state, cypher, params)
+	return transactionCount(ctx, transaction, cypher, params)
 }
 
 func (service *Service) countPropertyTargetValues(
 	ctx context.Context,
-	state string,
+	transaction *lithograph.Transaction,
 	ref OntologyRef,
 	newName string,
 ) (int64, error) {
@@ -239,35 +249,7 @@ func (service *Service) countPropertyTargetValues(
 	default:
 		return 0, publicError(CodeType, "Property rename requires a Definition Ref", nil)
 	}
-	return service.queryCount(ctx, state, cypher, params)
-}
-
-func (service *Service) queryCount(
-	ctx context.Context,
-	state string,
-	cypher string,
-	params map[string]any,
-) (int64, error) {
-	result, err := service.database.Query(ctx, lithograph.QueryRequest{
-		At:     state,
-		Cypher: cypher,
-		Params: params,
-	})
-	if err != nil {
-		return 0, AsPublicError(err)
-	}
-	rows, err := rowsByName(result.Result)
-	if err != nil {
-		return 0, err
-	}
-	if len(rows) != 1 {
-		return 0, publicError(CodeInternal, "unexpected Lithograph count result", nil)
-	}
-	var count int64
-	if err := json.Unmarshal(rows[0]["count"], &count); err != nil {
-		return 0, publicError(CodeInternal, "decode Lithograph count result", err)
-	}
-	return count, nil
+	return transactionCount(ctx, transaction, cypher, params)
 }
 
 func applyKnowledgeRenameMaintenance(

@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
@@ -22,6 +23,51 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 		fallback = http.NotFoundHandler()
 	}
 	mux := http.NewServeMux()
+	patchHandler := func(
+		apply func(context.Context, kernel.PatchRequest) (kernel.PatchResult, error),
+	) http.HandlerFunc {
+		return func(response http.ResponseWriter, request *http.Request) {
+			if !authenticate(response, request, runtime.Credential.Token) {
+				return
+			}
+			if request.Method != http.MethodPost {
+				writeMethodNotAllowed(response)
+				return
+			}
+			var input kernel.PatchRequest
+			if err := decodeJSONRequest(response, request, &input); err != nil {
+				kernel.WriteJSONError(response, err)
+				return
+			}
+			result, err := apply(request.Context(), input)
+			if err != nil {
+				kernel.WriteJSONError(response, err)
+				return
+			}
+			writeJSON(response, http.StatusOK, result)
+		}
+	}
+	mux.HandleFunc("/api/v1/object/read", func(response http.ResponseWriter, request *http.Request) {
+		if !authenticate(response, request, runtime.Credential.Token) {
+			return
+		}
+		if request.Method != http.MethodPost {
+			writeMethodNotAllowed(response)
+			return
+		}
+		var input kernel.ObjectReadRequest
+		if err := decodeJSONRequest(response, request, &input); err != nil {
+			kernel.WriteJSONError(response, err)
+			return
+		}
+		result, err := runtime.Kernel.ReadObjects(request.Context(), input)
+		if err != nil {
+			kernel.WriteJSONError(response, err)
+			return
+		}
+		writeJSON(response, http.StatusOK, result)
+	})
+	mux.HandleFunc("/api/v1/object/patch", patchHandler(runtime.Kernel.PatchObjects))
 	mux.HandleFunc("/api/v1/ontology/read", func(response http.ResponseWriter, request *http.Request) {
 		if !authenticate(response, request, runtime.Credential.Token) {
 			return
@@ -83,26 +129,7 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 			_, _ = response.Write(body.JSON)
 		}
 	})
-	mux.HandleFunc("/api/v1/ontology/patch", func(response http.ResponseWriter, request *http.Request) {
-		if !authenticate(response, request, runtime.Credential.Token) {
-			return
-		}
-		if request.Method != http.MethodPost {
-			writeMethodNotAllowed(response)
-			return
-		}
-		var input kernel.PatchRequest
-		if err := decodeJSONRequest(response, request, &input); err != nil {
-			kernel.WriteJSONError(response, err)
-			return
-		}
-		result, err := runtime.Kernel.PatchOntology(request.Context(), input)
-		if err != nil {
-			kernel.WriteJSONError(response, err)
-			return
-		}
-		writeJSON(response, http.StatusOK, result)
-	})
+	mux.HandleFunc("/api/v1/ontology/patch", patchHandler(runtime.Kernel.PatchOntology))
 	mux.Handle("/", fallback)
 	return mux
 }

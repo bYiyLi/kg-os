@@ -49,6 +49,10 @@ func planOntologyPatch(base *snapshot, patchText string) (*plannedState, error) 
 	if err != nil {
 		return nil, err
 	}
+	return planOntologyEntries(base, document.Entries)
+}
+
+func planOntologyEntries(base *snapshot, entries []patchEntry) (*plannedState, error) {
 	plan := &plannedState{
 		Base:            base,
 		Objects:         map[OntologyRef]*plannedObject{},
@@ -82,7 +86,7 @@ func planOntologyPatch(base *snapshot, patchText string) (*plannedState, error) 
 
 	usedBaseTargets := map[OntologyRef]struct{}{}
 	usedAliases := map[string]struct{}{}
-	for _, entry := range document.Entries {
+	for _, entry := range entries {
 		if err := plan.applyEntry(entry, usedBaseTargets, usedAliases); err != nil {
 			return nil, err
 		}

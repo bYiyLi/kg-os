@@ -1,6 +1,7 @@
 package kernel
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -9,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/bYiyLi/kg-os/internal/lithograph"
 )
 
 const (
@@ -95,18 +98,15 @@ func (service *Service) ReadOntology(ctx context.Context, request OntologyReadRe
 }
 
 func (service *Service) ReadObject(ctx context.Context, at, rawRef string) (ObjectBody, error) {
-	if at == "" {
-		return ObjectBody{}, publicError(CodeInvalidArgument, "at is required", nil)
-	}
-	ref, err := ParseOntologyRef(rawRef)
+	result, err := service.ReadObjects(ctx, ObjectReadRequest{At: at, Refs: []string{rawRef}})
 	if err != nil {
 		return ObjectBody{}, err
 	}
-	snapshot, err := service.decodeSnapshot(ctx, at)
-	if err != nil {
-		return ObjectBody{}, err
+	if len(result.Results) != 1 {
+		return ObjectBody{}, publicError(CodeInternal, "single Object read returned unexpected result count", nil)
 	}
-	value, err := snapshot.objectValue(ref)
+	item := result.Results[0]
+	value, err := ParseObjectJSON(item.Kind, item.Value)
 	if err != nil {
 		return ObjectBody{}, err
 	}
@@ -122,13 +122,197 @@ func (service *Service) ReadObject(ctx context.Context, at, rawRef string) (Obje
 		return ObjectBody{}, publicError(CodeResource, "Object body exceeds response resource limit", nil)
 	}
 	return ObjectBody{
-		State: snapshot.State,
-		Ref:   ref.String(),
-		Kind:  ref.Kind,
+		State: result.State,
+		Ref:   item.Ref,
+		Kind:  item.Kind,
 		Value: value,
 		YAML:  yamlBody,
 		JSON:  jsonBody,
 	}, nil
+}
+
+func (service *Service) ReadObjects(ctx context.Context, request ObjectReadRequest) (ObjectReadResult, error) {
+	if request.At == "" {
+		return ObjectReadResult{}, publicError(CodeInvalidArgument, "at is required", nil)
+	}
+	if len(request.Refs) < 1 || len(request.Refs) > maxBatchRefs {
+		return ObjectReadResult{}, publicError(CodeInvalidArgument, "Object read requires 1..100 refs", nil)
+	}
+	parsed := make([]ObjectRef, 0, len(request.Refs))
+	seen := map[string]struct{}{}
+	hasOntology := false
+	for _, raw := range request.Refs {
+		if _, exists := seen[raw]; exists {
+			return ObjectReadResult{}, publicError(CodeInvalidArgument, "duplicate Object Ref", nil)
+		}
+		seen[raw] = struct{}{}
+		ref, err := ParseObjectRef(raw)
+		if err != nil {
+			return ObjectReadResult{}, err
+		}
+		if _, ok := ref.Ontology(); ok {
+			hasOntology = true
+		}
+		parsed = append(parsed, ref)
+	}
+
+	state, err := service.database.ResolveState(ctx, request.At)
+	if err != nil {
+		return ObjectReadResult{}, AsPublicError(err)
+	}
+	var ontology *snapshot
+	if hasOntology {
+		ontology, err = service.decodeResolvedSnapshot(ctx, state)
+		if err != nil {
+			return ObjectReadResult{}, err
+		}
+	}
+	result := ObjectReadResult{State: state, Results: make([]ObjectReadItem, 0, len(parsed))}
+	totalBytes := 0
+	for _, ref := range parsed {
+		var value ObjectValue
+		if ontologyRef, ok := ref.Ontology(); ok {
+			value, err = ontology.objectValue(ontologyRef)
+		} else {
+			value, err = service.readKnowledgeObject(ctx, state, ref)
+		}
+		if err != nil {
+			return ObjectReadResult{}, err
+		}
+		jsonBody, renderErr := RenderObjectJSON(value)
+		if renderErr != nil {
+			return ObjectReadResult{}, renderErr
+		}
+		yamlBody, renderErr := RenderObjectYAML(value)
+		if renderErr != nil {
+			return ObjectReadResult{}, renderErr
+		}
+		totalBytes += len(jsonBody) + len(yamlBody)
+		if totalBytes > maxReadBytes {
+			return ObjectReadResult{}, publicError(CodeResource, "Object read result exceeds response resource limit", nil)
+		}
+		result.Results = append(result.Results, ObjectReadItem{
+			Kind: ref.Kind, Ref: ref.String(), Value: append(json.RawMessage(nil), bytes.TrimSpace(jsonBody)...),
+		})
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return ObjectReadResult{}, publicError(CodeInternal, "encode Object read result", err)
+	}
+	if len(encoded) > maxReadBytes {
+		return ObjectReadResult{}, publicError(CodeResource, "Object read result exceeds response resource limit", nil)
+	}
+	return result, nil
+}
+
+func (service *Service) readKnowledgeObject(ctx context.Context, state string, ref ObjectRef) (ObjectValue, error) {
+	params := map[string]any{"id": ref.String()}
+	switch ref.Kind {
+	case KindKnowledgeNode:
+		query, err := service.database.Query(ctx, lithograph.QueryRequest{
+			At: state, Cypher: "MATCH (n) WHERE elementId(n) = $id RETURN n", Params: params,
+		})
+		if err != nil {
+			return ObjectValue{}, AsPublicError(err)
+		}
+		row, err := singleKnowledgeRow(query.Result, ref, "Node")
+		if err != nil {
+			return ObjectValue{}, err
+		}
+		var node taggedNode
+		if err := json.Unmarshal(row["n"], &node); err != nil {
+			return ObjectValue{}, publicError(CodeInternal, "decode Knowledge Node", err)
+		}
+		if node.ElementID != ref.String() {
+			return ObjectValue{}, publicError(CodeConsistency, "Knowledge Node identity does not match requested Ref", nil)
+		}
+		if hasLabel(node.Labels, internalLabel) {
+			return ObjectValue{}, errorWithDetails(CodeConsistency, "internal KG OS Node is not a public Knowledge Object", map[string]any{"ref": ref.String()})
+		}
+		value := ObjectValue{Kind: KindKnowledgeNode, KnowledgeNode: &KnowledgeNode{
+			Labels: append([]string(nil), node.Labels...), Properties: cloneRawProperties(node.Properties),
+		}}
+		if err := normalizeObject(value); err != nil {
+			return ObjectValue{}, err
+		}
+		return value, nil
+
+	case KindKnowledgeRelationship:
+		query, err := service.database.Query(ctx, lithograph.QueryRequest{
+			At:     state,
+			Cypher: "MATCH (a)-[r]->(b) WHERE elementId(r) = $id RETURN r, a, b",
+			Params: params,
+		})
+		if err != nil {
+			return ObjectValue{}, AsPublicError(err)
+		}
+		row, err := singleKnowledgeRow(query.Result, ref, "Relationship")
+		if err != nil {
+			return ObjectValue{}, err
+		}
+		var relationship taggedRelationship
+		var start taggedNode
+		var end taggedNode
+		if err := json.Unmarshal(row["r"], &relationship); err != nil {
+			return ObjectValue{}, publicError(CodeInternal, "decode Knowledge Relationship", err)
+		}
+		if err := json.Unmarshal(row["a"], &start); err != nil {
+			return ObjectValue{}, publicError(CodeInternal, "decode Knowledge Relationship start", err)
+		}
+		if err := json.Unmarshal(row["b"], &end); err != nil {
+			return ObjectValue{}, publicError(CodeInternal, "decode Knowledge Relationship end", err)
+		}
+		if relationship.ElementID != ref.String() {
+			return ObjectValue{}, publicError(CodeConsistency, "Knowledge Relationship identity does not match requested Ref", nil)
+		}
+		if hasLabel(start.Labels, internalLabel) || hasLabel(end.Labels, internalLabel) {
+			return ObjectValue{}, errorWithDetails(CodeConsistency, "internal KG OS Relationship is not a public Knowledge Object", map[string]any{"ref": ref.String()})
+		}
+		value := ObjectValue{Kind: KindKnowledgeRelationship, KnowledgeRelationship: &KnowledgeRelationship{
+			Type: relationship.Type, Start: relationship.Start, End: relationship.End,
+			Properties: cloneRawProperties(relationship.Properties),
+		}}
+		if err := normalizeObject(value); err != nil {
+			return ObjectValue{}, err
+		}
+		return value, nil
+	default:
+		return ObjectValue{}, publicError(CodeInvalidArgument, "Knowledge read requires a Knowledge Object Ref", nil)
+	}
+}
+
+func singleKnowledgeRow(
+	result lithograph.Result,
+	ref ObjectRef,
+	kind string,
+) (map[string]json.RawMessage, error) {
+	rows, err := rowsByName(result)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, objectRefNotFound(ref)
+	}
+	if len(rows) != 1 {
+		return nil, publicError(
+			CodeConsistency,
+			"Knowledge "+kind+" identity is not unique",
+			nil,
+		)
+	}
+	return rows[0], nil
+}
+
+func objectRefNotFound(ref ObjectRef) error {
+	return errorWithDetails(CodeObjectNotFound, "Object was not found", map[string]any{"ref": ref.String()})
+}
+
+func cloneRawProperties(input map[string]json.RawMessage) map[string]json.RawMessage {
+	output := make(map[string]json.RawMessage, len(input))
+	for key, value := range input {
+		output[key] = append(json.RawMessage(nil), value...)
+	}
+	return output
 }
 
 func (snapshot *snapshot) objectValue(ref OntologyRef) (ObjectValue, error) {

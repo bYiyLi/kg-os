@@ -67,6 +67,10 @@ func (service *Service) decodeSnapshot(ctx context.Context, stateRef string) (*s
 	if err != nil {
 		return nil, AsPublicError(err)
 	}
+	return service.decodeResolvedSnapshot(ctx, state)
+}
+
+func (service *Service) decodeResolvedSnapshot(ctx context.Context, state string) (*snapshot, error) {
 	graphNodes, graphRelationships, err := service.readGraphType(ctx, state)
 	if err != nil {
 		return nil, err

@@ -366,16 +366,20 @@ func TestRunOntologyEditBatchAndFailures(t *testing.T) {
 	state := "commit/" + strings.Repeat("a", 64)
 	t.Run("batch framing", func(t *testing.T) {
 		configureFakeCLIDaemon(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var input struct {
-				At  string `json:"at"`
-				Ref string `json:"ref"`
-			}
+			var input kernel.ObjectReadRequest
 			if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 				t.Fatal(err)
 			}
-			w.Header().Set("X-KGOS-State", input.At)
-			w.Header().Set("X-KGOS-Ref", input.Ref)
-			_, _ = io.WriteString(w, "name: \""+input.Ref+"\"\nincludes: []\n")
+			if len(input.Refs) != 2 {
+				t.Fatalf("refs = %#v", input.Refs)
+			}
+			_ = json.NewEncoder(w).Encode(kernel.ObjectReadResult{
+				State: input.At,
+				Results: []kernel.ObjectReadItem{
+					{Kind: kernel.KindDomain, Ref: input.Refs[0], Value: json.RawMessage(`{"name":"A","includes":[]}`)},
+					{Kind: kernel.KindDomain, Ref: input.Refs[1], Value: json.RawMessage(`{"name":"B","includes":[]}`)},
+				},
+			})
 		}))
 		var stdout, stderr strings.Builder
 		code := runOntologyEdit(
@@ -394,9 +398,12 @@ func TestRunOntologyEditBatchAndFailures(t *testing.T) {
 
 	t.Run("metadata mismatch", func(t *testing.T) {
 		configureFakeCLIDaemon(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("X-KGOS-State", state)
-			w.Header().Set("X-KGOS-Ref", "domain:Other")
-			_, _ = io.WriteString(w, "name: \"A\"\nincludes: []\n")
+			_ = json.NewEncoder(w).Encode(kernel.ObjectReadResult{
+				State: state,
+				Results: []kernel.ObjectReadItem{
+					{Kind: kernel.KindDomain, Ref: "domain:Other", Value: json.RawMessage(`{"name":"A","includes":[]}`)},
+				},
+			})
 		}))
 		var stdout, stderr strings.Builder
 		code := runOntologyEdit(

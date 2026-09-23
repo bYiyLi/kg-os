@@ -1,6 +1,7 @@
 package kernel
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -14,12 +15,28 @@ const (
 	KindDomain                 ObjectKind = "domain"
 	KindNodeDefinition         ObjectKind = "node-definition"
 	KindRelationshipDefinition ObjectKind = "relationship-definition"
+	KindKnowledgeNode          ObjectKind = "knowledge-node"
+	KindKnowledgeRelationship  ObjectKind = "knowledge-relationship"
 )
 
 type ObjectValue struct {
-	Kind       ObjectKind
-	Domain     *Domain
-	Definition *Definition
+	Kind                  ObjectKind
+	Domain                *Domain
+	Definition            *Definition
+	KnowledgeNode         *KnowledgeNode
+	KnowledgeRelationship *KnowledgeRelationship
+}
+
+type KnowledgeNode struct {
+	Labels     []string                   `json:"labels" yaml:"labels"`
+	Properties map[string]json.RawMessage `json:"properties" yaml:"-"`
+}
+
+type KnowledgeRelationship struct {
+	Type       string                     `json:"type" yaml:"type"`
+	Start      string                     `json:"start" yaml:"start"`
+	End        string                     `json:"end" yaml:"end"`
+	Properties map[string]json.RawMessage `json:"properties" yaml:"-"`
 }
 
 type Domain struct {
@@ -106,6 +123,22 @@ type OntologyReadResult struct {
 	Results []OntologyReadItem `json:"results"`
 }
 
+type ObjectReadRequest struct {
+	At   string   `json:"at"`
+	Refs []string `json:"refs"`
+}
+
+type ObjectReadItem struct {
+	Kind  ObjectKind      `json:"kind"`
+	Ref   string          `json:"ref"`
+	Value json.RawMessage `json:"value"`
+}
+
+type ObjectReadResult struct {
+	State   string           `json:"state"`
+	Results []ObjectReadItem `json:"results"`
+}
+
 type ObjectBody struct {
 	State string
 	Ref   string
@@ -143,19 +176,94 @@ type PatchResult struct {
 func normalizeObject(value ObjectValue) error {
 	switch value.Kind {
 	case KindDomain:
-		if value.Domain == nil || value.Definition != nil {
+		if value.Domain == nil || value.Definition != nil || value.KnowledgeNode != nil ||
+			value.KnowledgeRelationship != nil {
 			return publicError(CodeType, "domain object has invalid shape", nil)
 		}
 		return normalizeDomain(value.Domain)
 	case KindNodeDefinition, KindRelationshipDefinition:
-		if value.Definition == nil || value.Domain != nil {
+		if value.Definition == nil || value.Domain != nil || value.KnowledgeNode != nil ||
+			value.KnowledgeRelationship != nil {
 			return publicError(CodeType, "definition object has invalid shape", nil)
 		}
 		value.Definition.Kind = value.Kind
 		return normalizeDefinition(value.Definition)
+	case KindKnowledgeNode:
+		if value.KnowledgeNode == nil || value.Domain != nil || value.Definition != nil ||
+			value.KnowledgeRelationship != nil {
+			return publicError(CodeType, "Knowledge Node object has invalid shape", nil)
+		}
+		return normalizeKnowledgeNode(value.KnowledgeNode)
+	case KindKnowledgeRelationship:
+		if value.KnowledgeRelationship == nil || value.Domain != nil || value.Definition != nil ||
+			value.KnowledgeNode != nil {
+			return publicError(CodeType, "Knowledge Relationship object has invalid shape", nil)
+		}
+		return normalizeKnowledgeRelationship(value.KnowledgeRelationship)
 	default:
-		return publicError(CodeInvalidArgument, "unsupported Ontology object kind", nil)
+		return publicError(CodeInvalidArgument, "unsupported Object kind", nil)
 	}
+}
+
+func normalizeKnowledgeNode(node *KnowledgeNode) error {
+	if node.Properties == nil {
+		node.Properties = map[string]json.RawMessage{}
+	}
+	if err := normalizeSet(&node.Labels, "labels"); err != nil {
+		return err
+	}
+	for _, label := range node.Labels {
+		if err := validateKnowledgeIdentifier(label, "Knowledge Node label"); err != nil {
+			return err
+		}
+	}
+	return validateKnowledgeProperties(node.Properties)
+}
+
+func normalizeKnowledgeRelationship(relationship *KnowledgeRelationship) error {
+	if relationship.Properties == nil {
+		relationship.Properties = map[string]json.RawMessage{}
+	}
+	if err := validateKnowledgeIdentifier(relationship.Type, "Knowledge Relationship type"); err != nil {
+		return err
+	}
+	for _, endpoint := range []struct {
+		name string
+		ref  string
+	}{{"start", relationship.Start}, {"end", relationship.End}} {
+		ref, err := ParseObjectRef(endpoint.ref)
+		if err != nil || ref.Kind != KindKnowledgeNode {
+			return publicError(CodeType, "Knowledge Relationship "+endpoint.name+" must reference a Knowledge Node", err)
+		}
+	}
+	return validateKnowledgeProperties(relationship.Properties)
+}
+
+func validateKnowledgeIdentifier(value, field string) error {
+	if value == "" {
+		return publicError(CodeType, field+" must not be empty", nil)
+	}
+	if strings.HasPrefix(value, reservedPrefix) {
+		return publicError(CodeReservedIdentifier, field+" uses the reserved KG OS namespace", nil)
+	}
+	if strings.IndexByte(value, 0) >= 0 {
+		return publicError(CodeType, field+" must not contain NUL", nil)
+	}
+	return nil
+}
+
+func validateKnowledgeProperties(properties map[string]json.RawMessage) error {
+	for name, raw := range properties {
+		if err := validateKnowledgeIdentifier(name, "Knowledge Property name"); err != nil {
+			return err
+		}
+		canonical, _, err := normalizeKnowledgePropertyRaw(raw)
+		if err != nil {
+			return err
+		}
+		properties[name] = canonical
+	}
+	return nil
 }
 
 func normalizeDomain(domain *Domain) error {

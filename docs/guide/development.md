@@ -19,7 +19,7 @@ TypeScript
 
 `kgosd`、Kernel 与 `kg` CLI 不再使用旧 TypeScript 实现。产品运行时不依赖 Node.js；Node/pnpm 只用于 SDK、Web 和仓库工程工具。
 
-Phase 01 已把 `kgosd` 从工程壳层推进为真实本地 Runtime / Lithograph Host；Phase 02 已进一步在启动时完成 Knowledge Base bootstrap / reopen validation，并提供 authenticated Ontology data routes 与 `kg ontology` CLI；Phase 03 当前工作树已实现 `kg doctor`、`kg install`、本机 credential fallback 与业务命令 Runtime auto-start。当前已实现的是 `/api/v1/ontology/read`、`/api/v1/ontology/object`、`/api/v1/ontology/patch`；其它尚未实现的业务 `/api/*` 仍返回 404。普通 Knowledge CRUD、通用 Object / Graph / Evolution、SDK/Web/Skill 业务交互仍属于后续 Phase。
+Phase 01 已把 `kgosd` 从工程壳层推进为真实本地 Runtime / Lithograph Host；Phase 02 已完成 Knowledge Base bootstrap / reopen validation、authenticated Ontology routes 与 `kg ontology`；Phase 03 已完成 `kg doctor`、`kg install`、本机 credential fallback 与业务命令 Runtime auto-start。当前工作树还实现了 Phase 04 的 `/api/v1/object/read`、`/api/v1/object/patch` 与 `kg object read/patch`，支持五类 Object 的 batch read 和 Knowledge Node/Relationship mutation。Graph / Evolution、SDK/Web/Skill 业务交互仍属于后续 Phase；Object不提供 list/search或第二套 CRUD。
 
 ## 工程目录
 
@@ -180,7 +180,7 @@ sqlite3_lithograph_init
 sqlite3_lithographopenaicompatible_init
 ```
 
-native suite 真实覆盖 SQLite >= 3.45、FTS5、Lithograph `0.3.0` / `CY25-2026.08` / storage format 3、`lithograph_validate(query)`、`lithograph()`、`lithograph_rows()`、query/execute context、Semantic Provider readiness/cache、explicit transaction、context cancellation、early-close rollback、shutdown cleanup 与 reopen；Phase 02 还把 Kernel bootstrap/decoder/compiler、Ontology Patch/data-safety、HTTP auth和真实 daemon + `kg ontology` E2E加入同一 native gate。最终 Phase 状态仍以对应 Phase Acceptance 和要求的远端 CI 为准。
+native suite 真实覆盖 SQLite >= 3.45、FTS5、Lithograph `0.3.0` / `CY25-2026.08` / storage format 3、`lithograph_validate(query)`、`lithograph()`、`lithograph_rows()`、query/execute context、Semantic Provider readiness/cache、explicit transaction、context cancellation、early-close rollback、shutdown cleanup 与 reopen；Phase 02 的 Kernel bootstrap/decoder/compiler、Ontology Patch/data-safety、HTTP auth和真实 daemon + `kg ontology` E2E，以及当前工作树 Phase 04 的 Knowledge Object read/patch、mixed Ontology+Knowledge transaction 与 Object daemon/CLI integration均进入同一 native gate。最终 Phase 状态仍以对应 Phase Acceptance 和要求的远端 CI 为准。
 
 ## 构建与本地候选交付物
 
@@ -214,7 +214,7 @@ pnpm pack:release
 pnpm check:quick
 ```
 
-[GitHub Actions](../../.github/workflows/ci.yml)使用 Ubuntu 24.04 x64，安装 Node `24.15.0`、pnpm `10.34.5`、Go `1.27.1`、GCC 和 Chromium system dependencies，然后运行完整 `pnpm validate`。Phase 00 只有在最终推送 revision 的远端 CI 也成功后才能标记 `done`。
+[GitHub Actions](../../.github/workflows/ci.yml)使用 Ubuntu 24.04 x64，安装 Node `24.15.0`、pnpm `10.34.5`、Go `1.27.1`、GCC 和 Chromium system dependencies，然后运行完整 `pnpm validate`。任何要求该远端门禁的 Phase 都只有在最终 pushed revision 的对应 CI 成功后才能标记 `done`。
 
 ## 常见问题
 

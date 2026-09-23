@@ -35,6 +35,8 @@ func rootHelp(locale cliLocale) string {
 			"  kg [--help] [--version]\n" +
 			"  kg doctor [--json]\n" +
 			"  kg install [配置参数]\n" +
+			"  kg object read <ObjectRef> ... --at <StateRef> [--body] [--format <yaml|json>]\n" +
+			"  kg object patch --base-state <ResolvedState> --branch <name> [正文参数]\n" +
 			"  kg ontology [<OntologyRef> ...] --at <StateRef> [--limit <n>] [--cursor <token>]\n" +
 			"  kg ontology <OntologyRef> [<OntologyRef> ...] --at <ResolvedState> --edit\n" +
 			"  kg ontology patch --base-state <ResolvedState> --branch <name> [正文参数]\n\n" +
@@ -47,12 +49,37 @@ func rootHelp(locale cliLocale) string {
 		"  kg [--help] [--version]\n" +
 		"  kg doctor [--json]\n" +
 		"  kg install [configuration options]\n" +
+		"  kg object read <ObjectRef> ... --at <StateRef> [--body] [--format <yaml|json>]\n" +
+		"  kg object patch --base-state <ResolvedState> --branch <name> [payload options]\n" +
 		"  kg ontology [<OntologyRef> ...] --at <StateRef> [--limit <n>] [--cursor <token>]\n" +
 		"  kg ontology <OntologyRef> [<OntologyRef> ...] --at <ResolvedState> --edit\n" +
 		"  kg ontology patch --base-state <ResolvedState> --branch <name> [payload options]\n\n" +
 		"Options:\n" +
 		"  -h, --help     Show this help\n" +
 		"  -V, --version  Show the installed version\n"
+}
+
+func objectHelp(locale cliLocale) string {
+	if locale == localeChinese {
+		return "KG OS Object 命令\n\n" +
+			"用法:\n" +
+			"  kg object read <ObjectRef> ... --at <StateRef> [--body] [--format <yaml|json>] [--pretty]\n" +
+			"  kg object read --refs-file <path> --at <StateRef> [--body] [--format <yaml|json>] [--pretty]\n" +
+			"  <refs> | kg object read --at <StateRef> [--body] [--format <yaml|json>] [--pretty]\n" +
+			"  kg object patch --base-state <commit/...> --branch <name>\n" +
+			"    [--patch <diff> | --patch-file <path> | stdin] [--author <text>] [--message <text>]\n\n" +
+			"ObjectRef: domain:<name> | node:<name> | relationship:<name> | n:<id> | r:<id>\n" +
+			"read 默认输出 JSON envelope；--body 默认输出 canonical YAML。\n"
+	}
+	return "KG OS Object commands\n\n" +
+		"Usage:\n" +
+		"  kg object read <ObjectRef> ... --at <StateRef> [--body] [--format <yaml|json>] [--pretty]\n" +
+		"  kg object read --refs-file <path> --at <StateRef> [--body] [--format <yaml|json>] [--pretty]\n" +
+		"  <refs> | kg object read --at <StateRef> [--body] [--format <yaml|json>] [--pretty]\n" +
+		"  kg object patch --base-state <commit/...> --branch <name>\n" +
+		"    [--patch <diff> | --patch-file <path> | stdin] [--author <text>] [--message <text>]\n\n" +
+		"ObjectRef: domain:<name> | node:<name> | relationship:<name> | n:<id> | r:<id>\n" +
+		"read emits a JSON envelope by default; --body emits canonical YAML by default.\n"
 }
 
 func ontologyHelp(locale cliLocale) string {

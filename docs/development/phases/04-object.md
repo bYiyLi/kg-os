@@ -1,6 +1,6 @@
 # Phase 04：General Object Read & Patch
 
-**状态：`ready`**
+**状态：`in_progress`**
 
 ## 1. 目标与范围
 
@@ -61,7 +61,7 @@ kg object patch
 - Phase 03 已有 business-command Runtime ensure、本机 credential resolution与稳定 `kg` HTTP client路径；
 - D73 已冻结通用 Object只保留 batch read / patch，设计上不存在 list/search implementation dependency。
 
-Design Inputs、依赖顺序与Acceptance已经齐全，因此 Phase状态为 `ready`。
+Design Inputs、依赖顺序与Acceptance已经齐全；当前本地实现、Review 与本地验收均已完成，仍待最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate 成功，因此 Phase状态为 `in_progress`。
 
 ### 3.2 Lithograph baseline
 
@@ -298,6 +298,30 @@ Phase 04只有同时满足以下条件才能进入 `done`：
 
 ## 11. 当前状态
 
-2026-09-23：D73、Object / CLI / Implementation设计已完成本轮同步，本Phase计划建立。Phase 00–03前置依赖均已完成，当前没有已知设计 blocker，因此状态为 `ready`。
+2026-09-23：04.1–04.8 已在当前工作树完成本地实现与 Review。原 A–I Acceptance 保持不变，不以当前实现反向改写验收。
 
-尚未执行Phase 04代码修改、测试、CI、提交或推送；这些动作只有真实发生后才能记录为完成证据。
+| Acceptance | 当前证据 | 状态 |
+| --- | --- | --- |
+| A 五类 Object batch read | Kernel / daemon / CLI tests 与真实 Lithograph integration 覆盖 Domain、Node Definition、Relationship Definition、Knowledge Node、Knowledge Relationship；一次 resolved State pin，结果顺序保持请求顺序 | 本地通过 |
+| B Read 失败与边界 | tests 覆盖 duplicate / invalid / missing / internal-reserved / unsupported typed value / resource 与 invalid daemon response；CLI失败 stdout 保持为空 | 本地通过 |
+| C CLI read 输入与 body | positional、`--refs-file`、implicit stdin，YAML/JSON envelope/body、batch YAML framing 与 canonical renderer 均有自动测试 | 本地通过 |
+| D CLI patch 输入 | inline `--patch`、`--patch-file`、implicit stdin 共用单次 patch request 路径；invalid base/body/daemon response/error contract 有测试 | 本地通过 |
+| E Batch create | 真实 Lithograph E2E 覆盖同一 Patch 创建多个 Knowledge Node / Relationship、request-local alias 与真实 created Ref | 本地通过 |
+| F Update / restructure | Node labels/properties、Relationship properties/type/endpoints、replacement transition 与 property/definition rename maintenance 有真实 integration 证据 | 本地通过 |
+| G Delete safety | Node incident Relationship 检查、显式 Relationship delete/restructure、非 DETACH 行为与 staged data-safety 有自动/真实数据库证据 | 本地通过 |
+| H Atomicity / concurrency | Ontology + Knowledge 共用 explicit transaction；strict base、no-op、constraint/data-safety failure、abort 与 staged validation 均在真实 Lithograph 路径验证 | 本地通过 |
+| I Regression / delivery | 主工作树与独立 fresh-source `pnpm validate` 均通过；Go statement coverage **90.2%**、race、govulncheck、TS/V8 + type coverage 100%、jscpd 0 clones、unused/build/Playwright/native/package/license/audit/diff 全绿；未发现 `object list/search` 实现。最终 pushed SHA 的 Ubuntu CI 尚未执行 | 本地通过，远端待完成 |
+
+### Phase Review
+
+本轮按第 9 节持续执行 review → 修复 → re-review，并收口以下 finding：
+
+- Knowledge / Ontology mixed Patch 最初在 data-safety 上仍存在 pre-transaction 旧路径；现统一在同一个 explicit transaction 的 staged state 验证，避免 mixed delta 被旧状态误判。
+- 删除 mixed Patch 后已经失效的 pre-transaction count wrapper / query 死路径，统一复用 transaction count helper。
+- Object / Ontology Patch CLI、daemon Patch route、Knowledge Relationship property update、Knowledge read row validation 与 Object decode 出现重复实现；现只提取最小共享 helper，jscpd 最终为 **0 clones**。
+- 补齐 typed-value、canonical YAML/JSON、Knowledge projection、CLI failure contract、旧 Ontology object adapter JSON/YAML/406 等真实边界测试，使仓库 Go total statement coverage稳定为 **90.2%**。
+- 复核生产源码不存在 `object list` / `object search`，没有新增第二套 CRUD、Search DSL、Graph public surface、新 dependency 或 Lithograph 仓库改动。
+- 主工作树完整 `pnpm validate` 已通过；独立 `/tmp` fresh-source Git repo 在不复用主树 `node_modules` / cache / build artifact 的条件下执行 `pnpm run setup && pnpm validate` 同样通过。
+- `git diff --check` 通过；当前工作树没有 secret、database fixture、extension cache 或生成 artifact 进入版本状态。
+
+当前 reviewed local scope 没有剩余 task-affecting implementation finding。Phase 04 仍保持 `in_progress`，唯一未闭环的 Phase 完成条件是：提交并推送最终 revision 后，其 Ubuntu 24.04 x64 GitHub Actions Validate 必须真实成功。当前用户尚未授权 commit / push，因此本轮未执行远端门禁，也不把 Phase 标记为 `done`。

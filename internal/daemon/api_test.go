@@ -167,6 +167,8 @@ func TestOntologyHandlerAdapterErrorBranches(t *testing.T) {
 		"/api/v1/ontology/read",
 		"/api/v1/ontology/object",
 		"/api/v1/ontology/patch",
+		"/api/v1/object/read",
+		"/api/v1/object/patch",
 	} {
 		request = httptest.NewRequest(http.MethodGet, path, nil)
 		request.Header.Set("Authorization", "Bearer secret")

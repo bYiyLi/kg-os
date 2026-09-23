@@ -10,6 +10,18 @@ import (
 )
 
 func (service *Service) PatchOntology(ctx context.Context, request PatchRequest) (PatchResult, error) {
+	return service.patchObjects(ctx, request, true)
+}
+
+func (service *Service) PatchObjects(ctx context.Context, request PatchRequest) (PatchResult, error) {
+	return service.patchObjects(ctx, request, false)
+}
+
+func (service *Service) patchObjects(
+	ctx context.Context,
+	request PatchRequest,
+	ontologyOnly bool,
+) (PatchResult, error) {
 	if err := validateResolvedState(request.BaseState); err != nil {
 		return PatchResult{}, err
 	}
@@ -30,21 +42,38 @@ func (service *Service) PatchOntology(ctx context.Context, request PatchRequest)
 	if currentHead != request.BaseState {
 		return PatchResult{}, publicError(CodeStaleBaseState, "target branch head no longer matches baseState", nil)
 	}
-	plan, err := planOntologyPatch(base, request.Patch)
+	document, err := parseGitPatch(request.Patch)
 	if err != nil {
 		return PatchResult{}, err
+	}
+	ontologyEntries, knowledgeEntries, err := partitionObjectPatchEntries(document)
+	if err != nil {
+		return PatchResult{}, err
+	}
+	if ontologyOnly && len(knowledgeEntries) != 0 {
+		return PatchResult{}, publicError(CodeInvalidArgument, "ontology patch contains non-Ontology object kind", nil)
+	}
+	plan, err := planOntologyEntries(base, ontologyEntries)
+	if err != nil {
+		return PatchResult{}, err
+	}
+	var knowledgePlan *plannedKnowledgePatch
+	if !ontologyOnly {
+		knowledgePlan, err = service.planKnowledgePatch(ctx, request.BaseState, knowledgeEntries)
+		if err != nil {
+			return PatchResult{}, err
+		}
+		if err := mergeOntologyDerivedKnowledge(plan, knowledgePlan); err != nil {
+			return PatchResult{}, err
+		}
 	}
 	noOp, err := plan.isNoOp()
 	if err != nil {
 		return PatchResult{}, err
 	}
-	if noOp {
+	if noOp && (knowledgePlan == nil || knowledgePlan.isNoOp()) {
 		return plan.patchResult(request.BaseState), nil
 	}
-	if err := service.validateDataSafety(ctx, plan); err != nil {
-		return PatchResult{}, err
-	}
-
 	baseConstraints, err := collectBaseConstraints(base)
 	if err != nil {
 		return PatchResult{}, err
@@ -97,13 +126,23 @@ func (service *Service) PatchOntology(ctx context.Context, request PatchRequest)
 		}
 	}()
 
-	if err := applyKnowledgeRenameMaintenance(ctx, transaction, plan); err != nil {
-		return PatchResult{}, err
-	}
 	if err := dropChangedIndexes(ctx, transaction, baseIndexes, targetIndexes); err != nil {
 		return PatchResult{}, err
 	}
 	if err := dropChangedConstraints(ctx, transaction, baseConstraints, targetConstraints); err != nil {
+		return PatchResult{}, err
+	}
+	if err := applyKnowledgePreSchema(ctx, transaction, knowledgePlan); err != nil {
+		return PatchResult{}, err
+	}
+	if err := service.validateStagedDataSafety(ctx, transaction, plan); err != nil {
+		return PatchResult{}, err
+	}
+	if err := applyKnowledgeRenameMaintenance(ctx, transaction, plan); err != nil {
+		return PatchResult{}, err
+	}
+	knowledgeResult, err := applyKnowledgeExistingBeforeSchema(ctx, transaction, knowledgePlan)
+	if err != nil {
 		return PatchResult{}, err
 	}
 	if baseGraphType != targetGraphType {
@@ -139,6 +178,13 @@ func (service *Service) PatchOntology(ctx context.Context, request PatchRequest)
 	if err := validateStagedSnapshot(ctx, transaction, request.BaseState, plan); err != nil {
 		return PatchResult{}, err
 	}
+	knowledgeResult, err = applyKnowledgePostSchema(ctx, transaction, knowledgePlan, knowledgeResult)
+	if err != nil {
+		return PatchResult{}, err
+	}
+	if err := validateStagedKnowledge(ctx, transaction, knowledgePlan, knowledgeResult); err != nil {
+		return PatchResult{}, err
+	}
 
 	rawCommit, err := transaction.Commit(ctx)
 	if err != nil {
@@ -149,7 +195,18 @@ func (service *Service) PatchOntology(ctx context.Context, request PatchRequest)
 	if err != nil {
 		return PatchResult{}, err
 	}
-	return plan.patchResult(state), nil
+	result := plan.patchResult(state)
+	result.Created = append(result.Created, knowledgeResult.Created...)
+	result.Transitions = append(result.Transitions, knowledgeResult.Transitions...)
+	sort.Slice(result.Created, func(i, j int) bool {
+		left := string(result.Created[i].Kind) + "\x00" + result.Created[i].Alias
+		right := string(result.Created[j].Kind) + "\x00" + result.Created[j].Alias
+		return left < right
+	})
+	sort.Slice(result.Transitions, func(i, j int) bool {
+		return result.Transitions[i].From < result.Transitions[j].From
+	})
+	return result, nil
 }
 
 func plannedObjectsFromSnapshot(base *snapshot) map[OntologyRef]*plannedObject {

@@ -118,7 +118,7 @@ func TestRootAndDiagnosticHelpValidation(t *testing.T) {
 	stderr.Reset()
 	if code := run(
 		context.Background(),
-		[]string{"object"},
+		[]string{"definitely-not-a-command"},
 		strings.NewReader(""),
 		false,
 		&stdout,

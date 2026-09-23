@@ -26,6 +26,29 @@ func ParseObjectYAML(kind ObjectKind, body []byte) (ObjectValue, error) {
 	return value, nil
 }
 
+func ParseObjectJSON(kind ObjectKind, body []byte) (ObjectValue, error) {
+	decodeStrict := func(target any) error {
+		decoder := json.NewDecoder(bytes.NewReader(body))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(target); err != nil {
+			return publicError(CodeType, "JSON Object value does not match the Object schema", err)
+		}
+		var trailing any
+		if err := decoder.Decode(&trailing); err != io.EOF {
+			return publicError(CodeParse, "Object JSON must contain exactly one value", err)
+		}
+		return nil
+	}
+	value, err := decodeObjectValue(kind, decodeStrict)
+	if err != nil {
+		return ObjectValue{}, err
+	}
+	if err := normalizeObject(value); err != nil {
+		return ObjectValue{}, err
+	}
+	return value, nil
+}
+
 func parseObjectYAMLRaw(kind ObjectKind, body []byte) (ObjectValue, error) {
 	var syntax yaml.Node
 	decoder := yaml.NewDecoder(bytes.NewReader(body))
@@ -62,23 +85,45 @@ func parseObjectYAMLRaw(kind ObjectKind, body []byte) (ObjectValue, error) {
 		return nil
 	}
 
+	if kind == KindKnowledgeNode || kind == KindKnowledgeRelationship {
+		return parseKnowledgeYAML(kind, &syntax)
+	}
+	return decodeObjectValue(kind, decodeStrict)
+}
+
+func decodeObjectValue(
+	kind ObjectKind,
+	decode func(any) error,
+) (ObjectValue, error) {
 	value := ObjectValue{Kind: kind}
 	switch kind {
 	case KindDomain:
 		var domain Domain
-		if err := decodeStrict(&domain); err != nil {
+		if err := decode(&domain); err != nil {
 			return ObjectValue{}, err
 		}
 		value.Domain = &domain
 	case KindNodeDefinition, KindRelationshipDefinition:
 		var definition Definition
-		if err := decodeStrict(&definition); err != nil {
+		if err := decode(&definition); err != nil {
 			return ObjectValue{}, err
 		}
 		definition.Kind = kind
 		value.Definition = &definition
+	case KindKnowledgeNode:
+		var node KnowledgeNode
+		if err := decode(&node); err != nil {
+			return ObjectValue{}, err
+		}
+		value.KnowledgeNode = &node
+	case KindKnowledgeRelationship:
+		var relationship KnowledgeRelationship
+		if err := decode(&relationship); err != nil {
+			return ObjectValue{}, err
+		}
+		value.KnowledgeRelationship = &relationship
 	default:
-		return ObjectValue{}, publicError(CodeInvalidArgument, "unsupported Ontology object kind", nil)
+		return ObjectValue{}, publicError(CodeInvalidArgument, "unsupported Object kind", nil)
 	}
 	return value, nil
 }
@@ -130,7 +175,7 @@ func validateYAMLNode(node *yaml.Node, depth int, count *int, active map[*yaml.N
 func topLevelYAMLFields(document *yaml.Node) (map[string]struct{}, error) {
 	if document.Kind != yaml.DocumentNode || len(document.Content) != 1 ||
 		document.Content[0].Kind != yaml.MappingNode {
-		return nil, publicError(CodeType, "Ontology object must be a YAML mapping", nil)
+		return nil, publicError(CodeType, "Object must be a YAML mapping", nil)
 	}
 	fields := map[string]struct{}{}
 	mapping := document.Content[0]
@@ -162,8 +207,12 @@ func validateRequiredFields(kind ObjectKind, fields map[string]struct{}) error {
 		return require("name", "properties", "constraints")
 	case KindRelationshipDefinition:
 		return require("name", "from", "to", "properties", "constraints")
+	case KindKnowledgeNode:
+		return require("labels", "properties")
+	case KindKnowledgeRelationship:
+		return require("type", "start", "end", "properties")
 	default:
-		return publicError(CodeInvalidArgument, "unsupported Ontology object kind", nil)
+		return publicError(CodeInvalidArgument, "unsupported Object kind", nil)
 	}
 }
 
@@ -263,8 +312,26 @@ func RenderObjectYAML(value ObjectValue) ([]byte, error) {
 		if len(definition.Indexes) != 0 {
 			add("indexes", indexesNode(definition.Indexes, false))
 		}
+	case KindKnowledgeNode:
+		node := value.KnowledgeNode
+		add("labels", stringListNode(node.Labels))
+		properties, err := rawPropertiesYAMLNode(node.Properties)
+		if err != nil {
+			return nil, err
+		}
+		add("properties", properties)
+	case KindKnowledgeRelationship:
+		relationship := value.KnowledgeRelationship
+		add("type", stringNode(relationship.Type))
+		add("start", stringNode(relationship.Start))
+		add("end", stringNode(relationship.End))
+		properties, err := rawPropertiesYAMLNode(relationship.Properties)
+		if err != nil {
+			return nil, err
+		}
+		add("properties", properties)
 	default:
-		return nil, publicError(CodeInvalidArgument, "unsupported Ontology object kind", nil)
+		return nil, publicError(CodeInvalidArgument, "unsupported Object kind", nil)
 	}
 	document := &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{root}}
 	var output bytes.Buffer
@@ -290,8 +357,12 @@ func RenderObjectJSON(value ObjectValue) ([]byte, error) {
 		body, err = json.Marshal(value.Domain)
 	case KindNodeDefinition, KindRelationshipDefinition:
 		body, err = marshalDefinitionJSON(value.Definition)
+	case KindKnowledgeNode:
+		body, err = json.Marshal(value.KnowledgeNode)
+	case KindKnowledgeRelationship:
+		body, err = json.Marshal(value.KnowledgeRelationship)
 	default:
-		return nil, publicError(CodeInvalidArgument, "unsupported Ontology object kind", nil)
+		return nil, publicError(CodeInvalidArgument, "unsupported Object kind", nil)
 	}
 	if err != nil {
 		return nil, publicError(CodeInternal, "render Object JSON", err)

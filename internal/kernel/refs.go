@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -9,6 +10,58 @@ import (
 type OntologyRef struct {
 	Kind ObjectKind
 	Name string
+}
+
+type ObjectRef struct {
+	Kind ObjectKind
+	Name string
+	ID   string
+}
+
+func (ref ObjectRef) String() string {
+	switch ref.Kind {
+	case KindDomain, KindNodeDefinition, KindRelationshipDefinition:
+		return OntologyRef{Kind: ref.Kind, Name: ref.Name}.String()
+	case KindKnowledgeNode:
+		return "n:" + ref.ID
+	case KindKnowledgeRelationship:
+		return "r:" + ref.ID
+	default:
+		return ""
+	}
+}
+
+func (ref ObjectRef) Ontology() (OntologyRef, bool) {
+	switch ref.Kind {
+	case KindDomain, KindNodeDefinition, KindRelationshipDefinition:
+		return OntologyRef{Kind: ref.Kind, Name: ref.Name}, true
+	default:
+		return OntologyRef{}, false
+	}
+}
+
+func ParseObjectRef(value string) (ObjectRef, error) {
+	if strings.HasPrefix(value, "n:") || strings.HasPrefix(value, "r:") {
+		prefix := value[:2]
+		id := value[2:]
+		if id == "" || (len(id) > 1 && id[0] == '0') {
+			return ObjectRef{}, publicError(CodeInvalidArgument, "invalid Knowledge Object Ref", nil)
+		}
+		parsed, err := strconv.ParseUint(id, 10, 64)
+		if err != nil || strconv.FormatUint(parsed, 10) != id {
+			return ObjectRef{}, publicError(CodeInvalidArgument, "invalid Knowledge Object Ref", err)
+		}
+		kind := KindKnowledgeNode
+		if prefix == "r:" {
+			kind = KindKnowledgeRelationship
+		}
+		return ObjectRef{Kind: kind, ID: id}, nil
+	}
+	ref, err := ParseOntologyRef(value)
+	if err != nil {
+		return ObjectRef{}, publicError(CodeInvalidArgument, "invalid Object Ref", err)
+	}
+	return ObjectRef{Kind: ref.Kind, Name: ref.Name}, nil
 }
 
 func (ref OntologyRef) String() string {
@@ -103,6 +156,17 @@ func fromHex(value byte) (byte, bool) {
 }
 
 func parseNewTarget(value string) (ObjectKind, string, error) {
+	kind, alias, err := parseNewObjectTarget(value)
+	if err != nil {
+		return "", "", err
+	}
+	if kind != KindDomain && kind != KindNodeDefinition && kind != KindRelationshipDefinition {
+		return "", "", publicError(CodeInvalidArgument, "ontology patch contains non-Ontology object kind", nil)
+	}
+	return kind, alias, nil
+}
+
+func parseNewObjectTarget(value string) (ObjectKind, string, error) {
 	if !strings.HasPrefix(value, "new:") {
 		return "", "", publicError(CodeInvalidArgument, "new object target must start with new:", nil)
 	}
@@ -112,8 +176,9 @@ func parseNewTarget(value string) (ObjectKind, string, error) {
 		return "", "", publicError(CodeInvalidArgument, "invalid new object target", nil)
 	}
 	kind := ObjectKind(rest[:separator])
-	if kind != KindDomain && kind != KindNodeDefinition && kind != KindRelationshipDefinition {
-		return "", "", publicError(CodeInvalidArgument, "ontology patch contains non-Ontology object kind", nil)
+	if kind != KindDomain && kind != KindNodeDefinition && kind != KindRelationshipDefinition &&
+		kind != KindKnowledgeNode && kind != KindKnowledgeRelationship {
+		return "", "", publicError(CodeInvalidArgument, "invalid new object kind", nil)
 	}
 	alias, err := decodeRefComponent(rest[separator+1:])
 	if err != nil || len(alias) == 0 || len([]byte(alias)) > 255 {
