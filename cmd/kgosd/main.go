@@ -36,7 +36,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "kgosd: %v\n", err)
 		return 1
 	}
-	if err := daemon.Serve(ctx, runtime, handler, stdout); err != nil {
+	if err := daemon.Serve(ctx, runtime, daemon.NewHandler(runtime, handler), stdout); err != nil {
 		_, _ = fmt.Fprintf(stderr, "kgosd: %v\n", err)
 		return 1
 	}

@@ -38,6 +38,58 @@ func (host *Host) Query(ctx context.Context, request QueryRequest) (QueryResult,
 	return QueryResult{State: state, Result: result}, nil
 }
 
+// ResolveState resolves a Lithograph StateRef to its immutable commit ref
+// without executing a caller query.
+func (host *Host) ResolveState(ctx context.Context, stateRef string) (string, error) {
+	if stateRef == "" {
+		return "", fmt.Errorf("state ref is required")
+	}
+	operationCtx, done, err := host.operationContext(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer done()
+	connection, err := host.acquire(operationCtx, host.readDB)
+	if err != nil {
+		return "", err
+	}
+	defer connection.Close()
+	state, err := resolveCommit(operationCtx, connection, stateRef)
+	if err != nil {
+		return "", fmt.Errorf("resolve state %q: %w", stateRef, err)
+	}
+	return state, nil
+}
+
+// QueryMetadata executes a read-only Lithograph version/ref metadata query
+// without options.at. Version procedures such as branch.list, tag.list and
+// commit.get reject historical execution options and expose their own explicit
+// version arguments where applicable.
+func (host *Host) QueryMetadata(
+	ctx context.Context,
+	cypher string,
+	params map[string]any,
+) (Result, error) {
+	if cypher == "" {
+		return Result{}, fmt.Errorf("metadata query Cypher is required")
+	}
+	operationCtx, done, err := host.operationContext(ctx)
+	if err != nil {
+		return Result{}, err
+	}
+	defer done()
+	connection, err := host.acquire(operationCtx, host.readDB)
+	if err != nil {
+		return Result{}, err
+	}
+	defer connection.Close()
+	result, err := executeRaw(operationCtx, connection, cypher, params, nil)
+	if err != nil {
+		return Result{}, fmt.Errorf("execute Lithograph metadata query: %w", err)
+	}
+	return result, nil
+}
+
 func (host *Host) Execute(ctx context.Context, request ExecuteRequest) (Result, error) {
 	if request.Branch == "" {
 		return Result{}, fmt.Errorf("execute branch is required")

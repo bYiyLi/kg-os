@@ -423,30 +423,11 @@ func verifySemanticProvider(
 	if err != nil {
 		return err
 	}
-	providerConfig := map[string]any{
-		"base_url":        semantic.BaseURL,
-		"model":           semantic.Model,
-		"send_dimensions": false,
-		"encoding_format": "float",
-		"cache": map[string]any{
-			"enabled":   semantic.CacheEnabled,
-			"path":      semantic.CachePath,
-			"max_bytes": semantic.CacheMaxBytes,
-		},
-	}
-	if semantic.APIKeyEnv != "" {
-		providerConfig["api_key_env"] = semantic.APIKeyEnv
-	}
 	params := map[string]any{
 		"name":     probeName,
 		"label":    probeName + "_label",
 		"property": probeName + "_property",
-		"options": map[string]any{
-			"provider":       semantic.Provider,
-			"providerConfig": providerConfig,
-			"dimensions":     semantic.Dimensions,
-			"similarity":     semantic.Similarity,
-		},
+		"options":  semantic.IndexOptions(),
 	}
 	if _, err := executeRaw(
 		ctx,

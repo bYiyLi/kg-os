@@ -23,7 +23,11 @@ await run(
     "-count=1",
     "./internal/lithograph",
     "./internal/runtime",
-    "./internal/lithographtest"
+    "./internal/lithographtest",
+    "./internal/kernel",
+    "./internal/daemon",
+    "./cmd/kg",
+    "./cmd/kgosd"
   ],
   { cwd: root, env }
 );

@@ -193,7 +193,7 @@ State Data、Branch 与 Tag 属于 State Space / Evolution 的 sidecar / ref 状
 
 KG OS v1 只负责初始化自己创建或明确以**空 Lithograph Root State**交给 KG OS 的 Knowledge Base，不自动接管一个已经包含调用方 graph / Schema history 的任意 Lithograph database。自动 adoption 会要求 KG OS 猜测已有 Schema element 与 semantic Binding / Domain 的业务意图，属于独立的数据导入 / 迁移问题，不是普通启动流程。
 
-这里的“空 Lithograph Root State”指 fresh initialized baseline：`branch/main` 仍指向唯一 Root Commit、没有其它 Branch / Tag、没有任何非 Root Commit，Root graph 与 Schema 为空。不能只因为当前 `main` 恰好回到 Root 就忽略数据库中已经存在的其它 ref 或历史。**这条严格条件只决定“是否允许自动 bootstrap”**。
+这里的“空 Lithograph Root State”指 fresh initialized baseline：`branch/main` 仍指向 Root Commit、没有其它 Branch / Tag，且 Root graph 与 Schema 为空。任何**当前 Branch / Tag 可达**的非 Root history 都会表现为额外 ref 或非 Root head，因此不满足该 baseline。已经失去全部 Branch / Tag 的 orphan Commit 不阻塞 bootstrap：Lithograph v0.3.0 的 public SQL contract 没有只读的全库 orphan inventory，而 KG OS 禁止读取其内部表；KG OS 也不会为这些 orphan Commit 建 Binding、移动 ref 或把它们宣称为 KG OS-valid State。**这条严格条件只决定“是否允许自动 bootstrap”**。
 
 打开已有数据库时，KG OS 先解析并验证 `branch/main` 当前 head；只要该 Snapshot 满足当前 KG OS-valid consistency invariants，就按已有 KG OS Knowledge Base 打开，不要求启动时扫描并证明所有历史 Commit、其它 Branch 或 Tag 都有效。consistency-invalid 历史仍可按 Ontology / Evolution / Graph 已定义的边界存在和诊断。只有 `main` head 不是 KG OS-valid、同时数据库又不满足上面的 fresh Root baseline 时，才属于 adoption / migration 边界并拒绝自动 bootstrap。这样不会把历史中的坏 Snapshot 当成启动阻塞，也不会把任意已有 Lithograph history静默收编。
 
@@ -203,4 +203,4 @@ Bootstrap 流程是：先执行 Lithograph `lithograph_init()` 得到空图 Root
 
 空 Ontology 的 bootstrap **不创建 sentinel、版本标记、默认 Domain、Definition Binding 或 Property Binding Node**。在没有调用方 Definition / Domain 时，internal semantic graph 可以为空；第一个 KG OS-valid State 由当前版本要求的 reserved internal Schema 与一致性规则共同判定，不依赖一个额外“已初始化”数据节点。Domain / Binding 只在真实 Ontology 对象出现时创建。未来 internal persistence format 需要迁移时必须另行建立显式 migration contract，不能提前把未使用的版本节点写进当前模型。
 
-因此 v1 正常 bootstrap 不产生 durable intermediate Commit：Lithograph Root Commit 是第一个 KG OS-valid State 之前唯一预期存在的 pre-KGOS / invalid history 节点。高层能力按 [Ontology 一致性规则](ontology.md#binding-record-与-schema-locator)处理它；bootstrap 完成后的 Graph 可按 [D59](decisions.md#d59-cypher-passthrough)直接访问底层历史，不受“仅 Evolution 诊断”的旧限制。KG OS 公共业务能力从 explicit transaction 成功产生的第一个 KG OS-valid State 开始。未来若需要把已有 Lithograph database 导入 KG OS，必须另行设计显式 adoption / migration contract；v1 不做自动推断。
+因此 v1 正常 bootstrap 不产生 durable intermediate Commit：当前 `main` 的 Root Commit 是第一个 KG OS-valid State 之前唯一允许自动承接的 **ref-reachable** pre-KGOS / invalid history 节点。无 ref orphan Commit 不改变 bootstrap target，也不会被 KG OS 自动补 Binding；若调用方显式持有其 immutable Commit descriptor，底层 Graph passthrough 仍可按 Lithograph 合同寻址它，这不等于 KG OS 自动 adoption。高层能力按 [Ontology 一致性规则](ontology.md#binding-record-与-schema-locator)处理目标 State；bootstrap 完成后的 Graph 可按 [D59](decisions.md#d59-cypher-passthrough)直接访问底层历史，不受“仅 Evolution 诊断”的旧限制。KG OS 公共业务能力从 explicit transaction 成功产生的第一个 KG OS-valid State 开始。未来若需要把已有 Lithograph graph / Schema history 导入 KG OS，必须另行设计显式 adoption / migration contract；v1 不做自动推断。

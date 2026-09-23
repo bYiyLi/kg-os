@@ -19,7 +19,7 @@ func TestEvaluateKG(t *testing.T) {
 		{name: "short help", args: []string{"other", "-h"}, want: "Usage: kg"},
 		{name: "version", args: []string{"--version"}, want: "0.0.0\n"},
 		{name: "short version", args: []string{"-V"}, want: "0.0.0\n"},
-		{name: "unsupported", args: []string{"object", "read"}, code: 2, want: "not implemented"},
+		{name: "unsupported", args: []string{"object", "read"}, code: 2, want: "not available"},
 	} {
 		test := test
 		t.Run(test.name, func(t *testing.T) {

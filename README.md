@@ -35,17 +35,17 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 ## 当前状态
 
-**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；业务能力仍未实现。** Phase 00 工程基线与 Phase 01 Runtime & Lithograph Host Foundation 均已完成。`KG_HOME` / config / credential、SQLite Extension resolver、正式 Go/Lithograph Host、SQL query / execute / true streaming / cancellation、Semantic Provider readiness/cache mapping、explicit transaction、single-instance lock 与 daemon shutdown lifecycle已经实现，并完成 macOS arm64本地验收、fresh-source validation与Ubuntu 24.04 x64远端 CI。
+**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 02 Ontology 当前处于实现收口。** Phase 00 工程基线与 Phase 01 Runtime & Lithograph Host Foundation 均已完成。`KG_HOME` / config / credential、SQLite Extension resolver、正式 Go/Lithograph Host、SQL query / execute / true streaming / cancellation、Semantic Provider readiness/cache mapping、explicit transaction、single-instance lock 与 daemon shutdown lifecycle已经进入完成基线。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
 **Phase 01 已完成。** Runtime & Lithograph Host 实现提交 `f7f679e0601c7ecd16f5409f58c9c3483796948f` 已推送到 `main`，本地完整 validation / fresh-source validation 与 Ubuntu 24.04 x64 GitHub Actions run `35687991251` 均成功；P1-01–P1-10 和 Phase Review 已闭环。
 
-**Phase 02 Ontology 已完成开发计划并处于 `ready`。** 本阶段将实现 Knowledge Base bootstrap、KG OS Internal Graph / Binding、完整 Ontology read/edit/Patch、Schema/Constraint/Index compiler，以及正式 authenticated `kg ontology` CLI。完成后调用方可以定义和维护自己的 Domain / Node / Relationship / Property / Constraint / Index 数据模型，但普通 Knowledge 数据 CRUD、Graph、Evolution、SDK/Web/Skill 和 daemon control仍未实现。
+**Phase 02 Ontology 当前为 `in_progress`。** 当前未提交工作树已经实现 Knowledge Base bootstrap、KG OS Internal Graph / Binding、Ontology read/edit/Patch、Schema/Constraint/Index compiler、authenticated HTTP 与正式 `kg ontology` CLI；P2-01–P2-11 已取得本地验收证据，主工作树完整 `pnpm validate`、独立 fresh-source setup + full validation、forced pre-commit、final diff/review 与真实 Lithograph v0.3.0 native suite均已通过。Phase 02 仍不能标记 `done`，因为计划要求最终 pushed SHA 的 Ubuntu 24.04 x64 native CI成功，而当前尚未执行 commit/push。普通 Knowledge 数据 CRUD、Graph、Evolution、SDK/Web/Skill 和 daemon control仍未实现。
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
-相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、[D67 Ontology Index profile](docs/design/decisions.md#d67-ontology-index-profile)和 [D68 reserved Ontology Schema](docs/design/decisions.md#d68-reserved-ontology-schema)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
+相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、[D67 Ontology Index profile](docs/design/decisions.md#d67-ontology-index-profile)、[D68 reserved Ontology Schema](docs/design/decisions.md#d68-reserved-ontology-schema)、[D69 Ontology Constraint profile](docs/design/decisions.md#d69-ontology-constraint-profile)、[D70 bootstrap orphan-history boundary](docs/design/decisions.md#d70-bootstrap-orphan-history) 与 [D71 generated Constraint identity](docs/design/decisions.md#d71-lithograph-generated-constraint-identity)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
 ## License
 

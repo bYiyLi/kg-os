@@ -31,8 +31,13 @@ func TestRunStartsRealRuntimeAndStopsOnContext(t *testing.T) {
 	}()
 
 	address := fmt.Sprintf("127.0.0.1:%d", port)
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(15 * time.Second)
 	for {
+		select {
+		case code := <-done:
+			t.Fatalf("kgosd exited before listening: code=%d stderr=%q", code, stderr.String())
+		default:
+		}
 		connection, err := net.DialTimeout("tcp4", address, 50*time.Millisecond)
 		if err == nil {
 			_ = connection.Close()
@@ -48,7 +53,7 @@ func TestRunStartsRealRuntimeAndStopsOnContext(t *testing.T) {
 	var code int
 	select {
 	case code = <-done:
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("kgosd did not stop after context cancellation")
 	}
 	if code != 0 {

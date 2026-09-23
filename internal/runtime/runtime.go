@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/bYiyLi/kg-os/internal/lithograph"
 	"github.com/bYiyLi/kg-os/internal/runtimeprofile"
 )
@@ -18,6 +19,7 @@ type Runtime struct {
 	Credential runtimeprofile.Credential
 	Extensions []runtimeprofile.ResolvedExtension
 	Database   *lithograph.Host
+	Kernel     *kernel.Service
 
 	lock   *runtimeprofile.InstanceLock
 	closed bool
@@ -70,12 +72,23 @@ func Open(ctx context.Context, explicitHome string, client *http.Client) (_ *Run
 	if err != nil {
 		return nil, err
 	}
+	kernelService, err := kernel.Open(
+		ctx,
+		database,
+		config.FullText.Analyzer,
+		config.SemanticDefaults(),
+	)
+	if err != nil {
+		_ = database.Close()
+		return nil, err
+	}
 	runtime := &Runtime{
 		Paths:      paths,
 		Config:     config,
 		Credential: credential,
 		Extensions: extensions,
 		Database:   database,
+		Kernel:     kernelService,
 		lock:       lock,
 	}
 	return runtime, nil

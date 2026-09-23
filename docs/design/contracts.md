@@ -50,7 +50,7 @@ Embedding 配置错误由 `EMBEDDING_CONFIG_ERROR` 表示：`[embedding]` 缺失
 
 Graph params 不再识别 `SemanticText` / `$semantic` marker；语义检索直接接受 String。普通 Map 中的 `$semantic` key 没有特殊意义；把 Map 传给要求 String 的 Semantic procedure，按底层参数类型规则失败。Semantic query 的 external I/O 本身不构成 KG OS 或 `lithograph_rows()` 的拒绝理由；它与 mutation / explicit transaction / transaction subquery 的组合完全遵守当前 Lithograph v0.3.0 execution contract，KG OS 不追加规则。Provider-owned cache 的配置冲突映射为底层 `INVALID_ARGUMENT`，cache file I/O / resource failure保留 `IO_ERROR` / `RESOURCE_ERROR`，取消保留 interrupt/cancellation 映射。普通 source 写入、普通非 Semantic read 与未改变 Semantic definition 的 merge 不因 KG OS cache policy主动发 embedding 请求。
 
-Ontology / Object v1 public profile 仍不接受 caller-owned Vector：Property `type` / type-constraint `valueType` 为 `VECTOR`，或 Object Value 含 Vector，按相应高层合同返回 `UNSUPPORTED_OPERATION`。Graph parameters、results 与 Cypher 写入则直接复用 Lithograph 的 Vector 能力，不因 Vector、`__kgos_` identifier 或高层 Binding 状态而额外拒绝；不再为这些内容附加 Graph commit 前校验。Managed Semantic 内部 embedding 仍不是图 Property，不会因普通 `RETURN n` 自动成为返回字段。写语句进入 Graph `query` 时，保留底层只读连接 / 执行错误，不将其解释成 KG OS 语句黑名单。
+Ontology / Object v1 public profile 仍不接受 caller-owned Vector：Property `type` 为 `VECTOR<...>`、Object Value 含 Vector，或底层 Schema 出现当前 Ontology 无法表达的 raw Vector Property / type Constraint / Vector Index 时，按对应高层边界返回 `UNSUPPORTED_OPERATION` 或 `CONSISTENCY_ERROR`；公共 standalone `type` Constraint 本身已不属于 v1 Ontology profile。Graph parameters、results 与 Cypher 写入则直接复用 Lithograph 的 Vector 能力，不因 Vector、`__kgos_` identifier 或高层 Binding 状态而额外拒绝；不再为这些内容附加 Graph commit 前校验。Managed Semantic 内部 embedding 仍不是图 Property，不会因普通 `RETURN n` 自动成为返回字段。写语句进入 Graph `query` 时，保留底层只读连接 / 执行错误，不将其解释成 KG OS 语句黑名单。
 
 Object Patch 的错误归类固定为：
 

@@ -9,7 +9,10 @@ import (
 	"sync"
 )
 
-var ErrLocked = errors.New("KG_HOME is already owned by another kgosd")
+var (
+	ErrLocked         = errors.New("KG_HOME is already owned by another kgosd")
+	ErrNoActiveDaemon = errors.New("KG_HOME has no active kgosd")
+)
 
 type InstanceLock struct {
 	mu     sync.Mutex
@@ -70,6 +73,36 @@ func (lock *InstanceLock) Endpoint() (string, error) {
 	}
 	if record.Endpoint == "" {
 		return "", fmt.Errorf("kgosd.lock endpoint is empty")
+	}
+	return record.Endpoint, nil
+}
+
+func ReadActiveEndpoint(path string) (string, error) {
+	file, err := os.OpenFile(path, os.O_RDWR, 0o600)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", ErrNoActiveDaemon
+		}
+		return "", fmt.Errorf("open kgosd.lock: %w", err)
+	}
+	defer file.Close()
+	if err := tryFileLock(file); err == nil {
+		_ = unlockFile(file)
+		return "", ErrNoActiveDaemon
+	} else if !errors.Is(err, errFileLocked) {
+		return "", fmt.Errorf("inspect kgosd.lock owner: %w", err)
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("seek kgosd.lock: %w", err)
+	}
+	decoder := json.NewDecoder(file)
+	decoder.DisallowUnknownFields()
+	var record lockRecord
+	if err := decoder.Decode(&record); err != nil {
+		return "", fmt.Errorf("decode active kgosd.lock: %w", err)
+	}
+	if record.Endpoint == "" {
+		return "", fmt.Errorf("active kgosd.lock endpoint is empty")
 	}
 	return record.Endpoint, nil
 }

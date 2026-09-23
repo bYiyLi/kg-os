@@ -272,6 +272,29 @@ func (config Config) SemanticDefaults() SemanticDefaults {
 	}
 }
 
+func (semantic SemanticDefaults) IndexOptions() map[string]any {
+	providerConfig := map[string]any{
+		"base_url":        semantic.BaseURL,
+		"model":           semantic.Model,
+		"send_dimensions": false,
+		"encoding_format": "float",
+		"cache": map[string]any{
+			"enabled":   semantic.CacheEnabled,
+			"path":      semantic.CachePath,
+			"max_bytes": semantic.CacheMaxBytes,
+		},
+	}
+	if semantic.APIKeyEnv != "" {
+		providerConfig["api_key_env"] = semantic.APIKeyEnv
+	}
+	return map[string]any{
+		"provider":       semantic.Provider,
+		"providerConfig": providerConfig,
+		"dimensions":     semantic.Dimensions,
+		"similarity":     semantic.Similarity,
+	}
+}
+
 func samePath(left, right string) bool {
 	leftAbs, leftErr := filepath.Abs(left)
 	rightAbs, rightErr := filepath.Abs(right)

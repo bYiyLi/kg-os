@@ -19,7 +19,10 @@ const allowed = new Map([
     }
   ],
   ["github.com/mattn/go-sqlite3", { version: "v1.14.52", file: "LICENSE", license: "MIT" }],
-  ["golang.org/x/sys", { version: "v0.48.0", file: "LICENSE", license: "BSD-3-Clause" }]
+  ["github.com/zeebo/blake3", { version: "v0.2.4", file: "LICENSE", license: "CC0-1.0" }],
+  ["github.com/klauspost/cpuid/v2", { version: "v2.0.12", file: "LICENSE", license: "MIT" }],
+  ["golang.org/x/sys", { version: "v0.48.0", file: "LICENSE", license: "BSD-3-Clause" }],
+  ["gopkg.in/yaml.v3", { version: "v3.0.1", file: "LICENSE", license: "MIT/Apache-2.0" }]
 ]);
 
 const result = await runCapture(
@@ -76,11 +79,27 @@ for (const [path, metadata] of modules) {
     ) {
       throw new Error(path + " no longer matches the reviewed BSD-3-Clause license text");
     }
+  } else if (reviewed.license === "CC0-1.0") {
+    if (
+      !license.includes("This work is released into the public domain with CC0 1.0.") ||
+      !license.includes("CC0 1.0 Universal") ||
+      !license.includes("Statement of Purpose")
+    ) {
+      throw new Error(path + " no longer matches the reviewed CC0-1.0 license text");
+    }
+  } else if (reviewed.license === "MIT/Apache-2.0") {
+    if (
+      !license.includes("This project is covered by two different licenses: MIT and Apache.") ||
+      !license.includes("Permission is hereby granted, free of charge") ||
+      !license.includes("Licensed under the Apache License, Version 2.0")
+    ) {
+      throw new Error(path + " no longer matches the reviewed MIT/Apache-2.0 license text");
+    }
   } else {
     throw new Error("unsupported reviewed license kind for " + path + ": " + reviewed.license);
   }
 }
 
 process.stdout.write(
-  "Go dependency license gate passed: BurntSushi/toml (MIT), mattn/go-sqlite3 (MIT), golang.org/x/sys (BSD-3-Clause)\n"
+  "Go dependency license gate passed: BurntSushi/toml (MIT), mattn/go-sqlite3 (MIT), zeebo/blake3 (CC0-1.0), klauspost/cpuid/v2 (MIT), golang.org/x/sys (BSD-3-Clause), gopkg.in/yaml.v3 (MIT/Apache-2.0)\n"
 );

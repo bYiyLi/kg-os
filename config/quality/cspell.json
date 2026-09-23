@@ -61,6 +61,7 @@
     "tsbuildinfo",
     "typecheck",
     "typescript-eslint",
+    "undesignated",
     "unstub",
     "Vitest",
     "worktree",
@@ -105,10 +106,14 @@
     "staticcheck",
     "Taskfile",
     "buildinfo",
+    "cpuid",
+    "gopkg",
     "GOROOT",
     "GOTOOLCHAIN",
     "lithographtest",
+    "klauspost",
     "runtimeprofile",
-    "webui"
+    "webui",
+    "zeebo"
   ]
 }

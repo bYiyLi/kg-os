@@ -1,6 +1,6 @@
 # Phase 02：Ontology
 
-**状态：`ready`**
+**状态：`in_progress`**
 
 ## 1. 目标与范围
 
@@ -37,6 +37,9 @@
 - [Ontology compiler / decoder](../../design/implementation.md#ontology-compiler--decoder)。
 - [D67 Ontology Index profile](../../design/decisions.md#d67-ontology-index-profile)。
 - [D68 reserved Ontology Schema](../../design/decisions.md#d68-reserved-ontology-schema)。
+- [D69 Ontology Constraint profile](../../design/decisions.md#d69-ontology-constraint-profile)。
+- [D70 Bootstrap orphan-history boundary](../../design/decisions.md#d70-bootstrap-orphan-history)。
+- [D71 Graph Type generated Constraint identity](../../design/decisions.md#d71-lithograph-generated-constraint-identity)。
 
 本计划只拆分实现与验收，不重新定义这些产品合同。
 
@@ -49,7 +52,7 @@
 - Go `database/sql` + bundled SQLite、Lithograph v0.3.0 extension loading、read/write connection、StateRef pin、Branch checkout、true streaming/cancellation、Provider readiness/cache mapping、explicit transaction、single-instance lock 与 process shutdown 已有真实本地/CI证据；
 - TypeScript SDK/Web workspace存在，但不属于本 Phase 业务交付。
 
-因此当前 Design Inputs、前置工程依赖、Feature 顺序与 Acceptance 已齐全，本 Phase 状态为 `ready`。
+因此在进入实现前，Design Inputs、前置工程依赖、Feature 顺序与 Acceptance 已齐全并满足 `ready` 条件；当前 Phase 已进入 `in_progress` 并完成本地实现与验收收口。
 
 ### 3.2 Lithograph integration baseline
 
@@ -116,7 +119,7 @@ Knowledge Base bootstrap
 
 ### Feature 02.1 Knowledge Base Bootstrap 与 State Validity
 
-- 在 Phase 01 Lithograph initialization 完成后，由 Kernel 先解析 `branch/main` head：若当前 head 已满足 KG OS-valid consistency invariants，按已有 Knowledge Base打开，不要求全 DAG / 全 refs 都有效；否则只有 fresh Root baseline才允许 bootstrap。fresh baseline要求 `main` 指向唯一 Root、没有额外 Branch/Tag或非 Root Commit且 Root graph/schema为空，不能只检查当前 head。
+- 在 Phase 01 Lithograph initialization 完成后，由 Kernel 先解析 `branch/main` head：若当前 head 已满足 KG OS-valid consistency invariants，按已有 Knowledge Base打开，不要求全 DAG / 全 refs 都有效；否则只有 fresh Root baseline才允许 bootstrap。fresh baseline要求 `main` 指向 Root、没有额外 Branch/Tag且 Root graph/schema为空；按 D70 不读取内部表证明无 ref orphan Commit，也不把 orphan history自动变成 KG OS State。
 - fresh Root 使用一个 Lithograph explicit transaction，以 Root 为 `expectedHead` 建立当前 KG OS 必需的 reserved internal Schema resources；成功只产生一个新的 Commit。
 - 空 Ontology 不创建 sentinel/version marker、默认 Domain 或 Binding Node；没有调用方模型时 internal semantic graph保持为空，KG OS-validity由 reserved internal Schema + consistency contract判定。
 - bootstrap 任一 statement / validation / commit 失败整体 abort；不能留下 partial Binding、partial Schema 或 intermediate Commit。
@@ -174,11 +177,12 @@ Knowledge Base bootstrap
 ### Feature 02.6 Schema / Constraint Compiler
 
 - 把 Node / Relationship Definition 编译到 Lithograph versioned Graph Type / Constraint；不持久化第二份 KG OS Schema。
-- 支持 Node identifying Label +附加 `labels`、Property type profile、`required`、`unique`、named/anonymous `unique | key | not_null | type` Constraint、关系 `from/to`（含 `null` 无端点限制）。
+- 支持 Node identifying Label +附加 `labels`、Property type profile、`required`、`unique`、named/anonymous `unique | key` Constraint、关系 `from/to`（含 `null` 无端点限制）。存在性/type 只通过 Property `required/type` 表达；standalone `not_null/type` 按 D69 在编译前拒绝，不建立 shadow Schema。
 - Node / Relationship Definition 都必须至少一个 Property；空定义在写入前返回 `INVALID_ARGUMENT`。
 - anonymous standalone Constraint按当前 deterministic naming规则创建；已有 explicit name/config读取和未修改保留。
-- compiler/decoder按当前 Schema来源区分 Graph Type field rule、standalone Constraint、Constraint-owned backing index与显式资源：Graph Type dependent type/required rule折回 Property字段，simple/explicit Constraint保留其真实声明来源；不能把 dependent rule重复输出为公共 `constraints`。
+- compiler/decoder按当前 Schema来源区分 Graph Type field rule、standalone Constraint、Constraint-owned backing index与显式资源：Graph Type dependent type/required rule折回 Property字段；v0.3.0 Graph-Type-origin单字段 UNIQUE按 D71 exact generated-name mapping折回 `unique:true`；simple/explicit Constraint保留其真实声明来源。不能按 `graph_constraint_*` 前缀猜 source，也不能把 dependent rule重复输出为公共 `constraints`。
 - UNIQUE/KEY等 Constraint-owned backing Index不得重复输出为公共 Index，也不能在修改/删除相邻显式 Index时误删；显式 standalone Constraint/Index的真实 name/config必须保留。
+- 显式 Range Index 若与某条有效 UNIQUE/KEY（含 Property `unique:true`）拥有同 Definition + 同有序 properties，在 transaction 前返回 `OBJECT_CONFLICT`；Constraint / Index Schema name冲突同样前置诊断，不能依赖 DDL顺序或隐藏别名。
 - 任何 immediate constraint / type / endpoint failure导致整个 explicit transaction rollback。
 
 ### Feature 02.7 Index Compiler
@@ -231,18 +235,18 @@ Knowledge Base bootstrap
 
 | ID | 验收场景 | 判定 | 当前状态 |
 | --- | --- | --- | --- |
-| P2-01 | KG OS Bootstrap / Reopen | KG OS-valid `main` 可在存在其它/invalid历史 refs 时正常 reopen；非 valid `main` 只有 fresh Root baseline才可一次 explicit transaction产生首个 KG OS-valid State；bootstrap author/message为null且无State Data；已有 history不被误收编；空 Ontology无 sentinel/default Domain/Binding；失败零 partial Commit；restart不重复 bootstrap | 待验收 |
-| P2-02 | Internal Graph / Binding | D68 reserved Graph Type及其 dependent Schema来源精确匹配且不泄露为公共 Constraint；无额外 internal Index/standalone uniqueness resource；closed-profile校验拒绝 internal多余payload、internal↔Knowledge跨界边、internal-target Schema与重复边；Domain/Definition/Property Binding、唯一 owner edge、Schema Locator与双向 coverage一致；`includes`不接受 Property Binding target；startup/Ontology validation不全图扫描普通 Knowledge reserved-looking identifier | 待验收 |
-| P2-03 | Ontology Read | 空 Overview、Overview / Domain / Definition、无 Domain、多父级/cycle、同名不同 kind、description缺省提示、1..100 batch、State pin、pagination、历史 State hidden config保真且不受当前 runtime默认值重解释，以及错误边界符合设计 | 待验收 |
-| P2-04 | Canonical Serialization | Domain/Definition YAML/JSON round-trip、deterministic render、set-like重复拒绝/排序、batch edit all-or-nothing framing、空集合与String边界通过 | 待验收 |
-| P2-05 | Patch / Concurrency | Git Extended Diff Add/Update/Delete/Rename/Restructure、多 entry、canonical typed Ref percent-encoding + Git pathname quoting、从空 Ontology一次创建互相引用的 Domain/Node/Relationship/共享Index、order-independent alias与合法cycle、exact apply、strict base、no-op、author/message、created/transitions及result ordering通过 | 待验收 |
-| P2-06 | Schema / Constraint | Node identifying/additional labels、Relationship/Property、type/required/unique/from/to（含 null）、named/anonymous composite Constraint正反向 round-trip；Graph Type dependent rule不重复暴露，显式来源/name保留，failure整体rollback | 待验收 |
-| P2-07 | Index | Constraint-owned backing Index不冒充显式 Index；composite Range、single-property Text/Point、multi-field/shared Full-text、single-field/shared Semantic的create/update/delete/读取回验通过；Full-text runtime analyzer与Semantic embedding/cache mapping按新建/重建边界写入并保留历史 hidden config，api_key secret不进State；Standard Index跨 Definition targets及公共 options/filterProperties被拒绝 | 待验收 |
-| P2-08 | Rename / Delete / Data Safety | Binding continuity、rename mandatory Knowledge rewrite、共享依赖；labels/from-to/required/type/unique及delete在需要调用方显式 Knowledge处理时拒绝；不自动增删Label/填值/迁边/删数据，无隐式数据损失与冲突诊断通过 | 待验收 |
-| P2-09 | Consistency Boundary | missing/duplicate/dangling Binding、unsupported Schema/config、direct low-level drift均不被高层伪装成合法 Ontology | 待验收 |
-| P2-10 | HTTP / Authentication | Ontology data routes使用统一 logical contract与Bearer auth；canonical body content negotiation复用唯一server renderer；401/错误映射/secret hygiene/取消通过 | 待验收 |
-| P2-11 | CLI Ontology | `kg ontology` / `--edit` / `patch` 的endpoint discovery、KG_TOKEN、resolved-State规则、stdout/stderr/exit、stdin/file与真实daemon E2E通过；CLI不重渲染canonical YAML | 待验收 |
-| P2-12 | Quality / CI / Review | 本地完整validation/fresh-source、Phase Review、final diff、最终 pushed SHA的Ubuntu 24.04 x64 native CI全部成功 | 待验收 |
+| P2-01 | KG OS Bootstrap / Reopen | KG OS-valid `main` 可在存在其它/invalid历史 refs 时正常 reopen；非 valid `main` 只有 fresh Root baseline才可一次 explicit transaction产生首个 KG OS-valid State；bootstrap author/message为null且无State Data；已有 history不被误收编；空 Ontology无 sentinel/default Domain/Binding；失败零 partial Commit；restart不重复 bootstrap | 本地已验收；P2-12 待收口 |
+| P2-02 | Internal Graph / Binding | D68 reserved Graph Type及其 dependent Schema来源精确匹配且不泄露为公共 Constraint；无额外 internal Index/standalone uniqueness resource；closed-profile校验拒绝 internal多余payload、internal↔Knowledge跨界边、internal-target Schema与重复边；Domain/Definition/Property Binding、唯一 owner edge、Schema Locator与双向 coverage一致；`includes`不接受 Property Binding target；startup/Ontology validation不全图扫描普通 Knowledge reserved-looking identifier | 本地已验收；P2-12 待收口 |
+| P2-03 | Ontology Read | 空 Overview、Overview / Domain / Definition、无 Domain、多父级/cycle、同名不同 kind、description缺省提示、1..100 batch、State pin、pagination、历史 State hidden config保真且不受当前 runtime默认值重解释，以及错误边界符合设计 | 本地已验收；P2-12 待收口 |
+| P2-04 | Canonical Serialization | Domain/Definition YAML/JSON round-trip、deterministic render、set-like重复拒绝/排序、batch edit all-or-nothing framing、空集合与String边界通过 | 本地已验收；P2-12 待收口 |
+| P2-05 | Patch / Concurrency | Git Extended Diff Add/Update/Delete/Rename/Restructure、多 entry、canonical typed Ref percent-encoding + Git pathname quoting、从空 Ontology一次创建互相引用的 Domain/Node/Relationship/共享Index、order-independent alias与合法cycle、exact apply、strict base、no-op、author/message、created/transitions及result ordering通过 | 本地已验收；P2-12 待收口 |
+| P2-06 | Schema / Constraint | Node identifying/additional labels、Relationship/Property、type/required/unique/from/to（含 null）、named/anonymous `unique/key` composite Constraint正反向 round-trip；standalone `not_null/type` 前置拒绝；Graph Type dependent rule不重复暴露，显式来源/name保留，failure整体rollback | 本地已验收；P2-12 待收口 |
+| P2-07 | Index | Constraint-owned backing Index不冒充显式 Index；等价 explicit Range + UNIQUE/KEY backing 与跨 resource name冲突前置拒绝；composite Range、single-property Text/Point、multi-field/shared Full-text、single-field/shared Semantic的create/update/delete/读取回验通过；Full-text runtime analyzer与Semantic embedding/cache mapping按新建/重建边界写入并保留历史 hidden config，api_key secret不进State；Standard Index跨 Definition targets及公共 options/filterProperties被拒绝 | 本地已验收；P2-12 待收口 |
+| P2-08 | Rename / Delete / Data Safety | Binding continuity、rename mandatory Knowledge rewrite、共享依赖；labels/from-to/required/type/unique及delete在需要调用方显式 Knowledge处理时拒绝；不自动增删Label/填值/迁边/删数据，无隐式数据损失与冲突诊断通过 | 本地已验收；P2-12 待收口 |
+| P2-09 | Consistency Boundary | missing/duplicate/dangling Binding、unsupported Schema/config、direct low-level drift均不被高层伪装成合法 Ontology | 本地已验收；P2-12 待收口 |
+| P2-10 | HTTP / Authentication | Ontology data routes使用统一 logical contract与Bearer auth；canonical body content negotiation复用唯一server renderer；401/错误映射/secret hygiene/取消通过 | 本地已验收；P2-12 待收口 |
+| P2-11 | CLI Ontology | `kg ontology` / `--edit` / `patch` 的endpoint discovery、KG_TOKEN、resolved-State规则、stdout/stderr/exit、stdin/file与真实daemon E2E通过；CLI不重渲染canonical YAML | 本地已验收；P2-12 待收口 |
+| P2-12 | Quality / CI / Review | 本地完整validation/fresh-source、Phase Review、final diff、最终 pushed SHA的Ubuntu 24.04 x64 native CI全部成功 | 本地已验收；仅最终 pushed SHA 的 Ubuntu 24.04 x64 native CI 待执行 |
 
 ## 7. 关键失败路径
 
@@ -250,7 +254,7 @@ Knowledge Base bootstrap
 - Binding / decoder：missing/duplicate/dangling Binding、wrong kind locator、reserved resource被误当调用方 Definition、unsupported raw Vector/public profile。
 - Read：invalid/duplicate Ref、batch >100、cursor scope/state mismatch、Definition超资源上限、Branch移动导致跨 State拼接。
 - Serialization/Patch：invalid YAML、unknown field、ambiguous target、Git path quoting错误、unsupported patch form、hunk mismatch、rename/header/body不一致、duplicate alias。
-- Compiler：空 Definition、非法 type/endpoint、duplicate rule、Constraint/Index name collision、shared resource冲突、immediate constraint failure。
+- Compiler：空 Definition、非法 type/endpoint、standalone `not_null/type`、duplicate rule、Constraint/Index name collision、等价 Range 与 UNIQUE/KEY backing冲突、shared resource冲突、immediate constraint failure。
 - Search definitions：未知 Full-text analyzer、Semantic Provider/config invalid、multi-field Semantic、公共 `options/filterProperties`、Standard Index跨 Definition targets、已有 hidden config无法安全 round-trip。
 - Data safety：rename目标已有值冲突、数据不满足新 required/unique/type/endpoint规则、删除仍有数据或共享依赖；Ontology-scoped入口不得借机开放任意 Knowledge mutation，不得填默认值、cascade delete或留下中间 durable State。
 - Concurrency：stale base、tx begin失败、任一 staged execution/cancel/error必须fail closed；所有失败路径验证 target Branch head / Commit count无本次 partial变化，不自动rebase/merge/retry未知write。
@@ -312,6 +316,10 @@ Commit、push、发布和部署仍是独立动作；计划写入本身不代表�
 
 ## 11. 当前状态
 
-2026-09-22 建立本计划时，Phase 00/01 均为 `done`，当前 `main` 工作区没有 Phase 02 业务实现。Ontology 产品行为与底层映射已经由现有 Design Inputs确定，本计划把它们组织为一个完整业务 Phase，不把 bootstrap单独作为一个用户不可见 Phase，也不提前实现 Knowledge CRUD。
+2026-09-22 Phase 02 已进入 `in_progress`。当前未提交工作树已实现 bootstrap / KG OS-valid State validation、reserved internal graph / Binding、Ontology decoder/read、canonical YAML/JSON、Git exact Patch、Schema/Constraint/Index compiler、rename/delete data-safety、authenticated HTTP 与 `kg ontology` CLI，并已通过真实 Lithograph v0.3.0 macOS arm64 native vertical-slice：create/read/reopen、strict stale base/no-op metadata、Binding continuity + Knowledge rename rewrite、delete fail-closed、Constraint/Index profile、direct Binding drift、真实 daemon + CLI auth/transport。
 
-当前 P2-01–P2-12 均为待验收；`ready` 只表示可以开始实现，不表示代码、测试、CI或发布已经完成。
+实现 review 期间用真实 Lithograph v0.3.0 发现并按 D69 修正两个原计划的不可表示映射：identifying Graph Type 上不能稳定承载 named standalone `not_null/type`，以及 UNIQUE/KEY backing Range 不能与等价独立 Range共存。对应公共输入现在必须在 KG OS transaction 前明确拒绝，而不是建立第二份 Schema/name metadata 或依赖底层 DDL失败。
+
+2026-09-23 本地实现与 Review 已收口：P2-01–P2-11 全部取得本地真实验收证据；主工作树完整 `pnpm validate` 通过，Go race / govulncheck / 90% coverage gate通过，最终 Go statement coverage为 90.1%；TypeScript/V8 coverage与type coverage均为100%；jscpd zero-duplicate、Playwright、真实 Lithograph v0.3.0 native suite、package/license/audit/diff gates全部通过。独立 fresh-source从空 `node_modules` / cache / artifact执行 `pnpm run setup` 与完整 `pnpm validate` 通过；forced Lefthook pre-commit与 `git diff --check` 通过。Review期间清理了旧空 `internal/kernel/kernel.go` 占位、不可达 Patch result marshal错误分支与两处重复生产代码，并补齐 CLI adapter / decoder / canonicalization边界测试；当前范围没有剩余本地 finding。
+
+P2-12 仍要求**最终 pushed SHA**的 Ubuntu 24.04 x64 native CGO CI成功。本次用户尚未授权 commit/push，因此该远端证据未执行，Phase 02继续保持 `in_progress`，不能标记为 `done`。

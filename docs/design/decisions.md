@@ -392,7 +392,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D49 KG OS v1 不公开 caller-owned Vector 数据类型（2026-09-16）
 
-> 后续调整：本条 reserved embedding Property、SemanticText 与 mandatory refresh 由 [D57](#d57-managed-semantic) 替换。[D59](#d59-cypher-passthrough) 进一步取消 Graph 的 Vector / identifier 输入、输出和 commit 前检查；当前 Ontology owner只把不可映射的 caller-owned Vector **Schema/Index**视为 Ontology consistency-invalid，不为纯 Knowledge Vector value做 startup全图扫描；Object在实际寻址含Vector的值时按自身profile拒绝。下列旧“整个 Snapshot一律invalid / Graph staged guard”不再是现行合同。
+> 后续调整：本条 reserved embedding Property、SemanticText 与 mandatory refresh 由 [D57](#d57-managed-semantic) 替换。[D59](#d59-cypher-passthrough) 进一步取消 Graph 的 Vector / identifier 输入、输出和 commit 前检查；[D69](#d69-ontology-constraint-profile) 又取消了公共 standalone `type` Constraint。当前 Ontology owner只把不可映射的 caller-owned Vector **Schema/Index**视为 Ontology consistency-invalid，不为纯 Knowledge Vector value做 startup全图扫描；Object在实际寻址含Vector的值时按自身profile拒绝。下列旧“整个 Snapshot一律invalid / Graph staged guard”不再是现行合同。
 
 - 决定：KG OS v1 的 caller-owned Ontology / Knowledge / Graph public value profile 排除 Vector。`VECTOR<...>` 不能作为 Property `type` 或 type constraint `valueType`，Object/Knowledge 不能保存 caller-owned Vector value，Graph 不接受 raw Vector parameter，也不返回 Vector result；`type: vector` 只作为 Index type 表示 KG OS 托管 semantic index。Vector 仍由 Lithograph 完整支持，并仅在 KG OS reserved managed materialization 与 SemanticText 解析后的内部 query parameter 中使用。
 - 授权依据：用户明确指出 Ontology 中不需要 `VECTOR<FLOAT32>(...)` 这类业务字段，并要求重新整理、优化和深度 review；此前已经确认向量模型与 query vector 不应成为外部使用者负担。
@@ -625,3 +625,35 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 - 备选：为 Domain→Domain 与 Domain→Definition 创建两个不同 Relationship Type；给 Lithograph增加 union endpoint语法；增加 standalone Constraint/Index或bootstrap sentinel。本次均没有当前必要性，且会扩大 persistence format或修改底层数据库合同。
 - 取舍：部分 Ontology invariant不由数据库 Schema单独证明，但所有 KG OS高层入口仍必须在同一 target State上执行 consistency validation；换取不修改 Lithograph、不过度增加 internal resources，并保持 semantic graph最小。
 - 当前合同：[Semantic graph 内部边界](ontology.md#semantic-graph-的内部边界)、[Knowledge Base bootstrap](architecture.md#knowledge-base-bootstrap)、[Phase 02](../development/phases/02-ontology.md)。
+
+<a id="d69-ontology-constraint-profile"></a>
+
+### D69 Ontology Constraint profile 不复制 identifying Graph Type 的 dependent 规则（2026-09-22）
+
+- 决定：KG OS v1 的公共 standalone `constraints` 只接受 `unique | key`；Property 存在性与类型继续只由 `required` / `type` 表达。公共输入中的 `not_null | type` Constraint 返回 `UNSUPPORTED_OPERATION`，不保存只用于名称的 shadow metadata。匿名 `unique/key` 继续按 Ontology canonical payload 生成稳定 `kgos_c_<sha256>` 名称。
+- Index coexistence：Lithograph `UNIQUE/KEY` Constraint 拥有 backing Range Index，因此公共 Ontology 不允许另一个独立 Range Index 使用同 Definition 与同一有序 properties；planner 在 transaction 前返回 `OBJECT_CONFLICT`。Constraint / Index 同名同样在 transaction 前冲突。
+- 依据：Lithograph v0.3.0 会拒绝 identifying Graph Type Label / Relationship Type 上的独立 property existence/type Constraint；Graph Type 产生的 dependent type/required Constraint 名称由数据库生成，不能稳定承载调用方自定义名称。Lithograph 同时拒绝与 UNIQUE/KEY backing Range 等价的独立 Range Index。
+- 备选：在 KG OS internal semantic graph 额外保存 named `not_null/type` 名称；把显式 Range name 映射为 Constraint backing Index 的显示别名；修改 Lithograph Schema 合同。本次均不采用：前两项会建立第二份 Schema/name 真源并破坏真实资源 round-trip，后一项超出当前 KG OS Phase 02 和 Lithograph 已冻结 v0.3.0 public contract。
+- 取舍：v1 的 Constraint shape 更窄，但每个可编辑声明都能由目标 State 的 Lithograph Schema 单独恢复，不依赖 KG OS shadow Schema。存在性、类型、唯一性、联合 key 与 Range 能力本身仍保留，只禁止同一底层规则的不可持久命名重复表达。
+- 当前合同：[Ontology Property / Constraint / Index 组织](ontology.md#propertyconstraint-与-index-的组织)、[Ontology compiler / decoder](implementation.md#ontology-compiler--decoder)、[Phase 02](../development/phases/02-ontology.md)。
+
+<a id="d70-bootstrap-orphan-history"></a>
+
+### D70 Bootstrap fresh baseline 以 public ref-reachable history 为边界（2026-09-22）
+
+- 决定：自动 bootstrap 要求 `main` 仍指向 Root、没有其它 Branch / Tag，且 Root graph / Schema 为空；不额外要求证明数据库物理上不存在已经失去全部 ref 的 orphan Commit。
+- 依据：Lithograph v0.3.0 public SQL 只提供从 Descriptor 起点遍历可达 DAG 的 `lithograph.log`，没有只读的全库 orphan Commit inventory；`lithograph.gc()` 会不可逆删除 orphan history，不能拿来做启动探测。KG OS 又明确禁止读取 Lithograph internal tables。
+- 语义：orphan Commit 不会被 bootstrap 移动到 `main`、创建 Binding 或宣称为 KG OS-valid State；调用方若显式持有其 immutable Commit descriptor，Graph passthrough 仍可按 Lithograph 合同寻址它。禁止自动 adoption 的核心边界继续是“不根据既有 graph / Schema 猜测并补建 KG OS Ontology”。
+- 备选：读取 Lithograph internal tables、启动时执行 GC、复制整个数据库后在副本执行 GC、要求 Lithograph v0.3.0 之外新增 inventory procedure。前两项违反 ownership / 安全边界，复制数据库代价与当前需求不成比例，新增底层合同会打破 Phase 02 已冻结的 v0.3.0 integration baseline，因此均不采用。
+- 当前合同：[Knowledge Base bootstrap](architecture.md#knowledge-base-bootstrap)、[Phase 02](../development/phases/02-ontology.md)。
+
+<a id="d71-lithograph-generated-constraint-identity"></a>
+
+### D71 Graph Type generated Constraint 使用 v0.3.0 exact identity 映射（2026-09-22）
+
+- 决定：KG OS decoder 对 Lithograph v0.3.0 identifying Graph Type 自动产生的 `UNIQUE/KEY` Constraint，只在真实 Constraint name 等于该 artifact 冻结的 automatic-name 算法结果时识别为 Graph-Type-origin resource；不能只看 `graph_constraint_*` 前缀。
+- 原因：`SHOW CONSTRAINTS.classification` 对 Graph-Type-origin 与 standalone `UNIQUE/KEY` 都是 `undesignated`；`SHOW CURRENT GRAPH TYPE AS GRAPH` 的 identifying element `constraints` 又同时列出两类资源，因此二者都不能单独恢复声明来源。v0.3.0 automatic name 是当前 public artifact 中可稳定重现的剩余 discriminator。
+- 映射：KG OS 复现 v0.3.0 对 target、ordered properties 与 `Unique/Key` kind 的 canonical input，并使用 BLAKE3 得到 exact generated name；这是 Lithograph adapter mapping，不是新的 KG OS 公共命名规则。显式 Constraint 仅在**恰好等于自身逻辑规则对应的 exact generated name**时返回 `RESERVED_IDENTIFIER`；其它 `graph_constraint_*` 名称仍是合法调用方名称。
+- 读取：Graph-Type-origin 单 Property `UNIQUE` 折回 `Property.unique: true`，不重复暴露为 public `constraints`。KG OS v1 自身不生成 Graph-Type-origin KEY / composite UNIQUE；若外部 State 含无法无损映射到当前 editable source profile 的这类资源，则该 State consistency-invalid。
+- 取舍：增加一个很小的 BLAKE3 Go dependency，以换取对 frozen v0.3.0 artifact 的可验证 source round-trip；不读取 Lithograph internal table、不复制 parser/storage，也不把整个 generated-name prefix 升级为 KG OS reserved namespace。
+- 当前合同：[Semantic graph 内部边界](ontology.md#semantic-graph-的内部边界)、[Ontology compiler / decoder](implementation.md#ontology-compiler--decoder)、[Phase 02](../development/phases/02-ontology.md)。

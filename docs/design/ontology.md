@@ -211,7 +211,7 @@ Relationship Definition:
 Property:
   name, title?, description?, type, required?, unique?, constraints?, indexes?
 Constraint:
-  name?, type, properties?, valueType?
+  name?, type, properties?
 Index:
   name, type, targets?, properties?
 ```
@@ -221,14 +221,14 @@ Index:
 - Relationship 的 `name` 是 identifying Relationship Type。`from/to` 为 Node Definition Ref，或 `null` 表示这一端不限制类型。具名端点表示该类型关系的对应节点必须符合该 Node Definition；Node 定义必须存在。它不是 Node 实例 Ref，也不表示关系数量限制。
 - v1 常规关系按 Relationship Type 识别，`from/to` 约束端点，不把端点作为隐藏的另一套匹配范围。底层 compiler 选择实现该语义的 Graph Type pattern。关系端点变化是模型约束变化，不能自行把现有边迁往另一节点。
 - `properties` 是必填、非空的完整 Property 声明列表，按 name 唯一。**Node / Relationship Definition 都必须至少声明一个字段**；创建无字段类型，或修改后让仍存在的类型没有字段，在编译前返回 `INVALID_ARGUMENT`。附加 Label、关系端点或索引不能代替字段声明，KG OS 不自动添加占位字段。
-- Property 的 `type` 使用 Lithograph 冻结 profile 的 Cypher 属性类型表达式，canonical 例子为 `STRING`、`INTEGER`、`DATE`、`ZONED DATETIME`、`LIST<STRING NOT NULL>`。KG OS v1 **不接受 caller-owned `VECTOR<...>` Property type**，也不接受通过 list/compound type 或显式 type constraint 把 Vector 带回调用方 Property；Vector 只作为 Lithograph Managed Semantic 的非图属性派生数据使用。这个收窄不改变 Lithograph 自身对 Vector 的支持。
+- Property 的 `type` 使用 Lithograph 冻结 profile 的 Cypher 属性类型表达式，canonical 例子为 `STRING`、`INTEGER`、`DATE`、`ZONED DATETIME`、`LIST<STRING NOT NULL>`。KG OS v1 **不接受 caller-owned `VECTOR<...>` Property type**，也不接受通过 list/compound type 把 Vector 带回调用方 Property；公共 standalone `type` Constraint 整体不属于 v1 profile。Vector 只作为 Lithograph Managed Semantic 的非图属性派生数据使用。这个收窄不改变 Lithograph 自身对 Vector 的支持。
 - `required: true` 要求 Property 存在且不为 null；`unique: true` 要求该 Definition 覆盖的元素中此单字段值唯一。二者独立，unique 不自动变为 required，更不是 element identity 或关系 cardinality。缺省或 false 表示未声明该规则；canonical 省略 false。
 - `type` 最外层存在性只由 `required` 表达；输入最外层 `NOT NULL` 归一到 required，若显式 `required:false` 与之冲突则拒绝。List 元素的 `NOT NULL` 保留在 type 中，不能误当整个字段必填。
 - 顶层 `properties` 必须输出且非空；`constraints` 与 Domain `includes` 即使为空也输出。Definition 顶层 `indexes` 为可选集合：缺省与 `[]` 都表示没有顶层索引，canonical YAML / JSON 为空时省略；非空时输出完整声明。Property 内的 `indexes` 及其它 optional collection 同样为空时省略。未知字段报错，不忽略。title/description 保持 optional，不把自然语言中的“必须”“唯一”等字样解释成 Schema 规则。
 
 `labels`、Domain `includes` 与 Index `targets` 是 **set-like collection**：输入不得出现重复 logical name / typed Ref，canonical 输出按 UTF-8 bytes 升序；重复项是非法 Object Value，而不是“自动去重后继续”。`properties`、复合 Constraint 的 property list 与 Index `properties` 则保持其各自已定义的 name uniqueness / 有序语义，不能因为 renderer 会排序其它集合而重排复合字段。
 
-至少一个字段的要求属于 Ontology / Object 的 Definition profile，也参与高层 State 一致性检查；公共 Graph 仍原样执行 Lithograph Cypher，不增加该检查。模型有字段声明不等于每个 Knowledge 实例都必须填写该字段；实例的必填规则仍由 `required` 或相应 Constraint 决定。
+至少一个字段的要求属于 Ontology / Object 的 Definition profile，也参与高层 State 一致性检查；公共 Graph 仍原样执行 Lithograph Cypher，不增加该检查。模型有字段声明不等于每个 Knowledge 实例都必须填写该字段；实例的必填规则由 `required` 或覆盖该字段的 `key` Constraint 决定。
 
 此模型直接表达当前需要的节点、关系、约束和检索能力，不是“完整 Lithograph Schema 管理工具”。Graph Type 命令组织、lookup 等数据库管理资源不因此升级为 Ontology 顶层对象。对于超出当前可表达 profile 的 Schema，不能以不完整 YAML 假装可无损编辑；必须明确诊断。以后补充真实需要的结构时扩充对应聚合字段，不恢复 raw `structure` 或大量独立 API。
 
@@ -238,13 +238,17 @@ Index:
 
 顶层 `indexes` 可省略不等于取消多字段或共享索引。复合 Range、多字段 Full-text，以及当前底层能够表达的跨 Definition Full-text / Managed Semantic 共享索引仍在顶层表达；不能拆成多个单字段索引后声称等价。输入空数组归一成省略只影响表示，不产生 Schema delta；从非空顶层集合删除声明仍按正常索引删除 / 共享资源规则处理。
 
-简单的存在性与单字段唯一性优先使用 `required/unique`；需要显式命名或组合规则时使用 `constraints`：`type` 为 `unique | key | not_null | type`。`key` 表示字段组合必填且联合唯一；`type` constraint 必须带 `valueType`，并与 Property `type` 使用同一个 KG OS public type profile，因此同样不能声明 `VECTOR<...>`。顶层 Constraint 的 `properties` 必填非空，Property 内由所在字段确定目标。联合唯一不是每个字段分别唯一，索引也不能拆成多个单字段后声称等价。
+存在性与属性类型只通过 Property 的 `required` / `type` 表达；`constraints` v1 只接受 `unique | key`，两者都可以显式命名或省略名称。`key` 表示字段组合必填且联合唯一。顶层 Constraint 的 `properties` 必填非空，Property 内由所在字段确定目标。联合唯一不是每个字段分别唯一，索引也不能拆成多个单字段后声称等价。
+
+KG OS v1 不接受公共 `not_null` / `type` Constraint，也不为它们保存一份只用于名称的 metadata：Lithograph v0.3.0 对 identifying Graph Type Label / Relationship Type 的存在性与类型规则属于 Graph Type dependent Constraint，独立 `not_null/type` Constraint会被数据库拒绝，而 dependent Constraint 的数据库生成名称不是调用方可指定的稳定名称。允许公共 named `not_null/type` 会迫使 KG OS 建立第二份 Schema 名称真源，违反当前 persistence 边界。因此调用方使用 `required` 和 Property `type`；输入 standalone `not_null/type` 返回 `UNSUPPORTED_OPERATION`。
 
 同一个约束不能同时由 Boolean 与一个同义的内嵌声明重复编辑；发现相同覆盖范围与同一规则重复表达时拒绝并指出位置。多字段 KEY 的存在性效果不反写成每个 Property 的独立 required 声明。默认阅读可说明有效规则，editable body 保留真实声明来源，不把“推导结果”变成另一份规则。
 
-Constraint 名称可省略，由 KG OS 创建时确定；explicit named Constraint 读取时保留真实名称。匿名 standalone Constraint 所需名称使用 `kgos_c_` 加其 canonical `{kind, targetRefs, type, properties, valueType?}` UTF-8 JSON 的 SHA-256 hex（kind 为 node/relationship，targetRefs 按 UTF-8 bytes 排序，properties 保序，键按上述顺序，JSON 无空白、直接 UTF-8 且不转义非 ASCII；缺省 valueType 不输出），创建后读回真实名称；若该名称已被不同资源占用则报冲突，不覆盖。创建后已存在的资源名称不因字段或 Definition 改名而重新计算。简单 required/unique 的底层内生资源名称不成为 AI 必须管理的对象。来源归并与派生 backing index 的区别由 compiler 从当前公开 Schema 读取，不能丢弃原有显式约束名称。
+Constraint 名称可省略，由 KG OS 创建时确定；explicit named Constraint 读取时保留真实名称。匿名 standalone Constraint 所需名称使用 `kgos_c_` 加其 canonical `{kind, targetRefs, type, properties}` UTF-8 JSON 的 SHA-256 hex（kind 为 node/relationship，targetRefs 按 UTF-8 bytes 排序，properties 保序，键按上述顺序，JSON 无空白、直接 UTF-8 且不转义非 ASCII），创建后读回真实名称；若该名称已被不同资源占用则报冲突，不覆盖。创建后已存在的资源名称不因字段或 Definition 改名而重新计算。简单 required/unique 的底层内生资源名称不成为 AI 必须管理的对象。来源归并与派生 backing index 的区别由 compiler 从当前公开 Schema 读取，不能丢弃原有显式约束名称。
 
 Index 的 `name` 必填，是之后查询真实使用的名称，不是显示别名。`type` 为 `range | text | point | fulltext | vector`；名字冲突按底层同一 Schema 的规则检测，不能以 Domain 当 namespace。`range/text/point` 表示对调用方业务 Property 的直接数据库索引：Range 接受一个或多个有序 Property，Text / Point 恰好一个 Property；它们在当前 Lithograph v0.3.0 contract 中没有 versioned Index configuration，因此 KG OS v1 **不暴露 per-index `options`**。Full-text 与 `vector` 同样不暴露 per-index 配置：前者由 daemon Full-text 默认值编译，后者由 Managed Semantic runtime 默认值编译并保留目标 State 中已有的 hidden versioned config。
+
+Lithograph 的 `UNIQUE/KEY` Constraint 自带同 target / properties 的 owning Range Index。KG OS 因此不允许再声明一个与某条有效 `unique/key`（包括 Property `unique:true`）**同 Definition、同有序 properties** 的独立 Range Index；这两个名字无法同时成为两个真实数据库资源。该组合在 transaction 前返回 `OBJECT_CONFLICT`，不能把显式 Index 静默映射成 Constraint backing Index、丢掉调用方 Index name，或在 decoder 中伪造两份资源。不同 target 或不同有序 properties 的 Range Index 不受此限制。
 
 `targets` 只用于当前底层确实支持多 target 的 Full-text / Managed Semantic Index；省略表示当前 Definition。`range/text/point` 是 Definition-local Index，公共输入不得为它们声明跨 Definition `targets`，canonical read 也不输出这类伪共享范围。Full-text / Managed Semantic 的共享 targets 必须全部是同 kind Definition。KG OS 不为标准 Index 拆出多个底层资源后伪装成一个共享 Index。
 
@@ -498,7 +502,7 @@ Domain、`INCLUDES` 与 Schema semantic metadata 和普通 Knowledge 共存在�
 
 KG OS v1 为所有 **KG OS 显式命名**的 internal graph / Schema identifier 保留 exact UTF-8 prefix `__kgos_`。调用方创建或修改的 Label、Relationship Type、Property key、Graph Type resource name、Constraint name、Index name 等只要以该 prefix 开头，都在 Object / Ontology Patch boundary 返回 `RESERVED_IDENTIFIER`；比较按 Lithograph identifier 的实际 name semantics，不额外做 Unicode normalization。这个 namespace 只服务 KG OS 基础设施，不进入调用方 Ontology 语义。Graph 是原始 Cypher 执行入口，不按该 prefix 拦截；直接 Cypher 与高层模型校验的边界见 [Graph](graph.md#graph)。
 
-Lithograph 因 Graph Type / Constraint 自动派生的 dependent Constraint / backing Index 是数据库生成资源，不属于 KG OS 自己选择名称的 identifier，因此它们**不要求**使用 `__kgos_` 前缀。KG OS 必须通过公开 Schema introspection 的 owner/origin/classification识别这类资源，并把 D68 reserved Graph Type 派生的规则视为 reserved Schema组成部分；不能仅靠名字前缀分类，也不能把 `graph_constraint_*` 等数据库生成名称投影成调用方可编辑 Constraint。反过来，任何额外 standalone Constraint / Index 只要 target指向 reserved internal Label/Type/Property，即使其名称没有 `__kgos_`，也不属于调用方 Ontology，且在 D68 未冻结时使 State consistency-invalid。
+Lithograph 因 Graph Type / Constraint 自动派生的 dependent Constraint / backing Index 是数据库生成资源，不属于 KG OS 自己选择名称的 identifier，因此它们**不要求**使用 `__kgos_` 前缀。KG OS 必须通过公开 Schema introspection 与当前 frozen artifact 的真实 source discriminator 识别这类资源，并把 D68 reserved Graph Type 派生的规则视为 reserved Schema 组成部分；不能仅靠名字前缀分类。v0.3.0 对 Graph-Type-origin 与 standalone `UNIQUE/KEY` 都报告 `classification=undesignated`，而 `SHOW CURRENT GRAPH TYPE AS GRAPH` 的 identifying element 又会同时列出两类 `constraints`，因此这两项都不足以恢复声明来源；KG OS 按 [D71](decisions.md#d71-lithograph-generated-constraint-identity) 使用 exact generated-name 映射。`graph_constraint_*` 前缀本身不属于 KG OS reserved namespace，也不能被 decoder 直接投影成调用方 Constraint。反过来，任何额外 standalone Constraint / Index 只要 target 指向 reserved internal Label/Type/Property，即使其名称没有 `__kgos_`，也不属于调用方 Ontology，且在 D68 未冻结时使 State consistency-invalid。
 
 v1 internal semantic graph 的最小持久化编码固定为：
 

@@ -11,7 +11,7 @@ Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能
 | 已确认的合同 | 工程工作 |
 | --- | --- |
 | Ontology Overview → 可选 Domain → Definition，无 search；1..100 Ref batch read | 单次 State pin、输入顺序、per-Domain cursor、batch all-or-nothing、描述缺省提示与有界图预览 |
-| Node/Relationship 聚合 Property、required/unique、Constraint/Index | 从公开 Graph Type/SHOW 与 semantic graph 反向构建逻辑值；编译到数据库，不建立 owner-only 公共 structure AST |
+| Node/Relationship 聚合 Property、required/unique、Constraint/Index | 从公开 Graph Type/SHOW 与 semantic graph 反向构建逻辑值；存在性/类型由 Property `required/type` 表达，standalone Constraint 只保留可真实命名 round-trip 的 `unique/key`；编译到数据库，不建立 owner-only 公共 structure AST |
 | Domain/Definition canonical YAML + 唯一 Object Patch | 标准 YAML/Git parser、exact apply、input-only renameFrom、语义差异、共享资源去重和冲突定位 |
 | 单 State、strict base、无隐式数据损失 | 复用已验收的 SQL explicit-transaction adapter；实现并验证 DDL/DML 顺序、即时约束、引用改写、Knowledge data rewrite 与 index maintenance |
 | Binding / Object Graph View / reserved identifier | 空库 bootstrap、Object / Ontology 的双向覆盖与内部数据投影校验；不作为公共 Graph Cypher 的执行条件 |
@@ -28,6 +28,8 @@ Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能
 实现先从目标 State 的公开 Schema 与 metadata 得到完整源信息，再建立本次操作的 source mapping，区分字段自带规则、具名约束、derived backing index 和独立显式索引。该映射是 operation-local 工程数据，不是新的公共结构、不作为第二份 Schema 持久化。
 
 反向读取必须保留真实的 index/constraint name、target、字段顺序、类型、端点语义及配置。相同公共值能通过多种底层 DDL 实现，不要求 AST/资源数量一一对应；但不能把另一种 coverage、复合约束或多目标索引简化成语义不同的 Boolean。
+
+Lithograph v0.3.0 的 identifying Graph Type 上，Property type / required 是 origin-dependent Constraint；独立 `not_null/type` Constraint不能合法指向同一 identifying Label / Relationship Type，因此 KG OS 不创建只为保存名称的 shadow metadata。Standalone public Constraint 只编译 `unique/key`。Graph-Type-origin 与 standalone `UNIQUE/KEY` 在 v0.3.0 `SHOW CONSTRAINTS` 中都属于 `undesignated`，AS GRAPH virtual constraints 也混合两类来源；decoder 因此按 [D71](decisions.md#d71-lithograph-generated-constraint-identity) 复现 frozen exact automatic-name mapping，而不以 `graph_constraint_*` 前缀猜 source。单 Property Graph-Type UNIQUE 折回 `Property.unique=true`；当前 KG OS compiler 不生成 Graph-Type KEY / composite UNIQUE。`unique/key` 同时拥有 backing Range Index；若公共目标又声明同 Definition + 同有序 properties 的独立 Range Index，planner 在 transaction 前返回 `OBJECT_CONFLICT`，不依赖 DDL 执行顺序解决资源冲突。
 
 正向编译先比较公共逻辑变化，再保留未修改的来源与配置，计算必需的底层变动。一次 Node/Relationship Patch 可同时改变 Schema、Constraint、Index 和 Binding；shared resource 使用一个规范化变化计划。新建时源映射为空，按 ontology.md 的命名/默认规则选择最小合法计划。不能靠临时 UUID、公共 owner registry 或 raw Schema escape hatch 填补 mapping。
 

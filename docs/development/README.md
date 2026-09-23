@@ -57,9 +57,9 @@ Feature 是实现单元，Phase 是默认交付与验收单元。Feature 完成�
 
 旧 Phase 01 TypeScript / `ffi-rs` / 自制 SQLite runtime / v0.2.x 实现尝试已经从当前工程基线清理；原 Phase 00 重复 Lithograph execution smoke也已在 Phase 01实现时删除，`internal/lithographtest`只保留 bundled SQLite build-profile测试。正式 bundled SQLite connection lifecycle、Runtime host与transaction adapter已经进入当前 `main` 基线；业务数据库语义与Knowledge Base bootstrap仍由后续 Phase拥有。
 
-KG OS 业务能力仍未实现。Phase 01 的 credential 范围是 `auth.json` 生成/读取与 runtime secret ownership，不代表公共 HTTP Bearer middleware、API/control routes 或 `kg daemon start/status/stop/restart` 已完成；这些能力与 Knowledge Base bootstrap、Ontology / Object / Graph / Evolution 及正式 client surface继续以设计文档为行为真源。
+Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime secret ownership；Phase 02 当前工作树已经在其上实现 Ontology data routes 的统一 Bearer authentication、Knowledge Base bootstrap 与正式 `kg ontology` client surface。通用 Object / Graph / Evolution、SDK/Web/Skill 业务交互和 `kg daemon start/status/stop/restart` 仍未实现。
 
-**Phase 02 当前为 `ready`。** 本阶段把 Knowledge Base bootstrap、internal semantic graph / Binding、Ontology read/edit、Ontology-scoped Object Patch、Schema/Constraint/Index compiler 与正式 authenticated `kg ontology` CLI作为一个完整交付单元。Phase 02 完成后调用方可以定义和维护自己的数据模型；普通 Knowledge 数据 CRUD、Graph、Evolution、SDK/Web/Skill 与 daemon control仍属于后续阶段。当前没有 Phase 02 实现证据。
+**Phase 02 当前为 `in_progress`。** 当前未提交工作树已经实现 Knowledge Base bootstrap、internal semantic graph / Binding、Ontology read/edit、Ontology-scoped Object Patch、Schema/Constraint/Index compiler、authenticated HTTP 与正式 `kg ontology` CLI。P2-01–P2-11 已取得本地验收证据；主工作树完整 `pnpm validate`、独立 fresh-source setup + full validation、forced pre-commit、final diff/review、真实 Lithograph v0.3.0 native suite均已通过。剩余完成条件只有最终 pushed SHA 的 Ubuntu 24.04 x64 native CI；当前未授权 commit/push，因此 Phase 02 保持 `in_progress`。普通 Knowledge 数据 CRUD、Graph、Evolution、SDK/Web/Skill 与 daemon control仍属于后续阶段。
 
 ## 5. 路线总览
 
@@ -67,7 +67,7 @@ KG OS 业务能力仍未实现。Phase 01 的 credential 范围是 `auth.json` �
 | --- | --- | --- | --- |
 | [00 Engineering Foundation](phases/00-engineering-foundation.md) | `done` | Go 1.27.1 daemon/kernel/CLI + TypeScript SDK/Web workspace、pinned Go quality tools、bundled CGO/SQLite+FTS5 baseline、90% coverage/race/security gates、真实 v0.3.0 smoke、macOS arm64 + Ubuntu 24.04 x64 native证据 | [D65](../design/decisions.md#d65-go-runtime)、[D66](../design/decisions.md#d66-lithograph-v030-sql-only) |
 | [01 Runtime & Lithograph Host Foundation](phases/01-runtime-lithograph-host.md) | `done` | `KG_HOME`、config/credential、extension resolver、Go read/write SQLite host、v0.3.0 SQL execution/stream/cancel、explicit tx、runtime ownership | [Runtime](../design/runtime.md)、[Go 数据库接入](../design/implementation.md#go-运行时与数据库接入) |
-| [02 Ontology](phases/02-ontology.md) | `ready` | KG OS bootstrap、internal semantic graph / Binding、Ontology read/edit/Patch、Schema/Constraint/Index compiler、authenticated HTTP + `kg ontology` | [Ontology](../design/ontology.md)、[Object Patch](../design/object.md#object-公共调用合同)、[Bootstrap](../design/architecture.md#knowledge-base-bootstrap) |
+| [02 Ontology](phases/02-ontology.md) | `in_progress` | KG OS bootstrap、internal semantic graph / Binding、Ontology read/edit/Patch、Schema/Constraint/Index compiler、authenticated HTTP + `kg ontology` | [Ontology](../design/ontology.md)、[Object Patch](../design/object.md#object-公共调用合同)、[Bootstrap](../design/architecture.md#knowledge-base-bootstrap) |
 
 当前实现依赖顺序：
 
@@ -82,7 +82,7 @@ Go Engineering Foundation
   -> complete CLI / SDK / Web / Skill / daemon-control surfaces and release closure
 ```
 
-Phase 02 已冻结为当前下一开发阶段。Phase 03 及之后仍不提前建立空 Phase；开始后续阶段前，再从对应 Design Inputs 建立计划与 Acceptance。
+Phase 02 是当前实施阶段，产品范围与 Acceptance 已冻结；Phase 03 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
 
 ## 6. Phase 通用完成标准
 
