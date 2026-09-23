@@ -246,7 +246,7 @@ KG OS v1 不接受公共 `not_null` / `type` Constraint，也不为它们保存�
 
 Constraint 名称可省略，由 KG OS 创建时确定；explicit named Constraint 读取时保留真实名称。匿名 standalone Constraint 所需名称使用 `kgos_c_` 加其 canonical `{kind, targetRefs, type, properties}` UTF-8 JSON 的 SHA-256 hex（kind 为 node/relationship，targetRefs 按 UTF-8 bytes 排序，properties 保序，键按上述顺序，JSON 无空白、直接 UTF-8 且不转义非 ASCII），创建后读回真实名称；若该名称已被不同资源占用则报冲突，不覆盖。创建后已存在的资源名称不因字段或 Definition 改名而重新计算。简单 required/unique 的底层内生资源名称不成为 AI 必须管理的对象。来源归并与派生 backing index 的区别由 compiler 从当前公开 Schema 读取，不能丢弃原有显式约束名称。
 
-Index 的 `name` 必填，是之后查询真实使用的名称，不是显示别名。`type` 为 `range | text | point | fulltext | vector`；名字冲突按底层同一 Schema 的规则检测，不能以 Domain 当 namespace。`range/text/point` 表示对调用方业务 Property 的直接数据库索引：Range 接受一个或多个有序 Property，Text / Point 恰好一个 Property；它们在当前 Lithograph v0.3.0 contract 中没有 versioned Index configuration，因此 KG OS v1 **不暴露 per-index `options`**。Full-text 与 `vector` 同样不暴露 per-index 配置：前者由 daemon Full-text 默认值编译，后者由 Managed Semantic runtime 默认值编译并保留目标 State 中已有的 hidden versioned config。
+Index 的 `name` 必填，是之后查询真实使用的名称，不是显示别名。`type` 为 `range | text | point | fulltext | vector`；名字冲突按底层同一 Schema 的规则检测，不能以 Domain 当 namespace。`range/text/point` 表示对调用方业务 Property 的直接数据库索引：Range 接受一个或多个有序 Property，Text / Point 恰好一个 Property；它们在当前 Lithograph v0.3.0 contract 中没有 versioned Index configuration，因此 KG OS v1 **不暴露 per-index `options`**。Full-text 与 `vector` 同样不暴露 per-index 配置：前者由 daemon 当前显式 Full-text 初始化配置编译，后者由当前显式 Managed Semantic 初始化配置编译并保留目标 State 中已有的 hidden versioned config。
 
 Lithograph 的 `UNIQUE/KEY` Constraint 自带同 target / properties 的 owning Range Index。KG OS 因此不允许再声明一个与某条有效 `unique/key`（包括 Property `unique:true`）**同 Definition、同有序 properties** 的独立 Range Index；这两个名字无法同时成为两个真实数据库资源。该组合在 transaction 前返回 `OBJECT_CONFLICT`，不能把显式 Index 静默映射成 Constraint backing Index、丢掉调用方 Index name，或在 decoder 中伪造两份资源。不同 target 或不同有序 properties 的 Range Index 不受此限制。
 
@@ -258,7 +258,7 @@ Lithograph 的 `UNIQUE/KEY` Constraint 自带同 target / properties 的 owning 
 
 Full-text analyzer 是有意隐藏的运行/数据库参数，不属于公共 Ontology Value。Aggregate decoder 读取某个 State 时，可以把不同 analyzer 创建的实际 Lithograph Full-text IndexDefinition 都投影为同一个简化 `type: fulltext`；**analyzer 不同本身不是 KG OS consistency violation**。已经存在且本次业务 Patch 没有要求重建的 Full-text Index 保留其 versioned analyzer；新建或因 targets/properties 等业务定义变化必须重建时，compiler 使用当前 daemon 的 `[fulltext].analyzer`，并继续固定 `fulltext.eventually_consistent = false`。
 
-KG OS 不在 State 中额外保存 analyzer fingerprint/generation，也不在打开已有 Knowledge Base 时比较当前 config 与历史 IndexDefinition。修改 `[fulltext].analyzer` 后 restart 照常启动；历史索引不批量迁移，后续新建/重建索引直接使用新配置。除 analyzer 这一有意隐藏字段外，若底层 Full-text definition 含 KG OS v1 无法安全解释的其它配置，decoder 仍不能静默伪装成等价公共定义。
+KG OS 不在 State 中额外保存 analyzer fingerprint/generation，也不在打开已有 Knowledge Base 时比较当前 config 与历史 IndexDefinition。`[fulltext].analyzer` 在安装合同中属于初始化后禁止修改的配置；KG OS 不保存初始化副本来检测或阻止人工修改，也不批量迁移历史索引。历史索引继续使用自身 versioned analyzer；新建/重建索引使用 daemon startup 时读取到的当前配置。除 analyzer 这一有意隐藏字段外，若底层 Full-text definition 含 KG OS v1 无法安全解释的其它配置，decoder 仍不能静默伪装成等价公共定义。
 
 ### 托管语义索引
 
@@ -296,7 +296,7 @@ KG OS 不在 State 中额外保存 analyzer fingerprint/generation，也不在�
 - **Semantic Index Create / Replace**：创建或替换 versioned 索引定义，仅做本地 Provider/config validation，不遍历数据、不调用 embedding 服务。定义变更与同次 Ontology Patch 的其它变化仍原子提交。
 - **Automatic Embedding Cache**：OpenAI-compatible Provider 可以按 IndexDefinition 中的 `providerConfig.cache` 透明命中 / 填充自己的独立 SQLite cache；Lithograph / KG OS 不拥有 text→Vector cache，调用方不需要预热。连接与持久化接入按 [Runtime](runtime.md#embedding-result-cache) 验证。
 - **Semantic materialization rebuild**：Lithograph 的 `db.index.semantic.rebuild(name, version)` 只重建目标 Snapshot 的 TEMP Semantic/HNSW materialization，不承担 Provider cache预热；它不创建 State、不移动 Branch，也不是创建索引、保存正文或普通查询的前置条件。KG OS 不新增预热 CLI/API；明确执行维护 Cypher 时使用 Graph `execute`。
-- **Config Migration**：因为运行配置变化而主动重写旧索引或历史 State。KG OS v1 不提供自动配置迁移；修改默认值只影响之后新建 / 必须重建的索引。
+- **Config Migration**：因为运行配置变化而主动重写旧索引或历史 State。KG OS v1 不提供自动配置迁移；Full-text / Embedding 初始化配置按安装合同禁止修改，同时 KG OS 不保存历史配置做检测或迁移。
 
 业务索引定义的替换、Lithograph TEMP/HNSW materialization 与 Provider-owned text→Vector cache 是三个独立生命周期，不能再用“先补齐 managed Property 才能提交”的旧规则把它们绑在一个写事务中。
 

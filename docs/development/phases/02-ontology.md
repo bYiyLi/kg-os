@@ -2,6 +2,8 @@
 
 **状态：`done`**
 
+> 后续设计调整：Phase 02 的完成证据保持有效；[D72](../../design/decisions.md#d72-local-install-runtime-onboarding) 在后续 Phase 03 替换了当时计划中的 env-only CLI credential、公开 `kg daemon ...` lifecycle 与可变 Full-text / Embedding runtime-default onboarding。下文相关条目用于说明 Phase 02 当时的边界与验收，不再定义当前后续产品路线。
+
 ## 1. 目标与范围
 
 在 Phase 01 已完成的 Go Runtime / Lithograph Host foundation 上，交付 KG OS 第一组完整业务能力：把空 Lithograph Root bootstrap 成第一个 **KG OS-valid State**，实现 Ontology 的内部 semantic graph / Binding / Schema Locator、正反向 compiler / decoder、canonical editable representation、Ontology-scoped Object Patch，以及正式的 authenticated HTTP + `kg ontology` / `kg ontology patch` 使用入口。

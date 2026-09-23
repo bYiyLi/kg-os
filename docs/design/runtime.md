@@ -12,23 +12,23 @@ Browser ───────── 页面 / API HTTP ────────�
                                               ▼
                                       kgosd（Go）
                                       ├── 内置 Web
-                                      ├── net/http API / control
+                                      ├── net/http API
                                       └── KG OS Kernel → database/sql → Lithograph
 ```
 
 `kgosd` 同时承载 API 与 Human-facing Web，因此 CLI、SDK 与 Web 使用同一个 KG OS Kernel 和同一组 Object / Graph / Evolution logical contract。部署和启动只需要这个 daemon，不单独安装、部署或启动 Web 服务；Web 与 API 共用进程、配置端口和 lifecycle。v1 不为 CLI 再建立 Unix socket / Named Pipe / gRPC 私有协议。
 
-## HTTP bind 与默认 endpoint
+## HTTP bind 与标准本地 endpoint
 
-v1 使用 IPv4 HTTP。默认配置只监听本机 loopback：
+v1 使用 IPv4 HTTP。`kg install` 的标准推荐值是本机 loopback：
 
 ```text
-default host = 127.0.0.1
-default port = 4765
-default origin = http://127.0.0.1:4765
+recommended host = 127.0.0.1
+recommended port = 4765
+recommended origin = http://127.0.0.1:4765
 ```
 
-`server.host` 与 `server.port` 都允许调用方在 `$KG_HOME/config.toml` 中显式覆盖。v1 `server.host` 接受 IPv4 bind address；默认值是 `127.0.0.1`。因此默认仍然只允许本机访问，但调用方可以明确配置 LAN address 或 `0.0.0.0`。`kgosd` 只绑定配置解析得到的这一组 `host:port`，不额外监听第二个地址。
+`server.host` 与 `server.port` 都必须由 `$KG_HOME/config.toml` 显式给出。v1 `server.host` 接受 IPv4 bind address；标准安装推荐 `127.0.0.1`，调用方也可以明确配置 LAN address 或 `0.0.0.0`。`kgosd` 只绑定配置解析得到的这一组 `host:port`，不额外监听第二个地址。
 
 `server.host = "0.0.0.0"` 表示监听所有 IPv4 interfaces。由于 wildcard bind address 不是一个适合作为 client target 的远端地址，`kg` 在这种配置下仍连接 `127.0.0.1:<port>`；其它设备应使用运行 `kgosd` 主机的实际可达 IP。对于其它具体 `server.host`，本机 CLI 直接连接该 configured host。
 
@@ -60,7 +60,7 @@ http://<host>:<port>/          → Web UI
 same origin                    → KG OS API / streaming
 ```
 
-Web 构建产物随 `kgosd` 同一交付物发布，由 `kgosd` 的 HTTP server 直接提供页面和资源；执行 `kg daemon start` 后，同一个 configured origin 即可访问 Web 与 API。没有独立 Web 启动命令、第二个服务端口或单独部署步骤。
+Web 构建产物随 `kgosd` 同一交付物发布，由 `kgosd` 的 HTTP server 直接提供页面和资源；本地业务 CLI 在需要时自动确保 daemon 已运行，同一个 configured origin 即可访问 Web 与 API。没有独立 Web 启动命令、第二个服务端口或单独部署步骤。
 
 Web 与 CLI / SDK 在逻辑上都是公共 API 的客户端。服务端与 `kg` CLI 使用 Go；Web / SDK 使用 TypeScript。Web 构建出的浏览器代码经 `kgosd` HTTP 下载后在浏览器执行；这里的“同进程”只表示页面 / 资源服务与 API 服务由同一个 daemon 承载，不表示浏览器代码在 Go 进程内执行。
 
@@ -74,7 +74,7 @@ Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemo
 
 ## 单 Token 实例认证
 
-KG OS v1 对 `kgosd` HTTP surface 使用一个最小的 **single-token instance authentication**：一个 `KG_HOME` 只有一个持久 access token；持有该 token 就拥有该实例全部 API / control 能力。v1 不建立 user、password、role、scope、refresh token、OAuth、session account 或多租户授权模型。
+KG OS v1 对 `kgosd` HTTP API surface 使用一个最小的 **single-token instance authentication**：一个 `KG_HOME` 只有一个持久 access token；持有该 token 就拥有该实例全部 API 能力。v1 不建立 user、password、role、scope、refresh token、OAuth、session account 或多租户授权模型。
 
 服务端 credential 的唯一真源是 `$KG_HOME/auth.json`：
 
@@ -88,7 +88,7 @@ KG OS v1 对 `kgosd` HTTP surface 使用一个最小的 **single-token instance 
 
 `auth.json` 是 runtime secret，不属于 Knowledge Base State、Commit Data、配置 fingerprint 或 Evolution。POSIX 上新建文件权限必须为 `0600`；其它平台使用等价的当前用户私有访问控制。token 不得写入日志、error `message/details`、lock file、State、HTTP response body 或诊断 dump。
 
-所有 `kgosd` **API 与 control request** 都必须携带：
+所有 `kgosd` **API request** 都必须携带：
 
 ```http
 Authorization: Bearer <token>
@@ -96,18 +96,36 @@ Authorization: Bearer <token>
 
 不接受 query parameter、URL、request body 或 cookie 作为 token 的第二种 canonical carrier。缺失、空、malformed 或不匹配的 Bearer credential 都返回同一个 `AUTHENTICATION_FAILED`，HTTP adapter 使用 `401 Unauthorized`，不得通过错误差异泄露 credential validity。实现比较 token 时使用适合 secret 的 constant-time comparison。
 
-客户端 credential 与服务端文件严格分离：
+客户端 credential 继续通过 Bearer 进入 daemon，但本机 CLI 可以复用当前 profile 的本地 secret：
 
-- `kg` CLI **只从非空环境变量 `KG_TOKEN` 取得 credential**，不自动读取 `auth.json`，也不提供 `--token`；
+- `kg` CLI 的 credential resolution 固定为：非空环境变量 `KG_TOKEN` 优先；否则读取当前 `$KG_HOME/auth.json`。显式 `KG_TOKEN` 存在但错误时不得 fallback 到本地文件；CLI 不提供 `--token`，也不把 token 写入 stdout/stderr；
 - SDK 必须由调用方显式提供 token，再统一发送 Bearer header；
-- Human-facing Web 不拥有 credential-free API 旁路；浏览器端必须先取得 token，再对所有 data/control API request 发送同一 Bearer credential。exact browser credential entry/storage 属于 Web adapter 实现合同，但不得让 token 进入 URL 或 server-side session account；
-- `kgosd` 自身启动、首次创建 `auth.json` 与**当前 profile 没有 active daemon 时** `kg daemon start` 的本地 process spawn 不是一个 HTTP API request，因此不要求预先存在客户端 token；一旦 active daemon 存在，任何 CLI/SDK/Web 对它的 HTTP 操作（包括 `start` 的 running/idempotent 检查以及 `status/stop/restart` 的 control 调用）都遵守上述认证合同。
+- Human-facing Web 不拥有 credential-free API 旁路；浏览器端必须先取得 token，再对所有 API request 发送同一 Bearer credential。exact browser credential entry/storage 属于 Web adapter 实现合同，但不得让 token 进入 URL 或 server-side session account；
+- `kgosd` 自身启动、首次创建 `auth.json` 与本地 CLI 为业务命令自动 spawn daemon 都不是 HTTP API request，因此不要求预先存在客户端 token；daemon ready 后，原始业务 request 仍必须按上述规则取得 token 并发送 Bearer header。
 
-默认 `127.0.0.1` 仍是安全边界的一部分。Bearer token 提供**认证**，不提供 transport confidentiality；v1 仍不内置 TLS。显式绑定 LAN address / `0.0.0.0` 时，在不可信网络上使用明文 HTTP 会暴露 bearer credential，属于 operator 明确承担的部署风险；多用户、细粒度授权、TLS 或公网安全部署必须另行设计。
+标准推荐的 `127.0.0.1` 仍是安全边界的一部分。Bearer token 提供**认证**，不提供 transport confidentiality；v1 仍不内置 TLS。显式绑定 LAN address / `0.0.0.0` 时，在不可信网络上使用明文 HTTP 会暴露 bearer credential；多用户、细粒度授权、TLS 或公网安全部署必须另行设计。
+
+## KG OS distribution
+
+官方 native distribution 必须把 CLI、daemon 与 KG OS 必需的 SQLite extensions 作为同一个可移动目录交付。当前 macOS / Linux package layout 固定为：
+
+```text
+<distribution>/
+├── kg
+├── kgosd
+├── extensions/
+│   ├── lithograph.<platform-library-suffix>
+│   └── lithograph-openai-compatible.<platform-library-suffix>
+└── manifest.json
+```
+
+`kg install` 以自身 executable 的 canonical directory 定位同 distribution 的 `kgosd` 与 `extensions/`，不依赖当前 working directory、PATH 中另一个同名 daemon 或用户手工提供官方 library path。release manifest 必须包含这些 files 的 SHA-256；`kg install` 在写配置前验证 required sidecar 存在且 hash 与 manifest 一致，`kg doctor` 只读执行同一完整性检查。package validation 要从 distribution 目录外执行 `kg doctor/install` 与真实 daemon smoke，证明布局自包含。当前支持目标沿用既有 macOS / Linux x64/arm64 工程基线；本节不新增平台承诺。
+
+installer 写入 `config.toml` 时，把 distribution 中的 Lithograph 与 OpenAI-compatible Provider library canonical absolute path 作为 required local `sqlite.extensions[].source`，并写入 manifest 中对应 SHA-256 与各自公开 entrypoint。daemon startup 后仍由既有 resolver 把这些 source 固定为 `$KG_HOME/extensions/<sha256>/` 的 immutable runtime artifact；installer 不建立第二套 extension cache。额外第三方 extension 继续由通用 `[[sqlite.extensions]]` 合同表达，不改变官方 distribution 的固定 required artifacts。
 
 ## `KG_HOME` runtime profile
 
-KG OS v1 使用环境变量 `KG_HOME` 选择唯一 runtime profile。未设置时默认使用当前 OS 用户 home 下的 `~/.kgosd`；设置时整个 daemon、CLI target discovery、credential、默认 Provider cache path、extension cache、日志与 Knowledge Base 都切换到该目录；显式 absolute Provider cache path仍按配置指向 profile 外位置。`KG_HOME` 自身不写入 `config.toml`，因为它负责定位 `config.toml`；实现必须把 effective `KG_HOME` 解析为明确的绝对目录，不能让不同组件各自解释相对路径。
+KG OS v1 使用环境变量 `KG_HOME` 选择唯一 runtime profile。未设置时使用当前 OS 用户 home 下的 `~/.kgosd`；设置时整个 daemon、CLI target discovery、credential、relative Provider cache path、extension cache、日志与 Knowledge Base 都切换到该目录；显式 absolute Provider cache path仍按配置指向 profile 外位置。`KG_HOME` 自身不写入 `config.toml`，因为它负责定位 `config.toml`；实现必须把 effective `KG_HOME` 解析为明确的绝对目录，不能让不同组件各自解释相对路径。
 
 一个 `KG_HOME` 固定对应：
 
@@ -135,7 +153,7 @@ $KG_HOME/
 
 ### `config.toml`
 
-`config.toml` 是持久的 **startup configuration**。v1 使用 server、Embedding cache policy、SQLite Extension、Full-text 与 Embedding 默认值五组配置。以下以 macOS 本地安装路径为例；路径必须替换成实际存在、包含 Managed Semantic 能力的构建：
+`config.toml` 是持久的 **startup configuration**。v1 使用 server、Embedding cache policy、SQLite Extension、Full-text 与 Embedding 五组配置。正式 Runtime 不依赖缺失字段的隐式默认值：`kg install` 必须写出完整显式配置，手工配置也必须满足同一完整性校验。以下以 macOS 本地安装路径为例；实际路径由安装产物决定：
 
 ```toml
 [server]
@@ -143,18 +161,18 @@ host = "127.0.0.1"
 port = 4765
 
 [cache]
-enabled = true
-# 省略 path 时使用 $KG_HOME/cache/openai-compatible.db
 path = "cache/openai-compatible.db"
 max_size_mb = 4096
 
 [[sqlite.extensions]]
-source = "/opt/kgos/extensions/liblithograph.dylib"
+source = "/opt/kgos/extensions/lithograph.dylib"
 entrypoint = "sqlite3_lithograph_init"
+sha256 = "<distribution-manifest-sha256>"
 
 [[sqlite.extensions]]
-source = "/opt/kgos/extensions/liblithograph_openai_compatible.dylib"
+source = "/opt/kgos/extensions/lithograph-openai-compatible.dylib"
 entrypoint = "sqlite3_lithographopenaicompatible_init"
+sha256 = "<distribution-manifest-sha256>"
 
 # 其它 SQLite extension 仍使用同一加载机制，但每项都显式提供真实 init symbol。
 
@@ -169,7 +187,21 @@ similarity = "cosine"
 api_key_env = "OPENAI_API_KEY"
 ```
 
-省略 `server.host` 等价默认 `127.0.0.1`；省略 `server.port` 等价默认 `4765`。`server.host` 必须是合法 IPv4 address string；v1 不把 hostname / DNS resolution 引入 bind contract。
+`server.host` 与 `server.port` 都是必填显式值；`server.host` 必须是合法 IPv4 address string，v1 不把 hostname / DNS resolution 引入 bind contract。`kg install` 的交互向导可以把 `127.0.0.1` / `4765` 作为推荐值显示，但用户按 Enter 只表示明确采用该值，最终配置仍完整写出。
+
+`[fulltext]` 与 `[embedding]` 属于 Knowledge Base 初始化配置。交互安装进入这组配置前只提示一次：
+
+```text
+以下配置初始化后禁止修改。
+```
+
+英文对应：
+
+```text
+The following settings must not be changed after initialization.
+```
+
+这条约定不引入配置 fingerprint、历史快照、修改检测、阻止、后续 warning、doctor 比较或自动迁移；`kgosd` 始终只在 startup 解析当前文件。
 
 ### Cypher 执行连接
 
@@ -191,21 +223,19 @@ KG OS 不实现 text -> Vector cache，也不调用 Lithograph cache procedure�
 
 ```toml
 [cache]
-enabled = true
-# optional；省略时使用 $KG_HOME/cache/openai-compatible.db
 path = "cache/openai-compatible.db"
 max_size_mb = 4096
 ```
 
-- 省略整段等价 `enabled=true`、默认 path 与 `max_size_mb=4096`；`enabled` 为 Boolean，`max_size_mb` 为正整数，1 MB 按 1 MiB 解释。
-- `path` optional；省略时使用 `$KG_HOME/cache/openai-compatible.db`。显式 absolute path 原样使用；relative path 统一相对 effective `KG_HOME` 解析，compiler 写入 `providerConfig.cache.path` 前必须得到 absolute path，避免进程 cwd 改变 cache identity / location。
-- enabled 时 `kgosd` 只确保 path 的父目录存在，不预创建、ATTACH、检查内部表或直接维护 cache database；OpenAI-compatible Provider 自己负责 cache marker/schema、lookup、publish、FIFO budget、并发与损坏处理。Provider 必须拒绝把 cache file 指向 `kgos.db`。
+- `path` 与 `max_size_mb` 都是必填；`max_size_mb` 为正整数，1 MB 按 1 MiB 解释。交互 installer 可以推荐 `cache/openai-compatible.db` 与 `4096`，但不能通过字段缺失表达默认值。
+- `path` 为 absolute path 时原样使用；relative path 统一相对 effective `KG_HOME` 解析，compiler 写入 `providerConfig.cache.path` 前必须得到 absolute path，避免进程 cwd 改变 cache identity / location。
+- v1 Provider cache 始终启用；`kgosd` 只确保 path 的父目录存在，不预创建、ATTACH、检查内部表或直接维护 cache database；OpenAI-compatible Provider 自己负责 cache marker/schema、lookup、publish、FIFO budget、并发与损坏处理。Provider 必须拒绝把 cache file 指向 `kgos.db`。
 - `max_size_mb` 映射为 Provider `cache.max_bytes = max_size_mb * 1024 * 1024`，转换必须检查整数范围。预算只约束 Provider 定义的 vector payload，不是 cache SQLite 文件物理大小，也不包含 Lithograph HNSW/TEMP materialization 或 extension artifact cache。
-- `enabled=false` 编译为 `providerConfig.cache.enabled=false`；KG OS 不删除已有 Provider cache file。Provider cache hit/miss 对 Lithograph 与 KG OS correctness 不可见，删除 cache 只会增加后续 Provider 调用。
-- `[cache]` 与 `[embedding]` 都是 Semantic Index **创建 / replace 默认值**，不是 daemon 对所有既有索引生效的 live global switch。修改后 restart 只影响之后新建 / 必须重建的 IndexDefinition；已经存在及历史 IndexDefinition 保留它们 versioned 的 providerConfig，包括 cache path/policy。把当前 `[cache].enabled=false` 也不会关闭旧 IndexDefinition 中已经 versioned 的 enabled cache。KG OS 不扫描、迁移或改写历史配置。
+- compiler 固定写入 `providerConfig.cache.enabled=true`；KG OS 不公开 disable/skip cache 的安装配置。Provider cache hit/miss 对 Lithograph 与 KG OS correctness 不可见，删除 cache 只会增加后续 Provider 调用。
+- `[cache]` 是 Semantic Index 创建 / replace 时使用的 provider cache 配置；已经存在及历史 IndexDefinition 继续保留它们 versioned 的 providerConfig。KG OS 不扫描、迁移或改写历史配置。
 - `db.index.semantic.rebuild` 仍是 Lithograph TEMP Semantic/HNSW maintenance，不是填充 Provider-owned embedding cache 的入口；KG OS 不新增预热 CLI/API、后台 scheduler 或第二套 cache service。
 
-Provider cache database 是 runtime/derived data，不属于 State、Commit、Branch、Lithograph storage format 或 Knowledge Base correctness source。其默认文件在 `$KG_HOME/cache/`，但 operator 显式 absolute path 可以放在 profile 外；因此 profile 删除只承诺清理 profile 内默认路径，不承诺删除外部 Provider cache。由于写入 IndexDefinition 的 cache path 是 versioned absolute path，复制 `kgos.db` 或改变 `KG_HOME` **不会**自动重写既有索引的 recorded path；v1 不提供 cache-path migration。查询旧索引时仍使用该索引自己的 recorded config，enabled cache的路径不可创建/打开时按 Provider公开 I/O/config错误失败。需要迁移时，operator必须保留原路径可用，或通过显式 Graph/Schema操作把目标 Semantic Index替换为使用新 providerConfig的版本；KG OS不会因为 profile移动偷偷改历史或当前 State。
+Provider cache database 是 runtime/derived data，不属于 State、Commit、Branch、Lithograph storage format 或 Knowledge Base correctness source。relative `path` 可以显式配置为 `cache/openai-compatible.db` 并解析到 `$KG_HOME/cache/`；absolute path 也允许位于 profile 外。由于写入 IndexDefinition 的 cache path 是 versioned absolute path，复制 `kgos.db` 或改变 `KG_HOME` **不会**自动重写既有索引的 recorded path；v1 不提供 cache-path migration。查询旧索引时仍使用该索引自己的 recorded config，cache路径不可创建/打开时按 Provider公开 I/O/config错误失败。
 
 ### SQLite Extension source resolver
 
@@ -246,7 +276,7 @@ Go SQLite runtime固定使用 `go-sqlite3` bundled amalgamation，并以 `sqlite
 
 generic loader之外仍要验证 Lithograph capability，但不要求配置 `kind = "lithograph"`。connection initialization分为两层：**物理 connection 构造**只负责打开目标 database、按顺序加载全部 configured extensions、验证 host SQLite version/FTS5并确认 `lithograph_version()` 可调用；**Lithograph database activation** 必须先由一个独占 read-write bootstrap connection完成。`lithograph_version()` 在尚未初始化的干净 database上返回 `databaseId:null` 与 `storageFormat.current:null`，此时 bootstrap connection执行一次 `lithograph_init()`；已有 database则按返回的 databaseId/storage format/profile做兼容性验证。只有初始化/迁移和 Root/`main`验证成功后，connection才允许进入后续 Lithograph SQL / Provider capability probe。
 
-当前 daemon `[embedding]` / `[cache]` 默认配置在已完成 Lithograph initialization的独占 bootstrap write connection上通过公开 SQL做**可回滚 local validation probe**：`lithograph_tx_begin()` → staged `db.index.semantic.createNodeIndex`（随机 probe index/label/property，使用当前 provider/config/dimensions/similarity）→ `lithograph_tx_abort()`。CREATE只调用 Provider本地 `validate`，不得触发 `embedBatch` / network；probe成功后不得留下 Commit、Schema、Index或 Branch变化。任一 configured extension init失败已经使 connection不可用，因此 Provider extension的 connection-local registration不需要读取 private client-data；缺少 `openai-compatible` registration或当前 config非法时 probe失败并终止 startup。
+当前 daemon `[embedding]` / `[cache]` 显式配置在已完成 Lithograph initialization的独占 bootstrap write connection上通过公开 SQL做**可回滚 local validation probe**：`lithograph_tx_begin()` → staged `db.index.semantic.createNodeIndex`（随机 probe index/label/property，使用当前 provider/config/dimensions/similarity）→ `lithograph_tx_abort()`。CREATE只调用 Provider本地 `validate`，不得触发 `embedBatch` / network；probe成功后不得留下 Commit、Schema、Index或 Branch变化。任一 configured extension init失败已经使 connection不可用，因此 Provider extension的 connection-local registration不需要读取 private client-data；缺少 `openai-compatible` registration或当前 config非法时 probe失败并终止 startup。
 
 bootstrap成功后才建立/开放正常 read-only 与 read-write connection set。每个新物理 connection仍经同一个 connection hook加载相同 artifacts并执行 host probe，再以 `lithograph_version()`确认自己看到的 `databaseId`、storage format与启动时 bootstrap结果一致；Full-text analyzer在每个 usable connection上验证。read-only connection不重复 staged Provider write probe，Provider registration由该 extension在该 connection上的 successful init负责，实际 Semantic query仍按目标 IndexDefinition执行 Provider validation。
 
@@ -279,19 +309,19 @@ KG OS v1 的 Full-text 只暴露一个 daemon-global 运行时分词配置：
 analyzer = "jieba"
 ```
 
-省略整个 `[fulltext]` 等价 `analyzer = "unicode61"`。`analyzer` 是非空、无 NUL 的**完整 FTS5 tokenizer specification STRING**，例如 `unicode61`、`porter unicode61`、`jieba`；KG OS 不解析第三方 tokenizer 的业务参数含义。它只决定 KG OS **新建或因业务定义变化重建** managed Full-text Index 时写入的 `fulltext.analyzer`，不负责根据名字寻找插件，也不覆盖已有 IndexDefinition。若 specification 需要第三方 tokenizer，对应实现必须由前述 `[[sqlite.extensions]]` 在每个 connection 上注册。
+`[fulltext].analyzer` 是必填显式值，是非空、无 NUL 的**完整 FTS5 tokenizer specification STRING**，例如 `unicode61`、`porter unicode61`、`jieba`；KG OS 不解析第三方 tokenizer 的业务参数含义。`kg install` 可以把 `unicode61` 作为推荐值，但最终文件必须显式写出选择。它决定 KG OS **新建或因业务定义变化重建** managed Full-text Index 时写入的 `fulltext.analyzer`；若 specification 需要第三方 tokenizer，对应实现必须由前述 `[[sqlite.extensions]]` 在每个 connection 上注册。
 
 KG OS v1 不公开 per-Index analyzer、`fulltext.eventually_consistent`、tokenizer path/arguments registry 或其它 FTS5 建表 options。Ontology 只声明“哪些字段需要 Full-text”。KG OS **创建或因业务定义变化重建** Full-text IndexDefinition 时写入当前 `[fulltext].analyzer`，并保持 `fulltext.eventually_consistent = false`；已经存在且本次不需要重建的 IndexDefinition 保留自己的 versioned analyzer。KG OS 不把 analyzer 配置、fingerprint 或 generation 额外写入 Knowledge Base。
 
 每个 SQLite connection 在配置 extension 全部加载后、进入可用池前，都必须对**当前 `[fulltext].analyzer`**做无持久副作用的 FTS5 capability probe；未知 tokenizer、参数构造失败或运行时依赖缺失都使该 connection 初始化失败。这个 probe 只验证本次 daemon 要用于新建/重建索引的 analyzer，不要求启动时枚举并验证全部历史 State 曾经使用过的 tokenizer。
 
-打开已有 Knowledge Base 时，KG OS **不比较**当前 `[fulltext].analyzer` 与库中已有 IndexDefinition，也不迁移或批量重建历史索引。历史 Full-text query 继续使用目标 State 的 versioned IndexDefinition 实际保存的 analyzer；如果那个 tokenizer 当前没有通过 `sqlite.extensions` 注册，则只让该次 Full-text 操作返回 `FULLTEXT_ANALYZER_UNAVAILABLE`。修改 runtime analyzer 后 restart 仍照常启动，后续新建/重建 Full-text Index 使用新值。
+打开已有 Knowledge Base 时，KG OS **不比较**当前 `[fulltext].analyzer` 与库中已有 IndexDefinition，也不迁移或批量重建历史索引。历史 Full-text query 继续使用目标 State 的 versioned IndexDefinition 实际保存的 analyzer；如果那个 tokenizer 当前没有通过 `sqlite.extensions` 注册，则只让该次 Full-text 操作返回 `FULLTEXT_ANALYZER_UNAVAILABLE`。虽然初始化合同要求该配置初始化后禁止修改，Runtime 不实现历史值检测。
 
 KG OS 不承诺检测第三方 extension 在同一 analyzer name 下偷偷替换算法/词典；远程 artifact SHA-256 pin 能固定 binary bytes，但插件外部资源仍由 operator 负责版本化。这与 Lithograph 的 tokenizer 可复现性边界一致。对同一 Knowledge Base 长期保持 analyzer 语义稳定是 operator responsibility，v1 不建立配置兼容检查或迁移机制。
 
 ### Embedding 配置与索引映射
 
-KG OS v1 继续使用 OpenAI-compatible Embeddings。`[embedding]` 是 **新建 / 因业务定义变化必须重建 Semantic Index 的默认配置**；实际 HTTP client 由独立的 `lithograph-openai-compatible` SQLite extension 提供。它与 Lithograph 通过同一 `[[sqlite.extensions]]` 列表加载到每个 connection，注册名固定为 `openai-compatible`。KG OS 不新增 provider registry、下载器或另一套 HTTP adapter。
+KG OS v1 继续使用 OpenAI-compatible Embeddings。`[embedding]` 是 Knowledge Base 初始化时确定、之后供新建 / 因业务定义变化必须重建 Semantic Index 使用的全局配置；实际 HTTP client 由独立的 `lithograph-openai-compatible` SQLite extension 提供。它与 Lithograph 通过同一 `[[sqlite.extensions]]` 列表加载到每个 connection，注册名固定为 `openai-compatible`。KG OS 不新增 provider registry、下载器或另一套 HTTP adapter。
 
 配置字段：
 
@@ -300,10 +330,10 @@ KG OS v1 继续使用 OpenAI-compatible Embeddings。`[embedding]` 是 **新建 
 | `base_url` | 必填，absolute HTTP(S) API root，无 query/fragment，去掉末尾 `/` |
 | `model` | 必填非空模型 ID，不通过 List Models 猜测 |
 | `dimensions` | 必填 Integer 1..4096，必须等于服务实际返回维度 |
-| `similarity` | 缺省 `cosine`，允许 `cosine` / `euclidean`，映射到索引配置 |
-| `api_key_env` | 可选，非空环境变量名；变量属于 kgosd 进程环境，启动时检查其值存在且非空 |
+| `similarity` | 必填，允许 `cosine` / `euclidean`，映射到索引配置 |
+| `api_key_env` | 字段必填；非空时必须是环境变量名且启动时检查其值存在且非空，空字符串表示调用方明确配置了无需认证的 endpoint |
 
-省略 `api_key_env` 表示 endpoint 无需认证。KG OS 不再接受内联 `api_key`；未知字段返回配置错误，不开放任意 headers/options bag。`[embedding]` 与本地扩展依然是 daemon 的运行前置条件；启动不发远端 health check 或 sample embedding 请求。
+KG OS 不接受字段缺失来表达 embedding 默认或禁用；也不接受内联 `api_key`。未知字段返回配置错误，不开放任意 headers/options bag。`[embedding]` 与本地扩展依然是 daemon 的运行前置条件；启动不发远端 health check 或 sample embedding 请求。
 
 `api_key_env` 路径的 compiler 映射示例：
 
@@ -332,13 +362,13 @@ CALL db.index.semantic.createNodeIndex(
 )
 ```
 
-Relationship 使用同形的 `createRelationshipIndex`。无认证时省略 `api_key_env`。`send_dimensions=false` 延续 KG OS 原来不向 endpoint 发送可选 dimensions 参数的约定；响应仍由 Provider 校验 exact dimension / finite FLOAT32。Provider 负责 batching、timeout/retry、取消与响应解码；KG OS 不复制这些实现。当前 Provider 会发送 `encoding_format: "float"`，兼容 endpoint 必须接受该请求形状，不再沿用旧文档“绝不发送 encoding_format”的 HTTP adapter 合同。
+Relationship 使用同形的 `createRelationshipIndex`。startup config 的 `embedding.api_key_env` 字段始终显式存在；其值为空字符串时，compiler 只在生成的 Provider `providerConfig` 中省略 `api_key_env`。`send_dimensions=false` 延续 KG OS 原来不向 endpoint 发送可选 dimensions 参数的约定；响应仍由 Provider 校验 exact dimension / finite FLOAT32。Provider 负责 batching、timeout/retry、取消与响应解码；KG OS 不复制这些实现。当前 Provider 会发送 `encoding_format: "float"`，兼容 endpoint 必须接受该请求形状，不再沿用旧文档“绝不发送 encoding_format”的 HTTP adapter 合同。
 
-完整 provider/config/dimensions/similarity 由 Lithograph 保存到 versioned IndexDefinition。KG OS 的 Ontology body 隐藏这些运行参数，但 decoder/compiler 必须保留未改变的底层配置。**修改 `[embedding]` 后 restart 只改变之后创建 / 必须重建索引的默认值；已有索引和历史查询仍使用各自保存的配置。** 不自动重写历史，不增加 KG OS State fingerprint/generation 或配置迁移系统。索引定义固定配置不等于快照远端模型；同名 endpoint/model 或扩展外部资源的语义稳定性仍由部署者负责。
+完整 provider/config/dimensions/similarity 由 Lithograph 保存到 versioned IndexDefinition。KG OS 的 Ontology body 隐藏这些运行参数，但 decoder/compiler 必须保留未改变的底层配置。初始化合同要求 `[embedding]` 初始化后禁止修改；KG OS 仍不自动重写历史，不增加 KG OS State fingerprint/generation、修改检测或配置迁移系统。索引定义固定配置不等于快照远端模型。
 
 #### 凭证不落库
 
-KG OS 只保留 `api_key_env` 认证输入，不增加内联密钥的转接层。索引只保存环境变量**名称**；Provider 在发请求时读取 kgosd 环境中的实际值，KG OS 不把解析后的 secret 写回 `providerConfig`、State、日志或错误。
+KG OS 只保留 `api_key_env` 这一认证输入，不增加内联密钥的转接层。配置值非空时，索引只保存环境变量**名称**；Provider 在发请求时读取 kgosd 环境中的实际值，KG OS 不把解析后的 secret 写回 `providerConfig`、State、日志或错误。配置值为空时表示 no-auth endpoint，索引不保存 `api_key_env`。
 
 环境变量名称随索引定义保存；历史索引仍引用原名称，修改当前默认名称不改写它们。普通 credential rotation 可保持同名变量并重启进程；若新 credential 会把相同 endpoint/model 路由到不同 embedding space，则必须按新的索引配置处理，不能把它当作只有认证值变化的轮换。KG OS 不增加 secret registry 或隐藏环境变量约定。Lithograph 本身仍支持直接配置 `api_key`，但该低层能力不进入 KG OS 的公共配置 profile。
 
@@ -351,9 +381,9 @@ KG OS 只保留 `api_key_env` 认证输入，不增加内联密钥的转接层�
 - 不触发 file watch / hot reload；
 - 不改变当前进程的 effective config；
 - 不触发当前进程自动退出；
-- `server.host` / `server.port`、`cache`、`sqlite.extensions`、`fulltext` 与 `embedding` 的新值只在下一次 `kgosd` 启动时生效。
+- `server.host` / `server.port`、`cache`、`sqlite.extensions`、`fulltext` 与 `embedding` 的当前文件值只在下一次 `kgosd` 启动时被读取。
 
-因此这些配置都是 restart-read settings。`kg daemon restart` 只负责让新 startup config 被重新读取；它不比较已有 Knowledge Base 的历史配置、不触发 Full-text / Embedding 数据迁移或自动重建。普通业务命令仍不能因为磁盘上的 config 文件变化而自行 hot-reload / restart daemon。
+KG OS 不检测运行中的 `config.toml` 是否被修改，也不因为文件变化自行 hot-reload / restart daemon。下一次进程启动读取当前文件；其中 `[fulltext]` / `[embedding]` 虽然属于“初始化后禁止修改”的安装合同，Runtime 仍不保存旧值进行比较。
 
 ### `extensions/`
 
@@ -365,7 +395,7 @@ KG OS 只保留 `api_key_env` 认证输入，不增加内联密钥的转接层�
 
 `kgosd` 启动时 open/create 此文件并尝试获取 OS-level exclusive file lock；整个进程生命周期持续持有该 lock。另一个 `kgosd` 无法取得 lock 时必须停止启动，不能通过不同端口绕过 single-instance 约束。
 
-取得 lock 后，新的 owner 先覆盖任何旧内容。HTTP bind 成功并且本机 control endpoint 已确定后，文件只需要保存当前 active daemon 的本机可连接 endpoint，例如：
+取得 lock 后，新的 owner 先覆盖任何旧内容。HTTP bind 与全部 startup validation 成功后，文件只需要保存当前 active daemon 的本机可连接 endpoint，例如：
 
 ```json
 {
@@ -391,20 +421,11 @@ v1 Knowledge Base 的唯一 target 固定为 `$KG_HOME/kgos.db`，不再增加 `
 
 `kgosd` 自身始终是 **foreground server**：直接执行 `kgosd` 时不 self-daemonize、不 fork 到后台。这样 terminal、launchd、systemd、Windows Service 或其它 supervisor 都可以直接管理同一个进程模型。
 
-`kg` 提供四个明确的 operator command：
-
-```text
-kg daemon start
-kg daemon status
-kg daemon stop
-kg daemon restart
-```
-
-普通 Object / Graph / Evolution 命令 **不会自动启动 daemon**。没有 active daemon 时，它们按 CLI transport-unavailable 规则失败，不产生隐藏 process side effect。
+普通用户不通过 `kg daemon ...` 管理进程；该 namespace 不进入 v1 public CLI。任何需要本地 daemon 的业务命令都先执行 Runtime ensure：已有 healthy active daemon 时直接复用，没有 active owner 时后台 spawn `kgosd` 并等待 ready。这个自动 spawn 是业务 CLI 的本地运行前置，不改变原始业务 request 的 HTTP/Bearer 边界。
 
 ### 启动
 
-直接 `kgosd` 与 `kg daemon start` 最终都进入同一个 daemon startup path：
+直接 `kgosd` 与 CLI Runtime ensure 的 background spawn 最终都进入同一个 daemon startup path：
 
 ```text
 resolve KG_HOME (default ~/.kgosd)
@@ -428,34 +449,33 @@ resolve KG_HOME (default ~/.kgosd)
 → resolve branch/main and open existing KG OS-valid head, or bootstrap only a fresh Root baseline; otherwise fail closed
 → validate the D68 reserved Ontology Schema + internal-marker subgraph invariants required by the main head, without a full Knowledge-data scan
 → resolve bundled Web assets
-→ bind <host>:<port> for Web + API/control
+→ bind <host>:<port> for Web + API
 → write active local endpoint into kgosd.lock
-→ serve Web shell + authenticated API/control
+→ serve Web shell + authenticated API
 ```
 
-任一步失败都必须结束该次启动并释放 OS lock；不能留下一个“看起来 active”的逻辑实例。`kg daemon start` 负责把 `kgosd` 作为 detached/background child 启动并等待它达到 `running`；`kgosd` 自身仍保持 foreground process 语义。对于**原本没有 active daemon**的 bootstrap/local start，父 CLI 不读取 `auth.json`、也不能调用未认证 health endpoint；它等待 child 成功取得 lock 并在完成 config/auth/database validation、HTTP bind 后发布 endpoint，或观察 child 提前退出 / startup timeout。因为 endpoint 只在上述 startup steps 成功后发布，所以该 lock publication 是这一条本地 spawn path 的 ready signal，不构成 credential-free API/control endpoint。
+任一步失败都必须结束该次启动并释放 OS lock；不能留下一个“看起来 active”的逻辑实例。CLI Runtime ensure 把 `kgosd` 作为 detached/background child 启动并等待它达到 `running`；`kgosd` 自身仍保持 foreground process 语义。对于原本没有 active daemon 的本地 start，父 CLI 等待 child 成功取得 lock 并在完成 config/auth/database validation、HTTP bind 后发布 endpoint，或观察 child 提前退出 / startup timeout。endpoint publication 是本地 ready signal，不构成 credential-free API endpoint；ready 后 CLI 再解析 credential并发送原始业务 request。
 
-`start` 是 idempotent：已有健康 `running` daemon 时返回当前实例，不再启动第二个进程。两个并发 `start` 最终也只能有一个 `kgosd` 获得 exclusive lock；另一个 caller 在观察到 winner 已经 `running` 后可以按同一成功结果返回。
+自动 start 必须幂等且并发安全：已有健康 `running` daemon 时不再启动第二个进程；多个业务 caller 并发触发 ensure 时最终也只能有一个 `kgosd` 获得 exclusive lock，其它 caller 等待 winner 发布 endpoint 后复用。
 
 ### 当前实例发现与状态
 
-业务 CLI 与 daemon operator **优先使用 active lock 中的 endpoint**，而不是重新用磁盘上的 `config.toml` 推测当前进程监听位置。这样运行中修改 host / port 后，旧 daemon 仍然可以被正常访问和停止。
+业务 CLI **只使用 active lock 中的 endpoint**，而不是重新用磁盘上的 `config.toml` 推测当前进程监听位置。
 
 状态判断遵守：
 
 ```text
-kgosd.lock 未被其它进程持有              → stopped
-lock 被持有，但尚未发布 endpoint           → starting
-lock 被持有，endpoint 的 control status=running → running
-lock 被持有，endpoint 的 control status=stopping → stopping
-lock 被持有并已有 endpoint，但 control HTTP 不可用 → unavailable
+kgosd.lock 未被其它进程持有                  → stopped
+lock 被持有，但尚未发布 endpoint               → starting
+lock 被持有、已发布 endpoint 且本地 TCP 可连接      → running
+lock 被持有、已发布 endpoint 但本地 TCP 不可连接    → unavailable
 ```
 
 stale `kgosd.lock` 文件因为没有 active OS lock，只能解释为 `stopped`，不能把旧 endpoint 当成正在运行的 daemon。
 
-### 停止
+### 停止与外部托管
 
-`kg daemon stop` 从 active lock 取得当前 endpoint，并通过同一个 HTTP service 请求 graceful shutdown，不读取 PID、不直接 `kill` 进程。daemon shutdown path 至少保证：
+daemon 自身仍保留统一 graceful shutdown path；平台正常 termination signal / event（例如 Unix SIGINT / SIGTERM）或外部 service manager 触发停止时至少保证：
 
 ```text
 进入 stopping
@@ -466,27 +486,13 @@ stale `kgosd.lock` 文件因为没有 active OS lock，只能解释为 `stopped`
 → 退出进程并释放 OS lock
 ```
 
-平台正常 termination signal / event（例如 Unix SIGINT / SIGTERM）也进入同一个 graceful shutdown path。`stop` 对已经 `stopped` 的状态是 idempotent success。若 lock owner 仍存在但 HTTP control channel 不可用，v1 不根据 PID 做 force kill；CLI 返回 daemon unavailable，由用户或外部 supervisor 处理异常进程。
-
-### Restart 与配置生效
-
-`kg daemon restart` 等价于显式的 lifecycle composition：
-
-```text
-stop current active daemon using lock endpoint
-→ old process releases lock
-→ start new kgosd
-→ new process重新读取当前 config.toml
-→ publish new active endpoint
-```
-
-如果 daemon 原本已经 stopped，`restart` 直接执行 start。因此手工修改运行中的 `config.toml` 不会让老进程漂移或退出；调用方在准备应用新 startup config 时显式执行 restart。
+若 active lock owner 存在但 HTTP 不可用，业务 CLI 返回 Runtime unavailable，不根据 PID 做 force kill、也不私自替换 owner。v1 不提供普通用户 daemon stop/restart 命令。
 
 ### OS service manager 边界
 
-v1 不建立自己的开机启动注册、service installation 或 process supervisor。需要长期托管时，macOS launchd、Linux systemd user service、Windows Service 等只需要执行 foreground `kgosd`。`kg daemon start` 是方便用户/AI 的本地 background launcher，不替代操作系统 service manager。
+v1 不建立自己的开机启动注册、service installation 或常驻 process supervisor。需要长期托管时，macOS launchd、Linux systemd user service、Windows Service 等只需要执行 foreground `kgosd`。普通业务 CLI 的 auto-start 只保证当前 profile 在需要时有可用 Runtime，不替代操作系统 service manager。
 
-exact HTTP control route、background detach 的平台实现、shutdown wait timeout 和 system-service packaging 属于工程实现合同，不改变上述 lifecycle 语义。
+background detach、ready wait timeout 和 system-service packaging 属于工程实现合同，不改变上述 lifecycle 语义。
 
 ## 边界
 
@@ -494,17 +500,16 @@ exact HTTP control route、background detach 的平台实现、shutdown wait tim
 - v1 不提供随机端口 fallback；
 - v1 不提供第二种 IPC transport；
 - `KG_HOME` 是唯一 runtime profile selector；未设置时默认 `~/.kgosd`，一个 profile 只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base；
-- `auth.json` 是该 profile 的持久 server credential；所有 daemon API/control request 使用 Bearer token，CLI 只从 `KG_TOKEN` 取得客户端 credential；
+- `auth.json` 是该 profile 的持久 server credential；所有 daemon API request 使用 Bearer token，本机 CLI 使用 `KG_TOKEN` 优先、否则读取当前 profile 的 `auth.json`；
 - v1 只有单 token 全权限认证，不提供 user / role / scope / OAuth / TLS；非 loopback plaintext HTTP 仍不是不可信网络安全模型；
 - `kgosd` / Kernel / `kg` CLI 使用 Go；SDK / Web 使用 TypeScript；内置 Web 随 daemon 交付，与 API 共用进程、端口和 lifecycle，不单独部署 Web 服务；
-- `config.toml` 不 hot reload；host / port 通过显式 restart 生效；
+- `config.toml` 不 hot reload，也不做修改检测；当前文件只在下一次 daemon startup 读取；
 - `[[sqlite.extensions]]` 是唯一 SQLite loadable-extension 配置入口；Lithograph 与第三方 tokenizer/其它 SQLite extension 都走同一 resolver/load lifecycle，不由业务请求动态加载；
 - remote extension 必须 SHA-256 pin，最终总是从 daemon-local immutable artifact 加载；每个 SQLite connection 都加载同一解析结果；
-- `[fulltext].analyzer` 是 KG OS 创建/重建 managed Full-text Index 时使用的 daemon runtime config，缺省 `unicode61`；已有 IndexDefinition 保留其 versioned analyzer；
-- `[embedding]` 是 daemon 必填的 Semantic Index 创建默认值；已有索引与历史 query 使用自身 versioned provider/config；
-- `[cache]` 默认开启、默认 4 GiB，映射到 OpenAI-compatible Provider 的独立 SQLite cache；省略 path 时使用 `$KG_HOME/cache/openai-compatible.db`，不写 Lithograph `main`；
+- `[fulltext].analyzer` 是必填初始化配置；`[embedding]` 的全部字段也是必填初始化配置；安装时明确提示初始化后禁止修改，但 Runtime 不保存历史值进行检查；
+- `[cache].path/max_size_mb` 必填且 cache 始终启用，映射到 OpenAI-compatible Provider 的独立 SQLite cache，不写 Lithograph `main`；
 - Full-text analyzer 与 Semantic provider/config 正常保存在各自 versioned IndexDefinition；KG OS 不保存第二份 fingerprint/generation，不在 restart 时自动迁移或批量重建；
 - `kgosd.lock` 只承担 single-instance + active-endpoint 定位，不保存 PID 或业务状态；
-- 业务命令不隐式启动 `kgosd`；
+- 业务命令在 active daemon 不存在时自动启动 `kgosd` 并等待 ready；`doctor` 与 `install` 本身不因此启动 daemon；
 - `$KG_HOME` 是 daemon runtime/config/credential/cache/persistent-data home，但不是 KG OS Knowledge graph 本身的另一套存储模型；
 - Knowledge Base target 仍为 `$KG_HOME/kgos.db`；Provider cache 是独立 derived runtime data，不属于 Knowledge Base storage；v1 没有单-daemon多库 selector。

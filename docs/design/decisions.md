@@ -336,7 +336,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D42 KG OS v1 使用 `kgosd` 本地 daemon 与 Rust / TypeScript 分层
 
-> 后续调整：[D63](#d63-typescript-integrated-web) 将 kgosd / Kernel 改为 TypeScript + Node.js，并明确内置 Web。下列 Rust / TypeScript 语言分工仅保留历史依据；daemon ownership 与客户端访问边界继续有效。
+> 后续调整：[D63](#d63-typescript-integrated-web) 曾将 kgosd / Kernel 改为 TypeScript + Node.js，[D65](#d65-go-runtime) 又改为 Go；[D72](#d72-local-install-runtime-onboarding) 保留 daemon ownership，但把普通用户 lifecycle 改为业务 CLI 自动确保 Runtime 可用。下列语言与用户 lifecycle 细节只保留历史依据。
 
 - 决定：KG OS v1 采用本地 daemon 形态，`kgosd` 作为统一访问入口并承载 KG OS Kernel。`kgosd`、Kernel、Lithograph host/client、projection/compiler 与 consistency validation 使用 Rust；SDK、CLI、Web 与 Skill / 生态集成使用 TypeScript / npm。上层 client 不直接打开 SQLite 或绕过 `kgosd` 访问 Lithograph。本决定确认 process boundary；具体本地 transport 后续由 D44 冻结。
 - 依据：这套分层在 2026-09-08 的已确认技术架构中已经成立；2026-09-10 引入 Lithograph 时，旧 Graph Engine / FTS5 / sqlite-vec 数据库职责被整体替换，但没有后续 decision 否定 daemon 形态或 Rust / TypeScript 分工。恢复这部分可以重新明确 process ownership、数据库访问边界和上层交付生态，同时与 D1/D6/D37 完全兼容。
@@ -402,7 +402,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D50 KG OS v1 只支持 OpenAI-compatible Embeddings API（2026-09-16）
 
-> 后续调整：OpenAI-compatible 协议选择延续；HTTP 执行 owner、wire 映射与认证配置由 [D57](#d57-managed-semantic) 调整，当前只保留 api_key_env，不再支持内联 api_key。
+> 后续调整：OpenAI-compatible 协议选择延续；HTTP 执行 owner、wire 映射与认证配置由 [D57](#d57-managed-semantic) 调整，当前只保留 api_key_env，不再支持内联 api_key；[D72](#d72-local-install-runtime-onboarding) 进一步要求 embedding 配置字段完整显式，similarity 不再靠缺失字段取默认，api_key_env 字段必须存在。
 
 - 决定：v1 不提供 `provider` 配置、provider registry 或插件系统，唯一远端 embedding protocol 是 OpenAI-compatible Embeddings 子集。`[embedding]` 必填 `base_url / model / dimensions`，`similarity` 缺省 `cosine`；认证可用 `api_key` 或 `api_key_env`，二者互斥，也允许都不配置表示无认证。`api_key_env` 在启动时解析为非空环境变量；任一方式得到 credential 后使用 `Authorization: Bearer <credential>`。
 - Wire 子集：KG OS 向 `${base_url}/embeddings` 发送 JSON `model + input`；`input` 支持 String / Array<String> 以便内部批量生成。v1 不发送 `dimensions/user/encoding_format` 或 provider-specific options。响应使用 `data[].index + data[].embedding`，每个 embedding 必须是 finite numeric array 且长度严格等于配置 `dimensions`；其它 OpenAI response 字段不是 correctness source。
@@ -424,6 +424,8 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D52 Full-text analyzer 是 kgosd 全局运行配置，Ontology 不暴露分词实现（2026-09-17）
 
+> 后续调整：[D72](#d72-local-install-runtime-onboarding) 保留 Ontology 不暴露 analyzer 与现有 versioned IndexDefinition 语义，但把 `[fulltext].analyzer` 改为 install 时必须显式给出、初始化后禁止修改的配置；不再以缺失 `[fulltext]` 默认 `unicode61`，也不把“修改 runtime analyzer”作为正常用户流程。
+
 - 决定：KG OS v1 的 Ontology Full-text Index 只声明真实 `name/targets/properties` 与 `type: fulltext`；不提供 per-index `analyzer/options/eventually_consistent/tokenizer plugin` 字段。Daemon startup config 的 `[fulltext].analyzer` 决定 KG OS **新建或因业务定义变化重建** Full-text IndexDefinition 时写入的 `fulltext.analyzer`，省略整段默认 `unicode61`；`fulltext.eventually_consistent` 固定为 false。Analyzer 是完整 FTS5 tokenizer specification string，但第三方 tokenizer implementation 由 D51 的 `sqlite.extensions` 在每个 SQLite connection 上提供，KG OS 不根据 analyzer 名称查找/安装插件，也不因配置变化覆盖已有 IndexDefinition。
 - State contract：analyzer 不进入公共 Ontology，也不另存 fulltext-space fingerprint/generation。Lithograph Full-text IndexDefinition 自己正常保存创建时的 analyzer，这是数据库执行所需的 versioned Schema 内容，不是 KG OS runtime config 的第二份副本。已有 Index 不因 restart/config change 自动改写；KG OS 新建或因业务 targets/properties 变化重建 Index 时使用当前 `[fulltext].analyzer`。因此同一 Knowledge Base 的不同历史 State，甚至同一 State 的不同 Full-text Index，都可能来自不同 runtime analyzer；这种差异本身不是 KG OS consistency violation。
 - Runtime / history：每个 connection 在 extensions 加载后、进入可用池前 probe 当前 `[fulltext].analyzer`，用于保证当前 daemon 能创建/重建新的 managed Full-text Index。历史 query 使用目标 State 的实际 versioned IndexDefinition analyzer；如果当前 connection 没有注册那个旧 tokenizer，只让该次 Full-text 操作返回 `FULLTEXT_ANALYZER_UNAVAILABLE`，daemon 与普通历史 read 继续可用。Remote extension hash 可以固定插件 binary，但 KG OS 无法仅靠 analyzer name 检测第三方插件外部词典/资源被原地替换；这是 operator/runtime reproducibility responsibility。
@@ -434,7 +436,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D53 Full-text / Embedding 只使用当前 runtime config，v1 不做配置迁移（2026-09-17）
 
-> 后续调整：Full-text 与不做自动配置迁移的决定延续；Embedding 现在由实际 versioned IndexDefinition 保存 provider/config，历史 query 不使用当前 runtime 默认值，见 [D57](#d57-managed-semantic)。
+> 后续调整：Embedding 现在由实际 versioned IndexDefinition 保存 provider/config，历史 query 不使用当前 runtime 默认值，见 [D57](#d57-managed-semantic)。[D72](#d72-local-install-runtime-onboarding) 进一步把 Full-text / Embedding 定义为初始化后禁止修改的安装配置，同时继续保持“不保存 fingerprint、不检测修改、不做自动迁移”；下文把配置修改视为正常流程的描述只保留历史依据。
 
 - 决定：`[fulltext]` 与 `[embedding]` 只属于 `kgosd` startup runtime config。KG OS 不把它们复制、摘要或冻结到 Knowledge Base，不保存 search-space fingerprint/generation，也不在打开已有库时比较“这个 State/Index/Vector 是由哪套 config 生成的”。配置修改后 restart 正常启动并直接使用新值，不返回 config-space mismatch。
 - Full-text：已有 Lithograph Full-text IndexDefinition 保留它创建时 versioned analyzer；当前 `[fulltext].analyzer` 只影响以后由 KG OS 新建或因业务定义变化而重建的 Full-text Index。KG OS 不因为 runtime analyzer 改变批量重建历史 Index。
@@ -456,6 +458,8 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D55 `auth.json` + `KG_TOKEN` 提供持久单 Token 实例认证（2026-09-17）
 
+> 后续调整：[D72](#d72-local-install-runtime-onboarding) 保留 single-token Bearer 服务端认证，但本机 `kg` 改为非空 `KG_TOKEN` 优先、否则读取当前 `$KG_HOME/auth.json`；同时删除普通用户 `kg daemon ...` lifecycle surface。下文 env-only client onboarding 只保留历史依据。
+
 - 决定：每个 `KG_HOME` 有且只有一个 server credential，保存在 `$KG_HOME/auth.json` 的 `token` 字段。首次 daemon startup 缺文件时用 CSPRNG 生成至少 256 bit entropy 的 opaque token并原子写入；后续 restart 复用，不自动 rotate。已有 `auth.json` malformed/unreadable/empty 时 fail closed。v1 不提供 user/password、role/scope、refresh token、OAuth、多 token registry 或 rotation API。
 - Client contract：所有 `kgosd` data/control HTTP request 使用 `Authorization: Bearer <token>`。CLI 只从 `KG_TOKEN` 环境变量取得 credential，不读 `auth.json`、不提供 `--token`；SDK 由调用方显式提供 token；Web 也必须取得相同 token 后访问 API，不存在 credential-free data/control 旁路。`kgosd` 自身 startup，以及当前 profile **没有 active daemon 时**首次/后续 `kg daemon start` 的本地 process spawn，不是 HTTP request，因此可以先创建 server credential；该 local start 以 child 成功取得 lock 并在完成 startup validation + HTTP bind 后发布 endpoint 作为 ready signal，不调用 credential-free health API。一旦 active daemon 存在，`daemon start/status/stop/restart` 的 control HTTP 与其它客户端调用一样必须认证。后续客户端由 operator 把该 secret 放入 `KG_TOKEN` 或其它 SDK/Web 输入。
 - Failure / secret boundary：missing/malformed/wrong Bearer 都映射为统一 `AUTHENTICATION_FAILED`，HTTP 为 401，不通过错误差异泄露 token validity。`auth.json` 是 runtime secret，不进入 Knowledge Base/State/Commit Data/lock/log/error；POSIX 创建权限固定 `0600`，其它平台使用等价 current-user-private ACL。CLI 缺/空 `KG_TOKEN` 在 dispatch 前用同一 code 本地失败；token 值不得出现在参数、URL、stdout/stderr 或日志。
@@ -466,7 +470,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D56 `cache.db` 是默认开启、4 GiB 上限的 Embedding result cache（2026-09-17）
 
-> 后续调整：本条独立 cache.db、LRU、文件收缩与 KG OS cache key 已由 [D57](#d57-managed-semantic) 替换；默认开启与 4 GiB 配置偏好保留，映射为 Lithograph payload 预算。
+> 后续调整：本条独立 cache.db、LRU、文件收缩与 KG OS cache key 已由 [D57](#d57-managed-semantic) 替换；[D72](#d72-local-install-runtime-onboarding) 又删除公开 `cache.enabled` 与缺失字段默认行为，当前 cache 始终启用且 `path/max_size_mb` 必须显式配置。下文旧 cache surface 只保留历史依据。
 
 - 决定：KG OS v1 在 `$KG_HOME/cache.db` 使用独立标准 SQLite 保存 **embedding result cache**。`[cache]` 只提供 `enabled` 与 `max_size_mb`：省略整段等价 `enabled = true`、`max_size_mb = 4096`，即默认开启、默认 4 GiB。cache path 不可配置；`[cache]` 不控制 D51 的 `extensions/` artifact cache。
 - Identity：每个最终 provider input 独立缓存。key 由固定 cache/protocol format version、canonical embedding `base_url`、`model`、`dimensions`、KG OS input-framing version 与 exact provider input bytes 共同决定并 SHA-256；credential 不参与，`similarity` 因不改变 embedding 输出也不参与。缓存不持久化原始业务文本，Provider success 只有经过 finite/exact-dimension validation 才能写入；negative result 不缓存。
@@ -593,6 +597,8 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D66 KG OS 对齐 Lithograph v0.3.0 SQL-only execution 与 Provider-owned cache（2026-09-21）
 
+> 后续调整：[D72](#d72-local-install-runtime-onboarding) 不改变 Provider-owned cache ownership，但把 KG OS 安装配置改为 cache 始终启用、`path/max_size_mb` 必填显式值；下文 optional path / enabled config 描述只保留 D66 当时的历史依据。
+
 - 决定：KG OS 的 application-facing Lithograph integration 只使用 SQLite SQL surface：完整结果使用 `lithograph()`，真正流式结果使用 `lithograph_rows()`，校验使用 `lithograph_validate(query)`；多 execution 单 Commit 使用 `lithograph_tx_begin() -> lithograph()/lithograph_rows()* -> lithograph_tx_commit()/abort()`。不再绑定或探测 application-facing Native query ABI，不要求取得 `sqlite3*`，也不存在 `lithograph_tx_execute()`。
 - Graph 映射：`graph query` 使用物理只读 connection，先通过 `lithograph.commit.get(StateRef)` 解析并 pin exact `commit/...`，再以该 commit 作为 `options.at` 执行原始 Cypher；`graph execute` 使用独占读写 connection，在 SQLite autocommit 状态先执行 `lithograph.branch.checkout(requestedBranch)`，随后不附加 `options.branch` 地执行原始 Cypher。这样 Branch / Tag / Merge 等拥有自身 target 的 procedure 不会被 KG OS 无条件 branch option 破坏，也不需要 procedure-name parser / allowlist。streaming 两者都消费 `lithograph_rows()`，非 streaming 使用 `lithograph()`。
 - Streaming wire：HTTP成功 stream只映射 `columns -> row* -> summary`；如果 daemon在至少一个 event已发送后失败，使用 adapter-only terminal `error` event携带公共 error envelope，`summary` / `error`互斥。transport断开导致 terminal event不可达时 client按 incomplete transport处理。daemon逐 event encode/write/flush后才拉取下一条 SQLite row，避免无界 prefetch并让 request cancellation沿 backpressure路径传播。
@@ -657,3 +663,19 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 - 读取：Graph-Type-origin 单 Property `UNIQUE` 折回 `Property.unique: true`，不重复暴露为 public `constraints`。KG OS v1 自身不生成 Graph-Type-origin KEY / composite UNIQUE；若外部 State 含无法无损映射到当前 editable source profile 的这类资源，则该 State consistency-invalid。
 - 取舍：增加一个很小的 BLAKE3 Go dependency，以换取对 frozen v0.3.0 artifact 的可验证 source round-trip；不读取 Lithograph internal table、不复制 parser/storage，也不把整个 generated-name prefix 升级为 KG OS reserved namespace。
 - 当前合同：[Semantic graph 内部边界](ontology.md#semantic-graph-的内部边界)、[Ontology compiler / decoder](implementation.md#ontology-compiler--decoder)、[Phase 02](../development/phases/02-ontology.md)。
+
+<a id="d72-local-install-runtime-onboarding"></a>
+
+### D72 本地安装由 doctor / install 驱动，业务 CLI 自动管理 Runtime（2026-09-23）
+
+- 决定：普通用户的本地入口收敛为 `kg doctor`、`kg install` 与业务命令。v1 不把 `kg daemon start/status/stop/restart` 暴露为普通 CLI surface，也不建立独立 daemon-control HTTP namespace；`kgosd` 继续作为 foreground daemon 与内部 Runtime executable 存在，开发环境或外部 OS service manager 仍可直接管理它。任何需要本地 Runtime 的业务命令先检查当前 `KG_HOME` 的 active lock；`running` 直接使用，`stopped` 时由 CLI 后台拉起 `kgosd` 并等待 endpoint publication，`starting` 时等待 ready，`unavailable` 按明确 lifecycle/transport error 失败。并发 caller 仍由现有 single-instance OS lock 保证最多启动一个 daemon。
+- `doctor`：只观察当前安装与运行条件，不创建或修改 `config.toml`、不下载 artifact、不创建 `auth.json/kgos.db`、不 bootstrap Knowledge Base、不启动 daemon。它检查 effective `KG_HOME`、完整配置、安装 artifact / extension source、所需环境变量、active Runtime 状态和可确定的当前 readiness；`stopped` 是非阻塞状态，因为业务 CLI 会自动拉起。诊断的人类文案支持中英文；机器字段、配置 key 与 error code 保持稳定英文 identifier。
+- `install`：只负责建立当前 `KG_HOME` 的 Runtime profile 与完整 startup configuration，不启动 daemon，也不创建 `kgos.db` 或执行 Knowledge Base bootstrap。所有用户可配置项必须解析成显式值；没有“skip / disable / configure later”的功能模式。命令行已提供的字段直接采用且不再询问；缺失字段在 TTY 中逐项询问，非 TTY 中返回稳定的 missing-key 结果。全部参数已给全时零交互直接 validate + install。推荐值只用于交互提示；用户按 Enter 表示明确采用该值，最终 `config.toml` 仍写出完整字段。KG OS 安装包自带并由 installer 确定的 `kgosd`、Lithograph 与官方 Provider artifact 位置属于 installer-derived 值，不要求用户输入底层 library path / entrypoint。
+- 完整配置：`server.host/port`、`cache.path/max_size_mb`、`fulltext.analyzer`、`embedding.base_url/model/dimensions/similarity/api_key_env` 都必须在生成后的 `config.toml` 中显式出现；`cache` 始终启用，不再公开 `cache.enabled`。空 `embedding.api_key_env` 只表示调用方明确选择了无需认证的 OpenAI-compatible endpoint，不表示跳过 Embedding。通用 `sqlite.extensions` 合同继续存在；installer 至少写入当前 KG OS distribution 所需的 Lithograph 与 OpenAI-compatible Provider entries，额外第三方 extension 仍遵守 D51 的显式 source / entrypoint / conditional library / sha256 合同。
+- 初始化配置：`[fulltext]` 与 `[embedding]` 属于 Knowledge Base 初始化配置。交互安装在进入这组字段前只提示一次“以下配置初始化后禁止修改。”；英文对应 “The following settings must not be changed after initialization.”，不追加责任、迁移或兼容性说明。KG OS 不为这条约定增加 fingerprint、历史配置快照、修改检测、阻止、warning、doctor 比较或自动 migration；用户手工修改文件后，Runtime 仍只按正常 startup config 解析当前值。
+- 认证：本机 `kg` 仍通过 HTTP Bearer 调用 daemon，不获得数据库旁路。credential resolution 改为：非空 `KG_TOKEN` 优先；否则读取当前 `$KG_HOME/auth.json`。显式 `KG_TOKEN` 错误时不得回退本地 token。第一次业务命令自动拉起 fresh daemon 后，CLI 等待 ready，再按同一规则取得 credential 并发送原始业务 request。SDK / Web 的 credential 合同不因此获得本地文件旁路。
+- 国际化：v1 人类可见 CLI 文案支持 English / 中文，默认 English。locale 解析优先 `LC_ALL`、`LC_MESSAGES`、`LANG`；首个非空值识别为中文 locale 时使用中文，其它或无法识别时使用英文。命令名、flag、JSON field、error code、配置 key 和其它机器合同不翻译。业务命令继续保持非交互；只有 `kg install` 在缺失配置且 stdin/stdout 可交互时进入安装向导。
+- 依据：用户从首次使用角度要求环境问题可由 `doctor` 一次诊断，安装与完整配置统一由 `install` 完成，参数齐全时适配 AI 零交互调用、参数缺失时按用户语言逐项引导；同时明确 daemon 不应成为普通用户管理对象，业务命令应自行确保 Runtime 可用，并要求初始化配置只在安装时简短提示禁止修改、不建立后续检测机制。
+- 替换：本决定替换 D55 的“CLI 只从 `KG_TOKEN` 取得 credential”部分，替换此前公开 `kg daemon ...` 与业务命令不得隐式启动 daemon 的 lifecycle surface，并替换 D53 / D52 中把 Full-text / Embedding runtime defaults 作为正常可变配置使用的产品约定。D51 的通用 extension loader、D54 的单 `KG_HOME` / 单 `kgos.db`、D55 的单 Token Bearer 服务端认证、D66 的 Provider-owned cache 与 SQL-only integration继续有效。
+- 取舍：用户侧首次流程从“配置文件 + daemon + token 搬运”收敛为“doctor → install → 业务命令”，同时不引入 profile registry、credential manager、配置历史或 daemon supervisor 产品面。代价是 `kg` 增加本地 Runtime ensure/spawn、安装向导与 i18n 责任；这些都只服务当前单机 Runtime 使用问题。
+- 当前合同：[CLI](cli.md)、[Runtime](runtime.md)、[Architecture](architecture.md#v1-运行时与技术分层)、[工程映射](implementation.md)、[Phase 03](../development/phases/03-installation-runtime-onboarding.md)。

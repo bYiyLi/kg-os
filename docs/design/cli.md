@@ -17,16 +17,16 @@ v1 CLI executable 固定为 `kg`。短 binary 适合 AI 高频调用和人工输
 CLI 遵守以下边界：
 
 - 命令树提供 Ontology 渐进读取，并映射共享 Object / Graph / Evolution；不按底层 REST route、Lithograph procedure 或数据库内部资源组织；
-- 除 Ontology 文本读取等下述显式例外外，默认输出稳定 JSON，适合 AI、脚本和 shell pipeline；人类需要可读缩进时使用 `--pretty`，不维护第二套 table 输出合同；
+- 除 Ontology 文本读取、`doctor` 人类诊断与 `install` 交互向导等下述显式例外外，默认输出稳定 JSON，适合 AI、脚本和 shell pipeline；人类需要可读缩进时使用 `--pretty`，不维护第二套 table 输出合同；
 - 不存在 connection-local current Branch、current State 或 checkout；需要 StateRef / Branch 的命令必须显式提供；
-- 不弹交互确认、不自动启动 editor、不进入 REPL、不自动打开 pager；命令参数不足时直接失败；
+- 业务命令不弹交互确认、不自动启动 editor、不进入 REPL、不自动打开 pager；只有 `kg install` 在配置缺失且 stdin/stdout 都可交互时逐项询问缺失配置；
 - 不自动遍历所有 pagination page；AI / 调用方显式读取 cursor 并决定是否继续，避免一次命令无界扩大上下文；
 - 不提供 `kg request`、raw SQL 或 SQLite 内部表 pass-through；Graph `query` / `execute` 原样执行 Lithograph Cypher / procedure，分别选择只读 / 读写连接；
 - CLI 只通过 `kgosd` 的 HTTP endpoint 使用 Kernel，不直接打开 SQLite database 或加载 Lithograph extension；
-- active daemon endpoint 从 `$KG_HOME/kgosd.lock` 的 active lock owner 定位；`KG_HOME` 未设置时默认 `~/.kgosd`。`config.toml` 的 `server.host/server.port` 只决定下一次 daemon startup，不为业务命令增加 `--endpoint` / `--host` / random discovery；
-- 任何发送到 active `kgosd` 的 CLI HTTP request 都必须从非空 `KG_TOKEN` 环境变量取得 credential，并发送 `Authorization: Bearer <KG_TOKEN>`；CLI 不读取 `$KG_HOME/auth.json`、不提供 `--token`、不把 token 写入 stdout/stderr。
+- active daemon endpoint 从 `$KG_HOME/kgosd.lock` 的 active lock owner 定位；`KG_HOME` 未设置时默认 `~/.kgosd`。`config.toml` 的 `server.host/server.port` 只决定 daemon startup，不为业务命令增加 `--endpoint` / `--host` / random discovery；
+- 任何发送到 active `kgosd` 的 CLI HTTP request 都发送 Bearer credential；本机解析顺序固定为非空 `KG_TOKEN` 优先，否则读取当前 `$KG_HOME/auth.json`。显式 token 错误时不 fallback；CLI 不提供 `--token`、不把 token 写入 stdout/stderr。
 
-`KG_HOME` 与 `KG_TOKEN` 是两个独立输入：前者选择本地 runtime profile / daemon target，后者证明客户端有权访问该实例。改变 `KG_HOME` 不会自动改变 `KG_TOKEN`；调用方必须为目标 profile 提供匹配 credential。
+`KG_HOME` 选择本地 runtime profile / daemon target。`KG_TOKEN` 是显式 credential override；未设置时，本机 CLI 使用目标 profile 自己的 `auth.json`。
 
 v1 不定义命令别名、缩写 namespace 或另一组 flattened commands。`kg branch ...`、`kg query ...` 等都不是 `kg evolution branch ...`、`kg graph query ...` 的第二种 canonical 拼写。
 
@@ -34,11 +34,8 @@ v1 不定义命令别名、缩写 namespace 或另一组 flattened commands。`k
 
 ```text
 kg
-├── daemon
-│   ├── start
-│   ├── status
-│   ├── stop
-│   └── restart
+├── doctor
+├── install
 │
 ├── ontology
 │   ├── [<OntologyRef> ...]      # 0 refs = Overview；1..100 refs = batch read
@@ -88,6 +85,12 @@ kg
 ```
 
 `kg --help`、任意 namespace / command 的 `--help` 以及 `kg --version` 属于标准 CLI discovery，不需要连接 daemon。Help 必须使用本文和 logical contract 的真实名词，并明确标出 required argument、StateRef grammar、分页、stdin/file input 和 write behavior；help 示例不能引入隐藏默认 Branch 或另一套快捷写语义。
+
+## 国际化
+
+v1 人类可见 CLI 文案支持 English 与中文，默认 English。locale 解析按 `LC_ALL` → `LC_MESSAGES` → `LANG` 取首个非空值；识别为中文 locale 时使用中文，其它值、缺失或无法识别时使用英文。v1 不增加独立语言配置文件或 profile setting。
+
+国际化只作用于 help、`doctor` 人类输出、`install` prompt / warning、普通本地说明文字。命令名、flag、JSON field、error code、配置 key、Ref、enum 与其它机器协议不翻译；因此 AI / script 不需要根据 locale 改写解析逻辑。
 
 ## 通用参数与输出
 
@@ -155,76 +158,91 @@ v1 exit code 只表达粗粒度执行层级，稳定业务分类始终读取 err
 | ---: | --- |
 | `0` | command 成功，包括 empty result |
 | `1` | daemon 已返回 KG OS / Lithograph public error |
-| `2` | CLI usage、参数、stdin/file/local parse/input，或 daemon start 的本地 config/spawn/lifecycle error；请求未成功 dispatch |
+| `2` | CLI usage、参数、stdin/file/local parse/input，或 install / Runtime ensure 的本地 config/spawn/lifecycle error；请求未成功 dispatch |
 | `3` | `kgosd` target / transport 不可用，或请求 / 响应传输失败 |
 
 连接中断按普通连接错误返回，使用既有 `IO_ERROR` envelope 与 exit `3`。该退出码只表示通信失败，不保证请求尚未执行或已提交变更已经回滚；CLI 不因连接错误自动重试写请求。
 
 进程被 shell signal 中断使用平台惯例，不建立 KG OS 业务 exit code。结构化 stdout/stderr 不输出 ANSI escape sequence。
 
-需要 active daemon 的命令在 dispatch 前发现 `KG_TOKEN` 缺失或为空时，返回本地 input/config failure（exit `2`）并使用 `AUTHENTICATION_FAILED` code，不发送请求；token 存在但 daemon 拒绝时属于 daemon public error（exit `1`，同一 `AUTHENTICATION_FAILED` code）。这包括 active daemon 存在时的 `daemon start/status/stop/restart` control path。`--help` / `--version` 与“当前 profile 没有 active daemon 时，`kg daemon start` 只做本地 process spawn”不属于 HTTP request，不需要预先存在 credential。
+需要 active daemon 的业务命令在 Runtime ensure 完成后解析 credential：非空 `KG_TOKEN` 优先，否则读取当前 `$KG_HOME/auth.json`；两者都不可用时返回本地 `AUTHENTICATION_FAILED`（exit `2`）且不发送业务 request。token 存在但 daemon 拒绝时属于 daemon public error（exit `1`）。`--help`、`--version`、`doctor`、`install` 与本地 daemon spawn 本身不要求先有 Bearer credential。
 
-## Daemon CLI
-
-Daemon commands 是本地 operator surface，不是 Object / Graph / Evolution 的第二套业务 API。生命周期语义由 [本地运行时](runtime.md#daemon-lifecycle) 拥有；v1 不提供 `--force`、PID 参数、endpoint override 或 auto-start flag。
-
-### start
+## Doctor
 
 ```text
-kg daemon start
+kg doctor [--json]
 ```
 
-如果当前实例已经 `running`，命令通过 authenticated control check 后 idempotent success；因此已有 active daemon 时 `start` 也要求 `KG_TOKEN`。如果当前 profile 没有 active daemon，则按 runtime contract 在本地后台启动 `kgosd`；CLI 通过 child 成功取得 lock 并发布 endpoint 判断 ready，而不是读取 `auth.json` 或调用未认证 health endpoint。这个 bootstrap spawn 不要求预先存在 token。第一次 profile 启动时 child 可以创建 `$KG_HOME/auth.json`；`kg daemon start` 不自动读取或导出其中的 token，operator 需要自行把该 secret 配置为后续客户端的 `KG_TOKEN`。成功 stdout：
+`doctor` 是 side-effect-free 本地诊断入口。它检查 effective `KG_HOME`、安装状态、`config.toml` 完整性与静态合法性、installer-managed Runtime artifacts、configured extension source 的可确定状态、必需环境变量以及 daemon lock/state；不得创建目录或文件、下载 artifact、启动 daemon、生成 credential、打开/初始化 `kgos.db` 或执行 Knowledge Base bootstrap。
 
-```json
-{"status":"running","endpoint":"http://127.0.0.1:4765"}
-```
+daemon `stopped` 是正常非阻塞诊断结果，因为后续业务命令会自动启动 Runtime；`starting/running/unavailable` 必须如实报告。默认 TTY 输出使用当前 locale 的简洁诊断文本；`--json` 输出稳定 machine result，至少包含 overall readiness、每个 check 的稳定 `id/status/blocking` 与适用的缺失配置 key，不翻译这些 identifier。
 
-配置无效、`kgosd` executable/spawn 失败或 bind conflict 属于本地 lifecycle failure；若已有 lock owner 但其 control endpoint 不可用，按 transport-unavailable 处理。`start` 不修改 `config.toml`。
+`doctor` 的 machine status 只使用 `ok | info | error`；daemon lifecycle state 放在对应 check 的 `details.state`，值固定为 `stopped | starting | running | unavailable`。`stopped` 对应 `status=info, blocking=false`。只要诊断过程本身完成，`doctor` 即 exit `0`，环境是否 ready 由 `ready` 与 `blocking` 表达；CLI usage / 无法读取必需诊断输入等命令自身失败才使用通用非零 exit code。
 
-### status
+## Install
 
 ```text
-kg daemon status
+kg install
+  [--server-host <ipv4>]
+  [--server-port <1..65535>]
+  [--cache-path <path>]
+  [--cache-max-size-mb <n>]
+  [--fulltext-analyzer <fts5-spec>]
+  [--embedding-base-url <url>]
+  [--embedding-model <id>]
+  [--embedding-dimensions <1..4096>]
+  [--embedding-similarity <cosine|euclidean>]
+  [--embedding-api-key-env <name-or-empty>]
 ```
 
-`status` 是观察命令；只要状态本身被成功判定，`stopped` / `starting` / `running` / `stopping` / `unavailable` 都属于成功观察并 exit `0`。stdout 只返回：
+`install` 只建立当前 `KG_HOME` 的 Runtime profile 与完整 `config.toml`，并定位/写入当前 KG OS distribution 所需的 `kgosd`、Lithograph 与 OpenAI-compatible Provider artifact 配置；它不启动 daemon、不生成 `auth.json`、不创建 `kgos.db`、不执行 Lithograph init 或 KG OS bootstrap。
+
+安装配置解析对每个用户可配置字段使用同一规则：
 
 ```text
-{ "status": "stopped" }
-{ "status": "starting" }
-{ "status": "running", "endpoint": "http://..." }
-{ "status": "stopping", "endpoint": "http://..." }
-{ "status": "unavailable", "endpoint": "http://..." }
+CLI flag 已提供 → 直接采用，不询问
+        ↓
+字段缺失且 TTY 可交互 → 按当前语言逐项询问
+        ↓
+字段缺失且不可交互 → INSTALL_CONFIGURATION_INCOMPLETE
+        ↓
+所有字段显式 resolved → validate → 原子写完整 config.toml
 ```
 
-`endpoint` 只在 active lock 已经发布 endpoint 时出现。文件存在但 OS lock 没有 active owner 时必须返回 `stopped`，不能使用 stale endpoint。
+交互提示可以展示推荐值；用户直接 Enter 表示明确采用该推荐值，不能靠输出文件省略字段表达默认。全部参数已提供时即使存在 TTY 也必须零 prompt，直接 validate + install，适合 AI / automation。非交互缺失错误使用 CLI-local 稳定 code `INSTALL_CONFIGURATION_INCOMPLETE`，exit `2`，`details.missing` 是按 config key 排序的字符串数组。
 
-### stop
+v1 installer 的推荐值冻结为：
+
+| Config key | Recommended value |
+| --- | --- |
+| `server.host` | `127.0.0.1` |
+| `server.port` | `4765` |
+| `cache.path` | `cache/openai-compatible.db` |
+| `cache.max_size_mb` | `4096` |
+| `fulltext.analyzer` | `unicode61` |
+| `embedding.base_url` | `https://api.openai.com/v1` |
+| `embedding.model` | `text-embedding-3-small` |
+| `embedding.dimensions` | `1536` |
+| `embedding.similarity` | `cosine` |
+| `embedding.api_key_env` | `OPENAI_API_KEY` |
+
+这些值只用于交互 prompt；它们不是 runtime 缺失字段默认值。用户可以输入其它合法值，也可以按 Enter 明确接受推荐值。
+
+`[fulltext]` 与 `[embedding]` 是初始化配置。交互安装进入这组字段前只显示一次当前语言对应的简短提示：
 
 ```text
-kg daemon stop
+以下配置初始化后禁止修改。
+
+The following settings must not be changed after initialization.
 ```
 
-通过 active endpoint 请求 graceful shutdown，并等待当前实例退出 / release lock。已经 stopped 时 idempotent success。成功 stdout：
+不追加其它责任、迁移或兼容性说明。该提示不意味着 CLI 保存或比较历史配置。
 
-```json
-{"status":"stopped"}
-```
+`cache` 没有 disable/skip 模式，installer 必须取得并写出 `path/max_size_mb`；`fulltext` 与 `embedding` 同样不能通过缺失字段表示未启用。`embedding.api_key_env` 字段也必须显式提供；空字符串只表示调用方明确选择无需认证的 endpoint。SQLite extension 的底层 library path / entrypoint 对官方必需 artifacts 由 installer 从 distribution 得到并完整写入，普通用户无需手工寻找这些路径。
 
-v1 没有 PID kill / `--force` fallback；active owner 存在但 HTTP control 不可用时失败。
+如果目标 `config.toml` 已经存在，`kg install` 不覆盖或重新引导配置：未提供任何 config-setting flag且现有配置合法时返回 already-installed 成功；现有配置非法时返回当前配置错误，由调用方直接修正文件；现有配置已经存在且调用方又提供任意 config-setting flag时返回 `INVALID_ARGUMENT` / exit `2`，不能静默忽略，也不比较新旧值。v1 不增加 `setup`、`config set` 或另一套配置持久化接口。
 
-### restart
-
-```text
-kg daemon restart
-```
-
-显式执行 stop → start；新的 `kgosd` 重新读取当前 `config.toml`。daemon 已经 stopped 时等价于 start。成功结果与 start 相同：
-
-```json
-{"status":"running","endpoint":"http://127.0.0.1:4765"}
-```
+交互向导实际询问过至少一个字段时，成功输出使用当前 locale 的简短 human text；完全参数化、零交互安装成功时遵守 JSON-first 规则，stdout 返回稳定 JSON，例如 `{"status":"installed","home":"<absolute KG_HOME>"}`。already-installed 的零交互成功使用 `status="already_installed"`。这些状态值不翻译。
 
 ## Ontology CLI
 
@@ -628,19 +646,20 @@ KG OS CLI 不单独维护 human-only 命令树。人类与 AI 使用相同 comma
 
 ## Runtime target 与非目标
 
-每次业务命令 dispatch 时，`kg` 按 [本地运行时](runtime.md) 先解析 effective `KG_HOME`（默认 `~/.kgosd`），再检查 `$KG_HOME/kgosd.lock`：只有 OS lock 存在 active owner 时才把其中的 endpoint 视为当前 daemon target。
+每次业务命令 dispatch 时，`kg` 按 [本地运行时](runtime.md) 先解析 effective `KG_HOME`（默认 `~/.kgosd`），再执行 Runtime ensure。只有 OS lock 存在 active owner 且已经发布 endpoint 时，才把其中的 endpoint 视为当前 daemon target。
 
 ```text
-active kgosd.lock owner
-        ↓
-published endpoint
-        ↓
-current kgosd
+active owner + endpoint → use current kgosd
+stopped                 → spawn kgosd → wait ready → use endpoint
+starting                → wait ready → use endpoint
+unavailable             → fail explicitly
 ```
 
-如果没有 active owner，普通业务命令直接使用本文既有 exit `3` transport failure；**不能自动执行 `kg daemon start`**。如果运行中的 daemon 启动后 `config.toml` 被修改，业务命令继续使用 lock 中的 effective endpoint；只有显式 `kg daemon restart` 后才切换到新 startup config。CLI 在 dispatch 前要求 `KG_TOKEN`，但**绝不自动读取** `$KG_HOME/auth.json`；连接失败时也不随机换端口或直接打开 SQLite。
+如果没有 active owner，业务命令自动后台启动 `kgosd`；spawn / startup validation / ready wait 失败属于本地 Runtime failure，原始业务 request 不得在未 ready 的 endpoint 上提前 dispatch。多个并发 caller 只能由 single-instance lock 产生一个 winner。运行中的 daemon 启动后即使磁盘 `config.toml` 被修改，当前进程仍继续使用 startup 时的 effective config；CLI 不比较配置文件、不自动 hot-reload/restart。
 
-一个 daemon 固定只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base。OpenAI-compatible Provider 可以使用独立 SQLite cache database，但它只是 derived runtime data，不是第二个 Knowledge Base 或 CLI target；默认位于 `$KG_HOME/cache/openai-compatible.db`。v1 不提供 `base list/use`、`--base` 或其它单-daemon多库选择 surface；需要另一套知识世界时启动另一个 `KG_HOME` profile。
+daemon ready 后，CLI 使用非空 `KG_TOKEN` 或当前 profile 的 `auth.json` 取得 credential，再发送原始业务 request。连接失败时不随机换端口、不直接打开 SQLite，也不因为显式 `KG_TOKEN` 失败而 fallback。
+
+一个 daemon 固定只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base。OpenAI-compatible Provider 可以使用独立 SQLite cache database，但它只是 derived runtime data，不是第二个 Knowledge Base 或 CLI target；标准 installer 推荐 `cache/openai-compatible.db`，实际路径仍由完整 `[cache].path` 显式配置。v1 不提供 `base list/use`、`--base` 或其它单-daemon多库选择 surface；需要另一套知识世界时启动另一个 `KG_HOME` profile。
 
 ## 兼容性
 

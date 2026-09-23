@@ -19,7 +19,7 @@ TypeScript
 
 `kgosd`、Kernel 与 `kg` CLI 不再使用旧 TypeScript 实现。产品运行时不依赖 Node.js；Node/pnpm 只用于 SDK、Web 和仓库工程工具。
 
-Phase 01 已把 `kgosd` 从工程壳层推进为真实本地 Runtime / Lithograph Host；Phase 02 当前工作树进一步在启动时完成 Knowledge Base bootstrap / reopen validation，并提供 authenticated Ontology data routes 与 `kg ontology` CLI。当前已实现的是 `/api/v1/ontology/read`、`/api/v1/ontology/object`、`/api/v1/ontology/patch`；其它尚未实现的业务 `/api/*` 与 `/control/*` 仍返回 404。普通 Knowledge CRUD、通用 Object / Graph / Evolution、SDK/Web/Skill 业务交互与 daemon control仍属于后续 Phase。
+Phase 01 已把 `kgosd` 从工程壳层推进为真实本地 Runtime / Lithograph Host；Phase 02 已进一步在启动时完成 Knowledge Base bootstrap / reopen validation，并提供 authenticated Ontology data routes 与 `kg ontology` CLI。当前已实现的是 `/api/v1/ontology/read`、`/api/v1/ontology/object`、`/api/v1/ontology/patch`；其它尚未实现的业务 `/api/*` 仍返回 404。Phase 03 的 `kg doctor`、`kg install`、本机 credential fallback 与业务命令 Runtime auto-start 已完成设计但尚未实现；普通 Knowledge CRUD、通用 Object / Graph / Evolution、SDK/Web/Skill 业务交互仍属于后续 Phase。
 
 ## 工程目录
 
@@ -101,7 +101,7 @@ pnpm dev
 - Go Phase 02 runtime：`http://127.0.0.1:4765`
 - Vite/React HMR：`http://127.0.0.1:5173`
 
-浏览器开发时访问 `5173`。Vite 把 `/api` 与 `/control` 代理到 Go 进程；尚未进入后续业务 Phase 的接口当前返回 404。
+浏览器开发时访问 `5173`。Vite 当前把 `/api` 代理到 Go 进程；仓库里残留的旧 `/control` proxy 属于被 D72 替换的未发布 daemon-control 方案，Phase 03 清理该历史配置，不作为当前产品接口。
 
 `pnpm dev` 强制把 `KG_HOME` 指向仓库内已忽略的 `.kgos-dev/`，先用真实 Lithograph v0.3.0 fixture 生成 `config.toml`，再启动无额外兼容参数的 `kgosd`；首次启动会在 fresh Root baseline 上执行 Phase 02 bootstrap。Web 源码修改由 Vite HMR 处理；Go 源码修改后重新启动 `pnpm dev`。Ctrl-C/SIGTERM 会联动停止 Go 与 Vite 子进程，正常退出后不应保留 `4765` / `5173` listener。
 

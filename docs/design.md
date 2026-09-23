@@ -16,9 +16,9 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [graph.md](design/graph.md) | Knowledge 数据模型、Graph query / execute、Cypher 与搜索边界 |
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
 | [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同 |
-| [cli.md](design/cli.md) | `kg` AI-first CLI command tree、参数、stdin/file、JSON/raw body/streaming、错误与 exit code |
-| [runtime.md](design/runtime.md) | Go `kgosd`、内置 Web 与 HTTP、`KG_HOME` 单 Knowledge Base profile、`auth.json`/Bearer authentication、Provider-owned Embedding cache mapping、SQLite Extension source resolver、Full-text / Semantic Index 默认配置与 api_key_env、single-instance lock、daemon lifecycle 与 Web hosting |
-| [decisions.md](design/decisions.md) | D1–D68 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [cli.md](design/cli.md) | `kg` AI-first CLI command tree、`doctor/install`、Runtime ensure、i18n、参数、stdin/file、JSON/raw body/streaming、错误与 exit code |
+| [runtime.md](design/runtime.md) | Go `kgosd`、内置 Web 与 HTTP、`KG_HOME` 单 Knowledge Base profile、完整 startup config、`auth.json`/Bearer authentication、Provider-owned Embedding cache mapping、SQLite Extension source resolver、Full-text / Semantic 初始化配置、single-instance lock、auto-start lifecycle 与 Web hosting |
+| [decisions.md](design/decisions.md) | D1–D72 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 ## 从配置到调用
@@ -26,6 +26,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 要解决的问题 | 正文位置 |
 | --- | --- |
 | kgosd 怎么配置扩展、模型和凭证 | [Runtime 配置示例](design/runtime.md#configtoml)、[Embedding 配置映射](design/runtime.md#embedding-配置与索引映射) |
+| 第一次怎么检查并安装本地 KG OS | [CLI Doctor / Install](design/cli.md#doctor)、[Runtime lifecycle](design/runtime.md#daemon-lifecycle)、[Phase 03](development/phases/03-installation-runtime-onboarding.md) |
 | 使用方怎么定义模型和索引 | [Ontology 公共格式](design/ontology.md#公共可编辑格式)、[完整编辑示例](design/ontology.md#编辑示例) |
 | 调用方怎么保存正文和查询 | [Graph 合同](design/graph.md#graph-公共调用合同)、[CLI query](design/cli.md#query)、[CLI execute](design/cli.md#execute) |
 | 需要实现和验证什么 | [工程待办与验收](design/implementation.md) |
@@ -36,10 +37,10 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 状态 | 范围与入口 |
 | --- | --- |
 | 已确认 | Ontology 渐进读取 / 聚合编辑、Object Patch、Knowledge / Graph、Evolution、单 profile / 单库 / 单 Token runtime；具体规则见上面的 owner 表 |
-| 当前实现基线 | Phase 00 Engineering Foundation 与 Phase 01 Runtime & Lithograph Host Foundation 均已完成；当前已具备 Go 工程基线、`KG_HOME` / config / credential、SQLite Extension resolver、Go/Lithograph v0.3.0 host、SQL buffered / true streaming / cancellation、Provider readiness/cache mapping、explicit transaction、single-instance lock 与进程 shutdown。阶段状态与完成证据由[开发计划](development/README.md)及对应 Phase 文件维护 |
-| 已确认调整 | [D59 Cypher 原样执行 / 读写连接](design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](design/decisions.md#d61-single-field-semantic)、[D62 Ontology 不创建无字段类型](design/decisions.md#d62-nonempty-definition-properties)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](design/decisions.md#d66-lithograph-v030-sql-only)、[D67 Ontology Index profile](design/decisions.md#d67-ontology-index-profile)、[D68 reserved Ontology Schema](design/decisions.md#d68-reserved-ontology-schema)；D63 仅保留单 daemon 内置 Web 的交付边界，D60 的透明缓存目标由 D66 重新分配 ownership |
+| 当前实现基线 | Phase 00 Engineering Foundation、Phase 01 Runtime & Lithograph Host Foundation 与 Phase 02 Ontology 均已完成；当前真实代码已具备 Go Runtime、完整 Ontology、authenticated HTTP 与 `kg ontology`，但尚未实现 D72 的 `doctor/install`、完整显式 config、CLI 本地 credential fallback、i18n 与业务 Runtime auto-start。阶段状态与完成证据由[开发计划](development/README.md)及对应 Phase 文件维护 |
+| 已确认调整 | [D59 Cypher 原样执行 / 读写连接](design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](design/decisions.md#d61-single-field-semantic)、[D62 Ontology 不创建无字段类型](design/decisions.md#d62-nonempty-definition-properties)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](design/decisions.md#d66-lithograph-v030-sql-only)、[D67 Ontology Index profile](design/decisions.md#d67-ontology-index-profile)、[D68 reserved Ontology Schema](design/decisions.md#d68-reserved-ontology-schema)、[D69 Ontology Constraint profile](design/decisions.md#d69-ontology-constraint-profile)、[D70 bootstrap orphan-history boundary](design/decisions.md#d70-bootstrap-orphan-history)、[D71 generated Constraint identity](design/decisions.md#d71-lithograph-generated-constraint-identity)、[D72 Local install / Runtime onboarding](design/decisions.md#d72-local-install-runtime-onboarding)；D63 仅保留单 daemon 内置 Web 的交付边界，D60 的透明缓存目标由 D66 重新分配 ownership，D72 替换 env-only CLI credential与公开 daemon-control onboarding |
 | 检索范围与限制 | [首版 Semantic 只支持单字段且不公开 filterProperties，Cypher 联合检索可组合；post-YIELD 过滤不等价于过滤范围内 top-k](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
-| 工程待办 | 在已完成 Runtime Host 基础上先实现 Knowledge Base bootstrap + 完整 Ontology（Binding、read/edit、Ontology-scoped shared Patch 与 Schema/Constraint/Index compiler）；之后再实现普通 Knowledge Object / 通用 Object surface、Graph 公共 HTTP、Evolution / Merge 及完整 SDK / Web / Skill / daemon control；具体阶段顺序见[开发计划](development/README.md)，复用边界见[工程映射](design/implementation.md) |
+| 工程待办 | Phase 03 先补齐 `doctor/install`、完整显式 config、en/zh、本机 credential fallback 与业务 Runtime auto-start；之后再实现普通 Knowledge Object / 通用 Object surface、Graph 公共 HTTP、Evolution / Merge 及完整 SDK / Web / Skill。具体阶段顺序见[开发计划](development/README.md)，复用边界见[工程映射](design/implementation.md) |
 | Web 待细化 | [kgosd 内置交付、同源服务与共享 Kernel 已定，具体页面布局和交互尚未展开](design/runtime.md#web-交互设计状态)；不阻塞 Kernel、daemon、CLI 或 SDK 的实现 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库、真实 loadable extension、SQL streaming 与 cancellation 集成测试。
