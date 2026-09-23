@@ -25,6 +25,8 @@ func run(
 		return 0
 	}
 	switch args[0] {
+	case "graph":
+		return runGraph(ctx, args[1:], stdin, stdinIsTTY, stdout, stderr)
 	case "object":
 		return runObject(ctx, args[1:], stdin, stdinIsTTY, stdout, stderr)
 	case "ontology":

@@ -32,13 +32,13 @@ type Event struct {
 type QueryRequest struct {
 	At     string
 	Cypher string
-	Params map[string]any
+	Params any
 }
 
 type ExecuteRequest struct {
 	Branch  string
 	Cypher  string
-	Params  map[string]any
+	Params  any
 	Author  *string
 	Message *string
 }

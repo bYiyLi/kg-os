@@ -436,7 +436,7 @@ kg graph execute \
   --params '{"id":"doc-001","title":"知识图谱设计","content":"知识图谱通过节点和关系组织知识。"}'
 ```
 
-这次写入不调用 embedding 服务，也不要求调用方手工更新向量。上述 CLI 仍是待实现的设计合同。
+这次写入不调用 embedding 服务，也不要求调用方手工更新向量。
 
 CLI 必须保持 Graph logical contract：`execute` **没有 `--base-state`**。它不能为了和 Object Patch 外观统一而增加 strict-base 语义。默认 stdout 是 `{state, columns, rows, counters}` JSON。
 

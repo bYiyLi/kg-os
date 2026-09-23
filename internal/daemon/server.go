@@ -28,6 +28,9 @@ func Serve(
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
 	}
 	serverErrors := make(chan error, 1)
 	go func() {

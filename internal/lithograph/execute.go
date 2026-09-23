@@ -127,8 +127,11 @@ func (host *Host) Execute(ctx context.Context, request ExecuteRequest) (Result, 
 func (host *Host) StreamQuery(
 	ctx context.Context,
 	request QueryRequest,
-	consume func(Event) error,
+	consume func(string, Event) error,
 ) (string, error) {
+	if consume == nil {
+		return "", fmt.Errorf("stream consumer is required")
+	}
 	if request.At == "" || request.Cypher == "" {
 		return "", fmt.Errorf("query state and Cypher are required")
 	}
@@ -146,7 +149,14 @@ func (host *Host) StreamQuery(
 	if err != nil {
 		return "", fmt.Errorf("resolve query state %q: %w", request.At, err)
 	}
-	if err := streamRaw(operationCtx, connection, request.Cypher, request.Params, map[string]any{"at": state}, consume); err != nil {
+	if err := streamRaw(
+		operationCtx,
+		connection,
+		request.Cypher,
+		request.Params,
+		map[string]any{"at": state},
+		func(event Event) error { return consume(state, event) },
+	); err != nil {
 		return "", fmt.Errorf("stream query at %q: %w", state, err)
 	}
 	return state, nil

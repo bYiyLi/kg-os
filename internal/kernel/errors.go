@@ -28,6 +28,10 @@ const (
 	CodeConstraint           ErrorCode = "CONSTRAINT_ERROR"
 	CodeBranchNotFound       ErrorCode = "BRANCH_NOT_FOUND"
 	CodeTagNotFound          ErrorCode = "TAG_NOT_FOUND"
+	CodeBranchHeadMoved      ErrorCode = "BRANCH_HEAD_MOVED"
+	CodeMergeConflict        ErrorCode = "MERGE_CONFLICT"
+	CodeMergeSessionNotFound ErrorCode = "MERGE_SESSION_NOT_FOUND"
+	CodeMergeSessionChanged  ErrorCode = "MERGE_SESSION_CHANGED"
 	CodeReadOnlySnapshot     ErrorCode = "READ_ONLY_SNAPSHOT"
 	CodeResource             ErrorCode = "RESOURCE_ERROR"
 	CodeIO                   ErrorCode = "IO_ERROR"
@@ -130,9 +134,11 @@ func HTTPStatus(err error) int {
 	switch public.Code {
 	case CodeAuthenticationFailed:
 		return http.StatusUnauthorized
-	case CodeObjectNotFound, CodeStateNotFound, CodeBranchNotFound, CodeTagNotFound:
+	case CodeObjectNotFound, CodeStateNotFound, CodeBranchNotFound, CodeTagNotFound,
+		CodeMergeSessionNotFound:
 		return http.StatusNotFound
-	case CodeObjectConflict, CodePatchBaseMismatch, CodeStaleBaseState, CodeConstraint:
+	case CodeObjectConflict, CodePatchBaseMismatch, CodeStaleBaseState, CodeConstraint,
+		CodeBranchHeadMoved, CodeMergeConflict, CodeMergeSessionChanged:
 		return http.StatusConflict
 	case CodeInvalidArgument, CodeParse, CodeSemantic, CodeType, CodeReservedIdentifier,
 		CodeUnsupportedOperation, CodeSchema, CodeReadOnlySnapshot:

@@ -315,7 +315,7 @@ KG OS v1 不公开 per-Index analyzer、`fulltext.eventually_consistent`、token
 
 每个 SQLite connection 在配置 extension 全部加载后、进入可用池前，都必须对**当前 `[fulltext].analyzer`**做无持久副作用的 FTS5 capability probe；未知 tokenizer、参数构造失败或运行时依赖缺失都使该 connection 初始化失败。这个 probe 只验证本次 daemon 要用于新建/重建索引的 analyzer，不要求启动时枚举并验证全部历史 State 曾经使用过的 tokenizer。
 
-打开已有 Knowledge Base 时，KG OS **不比较**当前 `[fulltext].analyzer` 与库中已有 IndexDefinition，也不迁移或批量重建历史索引。历史 Full-text query 继续使用目标 State 的 versioned IndexDefinition 实际保存的 analyzer；如果那个 tokenizer 当前没有通过 `sqlite.extensions` 注册，则只让该次 Full-text 操作返回 `FULLTEXT_ANALYZER_UNAVAILABLE`。虽然初始化合同要求该配置初始化后禁止修改，Runtime 不实现历史值检测。
+打开已有 Knowledge Base 时，KG OS **不比较**当前 `[fulltext].analyzer` 与库中已有 IndexDefinition，也不迁移或批量重建历史索引。历史 Full-text query 继续使用目标 State 的 versioned IndexDefinition 实际保存的 analyzer；如果那个 tokenizer 当前没有通过 `sqlite.extensions` 注册，则只让该次 Lithograph Full-text 操作按底层公开 category 失败，不能退化为空结果或改用当前 analyzer。KG OS raw Graph 不解析 Cypher 或错误文案来把这类底层执行失败重新分类为 `FULLTEXT_ANALYZER_UNAVAILABLE`；该 KG OS code 只属于前述当前 `[fulltext].analyzer` capability probe。虽然初始化合同要求该配置初始化后禁止修改，Runtime 不实现历史值检测。
 
 KG OS 不承诺检测第三方 extension 在同一 analyzer name 下偷偷替换算法/词典；远程 artifact SHA-256 pin 能固定 binary bytes，但插件外部资源仍由 operator 负责版本化。这与 Lithograph 的 tokenizer 可复现性边界一致。对同一 Knowledge Base 长期保持 analyzer 语义稳定是 operator responsibility，v1 不建立配置兼容检查或迁移机制。
 

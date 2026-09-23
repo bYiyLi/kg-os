@@ -85,7 +85,7 @@ func TestHostLifecycleQueryExecuteStreamAndReopen(t *testing.T) {
 			At:     "branch/main",
 			Cypher: "UNWIND range(1,3) AS value RETURN value",
 		},
-		func(event Event) error {
+		func(_ string, event Event) error {
 			events = append(events, event)
 			return nil
 		},
@@ -107,7 +107,7 @@ func TestHostLifecycleQueryExecuteStreamAndReopen(t *testing.T) {
 			At:     "branch/main",
 			Cypher: "UNWIND [] AS value RETURN value",
 		},
-		func(event Event) error {
+		func(_ string, event Event) error {
 			events = append(events, event)
 			return nil
 		},
@@ -126,7 +126,7 @@ func TestHostLifecycleQueryExecuteStreamAndReopen(t *testing.T) {
 			At:     "branch/main",
 			Cypher: "UNWIND range(1,1000) AS value RETURN value",
 		},
-		func(event Event) error {
+		func(_ string, event Event) error {
 			if event.Type == "row" {
 				seenRows++
 				return consumerErr
@@ -282,7 +282,7 @@ func TestExecutionRejectsInvalidRequestsAndEncoding(t *testing.T) {
 		t.Fatalf("execute with metadata: %v", err)
 	}
 
-	if _, err := host.StreamQuery(context.Background(), QueryRequest{}, func(Event) error { return nil }); err == nil {
+	if _, err := host.StreamQuery(context.Background(), QueryRequest{}, func(string, Event) error { return nil }); err == nil {
 		t.Fatal("stream query without state/Cypher was accepted")
 	}
 	if _, err := host.StreamQuery(
@@ -326,7 +326,7 @@ func TestHostContextCancellation(t *testing.T) {
 			At:     "branch/main",
 			Cypher: "UNWIND range(1,1000000000) AS value RETURN value",
 		},
-		func(Event) error { return nil },
+		func(string, Event) error { return nil },
 	)
 	if err == nil {
 		t.Fatal("long stream ignored context cancellation")
@@ -976,7 +976,7 @@ func TestHostCloseCancelsActiveWorkAndAbortsIdleTransaction(t *testing.T) {
 				At:     "branch/main",
 				Cypher: "UNWIND range(1,1000000000) AS value RETURN value",
 			},
-			func(event Event) error {
+			func(_ string, event Event) error {
 				if event.Type == "columns" {
 					close(started)
 				}

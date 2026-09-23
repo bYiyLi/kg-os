@@ -131,34 +131,46 @@ func TestFreshInstalledProfileAutoStartsRealRuntime(t *testing.T) {
 	}
 	results := make(chan commandResult, 2)
 	var callers sync.WaitGroup
-	for range 2 {
+	for index := range 2 {
 		callers.Add(1)
-		go func() {
+		go func(index int) {
 			defer callers.Done()
 			var callerStdout, callerStderr strings.Builder
-			code := runOntology(
-				context.Background(),
-				[]string{"--at", "branch/main"},
-				strings.NewReader(""),
-				true,
-				&callerStdout,
-				&callerStderr,
-			)
+			code := 0
+			if index == 0 {
+				code = runOntology(
+					context.Background(),
+					[]string{"--at", "branch/main"},
+					strings.NewReader(""),
+					true,
+					&callerStdout,
+					&callerStderr,
+				)
+			} else {
+				code = runGraph(
+					context.Background(),
+					[]string{"query", "--at", "branch/main", "--cypher", "RETURN 1 AS value"},
+					strings.NewReader(""),
+					true,
+					&callerStdout,
+					&callerStderr,
+				)
+			}
 			results <- commandResult{
 				code:   code,
 				stdout: callerStdout.String(),
 				stderr: callerStderr.String(),
 			}
-		}()
+		}(index)
 	}
 	callers.Wait()
 	close(results)
 	for result := range results {
 		if result.code != 0 {
-			t.Fatalf("concurrent ontology code=%d stderr=%q", result.code, result.stderr)
+			t.Fatalf("concurrent business command code=%d stderr=%q", result.code, result.stderr)
 		}
 		if result.stdout == "" {
-			t.Fatal("concurrent ontology returned empty output")
+			t.Fatal("concurrent business command returned empty output")
 		}
 	}
 	paths, _ := runtimeprofile.ResolvePaths(home)
@@ -170,6 +182,50 @@ func TestFreshInstalledProfileAutoStartsRealRuntime(t *testing.T) {
 	}
 	if _, err := runtimeprofile.ReadActiveEndpoint(paths.Lock); err != nil {
 		t.Fatalf("auto-start did not publish endpoint: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := runGraph(
+		context.Background(),
+		[]string{
+			"execute",
+			"--branch", "main",
+			"--cypher", "CREATE (n:Phase05AutoStart {value:1}) RETURN n.value AS value",
+		},
+		strings.NewReader(""),
+		true,
+		&stdout,
+		&stderr,
+	); code != 0 {
+		t.Fatalf("Graph execute after auto-start code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if stderr.Len() != 0 || !strings.Contains(stdout.String(), `"counters"`) {
+		t.Fatalf("Graph execute after auto-start stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := runGraph(
+		context.Background(),
+		[]string{
+			"query",
+			"--at", "branch/main",
+			"--cypher", "MATCH (n:Phase05AutoStart) RETURN n.value AS value",
+			"--stream",
+		},
+		strings.NewReader(""),
+		true,
+		&stdout,
+		&stderr,
+	); code != 0 {
+		t.Fatalf("Graph stream after auto-start code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if stderr.Len() != 0 ||
+		!strings.Contains(stdout.String(), `"type":"columns"`) ||
+		!strings.Contains(stdout.String(), `"type":"row"`) ||
+		!strings.Contains(stdout.String(), `"type":"summary"`) {
+		t.Fatalf("Graph stream after auto-start stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 
 	t.Setenv("KG_TOKEN", "definitely-wrong")

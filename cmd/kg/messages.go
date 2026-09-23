@@ -35,6 +35,8 @@ func rootHelp(locale cliLocale) string {
 			"  kg [--help] [--version]\n" +
 			"  kg doctor [--json]\n" +
 			"  kg install [配置参数]\n" +
+			"  kg graph query --at <StateRef> [Cypher 参数]\n" +
+			"  kg graph execute --branch <name> [Cypher 参数]\n" +
 			"  kg object read <ObjectRef> ... --at <StateRef> [--body] [--format <yaml|json>]\n" +
 			"  kg object patch --base-state <ResolvedState> --branch <name> [正文参数]\n" +
 			"  kg ontology [<OntologyRef> ...] --at <StateRef> [--limit <n>] [--cursor <token>]\n" +
@@ -49,6 +51,8 @@ func rootHelp(locale cliLocale) string {
 		"  kg [--help] [--version]\n" +
 		"  kg doctor [--json]\n" +
 		"  kg install [configuration options]\n" +
+		"  kg graph query --at <StateRef> [Cypher options]\n" +
+		"  kg graph execute --branch <name> [Cypher options]\n" +
 		"  kg object read <ObjectRef> ... --at <StateRef> [--body] [--format <yaml|json>]\n" +
 		"  kg object patch --base-state <ResolvedState> --branch <name> [payload options]\n" +
 		"  kg ontology [<OntologyRef> ...] --at <StateRef> [--limit <n>] [--cursor <token>]\n" +
@@ -57,6 +61,27 @@ func rootHelp(locale cliLocale) string {
 		"Options:\n" +
 		"  -h, --help     Show this help\n" +
 		"  -V, --version  Show the installed version\n"
+}
+
+func graphHelp(locale cliLocale) string {
+	if locale == localeChinese {
+		return "KG OS Graph 命令\n\n" +
+			"用法:\n" +
+			"  kg graph query --at <StateRef> (--cypher <text> | --cypher-file <path> | stdin)\n" +
+			"    [--params <json-map> | --params-file <path>] [--pretty | --stream]\n" +
+			"  kg graph execute --branch <name> (--cypher <text> | --cypher-file <path> | stdin)\n" +
+			"    [--params <json-map> | --params-file <path>] [--author <text>] [--message <text>]\n" +
+			"    [--pretty | --stream]\n\n" +
+			"query 使用只读 State snapshot；execute 每次重新 checkout 指定 Branch。\n"
+	}
+	return "KG OS Graph commands\n\n" +
+		"Usage:\n" +
+		"  kg graph query --at <StateRef> (--cypher <text> | --cypher-file <path> | stdin)\n" +
+		"    [--params <json-map> | --params-file <path>] [--pretty | --stream]\n" +
+		"  kg graph execute --branch <name> (--cypher <text> | --cypher-file <path> | stdin)\n" +
+		"    [--params <json-map> | --params-file <path>] [--author <text>] [--message <text>]\n" +
+		"    [--pretty | --stream]\n\n" +
+		"query uses a read-only State snapshot; execute re-checks out the requested Branch for every operation.\n"
 }
 
 func objectHelp(locale cliLocale) string {

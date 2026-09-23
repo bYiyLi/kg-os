@@ -77,11 +77,11 @@ Embedding compiler校验当前 `[embedding]`，按 [Runtime 映射](runtime.md#e
 
 语言与交付边界已由 [Architecture](architecture.md#v1-运行时与技术分层)及 [Runtime](runtime.md#web-hosting)确定；以下是工程工作，不要求重新确认 Go / TypeScript 分工或 Web 是否独立部署：
 
-Phase 01 已实现并验收数据库/runtime foundation；Phase 02 已在其上完成 Knowledge Base bootstrap、公共 Bearer middleware 与 Ontology HTTP/CLI；Phase 03 已完成 installer / doctor / i18n / 本机 credential fallback 与业务命令 auto-start；Phase 04 已完成通用 Object batch read / patch。下面的规则继续作为后续代码必须保持的工程约束。Graph public HTTP / NDJSON framing / client-disconnect是当前待接入的公共执行能力；Evolution 与完整 SDK/Web 业务 surface仍属于后续能力。
+Phase 01 已实现并验收数据库/runtime foundation；Phase 02 已在其上完成 Knowledge Base bootstrap、公共 Bearer middleware 与 Ontology HTTP/CLI；Phase 03 已完成 installer / doctor / i18n / 本机 credential fallback 与业务命令 auto-start；Phase 04 已完成通用 Object batch read / patch；Phase 05 当前工作树已接入 Graph public HTTP / NDJSON framing / client-disconnect 与正式 `kg graph query/execute`，阶段远端完成状态仍由开发计划维护。下面的规则继续作为代码必须保持的工程约束。Evolution 与完整 SDK/Web 业务 surface仍属于后续能力。
 
 1. **Go SQLite driver / adapter**：使用 `database/sql` + `github.com/mattn/go-sqlite3` bundled SQLite；固定 CGO build启用 `sqlite_fts5`，不使用 `libsqlite3`，不启用 `sqlite_omit_load_extension`。运行时仍实际验证 SQLite >= 3.45、FTS5、ordered explicit-entrypoint extension loading、只读 / 读写 connection、参数 / 错误映射与连接清理。每个物理 connection按 startup-resolved artifact set加载同一批 extensions；不绑定 Native query ABI、不暴露 `sqlite3*`、不建立第二套 SQLite runtime。
 2. **SQL execution 与 explicit transaction**：普通完整结果使用 `lithograph()`，streaming 使用 `lithograph_rows()`；Object Patch 等多 execution 单 Commit 使用 `lithograph_tx_begin -> lithograph()/lithograph_rows()* -> commit/abort`。验证 expectedHead、staged visibility、single Commit、empty delta、失败自动 abort 与 connection exclusive ownership，不复制 Lithograph transaction state machine。
-3. **执行、streaming 与 cancellation**：Graph streaming必须逐 event消费 `lithograph_rows()`，每个 event完成 NDJSON write + flush后才能拉取下一行，不能用无界 goroutine/channel预读或先收集完整结果。第一个 event准备完成前不得提前提交 2xx；pre-event failure使用普通 non-2xx JSON error，开始后 daemon failure使用 terminal `error` event，transport断开导致 terminal event不可达时由 client按 incomplete transport处理。HTTP request / daemon shutdown的 `context.Context`要通过 driver真实触发 SQLite interrupt，验证普通长查询、Semantic Provider wait、write stream、`IN TRANSACTIONS`、early close、client disconnect与 result-delivery failure的底层语义；不能用进程 kill / IPC代替正常 query cancellation。
+3. **执行、streaming 与 cancellation**：Graph streaming必须逐 event消费 `lithograph_rows()`，每个 event完成 NDJSON write + flush后才能拉取下一行，不能用无界 goroutine/channel预读或先收集完整结果。第一个 event准备完成前不得提前提交 2xx；pre-event failure使用普通 non-2xx JSON error，开始后 daemon failure使用 terminal `error` event，transport断开导致 terminal event不可达时由 client按 incomplete transport处理。HTTP request / daemon shutdown的 `context.Context`要通过 driver真实触发 SQLite interrupt，验证普通长查询、Semantic Provider wait、write stream、`IN TRANSACTIONS`、early close、client disconnect与 result-delivery failure的底层语义；不能用进程 kill / IPC代替正常 query cancellation。Semantic Provider wait 的验收服从 Lithograph/OpenAI-compatible Provider 已冻结合同：取消在 Provider callback checkpoint 生效，但正在阻塞的单次 HTTP system call 只由 versioned `timeout_ms` 限定，KG OS 不覆盖 timeout 或建立额外抢占线程。
 4. **内置 Web**：Web 使用 React/Vite/TypeScript 构建，产物进入 `kgosd` 交付物并由 Go `net/http` 同端口提供；验证页面、静态资源和已认证 API 使用同一 configured origin，停止 daemon 后不存在独立 Web 服务。开发 HMR 的具体宿主方式属于 Phase 00 工程实现，不改变单 daemon 产品边界。
 
 Go 与 TypeScript client 不共享服务端源码。公共 request/result/error contract 通过既有设计和跨语言 integration/fixture 验证保持一致；当前没有需求建立 OpenAPI/codegen/schema-registry 作为新的真源。
@@ -92,7 +92,7 @@ Go 与 TypeScript client 不共享服务端源码。公共 request/result/error 
 
 本轮已确认 Graph 不审查 Cypher 内容；旧的 procedure 白名单、Graph caller-owned Vector / reserved identifier 提交前检查不再是实现前置条件。Phase 01 已用真实 Go driver + Lithograph v0.3.0 release artifact 验证 read/write connection、StateRef pin / Branch checkout、Provider staged readiness、Provider-owned cache mapping、`lithograph_rows()` true streaming、`context.Context` cancellation 与 explicit transaction；这些不再是缺失的 Go adapter。
 
-后续公共 Graph surface 接入时仍须端到端复验以下不变量，不能用 Phase 01 的 host-level 证据替代公共 request/response 合同：
+公共 Graph surface 必须持续端到端保持以下不变量；Phase 05 已建立当前工作树的 public E2E 证据，后续修改不能用 Phase 01 的 host-level 证据替代公共 request/response 合同：
 
 1. **公共读写入口与认证**：Graph `query` / `execute` 通过已验收 adapter 建立 StateRef pin / Branch checkout，公共 HTTP route 统一执行 Bearer authentication，不增加 raw SQL、procedure 白名单或自动换 connection 重试。
 2. **原样 Cypher 与值/错误映射**：公共 Graph 不附加排除内部节点的 `graphView`，完整传递 Lithograph JSON value、底层 error 与调用方显式 execution options；用户 Cypher 改变 checkout 后，下一 operation 必须重新建立自身 context。
@@ -115,7 +115,7 @@ Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；
 - **Mutation compiler**：Phase 02 已实现 Ontology-scoped共享 Object Patch compiler；Phase 04 已在同一 parser / logical delta / explicit transaction上开放 Knowledge Node / Relationship create/update/delete/restructure、request-local alias、Ref transition 与 Ontology+Knowledge多 Object原子 Patch，没有第二套 CRUD 或单独 Schema resource API。
 - **Graph execution**：复用 Phase 01 已有 query / execute adapter，完成公共 Graph HTTP contract、Bearer middleware、NDJSON framing、transport cancellation 及 client integration；继续原样传递 Cypher 与 Lithograph JSON 值，不设 procedure、Vector 或 reserved identifier 检查。只有 public end-to-end 验收通过后才报告 Graph 能力可用。
 - **Evolution**：实现 read / state / ref / history / diff / merge，内部 schema slot 转为 aggregate 字段，固定 candidate revision 检查一致性后 finalize。
-- **Client surfaces**：Go `kg` 已具备 doctor / install / Runtime ensure、Ontology 与 Phase 04 Object read/patch；后续继续实现 Graph / Evolution surface。TypeScript SDK / Web继续消费同一 HTTP contract；Web 页面构建产物继续由同一 `kgosd` 交付，后续提供 Skill / SDK / Web 使用文档。
+- **Client surfaces**：Go `kg` 已具备 doctor / install / Runtime ensure、Ontology、Phase 04 Object read/patch 与 Phase 05 Graph query/execute；后续继续实现 Evolution surface。TypeScript SDK / Web继续消费同一 HTTP contract；Web 页面构建产物继续由同一 `kgosd` 交付，后续提供 Skill / SDK / Web 使用文档。
 
 Web 还需细化页面布局、导航与具体操作交互，状态由 [Runtime](runtime.md#web-交互设计状态)记录。页面细化是同一产品的前端工作，不产生单独部署的 Web 服务，也不是上面 Kernel、daemon、CLI 或 SDK 开工的前置条件；当前文档不把尚未细化的页面标为已设计完成。
 

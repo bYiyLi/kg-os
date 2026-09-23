@@ -1,6 +1,6 @@
 # Phase 05：Graph Query & Execute
 
-**状态：`ready`**
+**状态：`in_progress`**
 
 ## 1. 目标与范围
 
@@ -52,7 +52,7 @@ kg graph execute
 - Phase 04 已证明 Knowledge Node / Relationship 与 Ontology/Object 高层能力可以继续独立于 Graph passthrough，不需要为 Graph 增加另一套 Object discovery API；
 - Lithograph v0.3.0 的 scalar/rows summary 固定提供真实 terminal `commit` 与 `counters`；KG OS 只做公共 Graph projection，不能猜测或伪造 State / durability。
 
-Design Inputs、依赖顺序与 Acceptance 已齐全；当前没有需要用户重新确认的 Graph 产品语义，因此 Phase 状态为 `ready`。
+Design Inputs、依赖顺序与 Acceptance 已齐全；当前没有需要用户重新确认的 Graph 产品语义。05.1–05.8 已完成当前工作树实现、本地/ fresh-source 验收与 Review，但最终 pushed SHA 的 Ubuntu Validate 尚未执行，因此 Phase 状态为 `in_progress`。
 
 ### 3.2 Lithograph baseline
 
@@ -171,7 +171,7 @@ Graph public request/result mapping
 - stream consumer提前关闭、client disconnect或socket/write failure时，daemon不得后台继续drain execution；未finalize的普通write按Lithograph rollback语义处理。
 - 已经由 transaction subquery durable的成功batch不能因后续stream/error/transport失败被报告成整体rollback。
 - Lithograph已经finalize-success但summary result-delivery失败的场景不得被KG OS描述成“确定无副作用”，CLI/daemon不得自动重放未知结果的write。
-- Semantic Provider failure/cancellation不能转换成partial top-k success；Full-text analyzer unavailable不能转换成空结果。
+- Semantic Provider failure/cancellation不能转换成partial top-k success；Provider 正在阻塞的单次 HTTP system call 按其 versioned `timeout_ms` 与 cancellation checkpoint 合同结束，KG OS 不覆盖 timeout。Full-text analyzer unavailable不能转换成空结果；raw Graph 保留 Lithograph 实际公开 category，不按错误文案重分类。
 - public Graph passthrough即使产生高层invalid Snapshot也不自动修复；后续 Object/Ontology/Evolution按各自 consistency合同报告。
 
 ### Feature 05.8 Integration Hardening / Review Closure
@@ -211,8 +211,8 @@ Graph public request/result mapping
 8. client在partial rows后断开，daemon停止pull并取消底层execution；
 9. ordinary write stream在summary前失败/取消，与post-finalize summary delivery failure的durability语义不混淆；
 10. `CALL ... IN TRANSACTIONS`已有durable batch后发生later failure，不声称整个execute已rollback；
-11. Semantic Provider timeout/failure/cancel，不能返回缺候选的成功top-k；provider cache允许按自身合同保留；
-12. Full-text历史Index analyzer当前不可用，返回稳定错误而不是空结果；
+11. Semantic Provider timeout/failure/cancel，不能返回缺候选的成功top-k；取消通过 SQLite interrupt 传播，在 Provider callback checkpoint 生效，阻塞中的单次 HTTP system call 仍由 IndexDefinition 保存的 `timeout_ms` 上界约束；provider cache允许按自身合同保留；
+12. Full-text历史Index analyzer当前不可用时，保留 Lithograph 实际公开错误 category并失败，不按 message 猜成 KG OS code，也不返回空结果；
 13. Raw Vector、reserved-looking identifier或高层invalid Binding状态通过Graph合法执行时，KG OS不附加Object profile拒绝；
 14. non-streaming大结果超过底层/transport资源边界时失败，不自动切stream或静默截断。
 
@@ -234,7 +234,7 @@ Graph public request/result mapping
 - HTTP streaming：零行、多个row、write stream、terminal success/error、disconnect/cancellation；
 - CLI真实Runtime auto-start + credential fallback + query/execute normal/stream路径；
 - Ontology-managed Full-text真实query；
-- OpenAI-compatible Provider extension +本地HTTP fixture的真实Semantic query、cache miss/hit、reopen与historical State；
+- OpenAI-compatible Provider extension +本地HTTP fixture的真实Semantic query、cache miss/hit、reopen、historical State与 cancellation checkpoint；
 - Raw Vector、SHOW、Version/Schema、LOAD CSV与transaction subquery代表性passthrough；
 - ordinary write与`IN TRANSACTIONS`在cancel/result-delivery failure下的真实durability观察。
 
@@ -282,6 +282,38 @@ Phase 05只有同时满足以下条件才能进入 `done`：
 
 ## 11. 当前状态
 
-2026-09-23：Phase 05 计划已建立。当前仓库已确认 Phase 00–04 为 `done`，Phase 01 的 Lithograph query/execute/stream/cancellation host基础可直接复用，Graph / CLI / Runtime / error Design Inputs已闭合，A–J Acceptance与Feature顺序完整，因此本 Phase进入 `ready`。
+2026-09-24：05.1–05.8 已在当前工作树完成本地实现、真实 Lithograph v0.3.0 public E2E 与持续 Review。原 A–J Acceptance 保持不变；本次只依据实际证据更新进度，不因实现结果削弱验收。
 
-当前尚未开始 Phase 05 public Graph实现，也没有把 Phase 01 host-level tests当作本 Phase public HTTP/CLI验收证据。进入实现后必须按本计划补齐Kernel、daemon、CLI与public end-to-end证据，完成Review和远端门禁后才能改为`done`。
+| Acceptance | 当前证据 | 状态 |
+| --- | --- | --- |
+| A Query Snapshot | 真实 Lithograph integration 覆盖 Branch/Commit historical query、operation-start resolved State、query summary与pin State一致；只读入口写语句由Lithograph拒绝 | 本地通过 |
+| B Execute Branch | 每次 execute 使用 write connection + fresh Branch checkout；测试覆盖用户 Cypher 改 checkout 后下一 operation重新建立目标 context，且公开合同没有 `baseState` | 本地通过 |
+| C Non-stream result/value | query/execute JSON shape、真实 summary state/counters、Large Integer、tagged Map、Date、Point、UUID、Node/Relationship/Path与Raw Vector均有真实E2E | 本地通过 |
+| D HTTP/auth/error | 固定 POST query/execute、Bearer、JSON/NDJSON Accept、406/pre-event public error、Graph-specific `BRANCH_HEAD_MOVED/MERGE_*` category 与 malformed response均有测试 | 本地通过 |
+| E Streaming framing/backpressure | `lithograph_rows()` 真实 `columns -> row* -> summary`；逐event write+flush后再pull；terminal error、write failure、incomplete transport与零列状态机均有自动/真实数据库证据 | 本地通过 |
+| F CLI contract | inline/file/stdin Cypher、inline/file params、pretty/stream互斥、stdout/stderr/exit、真实 packaged Runtime auto-start 下 query/execute normal/stream均有E2E | 本地通过 |
+| G Cancellation/transport | request-context cancel、真实 client disconnect、daemon shutdown、普通 write rollback、post-finalize summary delivery failure与transport incomplete均有真实E2E | 本地通过 |
+| H Full-text / Semantic | Full-text query、不可用query-time analyzer保留Lithograph `SEMANTIC_ERROR`且不返回空成功；Semantic String query、Provider cache miss/hit、historical IndexDefinition、reopen与cancellation checkpoint均有真实E2E | 本地通过 |
+| I Passthrough / transaction | SHOW、Version Procedure、LOAD CSV、Raw Vector、reserved-looking identifier、Schema/transaction subquery均经raw Graph执行；已有durable batch不被伪装整体rollback | 本地通过 |
+| J Regression / delivery | Phase 00–04 regression gates保持通过；生产源码无Search DSL/Cypher parser/rewrite/procedure allowlist/第二host。主树与独立fresh-source完整 `pnpm validate` 均成功，Go coverage **90.0%**、jscpd 0 clones；最终 pushed SHA Ubuntu Validate尚未运行 | 本地通过 / 远端待验收 |
+
+### Phase Review
+
+本轮持续执行 review → 修复 → re-review，并关闭以下 task-affecting finding：
+
+- Graph params最初若复用 `map[string]any` 会使大JSON整数经过 `float64` 失真；现公共Graph request以raw JSON Map贯穿daemon/kernel到Lithograph，真实Large Integer/Raw Vector测试证明无损。
+- NDJSON projector最初以nil slice判断是否已见 `columns`，合法零列结果可能绕过重复columns检测；现使用独立状态位维护stream protocol。
+- Graph错误若直接复用Object Patch映射，会把Lithograph `BRANCH_HEAD_MOVED`错误改写成 `STALE_BASE_STATE`；现Graph保留数据库 `BRANCH_HEAD_MOVED/MERGE_*`公开category，Patch语义不受影响。
+- 对照Lithograph v0.3.0真源确认OpenAI-compatible Provider cancellation只在callback checkpoint观察；阻塞中的单次HTTP system call由versioned `timeout_ms`限定。KG OS设计/验收已同步，不增加第二HTTP client或伪造异步抢占。
+- 对照Lithograph Full-text实现确认历史/query-time analyzer不可用没有专用数据库category；raw Graph保持Lithograph实际 `SEMANTIC_ERROR/SCHEMA_ERROR`，不解析Cypher/message猜成KG OS code，也不伪装为空结果。
+- jscpd发现Graph query/execute handler与Accept解析存在重复；仅提取请求准备及content-negotiation最小helper，最终duplicate gate为 **0 clones**。
+- Go total statement coverage一度降到89.8%；通过增加Graph输入/响应/stream协议真实失败边界测试恢复并稳定为 **90.0%**，未降低仓库阈值。
+- 最终生产源码扫描确认只有 `graph query/execute`，没有Search DSL、Graph快捷search/fulltext/semantic/traverse、Cypher parser/rewrite、procedure allowlist、Object list/search复活、新dependency或第二套database host。
+
+主工作树完整 `pnpm validate` 已通过；独立 `/tmp` fresh-source clone从 `HEAD + 当前tracked diff + untracked Phase 05 source` 重建，在不复用主树 `node_modules` / build artifact的条件下执行 `pnpm run setup && pnpm validate` 同样通过。两套验证均覆盖race、真实Lithograph v0.3.0 native suite、Go statement coverage **90.0%**、govulncheck、TS/V8与type coverage 100%、jscpd 0 clones、unused/version/dedupe、build、Playwright、package、licenses、npm audit与diff gate。
+
+`git diff --check` 通过；当前版本状态没有secret、database/provider cache、extension cache、build artifact或临时Cypher/params文件。当前 reviewed local scope 没有剩余 task-affecting implementation finding。
+
+### 剩余条件
+
+- Phase完成条件要求**最终 pushed SHA**的 Ubuntu 24.04 x64 GitHub Actions Validate真实成功。该远端门禁尚未取得成功证据；Phase保持 `in_progress`，不能标记 `done`。

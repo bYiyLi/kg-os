@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -23,6 +24,48 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 		fallback = http.NotFoundHandler()
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/graph/query", func(response http.ResponseWriter, request *http.Request) {
+		var input kernel.GraphQueryRequest
+		mediaType, ok := prepareGraphRequest(
+			response, request, runtime.Credential.Token, &input,
+		)
+		if !ok {
+			return
+		}
+		if mediaType == "application/x-ndjson" {
+			writeGraphStream(response, func(consume func(kernel.GraphStreamEvent) error) error {
+				return runtime.Kernel.StreamGraphQuery(request.Context(), input, consume)
+			})
+			return
+		}
+		result, err := runtime.Kernel.QueryGraph(request.Context(), input)
+		if err != nil {
+			kernel.WriteJSONError(response, err)
+			return
+		}
+		writeJSON(response, http.StatusOK, result)
+	})
+	mux.HandleFunc("/api/v1/graph/execute", func(response http.ResponseWriter, request *http.Request) {
+		var input kernel.GraphExecuteRequest
+		mediaType, ok := prepareGraphRequest(
+			response, request, runtime.Credential.Token, &input,
+		)
+		if !ok {
+			return
+		}
+		if mediaType == "application/x-ndjson" {
+			writeGraphStream(response, func(consume func(kernel.GraphStreamEvent) error) error {
+				return runtime.Kernel.StreamGraphExecute(request.Context(), input, consume)
+			})
+			return
+		}
+		result, err := runtime.Kernel.ExecuteGraph(request.Context(), input)
+		if err != nil {
+			kernel.WriteJSONError(response, err)
+			return
+		}
+		writeJSON(response, http.StatusOK, result)
+	})
 	patchHandler := func(
 		apply func(context.Context, kernel.PatchRequest) (kernel.PatchResult, error),
 	) http.HandlerFunc {
@@ -134,6 +177,230 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 	return mux
 }
 
+func prepareGraphRequest(
+	response http.ResponseWriter,
+	request *http.Request,
+	token string,
+	target any,
+) (string, bool) {
+	if !authenticate(response, request, token) {
+		return "", false
+	}
+	if request.Method != http.MethodPost {
+		writeMethodNotAllowed(response)
+		return "", false
+	}
+	if err := decodeJSONRequest(response, request, target); err != nil {
+		kernel.WriteJSONError(response, err)
+		return "", false
+	}
+	mediaType, err := requestedGraphMediaType(request.Header.Get("Accept"))
+	if err != nil {
+		writeJSONErrorStatus(response, http.StatusNotAcceptable, err)
+		return "", false
+	}
+	return mediaType, true
+}
+
+type acceptMediaRange struct {
+	mediaType string
+	quality   float64
+	order     int
+}
+
+type acceptCandidate struct {
+	mediaType   string
+	quality     float64
+	order       int
+	specificity int
+}
+
+func parseAcceptRanges(accept string) []acceptMediaRange {
+	ranges := make([]acceptMediaRange, 0)
+	for order, rawRange := range strings.Split(accept, ",") {
+		rawRange = strings.TrimSpace(rawRange)
+		if rawRange == "" {
+			continue
+		}
+		mediaType, params, err := mime.ParseMediaType(rawRange)
+		if err != nil {
+			continue
+		}
+		quality := 1.0
+		if rawQ, ok := params["q"]; ok {
+			parsed, parseErr := strconv.ParseFloat(rawQ, 64)
+			if parseErr != nil || parsed < 0 || parsed > 1 {
+				continue
+			}
+			quality = parsed
+		}
+		ranges = append(ranges, acceptMediaRange{
+			mediaType: mediaType,
+			quality:   quality,
+			order:     order,
+		})
+	}
+	return ranges
+}
+
+func resolveAcceptCandidate(ranges []acceptMediaRange, representation string) acceptCandidate {
+	best := acceptCandidate{
+		mediaType:   representation,
+		quality:     -1,
+		order:       int(^uint(0) >> 1),
+		specificity: -1,
+	}
+	for _, mediaRange := range ranges {
+		specificity := -1
+		switch {
+		case mediaRange.mediaType == representation:
+			specificity = 2
+		case mediaRange.mediaType == "application/*":
+			specificity = 1
+		case mediaRange.mediaType == "*/*":
+			specificity = 0
+		}
+		if specificity < 0 || specificity < best.specificity {
+			continue
+		}
+		if specificity > best.specificity ||
+			mediaRange.quality > best.quality ||
+			(mediaRange.quality == best.quality && mediaRange.order < best.order) {
+			best.specificity = specificity
+			best.quality = mediaRange.quality
+			best.order = mediaRange.order
+		}
+	}
+	return best
+}
+
+func requestedGraphMediaType(accept string) (string, error) {
+	if strings.TrimSpace(accept) == "" {
+		return "application/json", nil
+	}
+	ranges := parseAcceptRanges(accept)
+	jsonCandidate := resolveAcceptCandidate(ranges, "application/json")
+	streamCandidate := resolveAcceptCandidate(ranges, "application/x-ndjson")
+	if jsonCandidate.quality <= 0 && streamCandidate.quality <= 0 {
+		return "", &kernel.PublicError{
+			Code:    kernel.CodeInvalidArgument,
+			Message: "Accept must allow application/json or application/x-ndjson",
+		}
+	}
+	if streamCandidate.quality > jsonCandidate.quality {
+		return "application/x-ndjson", nil
+	}
+	return "application/json", nil
+}
+
+type graphStreamWriteError struct {
+	err error
+}
+
+func (err *graphStreamWriteError) Error() string { return err.err.Error() }
+func (err *graphStreamWriteError) Unwrap() error { return err.err }
+
+type graphHTTPStream struct {
+	response   http.ResponseWriter
+	controller *http.ResponseController
+	started    bool
+	terminal   bool
+}
+
+func writeGraphStream(
+	response http.ResponseWriter,
+	stream func(func(kernel.GraphStreamEvent) error) error,
+) {
+	_, ok := response.(http.Flusher)
+	if !ok {
+		kernel.WriteJSONError(response, &kernel.PublicError{
+			Code:    kernel.CodeInternal,
+			Message: "HTTP streaming is unavailable",
+		})
+		return
+	}
+	output := &graphHTTPStream{
+		response:   response,
+		controller: http.NewResponseController(response),
+	}
+	err := stream(output.writeEvent)
+	if err == nil {
+		if !output.terminal {
+			public := &kernel.PublicError{
+				Code:    kernel.CodeInternal,
+				Message: "Graph stream ended without a terminal event",
+			}
+			if !output.started {
+				kernel.WriteJSONError(response, public)
+				return
+			}
+			_ = output.writeError(public)
+		}
+		return
+	}
+	var writeErr *graphStreamWriteError
+	if errors.As(err, &writeErr) {
+		return
+	}
+	if !output.started {
+		kernel.WriteJSONError(response, err)
+		return
+	}
+	if !output.terminal {
+		_ = output.writeError(kernel.AsPublicError(err))
+	}
+}
+
+func (stream *graphHTTPStream) writeEvent(event kernel.GraphStreamEvent) error {
+	if stream.terminal {
+		return &graphStreamWriteError{err: errors.New("graph stream emitted data after terminal event")}
+	}
+	body, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	if event.Type == "summary" {
+		stream.terminal = true
+	}
+	return stream.writeLine(body)
+}
+
+func (stream *graphHTTPStream) writeError(public *kernel.PublicError) error {
+	if stream.terminal {
+		return nil
+	}
+	body, err := json.Marshal(struct {
+		Type  string              `json:"type"`
+		Error *kernel.PublicError `json:"error"`
+	}{Type: "error", Error: public})
+	if err != nil {
+		return err
+	}
+	stream.terminal = true
+	return stream.writeLine(body)
+}
+
+func (stream *graphHTTPStream) writeLine(body []byte) error {
+	line := append(bytes.Clone(body), '\n')
+	if !stream.started {
+		stream.response.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
+		stream.response.Header().Set("X-Content-Type-Options", "nosniff")
+		stream.response.WriteHeader(http.StatusOK)
+		stream.started = true
+	}
+	written, err := stream.response.Write(line)
+	if err != nil {
+		return &graphStreamWriteError{err: err}
+	}
+	if written != len(line) {
+		return &graphStreamWriteError{err: io.ErrShortWrite}
+	}
+	if err := stream.controller.Flush(); err != nil {
+		return &graphStreamWriteError{err: err}
+	}
+	return nil
+}
+
 func authenticate(response http.ResponseWriter, request *http.Request, expected string) bool {
 	header := request.Header.Get("Authorization")
 	provided := ""
@@ -185,72 +452,11 @@ func requestedObjectMediaType(accept string) (string, error) {
 	if strings.TrimSpace(accept) == "" {
 		return "application/json", nil
 	}
-	type mediaRange struct {
-		mediaType string
-		quality   float64
-		order     int
-	}
-	ranges := make([]mediaRange, 0)
-	for order, rawRange := range strings.Split(accept, ",") {
-		rawRange = strings.TrimSpace(rawRange)
-		if rawRange == "" {
-			continue
-		}
-		mediaType, params, err := mime.ParseMediaType(rawRange)
-		if err != nil {
-			continue
-		}
-		quality := 1.0
-		if rawQ, ok := params["q"]; ok {
-			parsed, parseErr := strconv.ParseFloat(rawQ, 64)
-			if parseErr != nil || parsed < 0 || parsed > 1 {
-				continue
-			}
-			quality = parsed
-		}
-		if mediaType != "application/json" &&
-			mediaType != "application/yaml" &&
-			mediaType != "application/*" &&
-			mediaType != "*/*" {
-			continue
-		}
-		ranges = append(ranges, mediaRange{mediaType: mediaType, quality: quality, order: order})
-	}
-	type candidate struct {
-		mediaType string
-		quality   float64
-		order     int
-	}
-	resolve := func(representation string) candidate {
-		bestSpecificity := -1
-		best := candidate{mediaType: representation, quality: -1, order: int(^uint(0) >> 1)}
-		for _, mediaRange := range ranges {
-			specificity := -1
-			switch {
-			case mediaRange.mediaType == representation:
-				specificity = 2
-			case mediaRange.mediaType == "application/*":
-				specificity = 1
-			case mediaRange.mediaType == "*/*":
-				specificity = 0
-			}
-			if specificity < 0 || specificity < bestSpecificity {
-				continue
-			}
-			if specificity > bestSpecificity ||
-				mediaRange.quality > best.quality ||
-				(mediaRange.quality == best.quality && mediaRange.order < best.order) {
-				bestSpecificity = specificity
-				best.quality = mediaRange.quality
-				best.order = mediaRange.order
-			}
-		}
-		return best
-	}
-	jsonCandidate := resolve("application/json")
-	yamlCandidate := resolve("application/yaml")
-	best := candidate{quality: -1}
-	for _, candidate := range []candidate{jsonCandidate, yamlCandidate} {
+	ranges := parseAcceptRanges(accept)
+	jsonCandidate := resolveAcceptCandidate(ranges, "application/json")
+	yamlCandidate := resolveAcceptCandidate(ranges, "application/yaml")
+	best := acceptCandidate{quality: -1}
+	for _, candidate := range []acceptCandidate{jsonCandidate, yamlCandidate} {
 		if candidate.quality <= 0 {
 			continue
 		}
