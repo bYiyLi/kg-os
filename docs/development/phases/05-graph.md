@@ -1,6 +1,6 @@
 # Phase 05：Graph Query & Execute
 
-**状态：`in_progress`**
+**状态：`done`**
 
 ## 1. 目标与范围
 
@@ -52,7 +52,7 @@ kg graph execute
 - Phase 04 已证明 Knowledge Node / Relationship 与 Ontology/Object 高层能力可以继续独立于 Graph passthrough，不需要为 Graph 增加另一套 Object discovery API；
 - Lithograph v0.3.0 的 scalar/rows summary 固定提供真实 terminal `commit` 与 `counters`；KG OS 只做公共 Graph projection，不能猜测或伪造 State / durability。
 
-Design Inputs、依赖顺序与 Acceptance 已齐全；当前没有需要用户重新确认的 Graph 产品语义。05.1–05.8 已完成当前工作树实现、本地/ fresh-source 验收与 Review，但最终 pushed SHA 的 Ubuntu Validate 尚未执行，因此 Phase 状态为 `in_progress`。
+Design Inputs、依赖顺序与 Acceptance 已齐全；当前没有需要用户重新确认的 Graph 产品语义。05.1–05.8 已完成实现、本地/fresh-source 验收、Review 与远端 Ubuntu Validate，Phase 状态为 `done`。
 
 ### 3.2 Lithograph baseline
 
@@ -295,7 +295,7 @@ Phase 05只有同时满足以下条件才能进入 `done`：
 | G Cancellation/transport | request-context cancel、真实 client disconnect、daemon shutdown、普通 write rollback、post-finalize summary delivery failure与transport incomplete均有真实E2E | 本地通过 |
 | H Full-text / Semantic | Full-text query、不可用query-time analyzer保留Lithograph `SEMANTIC_ERROR`且不返回空成功；Semantic String query、Provider cache miss/hit、historical IndexDefinition、reopen与cancellation checkpoint均有真实E2E | 本地通过 |
 | I Passthrough / transaction | SHOW、Version Procedure、LOAD CSV、Raw Vector、reserved-looking identifier、Schema/transaction subquery均经raw Graph执行；已有durable batch不被伪装整体rollback | 本地通过 |
-| J Regression / delivery | Phase 00–04 regression gates保持通过；生产源码无Search DSL/Cypher parser/rewrite/procedure allowlist/第二host。主树与独立fresh-source完整 `pnpm validate` 均成功，Go coverage **90.0%**、jscpd 0 clones；最终 pushed SHA Ubuntu Validate尚未运行 | 本地通过 / 远端待验收 |
+| J Regression / delivery | Phase 00–04 regression gates保持通过；生产源码无Search DSL/Cypher parser/rewrite/procedure allowlist/第二host。主树与独立fresh-source完整 `pnpm validate` 均成功，Go coverage **90.0%**、jscpd 0 clones；实现提交 `324fa67358ca6c2cbdc558ac8df6f60bf64bfaf7` 已推送到 `main`，Ubuntu 24.04 x64 GitHub Actions run `35893218908` / Validate job `107290569875` 成功 | 已通过 |
 
 ### Phase Review
 
@@ -314,6 +314,6 @@ Phase 05只有同时满足以下条件才能进入 `done`：
 
 `git diff --check` 通过；当前版本状态没有secret、database/provider cache、extension cache、build artifact或临时Cypher/params文件。当前 reviewed local scope 没有剩余 task-affecting implementation finding。
 
-### 剩余条件
+### 完成证据
 
-- Phase完成条件要求**最终 pushed SHA**的 Ubuntu 24.04 x64 GitHub Actions Validate真实成功。该远端门禁尚未取得成功证据；Phase保持 `in_progress`，不能标记 `done`。
+实现提交 `324fa67358ca6c2cbdc558ac8df6f60bf64bfaf7` 已推送到 `main`，Ubuntu 24.04 x64 GitHub Actions run `35893218908` / Validate job `107290569875` 成功。结合主工作树与独立 fresh-source 完整 validation、A–J Acceptance、真实 Lithograph public E2E 与 Phase Review，05.1–05.8 已全部闭环，Phase 05 进入 `done`。

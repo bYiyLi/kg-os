@@ -77,7 +77,7 @@ Embedding compiler校验当前 `[embedding]`，按 [Runtime 映射](runtime.md#e
 
 语言与交付边界已由 [Architecture](architecture.md#v1-运行时与技术分层)及 [Runtime](runtime.md#web-hosting)确定；以下是工程工作，不要求重新确认 Go / TypeScript 分工或 Web 是否独立部署：
 
-Phase 01 已实现并验收数据库/runtime foundation；Phase 02 已在其上完成 Knowledge Base bootstrap、公共 Bearer middleware 与 Ontology HTTP/CLI；Phase 03 已完成 installer / doctor / i18n / 本机 credential fallback 与业务命令 auto-start；Phase 04 已完成通用 Object batch read / patch；Phase 05 当前工作树已接入 Graph public HTTP / NDJSON framing / client-disconnect 与正式 `kg graph query/execute`，阶段远端完成状态仍由开发计划维护。下面的规则继续作为代码必须保持的工程约束。Evolution 与完整 SDK/Web 业务 surface仍属于后续能力。
+Phase 01 已实现并验收数据库/runtime foundation；Phase 02 已在其上完成 Knowledge Base bootstrap、公共 Bearer middleware 与 Ontology HTTP/CLI；Phase 03 已完成 installer / doctor / i18n / 本机 credential fallback 与业务命令 auto-start；Phase 04 已完成通用 Object batch read / patch；Phase 05 已完成 Graph public HTTP / NDJSON framing / client-disconnect 与正式 `kg graph query/execute`，并通过 public E2E 与远端验收。下面的规则继续作为代码必须保持的工程约束。Evolution 与完整 SDK/Web 业务 surface仍属于后续能力。
 
 1. **Go SQLite driver / adapter**：使用 `database/sql` + `github.com/mattn/go-sqlite3` bundled SQLite；固定 CGO build启用 `sqlite_fts5`，不使用 `libsqlite3`，不启用 `sqlite_omit_load_extension`。运行时仍实际验证 SQLite >= 3.45、FTS5、ordered explicit-entrypoint extension loading、只读 / 读写 connection、参数 / 错误映射与连接清理。每个物理 connection按 startup-resolved artifact set加载同一批 extensions；不绑定 Native query ABI、不暴露 `sqlite3*`、不建立第二套 SQLite runtime。
 2. **SQL execution 与 explicit transaction**：普通完整结果使用 `lithograph()`，streaming 使用 `lithograph_rows()`；Object Patch 等多 execution 单 Commit 使用 `lithograph_tx_begin -> lithograph()/lithograph_rows()* -> commit/abort`。验证 expectedHead、staged visibility、single Commit、empty delta、失败自动 abort 与 connection exclusive ownership，不复制 Lithograph transaction state machine。
@@ -92,7 +92,7 @@ Go 与 TypeScript client 不共享服务端源码。公共 request/result/error 
 
 本轮已确认 Graph 不审查 Cypher 内容；旧的 procedure 白名单、Graph caller-owned Vector / reserved identifier 提交前检查不再是实现前置条件。Phase 01 已用真实 Go driver + Lithograph v0.3.0 release artifact 验证 read/write connection、StateRef pin / Branch checkout、Provider staged readiness、Provider-owned cache mapping、`lithograph_rows()` true streaming、`context.Context` cancellation 与 explicit transaction；这些不再是缺失的 Go adapter。
 
-公共 Graph surface 必须持续端到端保持以下不变量；Phase 05 已建立当前工作树的 public E2E 证据，后续修改不能用 Phase 01 的 host-level 证据替代公共 request/response 合同：
+公共 Graph surface 必须持续端到端保持以下不变量；Phase 05 已在完成基线建立 public E2E 证据，后续修改不能用 Phase 01 的 host-level 证据替代公共 request/response 合同：
 
 1. **公共读写入口与认证**：Graph `query` / `execute` 通过已验收 adapter 建立 StateRef pin / Branch checkout，公共 HTTP route 统一执行 Bearer authentication，不增加 raw SQL、procedure 白名单或自动换 connection 重试。
 2. **原样 Cypher 与值/错误映射**：公共 Graph 不附加排除内部节点的 `graphView`，完整传递 Lithograph JSON value、底层 error 与调用方显式 execution options；用户 Cypher 改变 checkout 后，下一 operation 必须重新建立自身 context。
@@ -105,7 +105,7 @@ Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；
 
 ## 实现范围映射
 
-实现前检查 Lithograph 实际文件与测试，不复制它的 Phase 状态为 KG OS 真源。当前可复用基线来自已完成的 Phase 00–04；实际阶段状态仍由[开发计划](../development/README.md)维护。以下内容只映射已确认设计产生的业务范围以及后续必须复用的基础 primitive，不在本文件维护阶段顺序或完成证据。
+实现前检查 Lithograph 实际文件与测试，不复制它的 Phase 状态为 KG OS 真源。当前可复用基线来自已完成的 Phase 00–05；实际阶段状态仍由[开发计划](../development/README.md)维护。以下内容只映射已确认设计产生的业务范围以及后续必须复用的基础 primitive，不在本文件维护阶段顺序或完成证据。
 
 - **Runtime / SQLite host**：Phase 01 已实现 `KG_HOME`、`auth.json` credential lifecycle、根目录 `kgos.db`、统一 extension resolver / per-connection loading、Lithograph v0.3.0 SQL execution/transaction、read/write connection、streaming/cancellation、Managed Semantic Provider readiness、lock 与 shutdown；Phase 02 已完成 empty-database bootstrap 与 authenticated Ontology routes；Phase 03 已完成 install / doctor /完整显式 config / credential fallback / business-command Runtime ensure 与 distribution artifact discovery；Phase 04 Object routes继续复用同一 `net/http` server、认证、Runtime ensure 与 explicit transaction。阶段状态与远端门禁仍由开发计划维护。
 - **Ontology storage mapping**：实现 semantic graph、Binding coverage、Schema Locator 与 Object / Ontology Graph View；高层 Object / Ontology 输入保留 reserved identifier 校验，公共 Graph 不复用该限制。
@@ -113,7 +113,7 @@ Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；
 - **Object representation**：实现五种公共 Object Ref、aggregate decoder 与 Knowledge 原生 Object value；canonical YAML / JSON 省略空的顶层 `indexes`，保留非空复合 / 共享索引。
 - **Read paths**：Ontology read 的全局 / Domain / Definition 展开与 1..100 Ref batch已进入 Phase 02；Phase 04 通用 Object read已复用同一模型，实现1..100明确 Ref、一次 resolved State pin、输入顺序和all-or-nothing，覆盖 Domain / Definition / Knowledge Node / Knowledge Relationship。Object不提供 list/search；Knowledge发现交给 Graph。
 - **Mutation compiler**：Phase 02 已实现 Ontology-scoped共享 Object Patch compiler；Phase 04 已在同一 parser / logical delta / explicit transaction上开放 Knowledge Node / Relationship create/update/delete/restructure、request-local alias、Ref transition 与 Ontology+Knowledge多 Object原子 Patch，没有第二套 CRUD 或单独 Schema resource API。
-- **Graph execution**：复用 Phase 01 已有 query / execute adapter，完成公共 Graph HTTP contract、Bearer middleware、NDJSON framing、transport cancellation 及 client integration；继续原样传递 Cypher 与 Lithograph JSON 值，不设 procedure、Vector 或 reserved identifier 检查。只有 public end-to-end 验收通过后才报告 Graph 能力可用。
+- **Graph execution**：复用 Phase 01 已有 query / execute adapter，已完成公共 Graph HTTP contract、Bearer middleware、NDJSON framing、transport cancellation 及 client integration，并通过 public end-to-end 验收；继续原样传递 Cypher 与 Lithograph JSON 值，不设 procedure、Vector 或 reserved identifier 检查。
 - **Evolution**：实现 read / state / ref / history / diff / merge，内部 schema slot 转为 aggregate 字段，固定 candidate revision 检查一致性后 finalize。
 - **Client surfaces**：Go `kg` 已具备 doctor / install / Runtime ensure、Ontology、Phase 04 Object read/patch 与 Phase 05 Graph query/execute；后续继续实现 Evolution surface。TypeScript SDK / Web继续消费同一 HTTP contract；Web 页面构建产物继续由同一 `kgosd` 交付，后续提供 Skill / SDK / Web 使用文档。
 

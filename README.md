@@ -35,7 +35,7 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 ## 当前状态
 
-**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 00–04 均已完成，Phase 05 Graph Query & Execute 当前为 `in_progress`。** 当前工作树已实现五类 Object batch read、通用 Object Patch，以及 `kg graph query/execute`、authenticated Graph HTTP、JSON/NDJSON streaming、Full-text / Semantic / Raw Vector passthrough 与 cancellation / transport hardening。Phase 05 主工作树和独立 fresh-source 全量本地验收均已通过；按开发计划，仍需最终 pushed SHA 的 Ubuntu GitHub Actions Validate 成功后才能进入 `done`。
+**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 00–05 均已完成。** 当前 `main` 已实现五类 Object batch read、通用 Object Patch，以及 `kg graph query/execute`、authenticated Graph HTTP、JSON/NDJSON streaming、Full-text / Semantic / Raw Vector passthrough 与 cancellation / transport hardening。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
@@ -47,7 +47,7 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 **Phase 04 General Object Read & Patch 当前为 `done`。** 通用 Object surface 只保留 batch `read` 与 batch `patch`：一次 read 接受 1..100 个明确 Ref并固定同一 State；CLI支持 positional text、refs file与stdin；一个 Git Extended Diff可原子修改多个 Ontology / Knowledge Object，并支持 inline patch、patch file与stdin。实现提交 `d1b4d8ccd792d009496596141520e0a930ae9ef3` 已推送到 `main`；主树和独立 fresh-source `pnpm validate` 均通过，Go statement coverage **90.2%**、jscpd 0 clones，Ubuntu 24.04 x64 GitHub Actions run `35870467442` / Validate job `107212896176` 成功。
 
-**Phase 05 Graph Query & Execute 当前为 `in_progress`。** `kg graph query` / `kg graph execute`、authenticated Graph HTTP、non-stream JSON、真正增量 NDJSON、Full-text / Semantic / Lithograph JSON passthrough、Runtime auto-start、client disconnect / daemon shutdown / transaction partial-durability 等本地实现与 Review 已闭环；主工作树与独立 fresh-source `pnpm validate` 均通过，Go statement coverage 为 **90.0%**、jscpd 为 0 clones。最终 pushed SHA 对应的 Ubuntu GitHub Actions Validate 尚未取得成功证据，因此 Phase 不能标记为 `done`；完整证据见[阶段计划](docs/development/phases/05-graph.md)。
+**Phase 05 Graph Query & Execute 当前为 `done`。** `kg graph query` / `kg graph execute`、authenticated Graph HTTP、non-stream JSON、真正增量 NDJSON、Full-text / Semantic / Lithograph JSON passthrough、Runtime auto-start、client disconnect / daemon shutdown / transaction partial-durability 等实现与 Review 已闭环。实现提交 `324fa67358ca6c2cbdc558ac8df6f60bf64bfaf7` 已推送到 `main`；主工作树与独立 fresh-source `pnpm validate` 均通过，Go statement coverage 为 **90.0%**、jscpd 为 0 clones，Ubuntu 24.04 x64 GitHub Actions run `35893218908` / Validate job `107290569875` 成功；完整证据见[阶段计划](docs/development/phases/05-graph.md)。
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
