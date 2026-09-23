@@ -1,6 +1,6 @@
 # Phase 02：Ontology
 
-**状态：`in_progress`**
+**状态：`done`**
 
 ## 1. 目标与范围
 
@@ -52,7 +52,7 @@
 - Go `database/sql` + bundled SQLite、Lithograph v0.3.0 extension loading、read/write connection、StateRef pin、Branch checkout、true streaming/cancellation、Provider readiness/cache mapping、explicit transaction、single-instance lock 与 process shutdown 已有真实本地/CI证据；
 - TypeScript SDK/Web workspace存在，但不属于本 Phase 业务交付。
 
-因此在进入实现前，Design Inputs、前置工程依赖、Feature 顺序与 Acceptance 已齐全并满足 `ready` 条件；当前 Phase 已进入 `in_progress` 并完成本地实现与验收收口。
+因此在进入实现前，Design Inputs、前置工程依赖、Feature 顺序与 Acceptance 已齐全并满足 `ready` 条件；当前 Phase 已完成实现、本地验收、Review 与要求的远端 CI。
 
 ### 3.2 Lithograph integration baseline
 
@@ -235,18 +235,18 @@ Knowledge Base bootstrap
 
 | ID | 验收场景 | 判定 | 当前状态 |
 | --- | --- | --- | --- |
-| P2-01 | KG OS Bootstrap / Reopen | KG OS-valid `main` 可在存在其它/invalid历史 refs 时正常 reopen；非 valid `main` 只有 fresh Root baseline才可一次 explicit transaction产生首个 KG OS-valid State；bootstrap author/message为null且无State Data；已有 history不被误收编；空 Ontology无 sentinel/default Domain/Binding；失败零 partial Commit；restart不重复 bootstrap | 本地已验收；P2-12 待收口 |
-| P2-02 | Internal Graph / Binding | D68 reserved Graph Type及其 dependent Schema来源精确匹配且不泄露为公共 Constraint；无额外 internal Index/standalone uniqueness resource；closed-profile校验拒绝 internal多余payload、internal↔Knowledge跨界边、internal-target Schema与重复边；Domain/Definition/Property Binding、唯一 owner edge、Schema Locator与双向 coverage一致；`includes`不接受 Property Binding target；startup/Ontology validation不全图扫描普通 Knowledge reserved-looking identifier | 本地已验收；P2-12 待收口 |
-| P2-03 | Ontology Read | 空 Overview、Overview / Domain / Definition、无 Domain、多父级/cycle、同名不同 kind、description缺省提示、1..100 batch、State pin、pagination、历史 State hidden config保真且不受当前 runtime默认值重解释，以及错误边界符合设计 | 本地已验收；P2-12 待收口 |
-| P2-04 | Canonical Serialization | Domain/Definition YAML/JSON round-trip、deterministic render、set-like重复拒绝/排序、batch edit all-or-nothing framing、空集合与String边界通过 | 本地已验收；P2-12 待收口 |
-| P2-05 | Patch / Concurrency | Git Extended Diff Add/Update/Delete/Rename/Restructure、多 entry、canonical typed Ref percent-encoding + Git pathname quoting、从空 Ontology一次创建互相引用的 Domain/Node/Relationship/共享Index、order-independent alias与合法cycle、exact apply、strict base、no-op、author/message、created/transitions及result ordering通过 | 本地已验收；P2-12 待收口 |
-| P2-06 | Schema / Constraint | Node identifying/additional labels、Relationship/Property、type/required/unique/from/to（含 null）、named/anonymous `unique/key` composite Constraint正反向 round-trip；standalone `not_null/type` 前置拒绝；Graph Type dependent rule不重复暴露，显式来源/name保留，failure整体rollback | 本地已验收；P2-12 待收口 |
-| P2-07 | Index | Constraint-owned backing Index不冒充显式 Index；等价 explicit Range + UNIQUE/KEY backing 与跨 resource name冲突前置拒绝；composite Range、single-property Text/Point、multi-field/shared Full-text、single-field/shared Semantic的create/update/delete/读取回验通过；Full-text runtime analyzer与Semantic embedding/cache mapping按新建/重建边界写入并保留历史 hidden config，api_key secret不进State；Standard Index跨 Definition targets及公共 options/filterProperties被拒绝 | 本地已验收；P2-12 待收口 |
-| P2-08 | Rename / Delete / Data Safety | Binding continuity、rename mandatory Knowledge rewrite、共享依赖；labels/from-to/required/type/unique及delete在需要调用方显式 Knowledge处理时拒绝；不自动增删Label/填值/迁边/删数据，无隐式数据损失与冲突诊断通过 | 本地已验收；P2-12 待收口 |
-| P2-09 | Consistency Boundary | missing/duplicate/dangling Binding、unsupported Schema/config、direct low-level drift均不被高层伪装成合法 Ontology | 本地已验收；P2-12 待收口 |
-| P2-10 | HTTP / Authentication | Ontology data routes使用统一 logical contract与Bearer auth；canonical body content negotiation复用唯一server renderer；401/错误映射/secret hygiene/取消通过 | 本地已验收；P2-12 待收口 |
-| P2-11 | CLI Ontology | `kg ontology` / `--edit` / `patch` 的endpoint discovery、KG_TOKEN、resolved-State规则、stdout/stderr/exit、stdin/file与真实daemon E2E通过；CLI不重渲染canonical YAML | 本地已验收；P2-12 待收口 |
-| P2-12 | Quality / CI / Review | 本地完整validation/fresh-source、Phase Review、final diff、最终 pushed SHA的Ubuntu 24.04 x64 native CI全部成功 | 本地已验收；仅最终 pushed SHA 的 Ubuntu 24.04 x64 native CI 待执行 |
+| P2-01 | KG OS Bootstrap / Reopen | KG OS-valid `main` 可在存在其它/invalid历史 refs 时正常 reopen；非 valid `main` 只有 fresh Root baseline才可一次 explicit transaction产生首个 KG OS-valid State；bootstrap author/message为null且无State Data；已有 history不被误收编；空 Ontology无 sentinel/default Domain/Binding；失败零 partial Commit；restart不重复 bootstrap | 已验收 |
+| P2-02 | Internal Graph / Binding | D68 reserved Graph Type及其 dependent Schema来源精确匹配且不泄露为公共 Constraint；无额外 internal Index/standalone uniqueness resource；closed-profile校验拒绝 internal多余payload、internal↔Knowledge跨界边、internal-target Schema与重复边；Domain/Definition/Property Binding、唯一 owner edge、Schema Locator与双向 coverage一致；`includes`不接受 Property Binding target；startup/Ontology validation不全图扫描普通 Knowledge reserved-looking identifier | 已验收 |
+| P2-03 | Ontology Read | 空 Overview、Overview / Domain / Definition、无 Domain、多父级/cycle、同名不同 kind、description缺省提示、1..100 batch、State pin、pagination、历史 State hidden config保真且不受当前 runtime默认值重解释，以及错误边界符合设计 | 已验收 |
+| P2-04 | Canonical Serialization | Domain/Definition YAML/JSON round-trip、deterministic render、set-like重复拒绝/排序、batch edit all-or-nothing framing、空集合与String边界通过 | 已验收 |
+| P2-05 | Patch / Concurrency | Git Extended Diff Add/Update/Delete/Rename/Restructure、多 entry、canonical typed Ref percent-encoding + Git pathname quoting、从空 Ontology一次创建互相引用的 Domain/Node/Relationship/共享Index、order-independent alias与合法cycle、exact apply、strict base、no-op、author/message、created/transitions及result ordering通过 | 已验收 |
+| P2-06 | Schema / Constraint | Node identifying/additional labels、Relationship/Property、type/required/unique/from/to（含 null）、named/anonymous `unique/key` composite Constraint正反向 round-trip；standalone `not_null/type` 前置拒绝；Graph Type dependent rule不重复暴露，显式来源/name保留，failure整体rollback | 已验收 |
+| P2-07 | Index | Constraint-owned backing Index不冒充显式 Index；等价 explicit Range + UNIQUE/KEY backing 与跨 resource name冲突前置拒绝；composite Range、single-property Text/Point、multi-field/shared Full-text、single-field/shared Semantic的create/update/delete/读取回验通过；Full-text runtime analyzer与Semantic embedding/cache mapping按新建/重建边界写入并保留历史 hidden config，api_key secret不进State；Standard Index跨 Definition targets及公共 options/filterProperties被拒绝 | 已验收 |
+| P2-08 | Rename / Delete / Data Safety | Binding continuity、rename mandatory Knowledge rewrite、共享依赖；labels/from-to/required/type/unique及delete在需要调用方显式 Knowledge处理时拒绝；不自动增删Label/填值/迁边/删数据，无隐式数据损失与冲突诊断通过 | 已验收 |
+| P2-09 | Consistency Boundary | missing/duplicate/dangling Binding、unsupported Schema/config、direct low-level drift均不被高层伪装成合法 Ontology | 已验收 |
+| P2-10 | HTTP / Authentication | Ontology data routes使用统一 logical contract与Bearer auth；canonical body content negotiation复用唯一server renderer；401/错误映射/secret hygiene/取消通过 | 已验收 |
+| P2-11 | CLI Ontology | `kg ontology` / `--edit` / `patch` 的endpoint discovery、KG_TOKEN、resolved-State规则、stdout/stderr/exit、stdin/file与真实daemon E2E通过；CLI不重渲染canonical YAML | 已验收 |
+| P2-12 | Quality / CI / Review | 本地完整validation/fresh-source、Phase Review、final diff、最终 pushed SHA的Ubuntu 24.04 x64 native CI全部成功 | 已验收：实现提交 `8e776043337bcda24a271f84af1c04fc0da515cc`，GitHub Actions run `35804756510` / Validate job `107002937680` 成功 |
 
 ## 7. 关键失败路径
 
@@ -322,4 +322,4 @@ Commit、push、发布和部署仍是独立动作；计划写入本身不代表�
 
 2026-09-23 本地实现与 Review 已收口：P2-01–P2-11 全部取得本地真实验收证据；主工作树完整 `pnpm validate` 通过，Go race / govulncheck / 90% coverage gate通过，最终 Go statement coverage为 90.1%；TypeScript/V8 coverage与type coverage均为100%；jscpd zero-duplicate、Playwright、真实 Lithograph v0.3.0 native suite、package/license/audit/diff gates全部通过。独立 fresh-source从空 `node_modules` / cache / artifact执行 `pnpm run setup` 与完整 `pnpm validate` 通过；forced Lefthook pre-commit与 `git diff --check` 通过。Review期间清理了旧空 `internal/kernel/kernel.go` 占位、不可达 Patch result marshal错误分支与两处重复生产代码，并补齐 CLI adapter / decoder / canonicalization边界测试；当前范围没有剩余本地 finding。
 
-P2-12 仍要求**最终 pushed SHA**的 Ubuntu 24.04 x64 native CGO CI成功。本次用户尚未授权 commit/push，因此该远端证据未执行，Phase 02继续保持 `in_progress`，不能标记为 `done`。
+2026-09-23 实现提交 `8e776043337bcda24a271f84af1c04fc0da515cc` 已推送到 `main`；Ubuntu 24.04 x64 GitHub Actions run `35804756510` / Validate job `107002937680` 成功，P2-12 远端门禁闭环。P2-01–P2-12 全部满足，Phase Review、设计/README/开发计划/开发指南/vlog同步与历史旧代码清理均已完成，因此 Phase 02 状态更新为 `done`。
