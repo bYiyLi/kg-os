@@ -14,11 +14,16 @@ import (
 )
 
 const (
-	DefaultServerHost       = "127.0.0.1"
-	DefaultServerPort       = 4765
-	DefaultCacheMaxSizeMB   = int64(4096)
-	DefaultFullTextAnalyzer = "unicode61"
-	DefaultSimilarity       = "cosine"
+	RecommendedServerHost       = "127.0.0.1"
+	RecommendedServerPort       = 4765
+	RecommendedCachePath        = "cache/openai-compatible.db"
+	RecommendedCacheMaxSizeMB   = int64(4096)
+	RecommendedFullTextAnalyzer = "unicode61"
+	RecommendedEmbeddingBaseURL = "https://api.openai.com/v1"
+	RecommendedEmbeddingModel   = "text-embedding-3-small"
+	RecommendedDimensions       = 1536
+	RecommendedSimilarity       = "cosine"
+	RecommendedAPIKeyEnv        = "OPENAI_API_KEY"
 )
 
 type LookupEnv func(string) (string, bool)
@@ -37,7 +42,6 @@ type ServerConfig struct {
 }
 
 type CacheConfig struct {
-	Enabled   bool   `toml:"enabled"`
 	Path      string `toml:"path"`
 	MaxSizeMB int64  `toml:"max_size_mb"`
 }
@@ -48,9 +52,9 @@ type SQLiteConfig struct {
 
 type ExtensionConfig struct {
 	Source     string `toml:"source"`
-	Library    string `toml:"library"`
+	Library    string `toml:"library,omitempty"`
 	Entrypoint string `toml:"entrypoint"`
-	SHA256     string `toml:"sha256"`
+	SHA256     string `toml:"sha256,omitempty"`
 }
 
 type FullTextConfig struct {
@@ -81,29 +85,53 @@ func LoadConfig(paths Paths, lookupEnv LookupEnv) (Config, error) {
 	if lookupEnv == nil {
 		lookupEnv = os.LookupEnv
 	}
-
-	config := Config{
-		Server:    ServerConfig{Host: DefaultServerHost, Port: DefaultServerPort},
-		Cache:     CacheConfig{Enabled: true, MaxSizeMB: DefaultCacheMaxSizeMB},
-		FullText:  FullTextConfig{Analyzer: DefaultFullTextAnalyzer},
-		Embedding: EmbeddingConfig{Similarity: DefaultSimilarity},
+	body, err := os.ReadFile(paths.Config)
+	if err != nil {
+		return Config{}, fmt.Errorf("load config.toml: %w", err)
 	}
+	config, err := ParseConfig(paths, body)
+	if err != nil {
+		return Config{}, err
+	}
+	if err := ValidateEmbeddingEnvironment(config, lookupEnv); err != nil {
+		return Config{}, err
+	}
+	return config, nil
+}
 
-	metadata, err := toml.DecodeFile(paths.Config, &config)
+func ParseConfig(paths Paths, body []byte) (Config, error) {
+	var config Config
+	metadata, err := toml.Decode(string(body), &config)
 	if err != nil {
 		return Config{}, fmt.Errorf("load config.toml: %w", err)
 	}
 	if undecoded := metadata.Undecoded(); len(undecoded) != 0 {
 		return Config{}, fmt.Errorf("config.toml contains unknown field %q", undecoded[0].String())
 	}
-
-	if err := config.normalizeAndValidate(paths, lookupEnv); err != nil {
+	required := [][]string{
+		{"server", "host"},
+		{"server", "port"},
+		{"cache", "path"},
+		{"cache", "max_size_mb"},
+		{"fulltext", "analyzer"},
+		{"embedding", "base_url"},
+		{"embedding", "model"},
+		{"embedding", "dimensions"},
+		{"embedding", "similarity"},
+		{"embedding", "api_key_env"},
+	}
+	for _, key := range required {
+		if !metadata.IsDefined(key...) {
+			return Config{}, fmt.Errorf("config.toml missing required field %s", strings.Join(key, "."))
+		}
+	}
+	if err := config.normalizeAndValidate(paths); err != nil {
 		return Config{}, err
 	}
 	return config, nil
 }
 
-func (config *Config) normalizeAndValidate(paths Paths, lookupEnv LookupEnv) error {
+func (config *Config) normalizeAndValidate(paths Paths) error {
 	if ip := net.ParseIP(config.Server.Host); ip == nil || ip.To4() == nil || strings.Contains(config.Server.Host, ":") {
 		return fmt.Errorf("server.host must be an IPv4 address")
 	}
@@ -111,9 +139,10 @@ func (config *Config) normalizeAndValidate(paths Paths, lookupEnv LookupEnv) err
 		return fmt.Errorf("server.port must be between 1 and 65535")
 	}
 
-	if config.Cache.Path == "" {
-		config.Cache.Path = filepath.Join(paths.CacheDir, "openai-compatible.db")
-	} else if !filepath.IsAbs(config.Cache.Path) {
+	if strings.TrimSpace(config.Cache.Path) == "" || strings.ContainsRune(config.Cache.Path, 0) {
+		return fmt.Errorf("cache.path must be non-empty and contain no NUL")
+	}
+	if !filepath.IsAbs(config.Cache.Path) {
 		config.Cache.Path = filepath.Join(paths.Home, config.Cache.Path)
 	}
 	absoluteCache, err := filepath.Abs(config.Cache.Path)
@@ -127,7 +156,7 @@ func (config *Config) normalizeAndValidate(paths Paths, lookupEnv LookupEnv) err
 	if config.Cache.MaxSizeMB > math.MaxInt64/(1024*1024) {
 		return fmt.Errorf("cache.max_size_mb exceeds supported range")
 	}
-	if config.Cache.Enabled && samePath(config.Cache.Path, paths.Database) {
+	if samePath(config.Cache.Path, paths.Database) {
 		return fmt.Errorf("cache.path must not point at kgos.db")
 	}
 
@@ -144,13 +173,13 @@ func (config *Config) normalizeAndValidate(paths Paths, lookupEnv LookupEnv) err
 		return fmt.Errorf("fulltext.analyzer must be non-empty and contain no NUL")
 	}
 
-	if err := normalizeEmbedding(&config.Embedding, lookupEnv); err != nil {
+	if err := normalizeEmbedding(&config.Embedding); err != nil {
 		return err
 	}
 	return nil
 }
 
-func normalizeEmbedding(config *EmbeddingConfig, lookupEnv LookupEnv) error {
+func normalizeEmbedding(config *EmbeddingConfig) error {
 	parsed, err := url.Parse(config.BaseURL)
 	if err != nil || !parsed.IsAbs() || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return fmt.Errorf("embedding.base_url must be an absolute HTTP(S) URL")
@@ -173,10 +202,20 @@ func normalizeEmbedding(config *EmbeddingConfig, lookupEnv LookupEnv) error {
 		if strings.TrimSpace(config.APIKeyEnv) == "" || strings.ContainsRune(config.APIKeyEnv, 0) {
 			return fmt.Errorf("embedding.api_key_env must be non-empty and contain no NUL")
 		}
-		value, ok := lookupEnv(config.APIKeyEnv)
-		if !ok || value == "" {
-			return fmt.Errorf("embedding.api_key_env %q is not set or empty", config.APIKeyEnv)
-		}
+	}
+	return nil
+}
+
+func ValidateEmbeddingEnvironment(config Config, lookupEnv LookupEnv) error {
+	if lookupEnv == nil {
+		lookupEnv = os.LookupEnv
+	}
+	if config.Embedding.APIKeyEnv == "" {
+		return nil
+	}
+	value, ok := lookupEnv(config.Embedding.APIKeyEnv)
+	if !ok || value == "" {
+		return fmt.Errorf("embedding.api_key_env %q is not set or empty", config.Embedding.APIKeyEnv)
 	}
 	return nil
 }
@@ -266,7 +305,7 @@ func (config Config) SemanticDefaults() SemanticDefaults {
 		APIKeyEnv:     config.Embedding.APIKeyEnv,
 		Dimensions:    config.Embedding.Dimensions,
 		Similarity:    config.Embedding.Similarity,
-		CacheEnabled:  config.Cache.Enabled,
+		CacheEnabled:  true,
 		CachePath:     config.Cache.Path,
 		CacheMaxBytes: config.Cache.MaxSizeMB * 1024 * 1024,
 	}

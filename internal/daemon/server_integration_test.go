@@ -135,12 +135,12 @@ func writeDaemonConfig(t *testing.T, home string, port int) {
 	providerLibrary, _ = filepath.Abs(providerLibrary)
 	body := fmt.Sprintf(
 		"[server]\nhost = \"127.0.0.1\"\nport = %d\n\n"+
-			"[cache]\nenabled = false\nmax_size_mb = 16\n\n"+
+			"[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n"+
 			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithograph_init\"\n\n"+
 			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithographopenaicompatible_init\"\n\n"+
 			"[fulltext]\nanalyzer = \"unicode61\"\n\n"+
 			"[embedding]\nbase_url = \"https://example.invalid/v1\"\n"+
-			"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\n",
+			"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n",
 		port,
 		strconv.Quote(mainLibrary),
 		strconv.Quote(providerLibrary),

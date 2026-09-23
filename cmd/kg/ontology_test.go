@@ -532,7 +532,7 @@ func TestRunOntologyRemainingLocalBranches(t *testing.T) {
 			ontologyReadCLI{At: state, Refs: []string{"domain:A"}, Edit: true},
 			&stdout,
 			&stderr,
-		); code != 3 {
+		); code != 2 {
 			t.Fatalf("edit code=%d stderr=%q", code, stderr.String())
 		}
 		stdout.Reset()
@@ -544,7 +544,7 @@ func TestRunOntologyRemainingLocalBranches(t *testing.T) {
 			true,
 			&stdout,
 			&stderr,
-		); code != 3 {
+		); code != 2 {
 			t.Fatalf("patch code=%d stderr=%q", code, stderr.String())
 		}
 	})
@@ -572,7 +572,7 @@ func TestRunOntologyRemainingLocalBranches(t *testing.T) {
 		}
 	})
 
-	t.Run("transport failures", func(t *testing.T) {
+	t.Run("unavailable runtime", func(t *testing.T) {
 		configureCLIEndpoint(t, "http://127.0.0.1:1")
 		var stdout, stderr strings.Builder
 		if code := runOntologyEdit(
@@ -580,7 +580,7 @@ func TestRunOntologyRemainingLocalBranches(t *testing.T) {
 			ontologyReadCLI{At: state, Refs: []string{"domain:A"}, Edit: true},
 			&stdout,
 			&stderr,
-		); code != 3 {
+		); code != 2 {
 			t.Fatalf("edit code=%d stderr=%q", code, stderr.String())
 		}
 		stdout.Reset()
@@ -592,7 +592,7 @@ func TestRunOntologyRemainingLocalBranches(t *testing.T) {
 			true,
 			&stdout,
 			&stderr,
-		); code != 3 {
+		); code != 2 {
 			t.Fatalf("patch code=%d stderr=%q", code, stderr.String())
 		}
 	})

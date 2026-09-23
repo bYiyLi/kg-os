@@ -1,16 +1,26 @@
 import { resolve } from "node:path";
 
 import { currentLithographArtifact } from "./lithograph-artifacts.mjs";
+import { prepareKGOSDDaemonFixture } from "./go-fixtures.mjs";
 import { run } from "./process.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 await run("node", ["scripts/prepare-lithograph.mjs"], { cwd: root });
 
 const artifact = currentLithographArtifact(root);
-const env = {
+const baseEnv = {
   ...process.env,
   CGO_ENABLED: "1",
-  GOTOOLCHAIN: "go1.27.1",
+  GOTOOLCHAIN: "go1.27.1"
+};
+const daemonBinary = await prepareKGOSDDaemonFixture({
+  root,
+  env: baseEnv,
+  tags: "sqlite_fts5"
+});
+const env = {
+  ...baseEnv,
+  KGOS_KGOSD_BINARY: daemonBinary,
   KGOS_LITHOGRAPH_LIBRARY: resolve(artifact.cacheDirectory, artifact.library),
   KGOS_LITHOGRAPH_PROVIDER_LIBRARY: resolve(artifact.cacheDirectory, artifact.providerLibrary)
 };

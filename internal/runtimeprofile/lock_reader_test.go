@@ -2,6 +2,8 @@ package runtimeprofile
 
 import (
 	"errors"
+	"fmt"
+	"net"
 	"path/filepath"
 	"testing"
 )
@@ -19,15 +21,27 @@ func TestReadActiveEndpointRequiresActiveOwner(t *testing.T) {
 	if _, err := ReadActiveEndpoint(path); err == nil {
 		t.Fatal("unpublished active lock must not produce endpoint")
 	}
-	if err := owner.PublishEndpoint("http://127.0.0.1:4765"); err != nil {
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	endpoint := fmt.Sprintf("http://%s", listener.Addr())
+	if err := owner.PublishEndpoint(endpoint); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	endpoint, err := ReadActiveEndpoint(path)
+	gotEndpoint, err := ReadActiveEndpoint(path)
 	if err != nil {
 		t.Fatalf("read active endpoint: %v", err)
 	}
-	if endpoint != "http://127.0.0.1:4765" {
-		t.Fatalf("endpoint = %q", endpoint)
+	if gotEndpoint != endpoint {
+		t.Fatalf("endpoint = %q, want %q", gotEndpoint, endpoint)
+	}
+	if err := listener.Close(); err != nil {
+		t.Fatalf("close listener: %v", err)
+	}
+	status := InspectDaemon(path)
+	if status.State != DaemonUnavailable || status.Endpoint != endpoint || status.Err == nil {
+		t.Fatalf("unreachable active endpoint status = %#v", status)
 	}
 	if err := owner.Close(); err != nil {
 		t.Fatalf("close: %v", err)

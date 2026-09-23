@@ -1,12 +1,12 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
+import { currentLithographArtifact } from "./lithograph-artifacts.mjs";
 import { runCapture } from "./process.mjs";
-import { prepareRuntimeProfile } from "./runtime-profile.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const outputIndex = process.argv.indexOf("--output");
@@ -26,10 +26,12 @@ const rootPackage = JSON.parse(await readFile(resolve(root, "package.json"), "ut
 const version = rootPackage.version;
 const workRoot = await mkdtemp(join(tmpdir(), "kgos-pack-"));
 const smokeDirectory = join(workRoot, "workspace-external-smoke");
+const smokeCwd = join(workRoot, "outside-distribution");
 const packDirectory =
   outputIndex === -1 ? join(workRoot, "release") : resolve(root, process.argv[outputIndex + 1]);
 const suffix = process.platform === "win32" ? ".exe" : "";
 const binaryNames = ["kgosd" + suffix, "kg" + suffix];
+const lithographArtifact = currentLithographArtifact(root);
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -45,6 +47,28 @@ async function copyBinaries(destination) {
       await chmod(target, 0o755);
     }
   }
+}
+
+async function copyExtensions(destination) {
+  const extensions = resolve(destination, "extensions");
+  await mkdir(extensions, { recursive: true });
+  await cp(
+    resolve(lithographArtifact.cacheDirectory, lithographArtifact.library),
+    resolve(extensions, lithographArtifact.library)
+  );
+  await cp(
+    resolve(lithographArtifact.cacheDirectory, lithographArtifact.providerLibrary),
+    resolve(extensions, lithographArtifact.providerLibrary)
+  );
+}
+
+async function copyDistribution(destination) {
+  await copyBinaries(destination);
+  await copyExtensions(destination);
+}
+
+function manifestFile(destination, path) {
+  return relative(destination, path).split(sep).join("/");
 }
 
 async function waitForOrigin(child) {
@@ -104,26 +128,93 @@ async function freeLoopbackPort() {
   return port;
 }
 
+async function pathExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function verifyWorkspaceExternalArtifact() {
-  await copyBinaries(smokeDirectory);
+  await mkdir(smokeCwd, { recursive: true });
+  await copyDistribution(smokeDirectory);
+  await writeManifest(smokeDirectory);
   const kg = resolve(smokeDirectory, "kg" + suffix);
   const daemon = resolve(smokeDirectory, "kgosd" + suffix);
-  const kgVersion = await runCapture(kg, ["--version"], { cwd: smokeDirectory });
-  const daemonVersion = await runCapture(daemon, ["--version"], { cwd: smokeDirectory });
+  const kgVersion = await runCapture(kg, ["--version"], { cwd: smokeCwd });
+  const daemonVersion = await runCapture(daemon, ["--version"], { cwd: smokeCwd });
   if (kgVersion.stdout !== version + "\n" || daemonVersion.stdout !== version + "\n") {
     throw new Error("built kg/kgosd returned the wrong version");
   }
 
-  const home = resolve(smokeDirectory, "home");
+  const home = resolve(workRoot, "home");
+  const freshDoctor = JSON.parse(
+    (
+      await runCapture(kg, ["doctor", "--json"], {
+        cwd: smokeCwd,
+        env: { ...process.env, KG_HOME: home }
+      })
+    ).stdout
+  );
+  if (freshDoctor.ready !== false || (await pathExists(home))) {
+    throw new Error("packaged fresh doctor was not side-effect-free");
+  }
   const port = await freeLoopbackPort();
-  await prepareRuntimeProfile({
-    root,
-    home,
-    host: "127.0.0.1",
-    port
-  });
+  const installed = JSON.parse(
+    (
+      await runCapture(
+        kg,
+        [
+          "install",
+          "--server-host",
+          "127.0.0.1",
+          "--server-port",
+          String(port),
+          "--cache-path",
+          "cache/openai-compatible.db",
+          "--cache-max-size-mb",
+          "4096",
+          "--fulltext-analyzer",
+          "unicode61",
+          "--embedding-base-url",
+          "https://example.invalid/v1",
+          "--embedding-model",
+          "phase03-package-smoke",
+          "--embedding-dimensions",
+          "3",
+          "--embedding-similarity",
+          "cosine",
+          "--embedding-api-key-env",
+          ""
+        ],
+        { cwd: smokeCwd, env: { ...process.env, KG_HOME: home } }
+      )
+    ).stdout
+  );
+  if (installed.status !== "installed" || installed.home !== home) {
+    throw new Error("packaged fully parameterized install returned an unexpected result");
+  }
+  const doctor = JSON.parse(
+    (
+      await runCapture(kg, ["doctor", "--json"], {
+        cwd: smokeCwd,
+        env: { ...process.env, KG_HOME: home }
+      })
+    ).stdout
+  );
+  const runtimeCheck = doctor.checks.find((check) => check.id === "runtime");
+  if (
+    doctor.ready !== true ||
+    runtimeCheck?.status !== "info" ||
+    runtimeCheck?.blocking !== false ||
+    runtimeCheck?.details?.state !== "stopped"
+  ) {
+    throw new Error("packaged doctor did not report installed/stopped as ready");
+  }
   const child = spawn(daemon, [], {
-    cwd: smokeDirectory,
+    cwd: smokeCwd,
     env: { ...process.env, KG_HOME: home },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -142,20 +233,21 @@ async function verifyWorkspaceExternalArtifact() {
     if (asset.status !== 200 || (await asset.text()).length === 0) {
       throw new Error("workspace-external Web asset smoke failed");
     }
-    const api = await fetch(origin + "/api/status");
-    if (api.status !== 404) {
-      throw new Error("Phase 01 artifact exposed an unexpected business API path");
-    }
   } finally {
     await stop(child);
   }
 }
 
-async function writeManifest() {
+async function writeManifest(destination) {
   const files = [];
-  for (const name of binaryNames) {
-    const bytes = await readFile(resolve(packDirectory, name));
-    files.push({ file: name, sha256: sha256(bytes) });
+  const artifactPaths = [
+    ...binaryNames.map((name) => resolve(destination, name)),
+    resolve(destination, "extensions", lithographArtifact.library),
+    resolve(destination, "extensions", lithographArtifact.providerLibrary)
+  ];
+  for (const path of artifactPaths) {
+    const bytes = await readFile(path);
+    files.push({ file: manifestFile(destination, path), sha256: sha256(bytes) });
   }
   const goVersion = (
     await runCapture("go", ["version"], {
@@ -170,19 +262,17 @@ async function writeManifest() {
     platform: process.platform,
     version
   };
-  await writeFile(
-    resolve(packDirectory, "manifest.json"),
-    JSON.stringify(manifest, null, 2) + "\n"
-  );
+  await writeFile(resolve(destination, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
 }
 
 try {
+  await runCapture("node", ["scripts/prepare-lithograph.mjs"], { cwd: root });
   await verifyWorkspaceExternalArtifact();
   if (outputIndex !== -1) {
     await rm(packDirectory, { force: true, recursive: true });
   }
-  await copyBinaries(packDirectory);
-  await writeManifest();
+  await copyDistribution(packDirectory);
+  await writeManifest(packDirectory);
 
   if (outputIndex !== -1) {
     await cp(resolve(root, "LICENSE"), resolve(packDirectory, "LICENSE"));
@@ -192,7 +282,7 @@ try {
     );
     await cp(resolve(root, "README.md"), resolve(packDirectory, "README.md"));
   }
-  process.stdout.write("Native artifact smoke and manifest passed.\n");
+  process.stdout.write("Native artifact, installer, doctor, and manifest smoke passed.\n");
 } finally {
   await rm(workRoot, { force: true, recursive: true });
 }

@@ -19,7 +19,7 @@ type Credential struct {
 }
 
 func LoadOrCreateCredential(paths Paths) (Credential, error) {
-	credential, err := loadCredential(paths.Auth)
+	credential, err := LoadCredential(paths)
 	if err == nil {
 		return credential, nil
 	}
@@ -27,6 +27,10 @@ func LoadOrCreateCredential(paths Paths) (Credential, error) {
 		return Credential{}, err
 	}
 	return createCredential(paths.Auth, rand.Reader)
+}
+
+func LoadCredential(paths Paths) (Credential, error) {
+	return loadCredential(paths.Auth)
 }
 
 func loadCredential(path string) (Credential, error) {

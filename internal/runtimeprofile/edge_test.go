@@ -371,6 +371,43 @@ func TestPublishArtifactAndCacheIntegrityFailures(t *testing.T) {
 		}
 	})
 
+	t.Run("read-only cached remote inspection", func(t *testing.T) {
+		extensionsDir, hash, _ := prepare(t)
+		paths := Paths{ExtensionsDir: extensionsDir}
+		config := ExtensionConfig{
+			Source:     "https://example.test/fixture.so",
+			Entrypoint: "sqlite3_fixture_init",
+			SHA256:     hash,
+		}
+		ready, err := CachedExtensionReady(paths, config)
+		if err != nil || !ready {
+			t.Fatalf("cached remote ready=%v err=%v", ready, err)
+		}
+		if err := os.WriteFile(
+			filepath.Join(extensionsDir, hash, "artifact"),
+			[]byte("corrupt"),
+			0o600,
+		); err != nil {
+			t.Fatal(err)
+		}
+		ready, err = CachedExtensionReady(paths, config)
+		if err != nil || ready {
+			t.Fatalf("corrupt cached remote ready=%v err=%v", ready, err)
+		}
+		config.Source = "relative.so"
+		if _, err := CachedExtensionReady(paths, config); err == nil {
+			t.Fatal("invalid cached extension config was accepted")
+		}
+		config = ExtensionConfig{
+			Source:     filepath.Join(t.TempDir(), "local.so"),
+			Entrypoint: "sqlite3_fixture_init",
+		}
+		ready, err = CachedExtensionReady(paths, config)
+		if err != nil || ready {
+			t.Fatalf("local source cached readiness = %v, %v", ready, err)
+		}
+	})
+
 	t.Run("empty hash", func(t *testing.T) {
 		if _, ok := loadCachedArtifact(t.TempDir(), "", "fixture.so", "", limits); ok {
 			t.Fatal("empty cache hash was accepted")
@@ -582,26 +619,24 @@ func TestAdditionalConfigFailures(t *testing.T) {
 	if err := os.WriteFile(extension, []byte("extension"), 0o600); err != nil {
 		t.Fatalf("write extension fixture: %v", err)
 	}
-	base := func(extra string) string {
-		return extra +
-			"\n[[sqlite.extensions]]\nsource = " + quoteTOML(extension) +
-			"\nentrypoint = \"init\"\n[embedding]\nbase_url = \"https://example.test/v1\"\n" +
-			"model = \"fixture\"\ndimensions = 8\n"
-	}
+	valid := completeRuntimeConfig(
+		"[[sqlite.extensions]]\nsource = "+quoteTOML(extension)+"\nentrypoint = \"init\"",
+		"",
+	)
 	for _, test := range []struct {
 		name string
 		body string
 		want string
 	}{
-		{name: "zero cache", body: base("[cache]\nmax_size_mb = 0\n"), want: "cache.max_size_mb"},
-		{name: "cache size overflow", body: base("[cache]\nmax_size_mb = 9223372036854775807\n"), want: "supported range"},
-		{name: "empty analyzer", body: base("\n[fulltext]\nanalyzer = \" \""), want: "fulltext.analyzer"},
-		{name: "empty entrypoint", body: strings.Replace(base(""), "entrypoint = \"init\"", "entrypoint = \"\"", 1), want: "entrypoint"},
-		{name: "http extension", body: strings.Replace(base(""), quoteTOML(extension), "\"http://example.test/x.so\"", 1), want: "https"},
-		{name: "empty model", body: strings.Replace(base(""), "model = \"fixture\"", "model = \"\"", 1), want: "embedding.model"},
-		{name: "dimensions high", body: strings.Replace(base(""), "dimensions = 8", "dimensions = 4097", 1), want: "dimensions"},
-		{name: "whitespace env", body: base("") + "api_key_env = \" \"\n", want: "api_key_env"},
-		{name: "ftp base", body: strings.Replace(base(""), "https://example.test/v1", "ftp://example.test/v1", 1), want: "HTTP(S)"},
+		{name: "zero cache", body: strings.Replace(valid, "max_size_mb = 4096", "max_size_mb = 0", 1), want: "cache.max_size_mb"},
+		{name: "cache size overflow", body: strings.Replace(valid, "max_size_mb = 4096", "max_size_mb = 9223372036854775807", 1), want: "supported range"},
+		{name: "empty analyzer", body: strings.Replace(valid, "analyzer = \"unicode61\"", "analyzer = \" \"", 1), want: "fulltext.analyzer"},
+		{name: "empty entrypoint", body: strings.Replace(valid, "entrypoint = \"init\"", "entrypoint = \"\"", 1), want: "entrypoint"},
+		{name: "http extension", body: strings.Replace(valid, quoteTOML(extension), "\"http://example.test/x.so\"", 1), want: "https"},
+		{name: "empty model", body: strings.Replace(valid, "model = \"fixture\"", "model = \"\"", 1), want: "embedding.model"},
+		{name: "dimensions high", body: strings.Replace(valid, "dimensions = 8", "dimensions = 4097", 1), want: "dimensions"},
+		{name: "whitespace env", body: strings.Replace(valid, "api_key_env = \"\"", "api_key_env = \" \"", 1), want: "api_key_env"},
+		{name: "ftp base", body: strings.Replace(valid, "https://example.test/v1", "ftp://example.test/v1", 1), want: "HTTP(S)"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			writeConfig(t, paths, test.body)

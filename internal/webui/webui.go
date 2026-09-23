@@ -102,10 +102,7 @@ func hasHiddenSegment(name string) bool {
 
 func isReserved(requestPath string) bool {
 	cleaned := path.Clean("/" + requestPath)
-	return cleaned == "/api" ||
-		strings.HasPrefix(cleaned, "/api/") ||
-		cleaned == "/control" ||
-		strings.HasPrefix(cleaned, "/control/")
+	return cleaned == "/api" || strings.HasPrefix(cleaned, "/api/")
 }
 
 func writeText(response http.ResponseWriter, status int, text string) {

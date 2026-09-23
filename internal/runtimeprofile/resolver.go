@@ -56,6 +56,33 @@ func ResolveExtensions(
 	return resolveExtensions(ctx, paths, configs, client, limits)
 }
 
+// CachedExtensionReady performs the same integrity validation used by the
+// resolver for an already-cached remote extension without downloading,
+// repairing, or publishing anything.
+func CachedExtensionReady(paths Paths, config ExtensionConfig) (bool, error) {
+	remote, sourcePath, err := validateAndClassifyExtensionConfig(&config)
+	if err != nil {
+		return false, err
+	}
+	if !remote {
+		return false, nil
+	}
+	limits := ResolverLimits{
+		MaxDownloadBytes:  defaultMaxDownload,
+		MaxExtractBytes:   defaultMaxExtract,
+		MaxFileBytes:      defaultMaxFile,
+		MaxArchiveEntries: defaultMaxEntries,
+	}
+	_, ok := loadCachedArtifact(
+		paths.ExtensionsDir,
+		config.SHA256,
+		sourcePath,
+		config.Library,
+		limits,
+	)
+	return ok, nil
+}
+
 func resolveExtensions(
 	ctx context.Context,
 	paths Paths,

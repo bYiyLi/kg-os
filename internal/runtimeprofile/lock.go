@@ -5,14 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"os"
 	"sync"
+	"time"
 )
 
 var (
 	ErrLocked         = errors.New("KG_HOME is already owned by another kgosd")
 	ErrNoActiveDaemon = errors.New("KG_HOME has no active kgosd")
 )
+
+const daemonEndpointProbeTimeout = 250 * time.Millisecond
 
 type InstanceLock struct {
 	mu     sync.Mutex
@@ -22,6 +27,21 @@ type InstanceLock struct {
 
 type lockRecord struct {
 	Endpoint string `json:"endpoint"`
+}
+
+type DaemonState string
+
+const (
+	DaemonStopped     DaemonState = "stopped"
+	DaemonStarting    DaemonState = "starting"
+	DaemonRunning     DaemonState = "running"
+	DaemonUnavailable DaemonState = "unavailable"
+)
+
+type DaemonStatus struct {
+	State    DaemonState
+	Endpoint string
+	Err      error
 }
 
 func AcquireLock(path string) (*InstanceLock, error) {
@@ -78,33 +98,82 @@ func (lock *InstanceLock) Endpoint() (string, error) {
 }
 
 func ReadActiveEndpoint(path string) (string, error) {
+	status := InspectDaemon(path)
+	if status.State == DaemonRunning {
+		return status.Endpoint, nil
+	}
+	if status.State == DaemonStopped {
+		return "", ErrNoActiveDaemon
+	}
+	if status.Err != nil {
+		return "", status.Err
+	}
+	return "", fmt.Errorf("kgosd is %s", status.State)
+}
+
+func InspectDaemon(path string) DaemonStatus {
 	file, err := os.OpenFile(path, os.O_RDWR, 0o600)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return "", ErrNoActiveDaemon
+			return DaemonStatus{State: DaemonStopped}
 		}
-		return "", fmt.Errorf("open kgosd.lock: %w", err)
+		return DaemonStatus{State: DaemonUnavailable, Err: fmt.Errorf("open kgosd.lock: %w", err)}
 	}
 	defer file.Close()
 	if err := tryFileLock(file); err == nil {
 		_ = unlockFile(file)
-		return "", ErrNoActiveDaemon
+		return DaemonStatus{State: DaemonStopped}
 	} else if !errors.Is(err, errFileLocked) {
-		return "", fmt.Errorf("inspect kgosd.lock owner: %w", err)
+		return DaemonStatus{
+			State: DaemonUnavailable,
+			Err:   fmt.Errorf("inspect kgosd.lock owner: %w", err),
+		}
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return "", fmt.Errorf("seek kgosd.lock: %w", err)
+		return DaemonStatus{State: DaemonUnavailable, Err: fmt.Errorf("seek kgosd.lock: %w", err)}
 	}
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
 	var record lockRecord
 	if err := decoder.Decode(&record); err != nil {
-		return "", fmt.Errorf("decode active kgosd.lock: %w", err)
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return DaemonStatus{State: DaemonStarting}
+		}
+		return DaemonStatus{
+			State: DaemonUnavailable,
+			Err:   fmt.Errorf("decode active kgosd.lock: %w", err),
+		}
 	}
 	if record.Endpoint == "" {
-		return "", fmt.Errorf("active kgosd.lock endpoint is empty")
+		return DaemonStatus{State: DaemonStarting}
 	}
-	return record.Endpoint, nil
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return DaemonStatus{
+			State: DaemonUnavailable,
+			Err:   fmt.Errorf("active kgosd.lock must contain exactly one JSON object"),
+		}
+	}
+	if err := probeDaemonEndpoint(record.Endpoint); err != nil {
+		return DaemonStatus{
+			State:    DaemonUnavailable,
+			Endpoint: record.Endpoint,
+			Err:      err,
+		}
+	}
+	return DaemonStatus{State: DaemonRunning, Endpoint: record.Endpoint}
+}
+
+func probeDaemonEndpoint(endpoint string) error {
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Scheme != "http" || parsed.Host == "" {
+		return fmt.Errorf("active kgosd endpoint is invalid")
+	}
+	connection, err := net.DialTimeout("tcp4", parsed.Host, daemonEndpointProbeTimeout)
+	if err != nil {
+		return fmt.Errorf("connect active kgosd endpoint: %w", err)
+	}
+	return connection.Close()
 }
 
 func (lock *InstanceLock) replace(body []byte) error {

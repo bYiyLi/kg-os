@@ -71,46 +71,39 @@ func TestResolvePathsDefaultHome(t *testing.T) {
 	}
 }
 
-func TestLoadConfigDefaultsAndSemanticMapping(t *testing.T) {
+func TestLoadConfigRequiresExplicitValuesAndMapsSemanticDefaults(t *testing.T) {
 	paths := testProfilePaths(t)
 	extension := filepath.Join(t.TempDir(), "extension.so")
 	if err := os.WriteFile(extension, []byte("extension"), 0o600); err != nil {
 		t.Fatalf("write extension fixture: %v", err)
 	}
-	writeConfig(t, paths, strings.Join([]string{
-		"[[sqlite.extensions]]",
-		"source = " + quoteTOML(extension),
-		"entrypoint = \"sqlite3_fixture_init\"",
+	writeConfig(t, paths, completeRuntimeConfig(
+		"[[sqlite.extensions]]\nsource = "+quoteTOML(extension)+"\nentrypoint = \"sqlite3_fixture_init\"",
 		"",
-		"[embedding]",
-		"base_url = \"https://example.test/v1/\"",
-		"model = \"fixture-model\"",
-		"dimensions = 1536",
-	}, "\n"))
+	))
 
 	config, err := LoadConfig(paths, func(string) (string, bool) { return "", false })
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	if config.Server.Host != DefaultServerHost || config.Server.Port != DefaultServerPort {
-		t.Fatalf("server defaults = %#v", config.Server)
+	if config.Server.Host != "127.0.0.1" || config.Server.Port != 4765 {
+		t.Fatalf("server = %#v", config.Server)
 	}
-	if !config.Cache.Enabled || config.Cache.MaxSizeMB != DefaultCacheMaxSizeMB {
-		t.Fatalf("cache defaults = %#v", config.Cache)
+	wantCache := filepath.Join(paths.Home, "cache/openai-compatible.db")
+	if config.Cache.Path != wantCache || config.Cache.MaxSizeMB != 4096 {
+		t.Fatalf("cache = %#v", config.Cache)
 	}
-	wantCache := filepath.Join(paths.CacheDir, "openai-compatible.db")
-	if config.Cache.Path != wantCache {
-		t.Fatalf("cache path = %q, want %q", config.Cache.Path, wantCache)
-	}
-	if config.FullText.Analyzer != DefaultFullTextAnalyzer {
+	if config.FullText.Analyzer != "unicode61" {
 		t.Fatalf("fulltext analyzer = %q", config.FullText.Analyzer)
 	}
 	if config.Embedding.BaseURL != "https://example.test/v1" ||
-		config.Embedding.Similarity != DefaultSimilarity {
-		t.Fatalf("embedding defaults = %#v", config.Embedding)
+		config.Embedding.Similarity != "cosine" ||
+		config.Embedding.APIKeyEnv != "" {
+		t.Fatalf("embedding = %#v", config.Embedding)
 	}
 	semantic := config.SemanticDefaults()
 	if semantic.Provider != "openai-compatible" ||
+		!semantic.CacheEnabled ||
 		semantic.CachePath != wantCache ||
 		semantic.CacheMaxBytes != 4096*1024*1024 {
 		t.Fatalf("semantic defaults = %#v", semantic)
@@ -123,13 +116,12 @@ func TestLoadConfigExplicitValues(t *testing.T) {
 	if err := os.WriteFile(extension, []byte("archive"), 0o600); err != nil {
 		t.Fatalf("write extension fixture: %v", err)
 	}
-	writeConfig(t, paths, strings.Join([]string{
+	configText := strings.Join([]string{
 		"[server]",
 		"host = \"0.0.0.0\"",
 		"port = 9000",
 		"",
 		"[cache]",
-		"enabled = false",
 		"path = \"derived/provider.db\"",
 		"max_size_mb = 2",
 		"",
@@ -147,7 +139,8 @@ func TestLoadConfigExplicitValues(t *testing.T) {
 		"dimensions = 3",
 		"similarity = \"euclidean\"",
 		"api_key_env = \"FIXTURE_KEY\"",
-	}, "\n"))
+	}, "\n")
+	writeConfig(t, paths, configText)
 
 	config, err := LoadConfig(paths, func(name string) (string, bool) {
 		return "secret", name == "FIXTURE_KEY"
@@ -155,14 +148,11 @@ func TestLoadConfigExplicitValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	if config.Cache.Enabled {
-		t.Fatal("cache enabled despite explicit false")
-	}
 	if config.Cache.Path != filepath.Join(paths.Home, "derived/provider.db") {
 		t.Fatalf("cache path = %q", config.Cache.Path)
 	}
 	semantic := config.SemanticDefaults()
-	if semantic.CacheEnabled || semantic.CacheMaxBytes != 2*1024*1024 ||
+	if !semantic.CacheEnabled || semantic.CacheMaxBytes != 2*1024*1024 ||
 		semantic.APIKeyEnv != "FIXTURE_KEY" ||
 		semantic.Similarity != "euclidean" {
 		t.Fatalf("semantic defaults = %#v", semantic)
@@ -175,12 +165,8 @@ func TestLoadConfigRejectsInvalidInputs(t *testing.T) {
 	if err := os.WriteFile(extension, []byte("extension"), 0o600); err != nil {
 		t.Fatalf("write extension fixture: %v", err)
 	}
-	base := func(extensionBlock string) string {
-		return extensionBlock + "\n[embedding]\n" +
-			"base_url = \"https://example.test/v1\"\n" +
-			"model = \"fixture\"\n" +
-			"dimensions = 8\n"
-	}
+	validExtension := "[[sqlite.extensions]]\nsource = " + quoteTOML(extension) + "\nentrypoint = \"init\""
+	valid := completeRuntimeConfig(validExtension, "")
 	tests := []struct {
 		name       string
 		config     string
@@ -188,102 +174,106 @@ func TestLoadConfigRejectsInvalidInputs(t *testing.T) {
 		wantSubstr string
 	}{
 		{
-			name: "unknown field",
-			config: base("[[sqlite.extensions]]\nsource = " + quoteTOML(extension) +
-				"\nentrypoint = \"init\"\nunknown = true"),
+			name:       "missing required field",
+			config:     strings.Replace(valid, "host = \"127.0.0.1\"\n", "", 1),
+			wantSubstr: "missing required field server.host",
+		},
+		{
+			name:       "removed cache enabled",
+			config:     strings.Replace(valid, "[cache]\n", "[cache]\nenabled = false\n", 1),
 			wantSubstr: "unknown field",
 		},
 		{
-			name: "hostname",
-			config: "[server]\nhost = \"localhost\"\n" + base(
-				"[[sqlite.extensions]]\nsource = "+quoteTOML(extension)+"\nentrypoint = \"init\"",
-			),
+			name:       "unknown field",
+			config:     valid + "unknown = true\n",
+			wantSubstr: "unknown field",
+		},
+		{
+			name:       "hostname",
+			config:     strings.Replace(valid, "host = \"127.0.0.1\"", "host = \"localhost\"", 1),
 			wantSubstr: "IPv4",
 		},
 		{
-			name: "invalid port",
-			config: "[server]\nport = 0\n" + base(
-				"[[sqlite.extensions]]\nsource = "+quoteTOML(extension)+"\nentrypoint = \"init\"",
-			),
+			name:       "invalid port",
+			config:     strings.Replace(valid, "port = 4765", "port = 0", 1),
 			wantSubstr: "server.port",
 		},
 		{
 			name:       "missing extension",
-			config:     "[embedding]\nbase_url = \"https://example.test/v1\"\nmodel = \"fixture\"\ndimensions = 8\n",
+			config:     completeRuntimeConfig("", ""),
 			wantSubstr: "sqlite.extensions",
 		},
 		{
-			name: "cache main collision",
-			config: "[cache]\npath = " + quoteTOML(paths.Database) + "\n" + base(
-				"[[sqlite.extensions]]\nsource = "+quoteTOML(extension)+"\nentrypoint = \"init\"",
-			),
+			name:       "cache main collision",
+			config:     strings.Replace(valid, "path = \"cache/openai-compatible.db\"", "path = "+quoteTOML(paths.Database), 1),
 			wantSubstr: "kgos.db",
 		},
 		{
 			name: "relative extension",
-			config: base(
+			config: completeRuntimeConfig(
 				"[[sqlite.extensions]]\nsource = \"extension.so\"\nentrypoint = \"init\"",
+				"",
 			),
 			wantSubstr: "absolute local",
 		},
 		{
 			name: "remote missing sha",
-			config: base(
+			config: completeRuntimeConfig(
 				"[[sqlite.extensions]]\nsource = \"https://example.test/extension.so\"\nentrypoint = \"init\"",
+				"",
 			),
 			wantSubstr: "sha256 is required",
 		},
 		{
 			name: "direct with library",
-			config: base(
-				"[[sqlite.extensions]]\nsource = " + quoteTOML(extension) +
-					"\nlibrary = \"lib.so\"\nentrypoint = \"init\"",
+			config: completeRuntimeConfig(
+				validExtension+"\nlibrary = \"lib.so\"",
+				"",
 			),
 			wantSubstr: "library is only valid",
 		},
 		{
 			name: "bad archive library",
-			config: base(
-				"[[sqlite.extensions]]\nsource = \"https://example.test/a.zip\"\n" +
-					"library = \"../lib.so\"\nentrypoint = \"init\"\n" +
-					"sha256 = \"" + strings.Repeat("0", 64) + "\"",
+			config: completeRuntimeConfig(
+				"[[sqlite.extensions]]\nsource = \"https://example.test/a.zip\"\n"+
+					"library = \"../lib.so\"\nentrypoint = \"init\"\n"+
+					"sha256 = \""+strings.Repeat("0", 64)+"\"",
+				"",
 			),
 			wantSubstr: "safe relative",
 		},
 		{
 			name: "bad sha",
-			config: base(
-				"[[sqlite.extensions]]\nsource = \"https://example.test/a.so\"\nentrypoint = \"init\"\n" +
-					"sha256 = \"" + strings.Repeat("A", 64) + "\"",
+			config: completeRuntimeConfig(
+				"[[sqlite.extensions]]\nsource = \"https://example.test/a.so\"\nentrypoint = \"init\"\n"+
+					"sha256 = \""+strings.Repeat("A", 64)+"\"",
+				"",
 			),
 			wantSubstr: "lowercase",
 		},
 		{
-			name: "invalid base url",
-			config: "[[sqlite.extensions]]\nsource = " + quoteTOML(extension) +
-				"\nentrypoint = \"init\"\n[embedding]\nbase_url = \"https://example.test/v1?q=1\"\n" +
-				"model = \"fixture\"\ndimensions = 8\n",
+			name:       "invalid base url",
+			config:     strings.Replace(valid, "https://example.test/v1", "https://example.test/v1?q=1", 1),
 			wantSubstr: "query or fragment",
 		},
 		{
-			name: "invalid dimensions",
-			config: "[[sqlite.extensions]]\nsource = " + quoteTOML(extension) +
-				"\nentrypoint = \"init\"\n[embedding]\nbase_url = \"https://example.test/v1\"\n" +
-				"model = \"fixture\"\ndimensions = 0\n",
+			name:       "invalid dimensions",
+			config:     strings.Replace(valid, "dimensions = 8", "dimensions = 0", 1),
 			wantSubstr: "dimensions",
 		},
 		{
-			name: "invalid similarity",
-			config: "[[sqlite.extensions]]\nsource = " + quoteTOML(extension) +
-				"\nentrypoint = \"init\"\n[embedding]\nbase_url = \"https://example.test/v1\"\n" +
-				"model = \"fixture\"\ndimensions = 8\nsimilarity = \"dot\"\n",
+			name:       "invalid similarity",
+			config:     strings.Replace(valid, "similarity = \"cosine\"", "similarity = \"dot\"", 1),
 			wantSubstr: "similarity",
 		},
 		{
-			name: "missing api key env",
-			config: "[[sqlite.extensions]]\nsource = " + quoteTOML(extension) +
-				"\nentrypoint = \"init\"\n[embedding]\nbase_url = \"https://example.test/v1\"\n" +
-				"model = \"fixture\"\ndimensions = 8\napi_key_env = \"MISSING_KEY\"\n",
+			name:       "missing api key env field",
+			config:     strings.Replace(valid, "api_key_env = \"\"\n", "", 1),
+			wantSubstr: "embedding.api_key_env",
+		},
+		{
+			name:       "missing api key environment value",
+			config:     strings.Replace(valid, "api_key_env = \"\"", "api_key_env = \"MISSING_KEY\"", 1),
 			lookup:     func(string) (string, bool) { return "", false },
 			wantSubstr: "not set or empty",
 		},
@@ -301,6 +291,34 @@ func TestLoadConfigRejectsInvalidInputs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func completeRuntimeConfig(extensionBlock, suffix string) string {
+	parts := []string{
+		"[server]",
+		"host = \"127.0.0.1\"",
+		"port = 4765",
+		"",
+		"[cache]",
+		"path = \"cache/openai-compatible.db\"",
+		"max_size_mb = 4096",
+		"",
+	}
+	if extensionBlock != "" {
+		parts = append(parts, extensionBlock, "")
+	}
+	parts = append(parts,
+		"[fulltext]",
+		"analyzer = \"unicode61\"",
+		"",
+		"[embedding]",
+		"base_url = \"https://example.test/v1\"",
+		"model = \"fixture\"",
+		"dimensions = 8",
+		"similarity = \"cosine\"",
+		"api_key_env = \"\"",
+	)
+	return strings.Join(parts, "\n") + "\n" + suffix
 }
 
 func TestLoadOrCreateCredentialCreatesAndReusesToken(t *testing.T) {

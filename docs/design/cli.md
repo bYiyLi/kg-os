@@ -226,7 +226,7 @@ v1 installer 的推荐值冻结为：
 | `embedding.similarity` | `cosine` |
 | `embedding.api_key_env` | `OPENAI_API_KEY` |
 
-这些值只用于交互 prompt；它们不是 runtime 缺失字段默认值。用户可以输入其它合法值，也可以按 Enter 明确接受推荐值。
+这些值只用于交互 prompt；它们不是 runtime 缺失字段默认值。用户可以输入其它合法值，也可以按 Enter 明确接受推荐值。`embedding.api_key_env` 的空字符串是一个合法值，因此交互 prompt 使用 `""` 表示调用方显式选择 no-auth；直接 Enter 仍表示采用推荐的 `OPENAI_API_KEY`。
 
 `[fulltext]` 与 `[embedding]` 是初始化配置。交互安装进入这组字段前只显示一次当前语言对应的简短提示：
 

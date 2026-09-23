@@ -1,6 +1,6 @@
 # Phase 03：Installation & Runtime Onboarding
 
-**状态：`ready`**
+**状态：`in_progress`**
 
 ## 1. 目标与范围
 
@@ -55,9 +55,9 @@ kg ontology --at branch/main
 
 - Phase 00 / 01 / 02 均为 `done`；
 - 当前 Go CLI / daemon、`KG_HOME` path resolution、runtime directories、config parser、extension resolver、single-instance lock、foreground `kgosd`、graceful shutdown、Bearer middleware、Knowledge Base bootstrap 与 `kg ontology` 已有真实实现；
-- 当前代码仍保留旧基线：config 部分字段有 implicit defaults、CLI 只接受 `KG_TOKEN`、业务命令不 auto-start daemon、`kg daemon ...` 尚未实现。Phase 03 必须按 D72 直接替换这些旧预期，不为未发布 surface 建兼容层。
+- Phase 03 开始实现前的代码基线仍保留旧行为：config 部分字段有 implicit defaults、CLI 只接受 `KG_TOKEN`、业务命令不 auto-start daemon；公开 `kg daemon ...` 则从未形成正式实现。当前工作树已按 D72 直接替换这些旧预期，没有为未发布 surface 建兼容层。
 
-Design Inputs、前置依赖、工作顺序和 Acceptance 已齐全，因此当前 Phase 状态为 `ready`。
+Design Inputs、前置依赖、工作顺序和 Acceptance 已齐全；当前实现、验证和 Review 已进入收口阶段，因此 Phase 状态为 `in_progress`。
 
 ### 3.2 Lithograph baseline
 
@@ -386,4 +386,38 @@ Phase 03 只有同时满足以下条件才能从 `ready/in_progress` 进入 `don
 7. 完整本地门禁、fresh-source validation 与 Phase要求的远端 CI真实通过；
 8. 没有临时 config、secret、database fixture、extension cache、build artifact 或 unrelated改动进入提交。
 
-当前只完成了设计与计划，尚未实现 Phase 03，因此没有实现/验证/CI/commit证据可记录。
+## 9. 当前实现与验收证据
+
+2026-09-23 当前工作树已经完成 03.1–03.8 的本地实现。原 A–L Acceptance 保持不变，不以当前实现反向改写验收。
+
+| Acceptance | 当前证据 | 状态 |
+| --- | --- | --- |
+| A Fresh doctor | packaged / unit 路径验证不存在的 temporary `KG_HOME` 返回 `ready=false`，命令后目录仍不存在 | 本地通过 |
+| B Human interactive install | 真实 packaged `kg install` 在 PTY 中分别以 English / 中文 locale 执行，10 个缺失字段逐项询问，初始化配置提示各只出现一次；最终 config 全字段显式，且没有 `auth.json` / `kgos.db` | 本地通过 |
+| C Fully parameterized AI install | package smoke 与 Go tests 使用全部 flags、non-interactive stdin；输出 `status=installed`，官方两项 extension path / SHA-256 来自 distribution manifest，`cache.enabled` 不存在 | 本地通过 |
+| D Partial parameter input | Go tests覆盖 TTY 只问缺失字段、non-TTY `INSTALL_CONFIGURATION_INCOMPLETE` + 排序后的 missing keys，以及非法 supplied value 在 prompt 前直接失败 | 本地通过 |
+| E Existing install | Go tests覆盖合法 config 幂等、非法 config 不覆盖、existing + config flag 返回 `INVALID_ARGUMENT` | 本地通过 |
+| F Doctor ready + stopped | package smoke / Go tests验证 installed + stopped 为 `status=info, blocking=false, details.state=stopped` 且 overall ready | 本地通过 |
+| G First business command auto-start | `lithograph_smoke` 使用真实 Lithograph v0.3.0 / Provider：fresh install 后无 `KG_TOKEN` 执行 `kg ontology --at branch/main`，真实创建 auth/db/bootstrap并返回 Ontology | 本地通过 |
+| H Explicit credential precedence | real daemon integration验证本地 `auth.json` fallback；显式错误 `KG_TOKEN` 返回 daemon `AUTHENTICATION_FAILED`，不 fallback | 本地通过 |
+| I Concurrent auto-start | `lithograph_smoke` 并发两个真实业务 Ontology caller，对 stopped profile 复用 OS lock / ready endpoint，两个调用均成功；race gate同时覆盖并发数据竞争 | 本地通过 |
+| J Runtime failure | unit / integration覆盖 invalid config、missing artifact、spawn failure、child early exit、timeout、starting owner、malformed active owner与 bind/startup相关既有 Runtime失败路径 | 本地通过 |
+| K CLI surface 与 i18n | tests覆盖 `doctor/install/ontology` help、en/zh/unknown locale、稳定 machine identifier；旧 `/control` dev proxy / Web reserved-path假设已清理 | 本地通过 |
+| L Regression / quality gates | 最终主工作树 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均通过；包含 macOS arm64 Go race、90.1% statement coverage、govulncheck、TS coverage/type coverage、zero duplicates、build、Playwright、真实 Lithograph v0.3.0 native suite、package、license/audit/diff。最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate 尚未执行 | 本地通过 / 远端待执行 |
+
+### Phase Review
+
+本轮按第 7 节逐项 Review，并修复：
+
+- installer supplied value 曾可能在发现非法值前继续 prompt；现改为复用同一 config parser 预校验，非法输入直接失败；
+- 交互 installer 原先无法同时满足“空行采用推荐值”和 `embedding.api_key_env=""` 的显式 no-auth；现约定交互输入 `""` 表示显式空字符串，空行仍采用推荐的 `OPENAI_API_KEY`；
+- doctor 曾只按 remote extension cache manifest 是否存在判断 ready；现复用 resolver 的完整 cache integrity validation，损坏 cache 只报告 deferred，不误报 ready；
+- CLI-local `INSTALL_CONFIGURATION_INCOMPLETE` 曾进入 Kernel error constants；现收回 CLI ownership；
+- doctor 与 distribution 重复实现 artifact SHA-256；现由 `internal/runtimeprofile` 统一一个流式文件 hash helper；
+- 旧 English root-help 双真源、Vite `/control` proxy、内置 Web `/control` reserved-path 测试已删除；
+- external detached child 的脆弱 coverage-only 测试已删除，真实 auto-start 保留 native E2E + race 证据。
+- native auto-start E2E 曾在 `go test -coverprofile` 内再次执行嵌套 `go build`，会干扰 coverage artifact 生命周期；现由仓库 Go task / native task 统一预构建测试用 `kgosd` fixture并通过环境变量注入，coverage 与 native gate均稳定通过。
+- active lock 原先只要已经发布 endpoint 就会被视为 running；现按 Runtime 真源要求增加有界 TCP readiness probe，published 但不可连接的 owner 明确报告 `unavailable`，不会让业务命令向失效 endpoint dispatch。
+- auto-start child 提前退出时原先只能看到进程 exit error；现有界捕获 `kgosd` stderr 并合并进本地 lifecycle error，覆盖 invalid config / startup failure 的可诊断性，同时不新增 daemon-control surface。
+
+当前 reviewed local scope 未发现剩余 task-affecting implementation finding。Phase 03 仍不能进入 `done`，因为完成条件要求最终 pushed SHA 的 Ubuntu 24.04 x64 CI；本次任务没有 commit / push 授权，相关远端门禁尚未执行。

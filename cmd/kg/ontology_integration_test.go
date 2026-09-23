@@ -144,10 +144,10 @@ func TestOntologyCLIRealDaemonE2E(t *testing.T) {
 		true,
 		&stdout,
 		&stderr,
-	); code != 2 {
+	); code != 0 {
 		t.Fatalf("missing-token exit = %d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	if stdout.Len() != 0 || !strings.Contains(stderr.String(), string(kernel.CodeAuthenticationFailed)) {
+	if stderr.Len() != 0 || !strings.Contains(stdout.String(), "# Ontology") {
 		t.Fatalf("missing-token stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 
@@ -170,11 +170,11 @@ func TestOntologyCLIRealDaemonE2E(t *testing.T) {
 		true,
 		&stdout,
 		&stderr,
-	); code != 3 {
-		t.Fatalf("transport exit = %d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	); code != 2 {
+		t.Fatalf("unavailable-runtime exit = %d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	if stdout.Len() != 0 || !strings.Contains(stderr.String(), string(kernel.CodeIO)) {
-		t.Fatalf("transport stdout=%q stderr=%q", stdout.String(), stderr.String())
+		t.Fatalf("unavailable-runtime stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
 
@@ -233,12 +233,12 @@ func writeOntologyCLIConfig(t *testing.T, home string, port int) {
 	providerLibrary, _ = filepath.Abs(providerLibrary)
 	body := fmt.Sprintf(
 		"[server]\nhost = \"127.0.0.1\"\nport = %d\n\n"+
-			"[cache]\nenabled = false\nmax_size_mb = 16\n\n"+
+			"[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n"+
 			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithograph_init\"\n\n"+
 			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithographopenaicompatible_init\"\n\n"+
 			"[fulltext]\nanalyzer = \"unicode61\"\n\n"+
 			"[embedding]\nbase_url = \"https://example.invalid/v1\"\n"+
-			"model = \"phase02-cli\"\ndimensions = 3\nsimilarity = \"cosine\"\n",
+			"model = \"phase02-cli\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n",
 		port,
 		strconv.Quote(mainLibrary),
 		strconv.Quote(providerLibrary),

@@ -17,7 +17,7 @@ import (
 
 func TestRuntimeOpenLockResolverCredentialAndReopen(t *testing.T) {
 	home := t.TempDir()
-	writeIntegrationConfig(t, home, false, "")
+	writeIntegrationConfig(t, home, "")
 
 	first, err := Open(context.Background(), home, nil)
 	if err != nil {
@@ -116,7 +116,7 @@ func TestRuntimeStartupFailureReleasesLock(t *testing.T) {
 func TestRuntimeStartupFailuresAfterConfigReleaseLock(t *testing.T) {
 	t.Run("malformed credential", func(t *testing.T) {
 		home := t.TempDir()
-		writeIntegrationConfig(t, home, false, "")
+		writeIntegrationConfig(t, home, "")
 		if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte("{"), 0o600); err != nil {
 			t.Fatalf("write malformed auth.json: %v", err)
 		}
@@ -137,7 +137,7 @@ func TestRuntimeStartupFailuresAfterConfigReleaseLock(t *testing.T) {
 			t.Fatalf("write cache parent blocker: %v", err)
 		}
 		cachePath := filepath.Join(blocking, "provider.db")
-		writeIntegrationConfig(t, home, true, cachePath)
+		writeIntegrationConfig(t, home, cachePath)
 		opened, err := Open(context.Background(), home, nil)
 		if opened != nil {
 			_ = opened.Close()
@@ -150,7 +150,7 @@ func TestRuntimeStartupFailuresAfterConfigReleaseLock(t *testing.T) {
 
 	t.Run("missing extension", func(t *testing.T) {
 		home := t.TempDir()
-		writeIntegrationConfig(t, home, false, "")
+		writeIntegrationConfig(t, home, "")
 		body, err := os.ReadFile(filepath.Join(home, "config.toml"))
 		if err != nil {
 			t.Fatalf("read config.toml: %v", err)
@@ -191,7 +191,7 @@ func assertRuntimeLockReleased(t *testing.T, home string) {
 func TestRuntimeCreatesExternalProviderCacheParentWithoutCreatingCacheDatabase(t *testing.T) {
 	home := t.TempDir()
 	external := filepath.Join(t.TempDir(), "nested", "provider", "cache.db")
-	writeIntegrationConfig(t, home, true, external)
+	writeIntegrationConfig(t, home, external)
 	opened, err := Open(context.Background(), home, nil)
 	if err != nil {
 		t.Fatalf("open runtime with external cache path: %v", err)
@@ -208,7 +208,7 @@ func TestRuntimeCreatesExternalProviderCacheParentWithoutCreatingCacheDatabase(t
 	}
 }
 
-func writeIntegrationConfig(t *testing.T, home string, cacheEnabled bool, cachePath string) {
+func writeIntegrationConfig(t *testing.T, home string, cachePath string) {
 	t.Helper()
 	mainLibrary := os.Getenv("KGOS_LITHOGRAPH_LIBRARY")
 	providerLibrary := os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY")
@@ -217,16 +217,10 @@ func writeIntegrationConfig(t *testing.T, home string, cacheEnabled bool, cacheP
 	}
 	mainLibrary, _ = filepath.Abs(mainLibrary)
 	providerLibrary, _ = filepath.Abs(providerLibrary)
-	cache := ""
-	if cacheEnabled {
-		cache = "[cache]\nenabled = true\n"
-		if cachePath != "" {
-			cache += "path = " + strconv.Quote(cachePath) + "\n"
-		}
-		cache += "max_size_mb = 16\n\n"
-	} else {
-		cache = "[cache]\nenabled = false\nmax_size_mb = 16\n\n"
+	if cachePath == "" {
+		cachePath = "cache/openai-compatible.db"
 	}
+	cache := "[cache]\npath = " + strconv.Quote(cachePath) + "\nmax_size_mb = 16\n\n"
 	body := "[server]\nhost = \"127.0.0.1\"\nport = 4765\n\n" +
 		cache +
 		"[[sqlite.extensions]]\nsource = " + strconv.Quote(mainLibrary) + "\n" +
@@ -235,7 +229,7 @@ func writeIntegrationConfig(t *testing.T, home string, cacheEnabled bool, cacheP
 		"entrypoint = \"sqlite3_lithographopenaicompatible_init\"\n\n" +
 		"[fulltext]\nanalyzer = \"unicode61\"\n\n" +
 		"[embedding]\nbase_url = \"https://example.invalid/v1\"\n" +
-		"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\n"
+		"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n"
 	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(body), 0o600); err != nil {
 		t.Fatalf("write config.toml: %v", err)
 	}

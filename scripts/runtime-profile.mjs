@@ -16,6 +16,10 @@ export async function prepareRuntimeProfile({ root, home, host, port }) {
       "host = " + JSON.stringify(host),
       "port = " + String(port),
       "",
+      "[cache]",
+      'path = "cache/openai-compatible.db"',
+      "max_size_mb = 4096",
+      "",
       "[[sqlite.extensions]]",
       "source = " + JSON.stringify(mainLibrary),
       'entrypoint = "sqlite3_lithograph_init"',
@@ -31,7 +35,8 @@ export async function prepareRuntimeProfile({ root, home, host, port }) {
       'base_url = "https://example.invalid/v1"',
       'model = "phase01-runtime-fixture"',
       "dimensions = 3",
-      'similarity = "cosine"'
+      'similarity = "cosine"',
+      'api_key_env = ""'
     ].join("\n") + "\n";
 
   await mkdir(home, { recursive: true });

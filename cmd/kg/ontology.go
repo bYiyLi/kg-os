@@ -12,7 +12,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/bYiyLi/kg-os/internal/command"
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/bYiyLi/kg-os/internal/runtimeprofile"
 )
@@ -43,7 +42,7 @@ func runOntology(
 	stderr io.Writer,
 ) int {
 	if hasHelp(args) {
-		_, _ = io.WriteString(stdout, command.KGOntologyHelp())
+		_, _ = io.WriteString(stdout, ontologyHelp(detectLocale()))
 		return 0
 	}
 	if len(args) != 0 && args[0] == "patch" {
@@ -65,7 +64,7 @@ func runOntologyRead(
 	stdout io.Writer,
 	stderr io.Writer,
 ) int {
-	target, code := resolveCLITarget(stderr)
+	target, code := resolveCLITarget(ctx, stderr)
 	if code != 0 {
 		return code
 	}
@@ -108,7 +107,7 @@ func runOntologyEdit(
 	if len(input.Refs) == 0 {
 		return writeLocalCLIError(stderr, kernel.CodeInvalidArgument, "--edit requires 1..100 OntologyRef values", 2)
 	}
-	target, code := resolveCLITarget(stderr)
+	target, code := resolveCLITarget(ctx, stderr)
 	if code != 0 {
 		return code
 	}
@@ -170,7 +169,7 @@ func runOntologyPatch(
 	if code != 0 {
 		return code
 	}
-	target, code := resolveCLITarget(stderr)
+	target, code := resolveCLITarget(ctx, stderr)
 	if code != 0 {
 		return code
 	}
@@ -407,18 +406,27 @@ type cliTarget struct {
 	Token    string
 }
 
-func resolveCLITarget(stderr io.Writer) (cliTarget, int) {
-	token := os.Getenv("KG_TOKEN")
-	if token == "" {
-		return cliTarget{}, writeLocalCLIError(stderr, kernel.CodeAuthenticationFailed, "KG_TOKEN is required", 2)
-	}
+func resolveCLITarget(ctx context.Context, stderr io.Writer) (cliTarget, int) {
 	paths, err := runtimeprofile.ResolvePaths(os.Getenv("KG_HOME"))
 	if err != nil {
-		return cliTarget{}, writeLocalCLIError(stderr, kernel.CodeIO, "resolve KG_HOME failed", 3)
+		return cliTarget{}, writeLocalCLIError(stderr, kernel.CodeIO, "resolve KG_HOME failed", 2)
 	}
-	endpoint, err := runtimeprofile.ReadActiveEndpoint(paths.Lock)
+	endpoint, err := ensureRuntime(ctx, paths)
 	if err != nil {
-		return cliTarget{}, writeLocalCLIError(stderr, kernel.CodeIO, "active kgosd is unavailable", 3)
+		return cliTarget{}, writeLocalCLIError(stderr, kernel.CodeIO, "ensure kgosd failed: "+err.Error(), 2)
+	}
+	token := os.Getenv("KG_TOKEN")
+	if token == "" {
+		credential, err := runtimeprofile.LoadCredential(paths)
+		if err != nil {
+			return cliTarget{}, writeLocalCLIError(
+				stderr,
+				kernel.CodeAuthenticationFailed,
+				"local KG OS credential is unavailable",
+				2,
+			)
+		}
+		token = credential.Token
 	}
 	return cliTarget{Endpoint: strings.TrimRight(endpoint, "/"), Token: token}, 0
 }

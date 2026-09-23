@@ -2,6 +2,7 @@ import { mkdir, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { currentLithographArtifact } from "./lithograph-artifacts.mjs";
+import { prepareKGOSDDaemonFixture } from "./go-fixtures.mjs";
 import { run, runCapture } from "./process.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -17,8 +18,14 @@ const nativeTags = "sqlite_fts5,lithograph_smoke";
 async function nativeEnvironment() {
   await run("node", ["scripts/prepare-lithograph.mjs"], { cwd: root, env: goEnv });
   const artifact = currentLithographArtifact(root);
+  const daemonBinary = await prepareKGOSDDaemonFixture({
+    root,
+    env: goEnv,
+    tags: sqliteTags
+  });
   return {
     ...goEnv,
+    KGOS_KGOSD_BINARY: daemonBinary,
     KGOS_LITHOGRAPH_LIBRARY: resolve(artifact.cacheDirectory, artifact.library),
     KGOS_LITHOGRAPH_PROVIDER_LIBRARY: resolve(artifact.cacheDirectory, artifact.providerLibrary)
   };

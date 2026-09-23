@@ -53,10 +53,8 @@ func Open(ctx context.Context, explicitHome string, client *http.Client) (_ *Run
 	if err != nil {
 		return nil, err
 	}
-	if config.Cache.Enabled {
-		if err := os.MkdirAll(filepath.Dir(config.Cache.Path), 0o700); err != nil {
-			return nil, fmt.Errorf("create Provider cache parent directory: %w", err)
-		}
+	if err := os.MkdirAll(filepath.Dir(config.Cache.Path), 0o700); err != nil {
+		return nil, fmt.Errorf("create Provider cache parent directory: %w", err)
 	}
 	extensions, err := runtimeprofile.ResolveExtensions(ctx, paths, config.SQLite.Extensions, client)
 	if err != nil {

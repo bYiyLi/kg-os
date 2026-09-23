@@ -57,11 +57,11 @@ Feature 是实现单元，Phase 是默认交付与验收单元。Feature 完成�
 
 旧 Phase 01 TypeScript / `ffi-rs` / 自制 SQLite runtime / v0.2.x 实现尝试已经从当前工程基线清理；原 Phase 00 重复 Lithograph execution smoke也已在 Phase 01实现时删除，`internal/lithographtest`只保留 bundled SQLite build-profile测试。正式 bundled SQLite connection lifecycle、Runtime host与transaction adapter已经进入当前 `main` 基线；业务数据库语义与Knowledge Base bootstrap仍由后续 Phase拥有。
 
-Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime secret ownership；Phase 02 已在其上完成 Ontology data routes 的统一 Bearer authentication、Knowledge Base bootstrap 与正式 `kg ontology` client surface。当前设计已经用 [D72](../design/decisions.md#d72-local-install-runtime-onboarding) 替换公开 daemon control 方案：普通用户通过 `doctor/install` 完成本地 onboarding，业务 CLI 自动确保 Runtime 可用。该调整将在 Phase 03 实现；通用 Object / Graph / Evolution、SDK/Web/Skill 业务交互仍属于后续阶段。
+Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime secret ownership；Phase 02 已在其上完成 Ontology data routes 的统一 Bearer authentication、Knowledge Base bootstrap 与正式 `kg ontology` client surface。当前设计已经用 [D72](../design/decisions.md#d72-local-install-runtime-onboarding) 替换公开 daemon control 方案：普通用户通过 `doctor/install` 完成本地 onboarding，业务 CLI 自动确保 Runtime 可用。该调整已在 Phase 03 当前工作树实现；通用 Object / Graph / Evolution、SDK/Web/Skill 业务交互仍属于后续阶段。
 
 **Phase 02 当前为 `done`。** Knowledge Base bootstrap、internal semantic graph / Binding、Ontology read/edit、Ontology-scoped Object Patch、Schema/Constraint/Index compiler、authenticated HTTP 与正式 `kg ontology` CLI均已实现并完成本地/远端验收。实现提交 `8e776043337bcda24a271f84af1c04fc0da515cc` 已推送到 `main`；主工作树完整 `pnpm validate`、独立 fresh-source setup + full validation、forced pre-commit、final diff/review与真实 Lithograph v0.3.0 native suite均成功，Ubuntu 24.04 x64 GitHub Actions run `35804756510` / Validate job `107002937680` 成功。普通 Knowledge 数据 CRUD、Graph、Evolution、SDK/Web/Skill仍属于后续阶段。
 
-**Phase 03 当前为 `ready`。** 设计与 Acceptance 已冻结为本地 Installation & Runtime Onboarding：`kg doctor` 只读诊断、`kg install` 完整显式配置、中英文 human-facing CLI、`KG_TOKEN -> auth.json` 本机 credential resolution，以及业务命令在 daemon stopped 时自动拉起 `kgosd`。当前代码仍是 Phase 02 完成基线，Phase 03 尚未开始实现，因此不能把新 CLI 行为描述成当前已可用。
+**Phase 03 当前为 `in_progress`。** `kg doctor` 只读诊断、`kg install` 完整显式配置、中英文 human-facing CLI、`KG_TOKEN -> auth.json` 本机 credential resolution、package artifact discovery/integrity，以及业务命令在 daemon stopped 时自动拉起 `kgosd` 已在当前工作树实现。macOS arm64 主工作树 full validation、独立 fresh-source、真实 packaged PTY en/zh install、真实 Lithograph v0.3.0 首次/并发 auto-start 与 Phase Review 已取得本地证据；最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate 尚未执行，所以不能标 `done`。
 
 ## 5. 路线总览
 
@@ -70,7 +70,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [00 Engineering Foundation](phases/00-engineering-foundation.md) | `done` | Go 1.27.1 daemon/kernel/CLI + TypeScript SDK/Web workspace、pinned Go quality tools、bundled CGO/SQLite+FTS5 baseline、90% coverage/race/security gates、真实 v0.3.0 smoke、macOS arm64 + Ubuntu 24.04 x64 native证据 | [D65](../design/decisions.md#d65-go-runtime)、[D66](../design/decisions.md#d66-lithograph-v030-sql-only) |
 | [01 Runtime & Lithograph Host Foundation](phases/01-runtime-lithograph-host.md) | `done` | `KG_HOME`、config/credential、extension resolver、Go read/write SQLite host、v0.3.0 SQL execution/stream/cancel、explicit tx、runtime ownership | [Runtime](../design/runtime.md)、[Go 数据库接入](../design/implementation.md#go-运行时与数据库接入) |
 | [02 Ontology](phases/02-ontology.md) | `done` | KG OS bootstrap、internal semantic graph / Binding、Ontology read/edit/Patch、Schema/Constraint/Index compiler、authenticated HTTP + `kg ontology` | [Ontology](../design/ontology.md)、[Object Patch](../design/object.md#object-公共调用合同)、[Bootstrap](../design/architecture.md#knowledge-base-bootstrap) |
-| [03 Installation & Runtime Onboarding](phases/03-installation-runtime-onboarding.md) | `ready` | `kg doctor`、`kg install`、完整显式 config、en/zh、人机双路径 installer、本机 credential fallback、业务命令 Runtime auto-start | [D72](../design/decisions.md#d72-local-install-runtime-onboarding)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md) |
+| [03 Installation & Runtime Onboarding](phases/03-installation-runtime-onboarding.md) | `in_progress` | `kg doctor`、`kg install`、完整显式 config、en/zh、人机双路径 installer、本机 credential fallback、业务命令 Runtime auto-start | [D72](../design/decisions.md#d72-local-install-runtime-onboarding)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md) |
 
 当前实现依赖顺序：
 
@@ -87,7 +87,7 @@ Go Engineering Foundation
   -> complete SDK / Web / Skill and release closure
 ```
 
-Phase 02 已完成；Phase 03 已按本次已确认设计建立并处于 `ready`。Phase 04 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
+Phase 02 已完成；Phase 03 当前本地实现与验收已闭环，保持 `in_progress` 等待最终 pushed SHA 的 Ubuntu 24.04 x64 CI。Phase 04 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
 
 ## 6. Phase 通用完成标准
 

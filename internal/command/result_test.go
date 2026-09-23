@@ -14,11 +14,10 @@ func TestEvaluateKG(t *testing.T) {
 		code int
 		want string
 	}{
-		{name: "default help", want: "KG OS command-line client"},
-		{name: "long help", args: []string{"--help"}, want: "Usage: kg"},
-		{name: "short help", args: []string{"other", "-h"}, want: "Usage: kg"},
 		{name: "version", args: []string{"--version"}, want: "0.0.0\n"},
 		{name: "short version", args: []string{"-V"}, want: "0.0.0\n"},
+		{name: "empty unsupported", code: 2, want: "not available"},
+		{name: "help unsupported internally", args: []string{"--help"}, code: 2, want: "not available"},
 		{name: "unsupported", args: []string{"object", "read"}, code: 2, want: "not available"},
 	} {
 		test := test
