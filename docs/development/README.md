@@ -65,6 +65,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 04 当前为 `done`。** 五类 Object batch read、Knowledge Node/Relationship公共投影、通用 batch Object Patch、mixed Ontology+Knowledge transaction、authenticated daemon adapter 与正式 `kg object read/patch` 已实现并完成本地/远端验收。主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均通过，Go statement coverage 为 **90.2%**、jscpd 为 0 clones，Phase Review 无剩余 task-affecting finding；`object list/search` 仍按 D73 不存在。实现提交 `d1b4d8ccd792d009496596141520e0a930ae9ef3` 已推送到 `main`，Ubuntu 24.04 x64 GitHub Actions run `35870467442` / Validate job `107212896176` 成功。
 
+**Phase 05 当前为 `ready`。** Graph Query & Execute 的 Design Inputs、Phase 01 host基线、Feature顺序与 A–J Acceptance 已齐全，计划入口见 [Phase 05](phases/05-graph.md)。本阶段只开放 `kg graph query` / `kg graph execute`，复用现有 Lithograph v0.3.0 query/execute/stream/cancellation adapter，完成 authenticated HTTP、NDJSON streaming、Full-text / Semantic public path与CLI；当前尚未开始 Phase 05 public Graph实现，Phase 01 host-level测试不作为本阶段完成证据。
+
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |
@@ -74,6 +76,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [02 Ontology](phases/02-ontology.md) | `done` | KG OS bootstrap、internal semantic graph / Binding、Ontology read/edit/Patch、Schema/Constraint/Index compiler、authenticated HTTP + `kg ontology` | [Ontology](../design/ontology.md)、[Object Patch](../design/object.md#object-公共调用合同)、[Bootstrap](../design/architecture.md#knowledge-base-bootstrap) |
 | [03 Installation & Runtime Onboarding](phases/03-installation-runtime-onboarding.md) | `done` | `kg doctor`、`kg install`、完整显式 config、en/zh、人机双路径 installer、本机 credential fallback、业务命令 Runtime auto-start | [D72](../design/decisions.md#d72-local-install-runtime-onboarding)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md) |
 | [04 General Object Read & Patch](phases/04-object.md) | `done` | 五类 Object batch read、Knowledge Node/Relationship投影、通用 batch Patch、CLI text/file/stdin 输入；本地/fresh-source/Ubuntu CI验收完成 | [D73](../design/decisions.md#d73-object-read-patch-surface)、[Object](../design/object.md)、[CLI](../design/cli.md) |
+| [05 Graph Query & Execute](phases/05-graph.md) | `ready` | `kg graph query/execute`、authenticated HTTP、JSON/NDJSON、Full-text / Semantic / Lithograph JSON passthrough、cancellation与transport hardening | [Graph](../design/graph.md)、[Graph CLI](../design/cli.md#graph-cli)、[Streaming](../design/runtime.md#graph-http-streaming-framing) |
 
 当前实现依赖顺序：
 
@@ -86,12 +89,13 @@ Go Engineering Foundation
        (doctor / install / complete config / i18n / local credential / auto-start)
   -> Phase 04: General Object Read & Patch
        (batch read / Knowledge Node+Relationship / batch patch)
-  -> Graph query/execute and managed search integration
+  -> Phase 05: Graph Query & Execute
+       (query / execute / HTTP / NDJSON / Full-text / Semantic)
   -> Evolution and Merge
   -> complete SDK / Web / Skill and release closure
 ```
 
-Phase 02、Phase 03 与 Phase 04 均已完成。Phase 05 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
+Phase 02、Phase 03 与 Phase 04 均已完成；Phase 05 已建立并为 `ready`。Phase 06 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
 
 ## 6. Phase 通用完成标准
 
@@ -114,5 +118,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 02：Ontology](phases/02-ontology.md)
 - [Phase 03：Installation & Runtime Onboarding](phases/03-installation-runtime-onboarding.md)
 - [Phase 04：General Object Read & Patch](phases/04-object.md)
+- [Phase 05：Graph Query & Execute](phases/05-graph.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

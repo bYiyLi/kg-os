@@ -35,7 +35,7 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 ## 当前状态
 
-**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 00–04 均已完成。** 当前基线已经具备五类 Object batch read、Knowledge Node/Relationship公共投影、通用 batch Object Patch、mixed Ontology+Knowledge transaction 与 `kg object read/patch`；Phase 04 的主工作树、独立 fresh-source 与 Ubuntu 24.04 x64 CI 验收均已闭环。
+**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 00–04 均已完成，Phase 05 Graph Query & Execute 已规划并进入 `ready`。** 当前已实现基线具备五类 Object batch read、Knowledge Node/Relationship公共投影、通用 batch Object Patch、mixed Ontology+Knowledge transaction 与 `kg object read/patch`；Graph public HTTP/CLI尚未实现，Phase 05 将复用 Phase 01 query/execute/stream/cancellation host完成 `kg graph query/execute`、NDJSON streaming与Full-text / Semantic公共查询路径。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
@@ -46,6 +46,8 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 **Phase 03 Installation & Runtime Onboarding 当前为 `done`。** `kg doctor -> kg install -> kg ontology ...` 首次流程、正式 package artifact discovery/integrity、完整显式配置、中英文交互、本机 credential fallback 与并发安全的 Runtime auto-start 已实现并完成本地/远端验收。实现提交 `c15a6c062ea457c7a72c90a59f46b77b4ae5c053` 已推送到 `main`；最终主工作树 validation、独立 fresh-source、真实 PTY、真实 Lithograph 首次/并发 auto-start 与 Ubuntu 24.04 x64 GitHub Actions run `35834430037` / Validate job `107094383436` 均成功。
 
 **Phase 04 General Object Read & Patch 当前为 `done`。** 通用 Object surface 只保留 batch `read` 与 batch `patch`：一次 read 接受 1..100 个明确 Ref并固定同一 State；CLI支持 positional text、refs file与stdin；一个 Git Extended Diff可原子修改多个 Ontology / Knowledge Object，并支持 inline patch、patch file与stdin。实现提交 `d1b4d8ccd792d009496596141520e0a930ae9ef3` 已推送到 `main`；主树和独立 fresh-source `pnpm validate` 均通过，Go statement coverage **90.2%**、jscpd 0 clones，Ubuntu 24.04 x64 GitHub Actions run `35870467442` / Validate job `107212896176` 成功。
+
+**Phase 05 Graph Query & Execute 当前为 `ready`。** 本阶段计划只新增 `kg graph query` 与 `kg graph execute` 两个canonical命令，并完成authenticated Graph HTTP、non-stream JSON、NDJSON streaming、Full-text / Semantic / Lithograph JSON passthrough、cancellation与transport failure验收；当前尚未开始Phase 05实现，完整范围和Acceptance见[阶段计划](docs/development/phases/05-graph.md)。
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
@@ -73,5 +75,6 @@ KG OS 采用双许可模式：
 - [Phase 02 计划](docs/development/phases/02-ontology.md)：Knowledge Base bootstrap 与完整 Ontology 能力的范围、Feature、验收和 Review。
 - [Phase 03 计划](docs/development/phases/03-installation-runtime-onboarding.md)：doctor / install、完整配置、i18n、本机认证与 Runtime auto-start 的范围和验收。
 - [Phase 04 计划](docs/development/phases/04-object.md)：通用 Object batch read、Knowledge Node/Relationship 与 batch Patch 的范围和验收。
+- [Phase 05 计划](docs/development/phases/05-graph.md)：Graph query/execute、authenticated HTTP、NDJSON streaming、Full-text / Semantic公共路径与 transport/cancellation 验收。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。
