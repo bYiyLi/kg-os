@@ -1,6 +1,6 @@
 # Phase 03：Installation & Runtime Onboarding
 
-**状态：`in_progress`**
+**状态：`done`**
 
 ## 1. 目标与范围
 
@@ -57,7 +57,7 @@ kg ontology --at branch/main
 - 当前 Go CLI / daemon、`KG_HOME` path resolution、runtime directories、config parser、extension resolver、single-instance lock、foreground `kgosd`、graceful shutdown、Bearer middleware、Knowledge Base bootstrap 与 `kg ontology` 已有真实实现；
 - Phase 03 开始实现前的代码基线仍保留旧行为：config 部分字段有 implicit defaults、CLI 只接受 `KG_TOKEN`、业务命令不 auto-start daemon；公开 `kg daemon ...` 则从未形成正式实现。当前工作树已按 D72 直接替换这些旧预期，没有为未发布 surface 建兼容层。
 
-Design Inputs、前置依赖、工作顺序和 Acceptance 已齐全；当前实现、验证和 Review 已进入收口阶段，因此 Phase 状态为 `in_progress`。
+Design Inputs、前置依赖、工作顺序和 Acceptance 已齐全；实现、验证、Review、本地完整验收与远端 Ubuntu 24.04 x64 CI 均已完成，因此 Phase 状态为 `done`。
 
 ### 3.2 Lithograph baseline
 
@@ -403,7 +403,7 @@ Phase 03 只有同时满足以下条件才能从 `ready/in_progress` 进入 `don
 | I Concurrent auto-start | `lithograph_smoke` 并发两个真实业务 Ontology caller，对 stopped profile 复用 OS lock / ready endpoint，两个调用均成功；race gate同时覆盖并发数据竞争 | 本地通过 |
 | J Runtime failure | unit / integration覆盖 invalid config、missing artifact、spawn failure、child early exit、timeout、starting owner、malformed active owner与 bind/startup相关既有 Runtime失败路径 | 本地通过 |
 | K CLI surface 与 i18n | tests覆盖 `doctor/install/ontology` help、en/zh/unknown locale、稳定 machine identifier；旧 `/control` dev proxy / Web reserved-path假设已清理 | 本地通过 |
-| L Regression / quality gates | 最终主工作树 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均通过；包含 macOS arm64 Go race、90.1% statement coverage、govulncheck、TS coverage/type coverage、zero duplicates、build、Playwright、真实 Lithograph v0.3.0 native suite、package、license/audit/diff。最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate 尚未执行 | 本地通过 / 远端待执行 |
+| L Regression / quality gates | 最终主工作树 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均通过；包含 macOS arm64 Go race、90.1% statement coverage、govulncheck、TS coverage/type coverage、zero duplicates、build、Playwright、真实 Lithograph v0.3.0 native suite、package、license/audit/diff。实现提交 `c15a6c062ea457c7a72c90a59f46b77b4ae5c053` 对应 Ubuntu 24.04 x64 GitHub Actions run `35834430037` / Validate job `107094383436` 成功 | 已通过 |
 
 ### Phase Review
 
@@ -420,4 +420,4 @@ Phase 03 只有同时满足以下条件才能从 `ready/in_progress` 进入 `don
 - active lock 原先只要已经发布 endpoint 就会被视为 running；现按 Runtime 真源要求增加有界 TCP readiness probe，published 但不可连接的 owner 明确报告 `unavailable`，不会让业务命令向失效 endpoint dispatch。
 - auto-start child 提前退出时原先只能看到进程 exit error；现有界捕获 `kgosd` stderr 并合并进本地 lifecycle error，覆盖 invalid config / startup failure 的可诊断性，同时不新增 daemon-control surface。
 
-当前 reviewed local scope 未发现剩余 task-affecting implementation finding。Phase 03 仍不能进入 `done`，因为完成条件要求最终 pushed SHA 的 Ubuntu 24.04 x64 CI；本次任务没有 commit / push 授权，相关远端门禁尚未执行。
+当前 reviewed scope 未发现剩余 task-affecting implementation finding。Phase 03 的 03.1–03.8、A–L Acceptance、Phase Review、本地完整 validation、fresh-source validation 与要求的 Ubuntu 24.04 x64 CI 均已闭环，阶段进入 `done`。
