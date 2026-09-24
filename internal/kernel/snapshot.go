@@ -10,10 +10,14 @@ import (
 )
 
 type snapshot struct {
-	State       string
-	Domains     map[string]*domainRecord
-	Definitions map[OntologyRef]*definitionRecord
+	State                 string
+	Domains               map[string]*domainRecord
+	Definitions           map[OntologyRef]*definitionRecord
+	internalNodes         map[string]internalNode
+	internalRelationships map[string]taggedRelationship
 }
+
+type snapshotQuery func(string) (lithograph.Result, error)
 
 type domainRecord struct {
 	Value     Domain
@@ -71,7 +75,31 @@ func (service *Service) decodeSnapshot(ctx context.Context, stateRef string) (*s
 }
 
 func (service *Service) decodeResolvedSnapshot(ctx context.Context, state string) (*snapshot, error) {
-	graphNodes, graphRelationships, err := service.readGraphType(ctx, state)
+	return service.decodeSnapshotWithQuery(state, func(cypher string) (lithograph.Result, error) {
+		query, err := service.database.Query(ctx, lithograph.QueryRequest{At: state, Cypher: cypher})
+		if err != nil {
+			return lithograph.Result{}, AsPublicError(err)
+		}
+		return query.Result, nil
+	})
+}
+
+func (service *Service) decodeMergeCandidateSnapshot(
+	ctx context.Context,
+	session string,
+	revision int64,
+) (*snapshot, error) {
+	return service.decodeSnapshotWithQuery("", func(cypher string) (lithograph.Result, error) {
+		result, err := service.database.QueryMergeCandidate(ctx, session, revision, cypher)
+		if err != nil {
+			return lithograph.Result{}, graphPublicError(err)
+		}
+		return result, nil
+	})
+}
+
+func (service *Service) decodeSnapshotWithQuery(state string, query snapshotQuery) (*snapshot, error) {
+	graphNodes, graphRelationships, err := readGraphTypeWithQuery(query)
 	if err != nil {
 		return nil, err
 	}
@@ -82,19 +110,21 @@ func (service *Service) decodeResolvedSnapshot(ctx context.Context, state string
 	if err := validateReservedGraphType(graphNodes, graphRelationships); err != nil {
 		return nil, err
 	}
-	internalNodes, internalRelationships, err := service.readInternalGraph(ctx, state)
+	internalNodes, internalRelationships, err := readInternalGraphWithQuery(query)
 	if err != nil {
 		return nil, err
 	}
 	result := &snapshot{
-		State:       state,
-		Domains:     map[string]*domainRecord{},
-		Definitions: definitions,
+		State:                 state,
+		Domains:               map[string]*domainRecord{},
+		Definitions:           definitions,
+		internalNodes:         internalNodes,
+		internalRelationships: internalRelationships,
 	}
 	if err := bindInternalGraph(result, internalNodes, internalRelationships, nodeElementIDs); err != nil {
 		return nil, err
 	}
-	if err := service.decodeSchemaResources(ctx, result); err != nil {
+	if err := decodeSchemaResourcesWithQuery(result, query); err != nil {
 		return nil, err
 	}
 	for _, record := range result.Definitions {
@@ -118,18 +148,14 @@ func (service *Service) decodeResolvedSnapshot(ctx context.Context, state string
 	return result, nil
 }
 
-func (service *Service) readGraphType(
-	ctx context.Context,
-	state string,
+func readGraphTypeWithQuery(
+	query snapshotQuery,
 ) (map[string]graphTypeNode, map[string]graphTypeRelationship, error) {
-	query, err := service.database.Query(ctx, lithograph.QueryRequest{
-		At:     state,
-		Cypher: "SHOW CURRENT GRAPH TYPE AS GRAPH",
-	})
+	result, err := query("SHOW CURRENT GRAPH TYPE AS GRAPH")
 	if err != nil {
-		return nil, nil, AsPublicError(err)
+		return nil, nil, err
 	}
-	return decodeGraphTypeResult(query.Result)
+	return decodeGraphTypeResult(result)
 }
 
 func decodeGraphTypeResult(

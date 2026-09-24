@@ -181,3 +181,109 @@ type TagMutationResult struct {
 	State         string `json:"state,omitempty"`
 	PreviousState string `json:"previousState,omitempty"`
 }
+
+type MergeConflictResolution struct {
+	Choice string          `json:"choice"`
+	Value  json.RawMessage `json:"value,omitempty"`
+}
+
+type MergeConflict struct {
+	ConflictID  string                   `json:"conflictId"`
+	Kind        ObjectKind               `json:"kind"`
+	Path        string                   `json:"path"`
+	BaseRef     string                   `json:"baseRef,omitempty"`
+	OursRef     string                   `json:"oursRef,omitempty"`
+	TheirsRef   string                   `json:"theirsRef,omitempty"`
+	RelatedRefs []string                 `json:"relatedRefs,omitempty"`
+	Base        json.RawMessage          `json:"base,omitempty"`
+	Ours        json.RawMessage          `json:"ours,omitempty"`
+	Theirs      json.RawMessage          `json:"theirs,omitempty"`
+	Resolution  *MergeConflictResolution `json:"resolution,omitempty"`
+
+	nativeSlot string
+}
+
+type MergeResolution struct {
+	ConflictID string          `json:"conflictId"`
+	Choice     string          `json:"choice"`
+	Value      json.RawMessage `json:"value,omitempty"`
+}
+
+type MergeSessionSummary struct {
+	Session     string `json:"session"`
+	Branch      string `json:"branch"`
+	TargetState string `json:"targetState"`
+	SourceState string `json:"sourceState"`
+	Revision    int64  `json:"revision"`
+}
+
+type MergeSession struct {
+	Session     string `json:"session"`
+	Branch      string `json:"branch"`
+	TargetState string `json:"targetState"`
+	SourceState string `json:"sourceState"`
+	Revision    int64  `json:"revision"`
+	Status      string `json:"status"`
+	Unresolved  int64  `json:"unresolved"`
+}
+
+type MergeStartRequest struct {
+	Branch string `json:"branch"`
+	Source string `json:"source"`
+}
+
+type MergeListRequest struct {
+	Limit  int    `json:"limit,omitempty"`
+	Cursor string `json:"cursor,omitempty"`
+}
+
+type MergeListResult struct {
+	Items  []MergeSessionSummary `json:"items"`
+	Cursor string                `json:"cursor,omitempty"`
+}
+
+type MergeGetRequest struct {
+	Session string `json:"session"`
+}
+
+type MergeConflictsRequest struct {
+	Session string `json:"session"`
+	Limit   int    `json:"limit,omitempty"`
+	Cursor  string `json:"cursor,omitempty"`
+}
+
+type MergeConflictsResult struct {
+	Session  string          `json:"session"`
+	Revision int64           `json:"revision"`
+	Items    []MergeConflict `json:"items"`
+	Cursor   string          `json:"cursor,omitempty"`
+}
+
+type MergeResolveRequest struct {
+	Session          string            `json:"session"`
+	ExpectedRevision int64             `json:"expectedRevision"`
+	Resolutions      []MergeResolution `json:"resolutions"`
+}
+
+type MergeFinalizeRequest struct {
+	Session          string  `json:"session"`
+	ExpectedRevision int64   `json:"expectedRevision"`
+	Author           *string `json:"author,omitempty"`
+	Message          *string `json:"message,omitempty"`
+}
+
+type MergeFinalizeResult struct {
+	Status      string `json:"status"`
+	TargetState string `json:"targetState"`
+	SourceState string `json:"sourceState"`
+	State       string `json:"state"`
+}
+
+type MergeAbortRequest struct {
+	Session          string `json:"session"`
+	ExpectedRevision int64  `json:"expectedRevision"`
+}
+
+type MergeAbortResult struct {
+	Session string `json:"session"`
+}

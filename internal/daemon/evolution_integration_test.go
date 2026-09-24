@@ -66,9 +66,145 @@ func TestPhase06EvolutionHTTPContract(t *testing.T) {
 		t.Fatalf("missing State status=%d body=%s", notFound.Code, notFound.Body.String())
 	}
 
-	merge := evolutionAPIRequest(t, handler, runtime.Credential.Token, http.MethodPost, "/api/v1/evolution/merge/start", struct{}{})
-	if merge.Code != http.StatusNotFound {
-		t.Fatalf("Phase 06 unexpectedly registered Merge route: status=%d body=%s", merge.Code, merge.Body.String())
+}
+
+func TestPhase07EvolutionMergeHTTPContract(t *testing.T) {
+	runtime := openDaemonRuntime(t, freePort(t))
+	defer runtime.Close()
+	handler := NewHandler(runtime, http.NotFoundHandler())
+	token := runtime.Credential.Token
+
+	overview := evolutionAPIRequest(
+		t, handler, token, http.MethodPost, "/api/v1/evolution/overview", struct{}{},
+	)
+	if overview.Code != http.StatusOK {
+		t.Fatalf("overview status=%d body=%s", overview.Code, overview.Body.String())
+	}
+	var summary kernel.EvolutionOverviewResult
+	if err := json.Unmarshal(overview.Body.Bytes(), &summary); err != nil {
+		t.Fatalf("decode overview: %v", err)
+	}
+
+	start := evolutionAPIRequest(
+		t,
+		handler,
+		token,
+		http.MethodPost,
+		"/api/v1/evolution/merge/start",
+		kernel.MergeStartRequest{Branch: "main", Source: summary.State},
+	)
+	if start.Code != http.StatusOK {
+		t.Fatalf("merge start status=%d body=%s", start.Code, start.Body.String())
+	}
+	var session kernel.MergeSession
+	if err := json.Unmarshal(start.Body.Bytes(), &session); err != nil ||
+		session.Status != "up_to_date" || session.Unresolved != 0 || session.Revision < 1 {
+		t.Fatalf("merge start = %#v err=%v", session, err)
+	}
+
+	list := evolutionAPIRequest(
+		t, handler, token, http.MethodPost, "/api/v1/evolution/merge/list",
+		kernel.MergeListRequest{Limit: 10},
+	)
+	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), session.Session) {
+		t.Fatalf("merge list status=%d body=%s", list.Code, list.Body.String())
+	}
+	get := evolutionAPIRequest(
+		t, handler, token, http.MethodPost, "/api/v1/evolution/merge/get",
+		kernel.MergeGetRequest{Session: session.Session},
+	)
+	if get.Code != http.StatusOK {
+		t.Fatalf("merge get status=%d body=%s", get.Code, get.Body.String())
+	}
+	conflicts := evolutionAPIRequest(
+		t, handler, token, http.MethodPost, "/api/v1/evolution/merge/conflicts",
+		kernel.MergeConflictsRequest{Session: session.Session, Limit: 1},
+	)
+	if conflicts.Code != http.StatusOK {
+		t.Fatalf("merge conflicts status=%d body=%s", conflicts.Code, conflicts.Body.String())
+	}
+	var page kernel.MergeConflictsResult
+	if err := json.Unmarshal(conflicts.Body.Bytes(), &page); err != nil ||
+		page.Revision != session.Revision || len(page.Items) != 0 {
+		t.Fatalf("merge conflicts = %#v err=%v", page, err)
+	}
+
+	resolve := evolutionAPIRequest(
+		t, handler, token, http.MethodPost, "/api/v1/evolution/merge/resolve",
+		kernel.MergeResolveRequest{
+			Session: session.Session, ExpectedRevision: session.Revision,
+			Resolutions: []kernel.MergeResolution{},
+		},
+	)
+	if resolve.Code != http.StatusOK {
+		t.Fatalf("merge resolve status=%d body=%s", resolve.Code, resolve.Body.String())
+	}
+	var resolved kernel.MergeSession
+	if err := json.Unmarshal(resolve.Body.Bytes(), &resolved); err != nil ||
+		resolved.Revision != session.Revision || resolved.Status != "up_to_date" {
+		t.Fatalf("merge resolve = %#v err=%v", resolved, err)
+	}
+	finalize := evolutionAPIRequest(
+		t, handler, token, http.MethodPost, "/api/v1/evolution/merge/finalize",
+		kernel.MergeFinalizeRequest{
+			Session: session.Session, ExpectedRevision: resolved.Revision,
+		},
+	)
+	if finalize.Code != http.StatusOK {
+		t.Fatalf("merge finalize status=%d body=%s", finalize.Code, finalize.Body.String())
+	}
+	var finalized kernel.MergeFinalizeResult
+	if err := json.Unmarshal(finalize.Body.Bytes(), &finalized); err != nil ||
+		finalized.Status != "up_to_date" || finalized.State != summary.State {
+		t.Fatalf("merge finalize = %#v err=%v", finalized, err)
+	}
+
+	abortStart := evolutionAPIRequest(
+		t,
+		handler,
+		token,
+		http.MethodPost,
+		"/api/v1/evolution/merge/start",
+		kernel.MergeStartRequest{Branch: "main", Source: summary.State},
+	)
+	if abortStart.Code != http.StatusOK {
+		t.Fatalf("abortable merge start status=%d body=%s", abortStart.Code, abortStart.Body.String())
+	}
+	var abortable kernel.MergeSession
+	if err := json.Unmarshal(abortStart.Body.Bytes(), &abortable); err != nil {
+		t.Fatalf("decode abortable session: %v", err)
+	}
+	abort := evolutionAPIRequest(
+		t, handler, token, http.MethodPost, "/api/v1/evolution/merge/abort",
+		kernel.MergeAbortRequest{
+			Session: abortable.Session, ExpectedRevision: abortable.Revision,
+		},
+	)
+	if abort.Code != http.StatusOK {
+		t.Fatalf("merge abort status=%d body=%s", abort.Code, abort.Body.String())
+	}
+
+	missing := evolutionAPIRequest(
+		t, handler, token, http.MethodPost, "/api/v1/evolution/merge/get",
+		kernel.MergeGetRequest{Session: abortable.Session},
+	)
+	if missing.Code != http.StatusNotFound ||
+		!strings.Contains(missing.Body.String(), string(kernel.CodeMergeSessionNotFound)) {
+		t.Fatalf("missing merge status=%d body=%s", missing.Code, missing.Body.String())
+	}
+	unauthorized := evolutionAPIRequest(
+		t, handler, "wrong", http.MethodPost, "/api/v1/evolution/merge/list",
+		kernel.MergeListRequest{},
+	)
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("merge unauthorized status=%d body=%s", unauthorized.Code, unauthorized.Body.String())
+	}
+	method := evolutionAPIRequest(
+		t, handler, token, http.MethodGet, "/api/v1/evolution/merge/list",
+		kernel.MergeListRequest{},
+	)
+	if method.Code != http.StatusMethodNotAllowed || method.Header().Get("Allow") != http.MethodPost {
+		t.Fatalf("merge method status=%d allow=%q", method.Code, method.Header().Get("Allow"))
 	}
 }
 

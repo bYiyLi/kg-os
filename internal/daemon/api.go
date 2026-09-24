@@ -203,6 +203,13 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 	mux.HandleFunc("/api/v1/evolution/tag/create", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionTagCreate))
 	mux.HandleFunc("/api/v1/evolution/tag/move", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionTagMove))
 	mux.HandleFunc("/api/v1/evolution/tag/delete", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionTagDelete))
+	mux.HandleFunc("/api/v1/evolution/merge/start", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeStart))
+	mux.HandleFunc("/api/v1/evolution/merge/list", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeList))
+	mux.HandleFunc("/api/v1/evolution/merge/get", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeGet))
+	mux.HandleFunc("/api/v1/evolution/merge/conflicts", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeConflicts))
+	mux.HandleFunc("/api/v1/evolution/merge/resolve", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeResolve))
+	mux.HandleFunc("/api/v1/evolution/merge/finalize", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeFinalize))
+	mux.HandleFunc("/api/v1/evolution/merge/abort", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeAbort))
 	mux.Handle("/", fallback)
 	return mux
 }

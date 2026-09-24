@@ -143,7 +143,15 @@ func evolutionHelp(locale cliLocale) string {
 			"  kg evolution state set-data <StateRef> (--data <json> | --data-file <path> | stdin) [--pretty]\n" +
 			"  kg evolution state clear-data <StateRef> [--pretty]\n" +
 			"  kg evolution branch list|create|delete ... [--pretty]\n" +
-			"  kg evolution tag list|create|move|delete ... [--pretty]\n\n" +
+			"  kg evolution tag list|create|move|delete ... [--pretty]\n" +
+			"  kg evolution merge start --branch <name> --source <StateRef> [--pretty]\n" +
+			"  kg evolution merge list [--limit <1..1000>] [--cursor <token>] [--pretty]\n" +
+			"  kg evolution merge get <session> [--pretty]\n" +
+			"  kg evolution merge conflicts <session> [--limit <1..1000>] [--cursor <token>] [--pretty]\n" +
+			"  kg evolution merge resolve <session> --expected-revision <integer>\n" +
+			"    (--resolutions <json-array> | --resolutions-file <path> | stdin) [--pretty]\n" +
+			"  kg evolution merge finalize <session> --expected-revision <integer> [--author <text>] [--message <text>] [--pretty]\n" +
+			"  kg evolution merge abort <session> --expected-revision <integer> [--pretty]\n\n" +
 			"scope=object 时必须同时提供 --object-ref <ObjectRef> 与 --anchor-state <StateRef>。\n"
 	}
 	return "KG OS Evolution commands\n\n" +
@@ -157,7 +165,15 @@ func evolutionHelp(locale cliLocale) string {
 		"  kg evolution state set-data <StateRef> (--data <json> | --data-file <path> | stdin) [--pretty]\n" +
 		"  kg evolution state clear-data <StateRef> [--pretty]\n" +
 		"  kg evolution branch list|create|delete ... [--pretty]\n" +
-		"  kg evolution tag list|create|move|delete ... [--pretty]\n\n" +
+		"  kg evolution tag list|create|move|delete ... [--pretty]\n" +
+		"  kg evolution merge start --branch <name> --source <StateRef> [--pretty]\n" +
+		"  kg evolution merge list [--limit <1..1000>] [--cursor <token>] [--pretty]\n" +
+		"  kg evolution merge get <session> [--pretty]\n" +
+		"  kg evolution merge conflicts <session> [--limit <1..1000>] [--cursor <token>] [--pretty]\n" +
+		"  kg evolution merge resolve <session> --expected-revision <integer>\n" +
+		"    (--resolutions <json-array> | --resolutions-file <path> | stdin) [--pretty]\n" +
+		"  kg evolution merge finalize <session> --expected-revision <integer> [--author <text>] [--message <text>] [--pretty]\n" +
+		"  kg evolution merge abort <session> --expected-revision <integer> [--pretty]\n\n" +
 		"scope=object requires both --object-ref <ObjectRef> and --anchor-state <StateRef>.\n"
 }
 

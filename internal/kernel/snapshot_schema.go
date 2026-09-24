@@ -1,7 +1,6 @@
 package kernel
 
 import (
-	"context"
 	"encoding/json"
 	"net/url"
 	"path/filepath"
@@ -10,19 +9,6 @@ import (
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
 )
-
-func (service *Service) decodeSchemaResources(ctx context.Context, state *snapshot) error {
-	return decodeSchemaResourcesWithQuery(state, func(cypher string) (lithograph.Result, error) {
-		result, err := service.database.Query(ctx, lithograph.QueryRequest{
-			At:     state.State,
-			Cypher: cypher,
-		})
-		if err != nil {
-			return lithograph.Result{}, AsPublicError(err)
-		}
-		return result.Result, nil
-	})
-}
 
 func decodeSchemaResourcesWithQuery(
 	state *snapshot,

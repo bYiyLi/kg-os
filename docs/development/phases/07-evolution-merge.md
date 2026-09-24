@@ -1,6 +1,6 @@
 # Phase 07：Evolution Merge Session
 
-**状态：`ready`**
+**状态：`in_progress`**
 
 ## 1. 目标与范围
 
@@ -62,10 +62,10 @@ kg evolution merge abort
 - Phase 02–04 已有 KG OS-valid Snapshot decoder、Binding / reserved Schema consistency validation、五类公共 Object Ref / Object Value、canonical aggregate projection 与 Knowledge element identity；
 - Phase 05 已有 authenticated daemon、JSON adapter、Runtime auto-start 与真实 Lithograph Graph integration；
 - Phase 06 已有 StateRef resolution、Branch/Tag/Commit metadata、History/Diff Change projector、public error mapping，以及正式 `kg evolution` command tree；
-- 当前代码已经识别 `MERGE_CONFLICT`、`MERGE_SESSION_NOT_FOUND`、`MERGE_SESSION_CHANGED` 等 Lithograph category，但尚没有公共 Merge Kernel / HTTP / CLI；
-- Phase 06 的 daemon integration test 明确验证 `/api/v1/evolution/merge/start` 尚未注册，因此现有代码不能作为 Phase 07 完成证据。
+- 当前工作树已增加 Merge Session Host adapter、公共 Kernel / HTTP / CLI，并继续复用 Phase 06 Evolution Core 的 State/Object/Change 与错误合同；
+- Phase 06 曾以 daemon integration test 明确验证 Merge route 未注册；该历史边界已由 Phase 07 route/CLI/integration tests 替换，不能继续作为当前实现状态判断。
 
-Design Inputs、前置依赖、Feature 顺序与 Acceptance 已齐全；当前没有需要重新确认的 Merge 产品语义，因此本 Phase 状态为 `ready`。
+Design Inputs、前置依赖、Feature 顺序与 Acceptance 已齐全；当前没有需要重新确认的 Merge 产品语义。实现与 Review 已开始，因此本 Phase 状态为 `in_progress`。
 
 ### 3.2 Lithograph v0.3.0 baseline
 
@@ -187,7 +187,7 @@ Lithograph Merge Session adapter
 
 - 只有 Session `unresolved=0` 才进入 candidate validation；仍有 conflict 时保留 `MERGE_CONFLICT`；
 - validation 前再次确认 pinned `targetState/sourceState` 均满足 D31，阻止 direct-Lithograph invalid Session 借 KG OS 继续演进；
-- 使用 **同一个 `session + expectedRevision` candidate read context**运行现有 KG OS Snapshot / consistency validation，覆盖 Binding coverage、reserved internal graph / Schema isolation、Ontology aggregate 可解释性、shared declaration consistency，以及 caller-owned Schema/Knowledge 不含 Vector；
+- 使用 **同一个 `session + expectedRevision` candidate read context**运行现有 KG OS Snapshot / consistency validation，覆盖 Binding coverage、reserved internal graph / Schema isolation、Ontology aggregate 可解释性、shared declaration consistency，以及当前 Ontology profile 无法映射的 caller-owned Vector Schema / Index；按 D49 / D59 不恢复纯 Knowledge Vector value 全图扫描；
 - decoder 的多次只读查询都携带同一 revision；并发 resolve 一旦把 revision 改变，后续 candidate read 必须返回 `MERGE_SESSION_CHANGED`，不能拼出跨 revision Snapshot；
 - candidate 是非持久工作区，不生成 State identity、不进入 History/Diff、不创建 cache/index 作为 correctness source；
 - Semantic source / IndexDefinition 只作为 candidate 业务值参与校验；KG OS 不生成 embedding、不访问 Provider cache 作为 consistency source，也不因普通正文 merge 主动调用远端模型；
@@ -370,6 +370,8 @@ Phase 07只有同时满足以下条件才能进入 `done`：
 
 ## 11. 当前状态
 
-2026-09-24：Phase 07 为 `ready`。Phase 00–06均已完成；Evolution owner、CLI owner、公共错误合同与D41已经冻结Merge Session logical contract。当前KG OS仍没有公共Merge Kernel / HTTP / CLI，Phase 06还显式验证Merge route不存在。
+2026-09-24：Phase 07 为 `in_progress`。Phase 00–06均已完成；Evolution owner、CLI owner、公共错误合同与D41继续冻结 Merge Session logical contract。当前工作树已经实现 Lithograph Merge Session adapter、`start/list/get/conflicts/resolve/finalize/abort` Kernel、公共 conflict/reverse mapping、exact-revision candidate consistency validation、七个 authenticated HTTP route 与正式 `kg evolution merge` CLI。
+
+当前本地证据：真实 bundled Lithograph v0.3.0 native suite通过；conflicted / ready / merged、fast-forward、up-to-date、restart recovery、stale revision/cursor、no-op resolution、D31 direct-Lithograph invalid Session、candidate-invalid、shared Index、Knowledge Node delete-vs-update 与 Relationship Property conflict均有 integration 覆盖。主工作树完整 `pnpm validate` 成功；独立 fresh Git checkout 叠加当前 tracked/untracked Phase 07 source 后，`pnpm run setup && pnpm validate` 同样成功；Go statement coverage **90.1%**，race、govulncheck、Playwright、native、package、license、audit、diff gates全部通过。多轮 Review 已修正 public Property aggregate path、Definition rename两侧Ref、shared Index单侧展示Ref、末页 conflict cursor、CLI resolutions unknown-field strict decode与 explicit null/absence serialization contract，并删除无用 helper；最终 `git diff --check`、dependency diff、生产 surface scan与 final diff/review没有新的 task-affecting finding。当前唯一未满足完成条件是最终 pushed SHA 的 Ubuntu 24.04 x64 CI，因此 Phase 仍保持 `in_progress`。
 
 本计划已核对当前Lithograph v0.3.0 `main`：durable Merge Session、expected-head CAS、bounded conflict pagination、incremental resolution、candidate `mergeSession` read context、revision/head finalize CAS、restart recovery与GC root均已有公开SQL合同和Phase 09验收证据。Phase 07可以复用现有Host/Snapshot/Object/Evolution primitive完成，不需要修改Lithograph或新增产品设计。

@@ -58,7 +58,7 @@ func TestEvolutionCLIStateDataInputContract(t *testing.T) {
 	}
 }
 
-func TestEvolutionCLIReadParsingAndNoMergeCommand(t *testing.T) {
+func TestEvolutionCLIReadParsingAndMergeCommandBoundary(t *testing.T) {
 	t.Parallel()
 	diff, err := parseEvolutionDiff([]string{
 		"--before", "branch/main", "--after", "tag/release", "--scope", "object",
@@ -79,8 +79,9 @@ func TestEvolutionCLIReadParsingAndNoMergeCommand(t *testing.T) {
 		t.Fatalf("merge command exit=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	help := evolutionHelp(localeEnglish)
-	if strings.Contains(help, "merge") {
-		t.Fatalf("Phase 06 help exposes Merge: %q", help)
+	if !strings.Contains(help, "kg evolution merge start") ||
+		!strings.Contains(help, "kg evolution merge resolve") {
+		t.Fatalf("Phase 07 help does not expose Merge: %q", help)
 	}
 }
 

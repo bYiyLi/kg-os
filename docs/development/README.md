@@ -69,7 +69,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 06 当前为 `done`。** Overview / Get / Ancestry、State / State Data、Branch / Tag、History / Diff、authenticated HTTP 与正式 `kg evolution` Core CLI 已完成；Review 已闭环 cursor pinning/frontier、typed Lithograph error category、invalid consistency issue、shared resource/continuity 与 `state.create` parent-CAS/writer boundary。实现提交 `2c2f4cb914a45b7a09d719a88008f0b5dc854df9` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均成功，Go statement coverage **90.0%**、jscpd 0 clones、race/govulncheck/Playwright/native/package/license/audit/diff gates 全部通过，Ubuntu 24.04 x64 GitHub Actions run `35951315990` / Validate job `107480271083` 成功。
 
-**Phase 07 Evolution Merge Session 当前为 `ready`。** Merge Session 的产品合同、CLI surface、公共错误与 invalid State 边界已由 Evolution / CLI / Contracts / D41 冻结；Lithograph v0.3.0 已提供 durable Session、expected-head CAS、bounded conflict pagination、incremental resolution、exact-revision candidate read 与 finalize CAS。Phase 07 将实现 public conflict projection / resolution reverse mapping、candidate consistency validation、authenticated HTTP 与正式 `kg evolution merge` 七个命令；当前尚未开始实现，因此没有 Phase 07 运行验收或完成证据。
+**Phase 07 Evolution Merge Session 当前为 `in_progress`。** Merge Session 的产品合同、CLI surface、公共错误与 invalid State 边界继续由 Evolution / CLI / Contracts / D41 冻结；当前工作树已实现 public conflict projection / resolution reverse mapping、exact-revision candidate consistency validation、authenticated HTTP 与正式 `kg evolution merge` 七个命令。主工作树完整 `pnpm validate` 与独立 fresh Git checkout 的 `pnpm run setup && pnpm validate` 均成功，Go statement coverage **90.1%**、race/govulncheck/Playwright/native/package/license/audit/diff gates 全部通过；final diff/review 无剩余 task-affecting finding。Review 已闭环 public aggregate path、rename continuity、shared resource display ref、conflict pagination cursor、strict CLI resolution input 与 explicit null/absence serialization 等边界。阶段仍需最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate 成功，因此暂不能标记 `done`。
 
 ## 5. 路线总览
 
@@ -82,7 +82,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [04 General Object Read & Patch](phases/04-object.md) | `done` | 五类 Object batch read、Knowledge Node/Relationship投影、通用 batch Patch、CLI text/file/stdin 输入；本地/fresh-source/Ubuntu CI验收完成 | [D73](../design/decisions.md#d73-object-read-patch-surface)、[Object](../design/object.md)、[CLI](../design/cli.md) |
 | [05 Graph Query & Execute](phases/05-graph.md) | `done` | `kg graph query/execute`、authenticated HTTP、JSON/NDJSON、Full-text / Semantic / Lithograph JSON passthrough、cancellation与transport hardening；本地/fresh-source/Ubuntu CI验收完成 | [Graph](../design/graph.md)、[Graph CLI](../design/cli.md#graph-cli)、[Streaming](../design/runtime.md#graph-http-streaming-framing) |
 | [06 Evolution Core](phases/06-evolution-core.md) | `done` | State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff、authenticated HTTP 与 `kg evolution` Core CLI；本地/fresh-source/Ubuntu CI 验收完成，不含 Merge | [Evolution](../design/evolution.md)、[Evolution CLI](../design/cli.md#evolution-cli)、[公共错误合同](../design/contracts.md#公共错误合同) |
-| [07 Evolution Merge Session](phases/07-evolution-merge.md) | `ready` | Merge Session adapter、public conflict projection、渐进 resolution、exact-revision candidate consistency、finalize/abort、authenticated HTTP 与 `kg evolution merge` CLI | [Evolution Merge](../design/evolution.md#evolution-公共调用合同)、[Merge CLI](../design/cli.md#merge-session)、[D41](../design/decisions.md#d41-evolution-merge-使用-lithograph-merge-session-渐进解决冲突) |
+| [07 Evolution Merge Session](phases/07-evolution-merge.md) | `in_progress` | Merge Session adapter、public conflict projection、渐进 resolution、exact-revision candidate consistency、finalize/abort、authenticated HTTP 与 `kg evolution merge` CLI 已实现；本地 full/fresh-source validation 与 final review 已完成，等待最终 pushed SHA 的 Ubuntu CI | [Evolution Merge](../design/evolution.md#evolution-公共调用合同)、[Merge CLI](../design/cli.md#merge-session)、[D41](../design/decisions.md#d41-evolution-merge-使用-lithograph-merge-session-渐进解决冲突) |
 
 当前实现依赖顺序：
 
@@ -104,7 +104,7 @@ Go Engineering Foundation
   -> complete SDK / Web / Skill and release closure
 ```
 
-Phase 02、Phase 03、Phase 04、Phase 05 与 Phase 06 均已完成；Phase 07 已具备完整 Design Inputs、依赖、Feature 顺序与 Acceptance，当前为 `ready`。Phase 08 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
+Phase 02、Phase 03、Phase 04、Phase 05 与 Phase 06 均已完成；Phase 07 当前为 `in_progress`，本地实现、Review、主工作树 full validation 与独立 fresh-source validation 已收口，仅等待最终 pushed SHA 的 Ubuntu CI 完成阶段验收。Phase 08 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
 
 ## 6. Phase 通用完成标准
 

@@ -1,7 +1,6 @@
 package kernel
 
 import (
-	"context"
 	"encoding/json"
 	"sort"
 
@@ -17,16 +16,12 @@ type internalNode struct {
 	Description *string
 }
 
-func (service *Service) readInternalGraph(
-	ctx context.Context,
-	state string,
+func readInternalGraphWithQuery(
+	query snapshotQuery,
 ) (map[string]internalNode, map[string]taggedRelationship, error) {
-	nodeQuery, err := service.database.Query(ctx, lithograph.QueryRequest{
-		At:     state,
-		Cypher: "MATCH (n:" + internalLabel + ") RETURN n",
-	})
+	nodeResult, err := query("MATCH (n:" + internalLabel + ") RETURN n")
 	if err != nil {
-		return nil, nil, AsPublicError(err)
+		return nil, nil, err
 	}
 	relationshipQueries := []string{
 		"MATCH (a:" + internalLabel + ")-[r]->(b) RETURN r",
@@ -34,13 +29,13 @@ func (service *Service) readInternalGraph(
 	}
 	relationshipResults := make([]lithograph.Result, 0, len(relationshipQueries))
 	for _, cypher := range relationshipQueries {
-		query, queryErr := service.database.Query(ctx, lithograph.QueryRequest{At: state, Cypher: cypher})
+		result, queryErr := query(cypher)
 		if queryErr != nil {
-			return nil, nil, AsPublicError(queryErr)
+			return nil, nil, queryErr
 		}
-		relationshipResults = append(relationshipResults, query.Result)
+		relationshipResults = append(relationshipResults, result)
 	}
-	return decodeInternalGraphResults(nodeQuery.Result, relationshipResults)
+	return decodeInternalGraphResults(nodeResult, relationshipResults)
 }
 
 func decodeInternalGraphResults(

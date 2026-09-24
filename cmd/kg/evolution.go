@@ -90,6 +90,8 @@ func runEvolution(
 		return runEvolutionBranch(ctx, args[1:], pretty, stdout, stderr)
 	case "tag":
 		return runEvolutionTag(ctx, args[1:], pretty, stdout, stderr)
+	case "merge":
+		return runEvolutionMerge(ctx, args[1:], stdin, stdinIsTTY, pretty, stdout, stderr)
 	default:
 		return evolutionUsageError(stderr, fmt.Sprintf("unknown evolution command %q", args[0]))
 	}
@@ -431,24 +433,16 @@ func parseEvolutionStateCreate(args []string) (kernel.StateCreateRequest, error)
 			request.Branch = value
 			index = next
 		case "--author":
-			value, next, err := nextCLIValue(args, index, "--author")
-			if err != nil || request.Author != nil {
-				if err == nil {
-					err = fmt.Errorf("--author may be provided only once")
-				}
+			next, err := parseOptionalCLITextOption(args, index, "--author", &request.Author)
+			if err != nil {
 				return request, err
 			}
-			request.Author = &value
 			index = next
 		case "--message":
-			value, next, err := nextCLIValue(args, index, "--message")
-			if err != nil || request.Message != nil {
-				if err == nil {
-					err = fmt.Errorf("--message may be provided only once")
-				}
+			next, err := parseOptionalCLITextOption(args, index, "--message", &request.Message)
+			if err != nil {
 				return request, err
 			}
-			request.Message = &value
 			index = next
 		default:
 			next, handled, err := parseEvolutionDataOption(args, index, &data)
@@ -591,6 +585,23 @@ func parseSingleNamedOption(args []string, name string) (string, error) {
 		return "", fmt.Errorf("%s is required", name)
 	}
 	return value, nil
+}
+
+func parseOptionalCLITextOption(
+	args []string,
+	index int,
+	name string,
+	target **string,
+) (int, error) {
+	if *target != nil {
+		return index, fmt.Errorf("%s may be provided only once", name)
+	}
+	value, next, err := nextCLIValue(args, index, name)
+	if err != nil {
+		return index, err
+	}
+	*target = &value
+	return next, nil
 }
 
 func extractEvolutionPretty(args []string) ([]string, bool, error) {
