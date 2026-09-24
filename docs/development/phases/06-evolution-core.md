@@ -1,6 +1,6 @@
 # Phase 06：Evolution Core
 
-**状态：`in_progress`**
+**状态：`done`**
 
 ## 1. 目标与范围
 
@@ -77,7 +77,7 @@ kg evolution tag delete
 - 当前 Ontology pagination 已有 opaque cursor 的 State/scope binding模式，可作为 Evolution cursor engineering reference，但 Evolution cursor仍必须满足自己的 root/before/after/filter pinning合同；
 - 当前 KG OS 还没有公共 Evolution Kernel / HTTP / CLI，实现存在于本 Phase 之后才能作为完成证据。
 
-Design Inputs、依赖顺序与 Acceptance 已齐全；当前没有需要重新确认的 Evolution Core 产品语义。Phase 06 实现已经进入工作树，因此当前状态为 `in_progress`。
+Design Inputs、依赖顺序与 Acceptance 已齐全；当前没有需要重新确认的 Evolution Core 产品语义。Phase 06 实现、验收与 Review 已全部完成，因此当前状态为 `done`。
 
 ### 3.2 Lithograph baseline
 
@@ -352,8 +352,8 @@ Phase 06只有同时满足以下条件才能进入 `done`：
 
 ## 11. 当前状态
 
-2026-09-24：Phase 00–05 已为 `done`；Evolution / CLI / implementation owner中的State、State Data、Branch、Tag、Ancestry、History、Diff合同已确认。当前工作树已经实现公共 Evolution Kernel / HTTP / CLI Core surface，并进入 Phase 级验收与 Review 收口。
+2026-09-24：Phase 00–06 已为 `done`。Evolution / CLI / implementation owner中的 State、State Data、Branch、Tag、Ancestry、History、Diff合同已确认，公共 Evolution Kernel / HTTP / CLI Core surface 已实现并完成 Phase 级验收与 Review。
 
 本计划已核对当前KG OS实现基线与Lithograph公开Version Procedure：Phase 06需要的Commit metadata/Data、Branch/Tag、bounded DAG log与structured diff均已有底层public SQL contract，可复用现有Host与Snapshot/Object primitive；Merge Session不属于本Phase。
 
-当前本地实现与 Review 已收口：`pnpm check:go`、`pnpm check:quick`、主工作树完整 `pnpm validate` 与独立 `.cache/phase06-fresh-20260924-1022` 的 `pnpm run setup && pnpm validate` 均成功；Go statement coverage **90.0%**、jscpd 0 clones，race、govulncheck、TypeScript/V8/type coverage、Playwright、真实 bundled Lithograph v0.3.0 native suite、package、licenses、npm audit 与 diff gate 均通过。真实场景覆盖 empty-delta State/Data、invalid State诊断、ref lifecycle、pinned Ancestry/History、shared Index、Relationship replacement、rename/name reuse、multi-parent History、authenticated HTTP、fresh installed profile Runtime auto-start 与 CLI E2E。最终 Phase Review 未发现新的 task-affecting implementation finding，生产代码没有第二套 Version store/History index、Evolution Merge/checkout/rebase/squash/reset/revert/gc surface或新依赖。仍缺最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate，因此状态保持 `in_progress`，不能提前标记 `done`。
+Phase 06 实现提交 `2c2f4cb914a45b7a09d719a88008f0b5dc854df9` 已推送到 `main`。`pnpm check:go`、`pnpm check:quick`、主工作树完整 `pnpm validate` 与独立 `.cache/phase06-fresh-20260924-1022` 的 `pnpm run setup && pnpm validate` 均成功；Go statement coverage **90.0%**、jscpd 0 clones，race、govulncheck、TypeScript/V8/type coverage、Playwright、真实 bundled Lithograph v0.3.0 native suite、package、licenses、npm audit 与 diff gate 均通过。真实场景覆盖 empty-delta State/Data、invalid State诊断、ref lifecycle、pinned Ancestry/History、shared Index、Relationship replacement、rename/name reuse、multi-parent History、authenticated HTTP、fresh installed profile Runtime auto-start 与 CLI E2E。最终 Phase Review 未发现新的 task-affecting implementation finding，生产代码没有第二套 Version store/History index、Evolution Merge/checkout/rebase/squash/reset/revert/gc surface或新依赖。Ubuntu 24.04 x64 GitHub Actions run `35951315990` / Validate job `107480271083` 对该实现提交成功，因此 A–J Acceptance 与本 Phase 全部完成条件均已满足。
