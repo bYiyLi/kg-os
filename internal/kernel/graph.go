@@ -198,16 +198,19 @@ func graphPublicError(err error) *PublicError {
 	if errors.As(err, &public) {
 		return public
 	}
-	message := err.Error()
-	switch lithographCategory(message) {
-	case "BRANCH_HEAD_MOVED":
-		return publicError(CodeBranchHeadMoved, safeDatabaseMessage(message), err)
-	case "MERGE_CONFLICT":
-		return publicError(CodeMergeConflict, safeDatabaseMessage(message), err)
-	case "MERGE_SESSION_NOT_FOUND":
-		return publicError(CodeMergeSessionNotFound, safeDatabaseMessage(message), err)
-	case "MERGE_SESSION_CHANGED":
-		return publicError(CodeMergeSessionChanged, safeDatabaseMessage(message), err)
+	category, message, _, ok := lithograph.ErrorDetails(err)
+	if !ok {
+		return AsPublicError(err)
+	}
+	switch category {
+	case lithograph.CategoryBranchHeadMoved:
+		return publicError(CodeBranchHeadMoved, message, err)
+	case lithograph.CategoryMergeConflict:
+		return publicError(CodeMergeConflict, message, err)
+	case lithograph.CategoryMergeSessionNotFound:
+		return publicError(CodeMergeSessionNotFound, message, err)
+	case lithograph.CategoryMergeSessionChanged:
+		return publicError(CodeMergeSessionChanged, message, err)
 	default:
 		return AsPublicError(err)
 	}

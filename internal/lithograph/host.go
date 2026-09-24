@@ -568,7 +568,7 @@ func (host *Host) Close() error {
 func scalarJSON(ctx context.Context, connection *sql.Conn, query string, args ...any) ([]byte, error) {
 	var raw []byte
 	if err := connection.QueryRowContext(ctx, query, args...).Scan(&raw); err != nil {
-		return nil, err
+		return nil, normalizeDatabaseError(err)
 	}
 	return append([]byte(nil), raw...), nil
 }

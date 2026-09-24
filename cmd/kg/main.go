@@ -31,6 +31,8 @@ func run(
 		return runObject(ctx, args[1:], stdin, stdinIsTTY, stdout, stderr)
 	case "ontology":
 		return runOntology(ctx, args[1:], stdin, stdinIsTTY, stdout, stderr)
+	case "evolution":
+		return runEvolution(ctx, args[1:], stdin, stdinIsTTY, stdout, stderr)
 	case "install":
 		return runInstall(args[1:], stdin, stdinIsTTY && writerIsTerminal(stdout), stdout, stderr)
 	case "doctor":

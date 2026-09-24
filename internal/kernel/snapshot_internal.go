@@ -85,10 +85,16 @@ func decodeInternalGraphResults(
 	}
 	for _, relationship := range relationships {
 		if _, ok := nodes[relationship.Start]; !ok {
-			return nil, nil, publicError(CodeConsistency, "internal relationship crosses into Knowledge graph", nil)
+			return nil, nil, markConsistencyIssue(
+				"BINDING_DANGLING",
+				publicError(CodeConsistency, "internal relationship crosses into Knowledge graph", nil),
+			)
 		}
 		if _, ok := nodes[relationship.End]; !ok {
-			return nil, nil, publicError(CodeConsistency, "internal relationship crosses into Knowledge graph", nil)
+			return nil, nil, markConsistencyIssue(
+				"BINDING_DANGLING",
+				publicError(CodeConsistency, "internal relationship crosses into Knowledge graph", nil),
+			)
 		}
 		if len(relationship.Properties) != 0 {
 			return nil, nil, publicError(CodeConsistency, "internal relationship has unexpected properties", nil)
@@ -150,7 +156,10 @@ func decodeInternalNode(node taggedNode) (internalNode, error) {
 			return internalNode{}, err
 		}
 		if kind != "node" && kind != "relationship" {
-			return internalNode{}, publicError(CodeConsistency, "Definition Binding has invalid kind", nil)
+			return internalNode{}, markConsistencyIssue(
+				"BINDING_KIND_MISMATCH",
+				publicError(CodeConsistency, "Definition Binding has invalid kind", nil),
+			)
 		}
 	}
 	return internalNode{
@@ -202,18 +211,27 @@ func bindInternalGraph(
 		switch relationship.Type {
 		case propertyOfType:
 			if source.Category != propertyBindingLabel || target.Category != definitionBindingLabel {
-				return publicError(CodeConsistency, "invalid Property Binding owner edge", nil)
+				return markConsistencyIssue(
+					"BINDING_KIND_MISMATCH",
+					publicError(CodeConsistency, "invalid Property Binding owner edge", nil),
+				)
 			}
 			propertyOwner[source.Node.ElementID] = target.Node.ElementID
 			propertyOwnerCount[source.Node.ElementID]++
 		case includesType:
 			if source.Category != domainLabel ||
 				(target.Category != domainLabel && target.Category != definitionBindingLabel) {
-				return publicError(CodeConsistency, "invalid Domain includes edge", nil)
+				return markConsistencyIssue(
+					"BINDING_KIND_MISMATCH",
+					publicError(CodeConsistency, "invalid Domain includes edge", nil),
+				)
 			}
 			key := source.Node.ElementID + "\x00" + target.Node.ElementID
 			if _, exists := includePairs[key]; exists {
-				return publicError(CodeConsistency, "duplicate Domain includes edge", nil)
+				return markConsistencyIssue(
+					"BINDING_DUPLICATE",
+					publicError(CodeConsistency, "duplicate Domain includes edge", nil),
+				)
 			}
 			includePairs[key] = struct{}{}
 			includeTargets[source.Node.ElementID] = append(includeTargets[source.Node.ElementID], target.Node.ElementID)
@@ -228,16 +246,32 @@ func bindInternalGraph(
 			}
 			ref := OntologyRef{Kind: kind, Name: node.Name}
 			if _, exists := definitionBindings[ref]; exists {
-				return publicError(CodeConsistency, "duplicate Definition Binding locator", nil)
+				return markConsistencyIssue(
+					"BINDING_DUPLICATE",
+					publicError(CodeConsistency, "duplicate Definition Binding locator", nil),
+				)
 			}
 			definitionBindings[ref] = node
 		case propertyBindingLabel:
-			if propertyOwnerCount[node.Node.ElementID] != 1 {
-				return publicError(CodeConsistency, "Property Binding must have exactly one owner", nil)
+			ownerCount := propertyOwnerCount[node.Node.ElementID]
+			if ownerCount == 0 {
+				return markConsistencyIssue(
+					"BINDING_MISSING",
+					publicError(CodeConsistency, "Property Binding must have exactly one owner", nil),
+				)
+			}
+			if ownerCount > 1 {
+				return markConsistencyIssue(
+					"BINDING_DUPLICATE",
+					publicError(CodeConsistency, "Property Binding must have exactly one owner", nil),
+				)
 			}
 		case domainLabel:
 			if _, exists := result.Domains[node.Name]; exists {
-				return publicError(CodeConsistency, "duplicate Domain name", nil)
+				return markConsistencyIssue(
+					"BINDING_DUPLICATE",
+					publicError(CodeConsistency, "duplicate Domain name", nil),
+				)
 			}
 			result.Domains[node.Name] = &domainRecord{
 				ElementID: node.Node.ElementID,
@@ -246,13 +280,23 @@ func bindInternalGraph(
 		}
 	}
 	if len(definitionBindings) != len(result.Definitions) {
-		return publicError(CodeConsistency, "Definition Binding coverage does not match caller Schema", nil)
+		issue := "BINDING_MISSING"
+		if len(definitionBindings) > len(result.Definitions) {
+			issue = "BINDING_DANGLING"
+		}
+		return markConsistencyIssue(
+			issue,
+			publicError(CodeConsistency, "Definition Binding coverage does not match caller Schema", nil),
+		)
 	}
 	definitionByID := map[string]OntologyRef{}
 	for ref, record := range result.Definitions {
 		binding, ok := definitionBindings[ref]
 		if !ok {
-			return publicError(CodeConsistency, "Definition is missing its Binding Record", nil)
+			return markConsistencyIssue(
+				"BINDING_MISSING",
+				publicError(CodeConsistency, "Definition is missing its Binding Record", nil),
+			)
 		}
 		record.ElementID = binding.Node.ElementID
 		record.Value.Title = binding.Title
@@ -265,15 +309,24 @@ func bindInternalGraph(
 		}
 		ownerRef, ok := definitionByID[propertyOwner[node.Node.ElementID]]
 		if !ok {
-			return publicError(CodeConsistency, "Property Binding owner cannot be resolved", nil)
+			return markConsistencyIssue(
+				"BINDING_DANGLING",
+				publicError(CodeConsistency, "Property Binding owner cannot be resolved", nil),
+			)
 		}
 		record := result.Definitions[ownerRef]
 		property := findProperty(record.Value.Properties, node.Name)
 		if property == nil {
-			return publicError(CodeConsistency, "Property Binding locator does not resolve to Schema", nil)
+			return markConsistencyIssue(
+				"BINDING_DANGLING",
+				publicError(CodeConsistency, "Property Binding locator does not resolve to Schema", nil),
+			)
 		}
 		if _, exists := record.PropertyElementIDs[node.Name]; exists {
-			return publicError(CodeConsistency, "duplicate Property Binding locator", nil)
+			return markConsistencyIssue(
+				"BINDING_DUPLICATE",
+				publicError(CodeConsistency, "duplicate Property Binding locator", nil),
+			)
 		}
 		property.Title = node.Title
 		property.Description = node.Description
@@ -281,7 +334,10 @@ func bindInternalGraph(
 	}
 	for _, record := range result.Definitions {
 		if len(record.PropertyElementIDs) != len(record.Value.Properties) {
-			return publicError(CodeConsistency, "Property Binding coverage does not match caller Schema", nil)
+			return markConsistencyIssue(
+				"BINDING_MISSING",
+				publicError(CodeConsistency, "Property Binding coverage does not match caller Schema", nil),
+			)
 		}
 	}
 	for _, domain := range result.Domains {
@@ -294,7 +350,10 @@ func bindInternalGraph(
 				domain.Value.Includes = append(domain.Value.Includes, ref.String())
 				continue
 			}
-			return publicError(CodeConsistency, "Domain membership target cannot be resolved", nil)
+			return markConsistencyIssue(
+				"BINDING_DANGLING",
+				publicError(CodeConsistency, "Domain membership target cannot be resolved", nil),
+			)
 		}
 		sort.Strings(domain.Value.Includes)
 	}

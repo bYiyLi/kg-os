@@ -67,7 +67,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 05 当前为 `done`。** `kg graph query/execute`、authenticated JSON/NDJSON HTTP、State pin / fresh Branch checkout、Lithograph JSON passthrough、Full-text / Semantic / Raw Vector public path、CLI Runtime auto-start，以及 cancellation / disconnect / partial-durability hardening 已完成并通过 Review。主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均成功，Go statement coverage **90.0%**、jscpd 0 clones；实现提交 `324fa67358ca6c2cbdc558ac8df6f60bf64bfaf7` 已推送到 `main`，Ubuntu 24.04 x64 GitHub Actions run `35893218908` / Validate job `107290569875` 成功。
 
-**Phase 06 当前为 `ready`。** Evolution Core 的 Design Inputs、Lithograph v0.3.0 Version Procedure 基线、Feature 顺序与 A–J Acceptance 已齐全，计划入口见 [Phase 06](phases/06-evolution-core.md)。本阶段实现 Overview / Get / Ancestry、State / State Data、Branch / Tag、History / Diff、authenticated HTTP 与正式 `kg evolution` Core CLI；Merge Session 明确留给后续独立 Phase。当前尚未开始 Phase 06 代码实现，现有 Lithograph Version Procedure 与 KG OS host primitive 不作为本阶段完成证据。
+**Phase 06 当前为 `in_progress`。** Overview / Get / Ancestry、State / State Data、Branch / Tag、History / Diff、authenticated HTTP 与正式 `kg evolution` Core CLI 已完成当前工作树实现；Review 已闭环 cursor pinning/frontier、typed Lithograph error category、invalid consistency issue、shared resource/continuity 与 `state.create` parent-CAS/writer boundary。主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均成功，Go statement coverage **90.0%**、jscpd 0 clones、race/govulncheck/Playwright/native/package/license/audit/diff gates 全部通过。仍需最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate，因此尚不能标记 `done`。
 
 ## 5. 路线总览
 
@@ -79,7 +79,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [03 Installation & Runtime Onboarding](phases/03-installation-runtime-onboarding.md) | `done` | `kg doctor`、`kg install`、完整显式 config、en/zh、人机双路径 installer、本机 credential fallback、业务命令 Runtime auto-start | [D72](../design/decisions.md#d72-local-install-runtime-onboarding)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md) |
 | [04 General Object Read & Patch](phases/04-object.md) | `done` | 五类 Object batch read、Knowledge Node/Relationship投影、通用 batch Patch、CLI text/file/stdin 输入；本地/fresh-source/Ubuntu CI验收完成 | [D73](../design/decisions.md#d73-object-read-patch-surface)、[Object](../design/object.md)、[CLI](../design/cli.md) |
 | [05 Graph Query & Execute](phases/05-graph.md) | `done` | `kg graph query/execute`、authenticated HTTP、JSON/NDJSON、Full-text / Semantic / Lithograph JSON passthrough、cancellation与transport hardening；本地/fresh-source/Ubuntu CI验收完成 | [Graph](../design/graph.md)、[Graph CLI](../design/cli.md#graph-cli)、[Streaming](../design/runtime.md#graph-http-streaming-framing) |
-| [06 Evolution Core](phases/06-evolution-core.md) | `ready` | State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff、authenticated HTTP 与 `kg evolution` Core CLI；不含 Merge | [Evolution](../design/evolution.md)、[Evolution CLI](../design/cli.md#evolution-cli)、[公共错误合同](../design/contracts.md#公共错误合同) |
+| [06 Evolution Core](phases/06-evolution-core.md) | `in_progress` | State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff、authenticated HTTP 与 `kg evolution` Core CLI；不含 Merge | [Evolution](../design/evolution.md)、[Evolution CLI](../design/cli.md#evolution-cli)、[公共错误合同](../design/contracts.md#公共错误合同) |
 
 当前实现依赖顺序：
 
@@ -100,7 +100,7 @@ Go Engineering Foundation
   -> complete SDK / Web / Skill and release closure
 ```
 
-Phase 02、Phase 03、Phase 04 与 Phase 05 均已完成；Phase 06 已建立并为 `ready`。Phase 07 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
+Phase 02、Phase 03、Phase 04 与 Phase 05 均已完成；Phase 06 当前为 `in_progress`。Phase 07 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
 
 ## 6. Phase 通用完成标准
 

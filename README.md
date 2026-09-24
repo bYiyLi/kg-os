@@ -35,7 +35,7 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 ## 当前状态
 
-**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 00–05 均已完成，Phase 06 Evolution Core 已规划并进入 `ready`。** 当前 `main` 已实现五类 Object batch read、通用 Object Patch，以及 `kg graph query/execute`、authenticated Graph HTTP、JSON/NDJSON streaming、Full-text / Semantic / Raw Vector passthrough 与 cancellation / transport hardening；Evolution Core 尚未实现。
+**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 00–05 均已完成，Phase 06 Evolution Core 当前为 `in_progress`。** 当前工作树已实现 Evolution Core 的 State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff、authenticated HTTP 与正式 `kg evolution` Core CLI，并进入全量验收与 Phase Review 收口；Merge Session 仍不属于本阶段。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
@@ -49,7 +49,7 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 **Phase 05 Graph Query & Execute 当前为 `done`。** `kg graph query` / `kg graph execute`、authenticated Graph HTTP、non-stream JSON、真正增量 NDJSON、Full-text / Semantic / Lithograph JSON passthrough、Runtime auto-start、client disconnect / daemon shutdown / transaction partial-durability 等实现与 Review 已闭环。实现提交 `324fa67358ca6c2cbdc558ac8df6f60bf64bfaf7` 已推送到 `main`；主工作树与独立 fresh-source `pnpm validate` 均通过，Go statement coverage 为 **90.0%**、jscpd 为 0 clones，Ubuntu 24.04 x64 GitHub Actions run `35893218908` / Validate job `107290569875` 成功；完整证据见[阶段计划](docs/development/phases/05-graph.md)。
 
-**Phase 06 Evolution Core 当前为 `ready`。** 本阶段将实现 State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff，以及正式 `kg evolution` Core CLI 与 authenticated HTTP；Merge Session 明确不属于本阶段，留在后续独立 Phase。完整范围和 Acceptance 见[阶段计划](docs/development/phases/06-evolution-core.md)。
+**Phase 06 Evolution Core 当前为 `in_progress`。** State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff、authenticated HTTP 与正式 `kg evolution` Core CLI 已完成当前工作树实现与本地 Review。主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均通过，Go statement coverage 为 **90.0%**、jscpd 为 0 clones，真实 bundled Lithograph v0.3.0、daemon 与 CLI E2E 均成功；当前只剩提交/推送后的 Ubuntu 24.04 x64 GitHub Actions Validate 完成条件，因此尚不能标记 `done`。Merge Session 明确不属于本阶段。完整范围和 Acceptance 见[阶段计划](docs/development/phases/06-evolution-core.md)。
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 

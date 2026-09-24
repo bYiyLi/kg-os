@@ -173,8 +173,64 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 		}
 	})
 	mux.HandleFunc("/api/v1/ontology/patch", patchHandler(runtime.Kernel.PatchOntology))
+	mux.HandleFunc("/api/v1/evolution/overview", postJSONHandler(
+		runtime.Credential.Token,
+		func(ctx context.Context, _ struct{}) (kernel.EvolutionOverviewResult, error) {
+			return runtime.Kernel.EvolutionOverview(ctx)
+		},
+	))
+	mux.HandleFunc("/api/v1/evolution/get", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionGet))
+	mux.HandleFunc("/api/v1/evolution/ancestry", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionAncestry))
+	mux.HandleFunc("/api/v1/evolution/history", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionHistory))
+	mux.HandleFunc("/api/v1/evolution/diff", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionDiff))
+	mux.HandleFunc("/api/v1/evolution/state/create", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionStateCreate))
+	mux.HandleFunc("/api/v1/evolution/state/set-data", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionStateSetData))
+	mux.HandleFunc("/api/v1/evolution/state/clear-data", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionStateClearData))
+	mux.HandleFunc("/api/v1/evolution/branch/list", postJSONHandler(
+		runtime.Credential.Token,
+		func(ctx context.Context, _ struct{}) (kernel.EvolutionRefListResult, error) {
+			return runtime.Kernel.EvolutionBranchList(ctx)
+		},
+	))
+	mux.HandleFunc("/api/v1/evolution/branch/create", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionBranchCreate))
+	mux.HandleFunc("/api/v1/evolution/branch/delete", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionBranchDelete))
+	mux.HandleFunc("/api/v1/evolution/tag/list", postJSONHandler(
+		runtime.Credential.Token,
+		func(ctx context.Context, _ struct{}) (kernel.EvolutionRefListResult, error) {
+			return runtime.Kernel.EvolutionTagList(ctx)
+		},
+	))
+	mux.HandleFunc("/api/v1/evolution/tag/create", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionTagCreate))
+	mux.HandleFunc("/api/v1/evolution/tag/move", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionTagMove))
+	mux.HandleFunc("/api/v1/evolution/tag/delete", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionTagDelete))
 	mux.Handle("/", fallback)
 	return mux
+}
+
+func postJSONHandler[Request any, Result any](
+	token string,
+	execute func(context.Context, Request) (Result, error),
+) http.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request) {
+		if !authenticate(response, request, token) {
+			return
+		}
+		if request.Method != http.MethodPost {
+			writeMethodNotAllowed(response)
+			return
+		}
+		var input Request
+		if err := decodeJSONRequest(response, request, &input); err != nil {
+			kernel.WriteJSONError(response, err)
+			return
+		}
+		result, err := execute(request.Context(), input)
+		if err != nil {
+			kernel.WriteJSONError(response, err)
+			return
+		}
+		writeJSON(response, http.StatusOK, result)
+	}
 }
 
 func prepareGraphRequest(

@@ -97,6 +97,25 @@ func (host *Host) Execute(ctx context.Context, request ExecuteRequest) (Result, 
 	if request.Cypher == "" {
 		return Result{}, fmt.Errorf("execute Cypher is required")
 	}
+	return host.withWriteConnection(ctx, func(operationCtx context.Context, connection *sql.Conn) (Result, error) {
+		if _, err := executeRaw(
+			operationCtx,
+			connection,
+			"CALL lithograph.branch.checkout($branch)",
+			map[string]any{"branch": request.Branch},
+			nil,
+		); err != nil {
+			return Result{}, fmt.Errorf("checkout branch %q: %w", request.Branch, err)
+		}
+		options := executionOptions(request.Author, request.Message)
+		return executeRaw(operationCtx, connection, request.Cypher, request.Params, options)
+	})
+}
+
+func (host *Host) withWriteConnection(
+	ctx context.Context,
+	execute func(context.Context, *sql.Conn) (Result, error),
+) (Result, error) {
 	operationCtx, done, err := host.operationContext(ctx)
 	if err != nil {
 		return Result{}, err
@@ -111,17 +130,7 @@ func (host *Host) Execute(ctx context.Context, request ExecuteRequest) (Result, 
 		discardConnection(connection)
 		return Result{}, err
 	}
-	if _, err := executeRaw(
-		operationCtx,
-		connection,
-		"CALL lithograph.branch.checkout($branch)",
-		map[string]any{"branch": request.Branch},
-		nil,
-	); err != nil {
-		return Result{}, fmt.Errorf("checkout branch %q: %w", request.Branch, err)
-	}
-	options := executionOptions(request.Author, request.Message)
-	return executeRaw(operationCtx, connection, request.Cypher, request.Params, options)
+	return execute(operationCtx, connection)
 }
 
 func (host *Host) StreamQuery(
@@ -259,7 +268,7 @@ func streamRaw(
 		optionsJSON,
 	)
 	if err != nil {
-		return err
+		return normalizeDatabaseError(err)
 	}
 	defer rows.Close()
 	lastOrdinal := -1
@@ -287,7 +296,7 @@ func streamRaw(
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return normalizeDatabaseError(err)
 	}
 	if !terminalSummary {
 		return fmt.Errorf("lithograph stream ended without terminal summary")

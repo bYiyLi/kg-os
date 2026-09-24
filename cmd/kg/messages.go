@@ -41,7 +41,8 @@ func rootHelp(locale cliLocale) string {
 			"  kg object patch --base-state <ResolvedState> --branch <name> [正文参数]\n" +
 			"  kg ontology [<OntologyRef> ...] --at <StateRef> [--limit <n>] [--cursor <token>]\n" +
 			"  kg ontology <OntologyRef> [<OntologyRef> ...] --at <ResolvedState> --edit\n" +
-			"  kg ontology patch --base-state <ResolvedState> --branch <name> [正文参数]\n\n" +
+			"  kg ontology patch --base-state <ResolvedState> --branch <name> [正文参数]\n" +
+			"  kg evolution <command> [参数]\n\n" +
 			"选项:\n" +
 			"  -h, --help     显示帮助\n" +
 			"  -V, --version  显示已安装版本\n"
@@ -57,7 +58,8 @@ func rootHelp(locale cliLocale) string {
 		"  kg object patch --base-state <ResolvedState> --branch <name> [payload options]\n" +
 		"  kg ontology [<OntologyRef> ...] --at <StateRef> [--limit <n>] [--cursor <token>]\n" +
 		"  kg ontology <OntologyRef> [<OntologyRef> ...] --at <ResolvedState> --edit\n" +
-		"  kg ontology patch --base-state <ResolvedState> --branch <name> [payload options]\n\n" +
+		"  kg ontology patch --base-state <ResolvedState> --branch <name> [payload options]\n" +
+		"  kg evolution <command> [options]\n\n" +
 		"Options:\n" +
 		"  -h, --help     Show this help\n" +
 		"  -V, --version  Show the installed version\n"
@@ -126,6 +128,37 @@ func ontologyHelp(locale cliLocale) string {
 		"    [--patch <diff> | --patch-file <path> | stdin] [--author <text>] [--message <text>]\n\n" +
 		"OntologyRef: domain:<name> | node:<name> | relationship:<name>\n" +
 		"Reads emit Markdown; --edit emits server-rendered canonical YAML; patch emits JSON.\n"
+}
+
+func evolutionHelp(locale cliLocale) string {
+	if locale == localeChinese {
+		return "KG OS Evolution 命令\n\n" +
+			"用法:\n" +
+			"  kg evolution overview [--pretty]\n" +
+			"  kg evolution get <StateRef> [--pretty]\n" +
+			"  kg evolution ancestry <StateRef> [--limit <1..1000>] [--cursor <token>] [--pretty]\n" +
+			"  kg evolution history <StateRef> --scope <all|ontology|knowledge|object> [范围参数] [分页参数] [--pretty]\n" +
+			"  kg evolution diff --before <StateRef> --after <StateRef> --scope <all|ontology|knowledge|object> [范围参数] [分页参数] [--pretty]\n" +
+			"  kg evolution state create --branch <name> [--data <json> | --data-file <path>] [--author <text>] [--message <text>] [--pretty]\n" +
+			"  kg evolution state set-data <StateRef> (--data <json> | --data-file <path> | stdin) [--pretty]\n" +
+			"  kg evolution state clear-data <StateRef> [--pretty]\n" +
+			"  kg evolution branch list|create|delete ... [--pretty]\n" +
+			"  kg evolution tag list|create|move|delete ... [--pretty]\n\n" +
+			"scope=object 时必须同时提供 --object-ref <ObjectRef> 与 --anchor-state <StateRef>。\n"
+	}
+	return "KG OS Evolution commands\n\n" +
+		"Usage:\n" +
+		"  kg evolution overview [--pretty]\n" +
+		"  kg evolution get <StateRef> [--pretty]\n" +
+		"  kg evolution ancestry <StateRef> [--limit <1..1000>] [--cursor <token>] [--pretty]\n" +
+		"  kg evolution history <StateRef> --scope <all|ontology|knowledge|object> [scope options] [pagination options] [--pretty]\n" +
+		"  kg evolution diff --before <StateRef> --after <StateRef> --scope <all|ontology|knowledge|object> [scope options] [pagination options] [--pretty]\n" +
+		"  kg evolution state create --branch <name> [--data <json> | --data-file <path>] [--author <text>] [--message <text>] [--pretty]\n" +
+		"  kg evolution state set-data <StateRef> (--data <json> | --data-file <path> | stdin) [--pretty]\n" +
+		"  kg evolution state clear-data <StateRef> [--pretty]\n" +
+		"  kg evolution branch list|create|delete ... [--pretty]\n" +
+		"  kg evolution tag list|create|move|delete ... [--pretty]\n\n" +
+		"scope=object requires both --object-ref <ObjectRef> and --anchor-state <StateRef>.\n"
 }
 
 func installHelp(locale cliLocale) string {

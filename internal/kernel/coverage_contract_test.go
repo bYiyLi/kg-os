@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bYiyLi/kg-os/internal/lithograph"
 	"gopkg.in/yaml.v3"
 )
 
@@ -39,28 +40,28 @@ func TestPublicErrorMappingCoverage(t *testing.T) {
 	}
 
 	categories := []struct {
-		category string
+		category lithograph.ErrorCategory
 		code     ErrorCode
 		message  string
 	}{
-		{"VERSION_NOT_FOUND", CodeStateNotFound, "state was not found"},
-		{"BRANCH_HEAD_MOVED", CodeStaleBaseState, "target branch head no longer matches baseState"},
-		{"INVALID_ARGUMENT", CodeInvalidArgument, "invalid input"},
-		{"PARSE_ERROR", CodeParse, "parse failed"},
-		{"SEMANTIC_ERROR", CodeSemantic, "semantic failed"},
-		{"TYPE_ERROR", CodeType, "type failed"},
-		{"SCHEMA_ERROR", CodeSchema, "schema failed"},
-		{"CONSTRAINT_ERROR", CodeConstraint, "constraint failed"},
-		{"RESOURCE_ERROR", CodeResource, "resource failed"},
-		{"IO_ERROR", CodeIO, "io failed"},
-		{"BRANCH_NOT_FOUND", CodeBranchNotFound, "branch failed"},
-		{"TAG_NOT_FOUND", CodeTagNotFound, "tag failed"},
-		{"READ_ONLY_SNAPSHOT", CodeReadOnlySnapshot, "read only"},
+		{lithograph.CategoryVersionNotFound, CodeStateNotFound, "state was not found"},
+		{lithograph.CategoryBranchHeadMoved, CodeStaleBaseState, "target branch head no longer matches baseState"},
+		{lithograph.CategoryInvalidArgument, CodeInvalidArgument, "invalid input"},
+		{lithograph.CategoryParse, CodeParse, "parse failed"},
+		{lithograph.CategorySemantic, CodeSemantic, "semantic failed"},
+		{lithograph.CategoryType, CodeType, "type failed"},
+		{lithograph.CategorySchema, CodeSchema, "schema failed"},
+		{lithograph.CategoryConstraint, CodeConstraint, "constraint failed"},
+		{lithograph.CategoryResource, CodeResource, "resource failed"},
+		{lithograph.CategoryIO, CodeIO, "io failed"},
+		{lithograph.CategoryBranchNotFound, CodeBranchNotFound, "branch failed"},
+		{lithograph.CategoryTagNotFound, CodeTagNotFound, "tag failed"},
+		{lithograph.CategoryReadOnlySnapshot, CodeReadOnlySnapshot, "read only"},
 	}
 	for _, test := range categories {
 		test := test
-		t.Run(test.category, func(t *testing.T) {
-			err := fmt.Errorf("wrapper: LITHOGRAPH_%s: %s", test.category, test.message)
+		t.Run(string(test.category), func(t *testing.T) {
+			err := fmt.Errorf("wrapper: %w", &lithograph.DatabaseError{Category: test.category, Message: test.message, SQLiteCode: 1})
 			got := AsPublicError(err)
 			if got.Code != test.code || got.Message != test.message || !errors.Is(got, err) {
 				t.Fatalf("mapped = %#v", got)
@@ -71,15 +72,9 @@ func TestPublicErrorMappingCoverage(t *testing.T) {
 	if got := AsPublicError(unknown); got.Code != CodeInternal || got.Message != "internal KG OS error" {
 		t.Fatalf("unknown map = %#v", got)
 	}
-	if lithographCategory("no marker") != "" ||
-		lithographCategory("LITHOGRAPH_TYPE_ERROR") != "" ||
-		lithographCategory("x LITHOGRAPH_TYPE_ERROR: y") != "TYPE_ERROR" {
-		t.Fatal("Lithograph category parsing is inconsistent")
-	}
-	if safeDatabaseMessage("plain") != "database operation failed" ||
-		safeDatabaseMessage("LITHOGRAPH_TYPE_ERROR") != "database operation failed" ||
-		safeDatabaseMessage("x LITHOGRAPH_TYPE_ERROR: safe") != "safe" {
-		t.Fatal("safe database message mapping is inconsistent")
+	spoofed := errors.New("wrapper mentions LITHOGRAPH_TYPE_ERROR: but is not a typed database error")
+	if got := AsPublicError(spoofed); got.Code != CodeInternal {
+		t.Fatalf("untyped database-looking message was trusted: %#v", got)
 	}
 
 	statuses := map[ErrorCode]int{

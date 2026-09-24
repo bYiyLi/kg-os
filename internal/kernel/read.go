@@ -227,7 +227,10 @@ func (service *Service) readKnowledgeObject(ctx context.Context, state string, r
 			return ObjectValue{}, publicError(CodeConsistency, "Knowledge Node identity does not match requested Ref", nil)
 		}
 		if hasLabel(node.Labels, internalLabel) {
-			return ObjectValue{}, errorWithDetails(CodeConsistency, "internal KG OS Node is not a public Knowledge Object", map[string]any{"ref": ref.String()})
+			return ObjectValue{}, &PublicError{
+				Code: CodeConsistency, Message: "internal KG OS Node is not a public Knowledge Object",
+				Details: map[string]any{"ref": ref.String()}, Cause: errInternalKnowledgeObject,
+			}
 		}
 		value := ObjectValue{Kind: KindKnowledgeNode, KnowledgeNode: &KnowledgeNode{
 			Labels: append([]string(nil), node.Labels...), Properties: cloneRawProperties(node.Properties),
@@ -266,7 +269,10 @@ func (service *Service) readKnowledgeObject(ctx context.Context, state string, r
 			return ObjectValue{}, publicError(CodeConsistency, "Knowledge Relationship identity does not match requested Ref", nil)
 		}
 		if hasLabel(start.Labels, internalLabel) || hasLabel(end.Labels, internalLabel) {
-			return ObjectValue{}, errorWithDetails(CodeConsistency, "internal KG OS Relationship is not a public Knowledge Object", map[string]any{"ref": ref.String()})
+			return ObjectValue{}, &PublicError{
+				Code: CodeConsistency, Message: "internal KG OS Relationship is not a public Knowledge Object",
+				Details: map[string]any{"ref": ref.String()}, Cause: errInternalKnowledgeObject,
+			}
 		}
 		value := ObjectValue{Kind: KindKnowledgeRelationship, KnowledgeRelationship: &KnowledgeRelationship{
 			Type: relationship.Type, Start: relationship.Start, End: relationship.End,

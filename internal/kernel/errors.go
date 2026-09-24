@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
+
+	"github.com/bYiyLi/kg-os/internal/lithograph"
 )
 
 type ErrorCode string
@@ -38,11 +39,36 @@ const (
 	CodeInternal             ErrorCode = "INTERNAL_ERROR"
 )
 
+var errInternalKnowledgeObject = errors.New("internal KG OS Knowledge object")
+
 type PublicError struct {
 	Code    ErrorCode      `json:"code"`
 	Message string         `json:"message"`
 	Details map[string]any `json:"details,omitempty"`
 	Cause   error          `json:"-"`
+}
+
+type consistencyDiagnostic struct {
+	issue string
+	err   error
+}
+
+func (err *consistencyDiagnostic) Error() string { return err.err.Error() }
+func (err *consistencyDiagnostic) Unwrap() error { return err.err }
+
+func markConsistencyIssue(issue string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return &consistencyDiagnostic{issue: issue, err: err}
+}
+
+func markedConsistencyIssue(err error) (string, bool) {
+	var diagnostic *consistencyDiagnostic
+	if errors.As(err, &diagnostic) && diagnostic.issue != "" {
+		return diagnostic.issue, true
+	}
+	return "", false
 }
 
 func (err *PublicError) Error() string {
@@ -70,63 +96,40 @@ func AsPublicError(err error) *PublicError {
 	if errors.As(err, &public) {
 		return public
 	}
-	message := err.Error()
-	category := lithographCategory(message)
+	category, message, _, ok := lithograph.ErrorDetails(err)
+	if !ok {
+		return publicError(CodeInternal, "internal KG OS error", err)
+	}
 	switch category {
-	case "VERSION_NOT_FOUND":
+	case lithograph.CategoryVersionNotFound:
 		return publicError(CodeStateNotFound, "state was not found", err)
-	case "BRANCH_HEAD_MOVED":
+	case lithograph.CategoryBranchHeadMoved:
 		return publicError(CodeStaleBaseState, "target branch head no longer matches baseState", err)
-	case "INVALID_ARGUMENT":
-		return publicError(CodeInvalidArgument, safeDatabaseMessage(message), err)
-	case "PARSE_ERROR":
-		return publicError(CodeParse, safeDatabaseMessage(message), err)
-	case "SEMANTIC_ERROR":
-		return publicError(CodeSemantic, safeDatabaseMessage(message), err)
-	case "TYPE_ERROR":
-		return publicError(CodeType, safeDatabaseMessage(message), err)
-	case "SCHEMA_ERROR":
-		return publicError(CodeSchema, safeDatabaseMessage(message), err)
-	case "CONSTRAINT_ERROR":
-		return publicError(CodeConstraint, safeDatabaseMessage(message), err)
-	case "RESOURCE_ERROR":
-		return publicError(CodeResource, safeDatabaseMessage(message), err)
-	case "IO_ERROR":
-		return publicError(CodeIO, safeDatabaseMessage(message), err)
-	case "BRANCH_NOT_FOUND":
-		return publicError(CodeBranchNotFound, safeDatabaseMessage(message), err)
-	case "TAG_NOT_FOUND":
-		return publicError(CodeTagNotFound, safeDatabaseMessage(message), err)
-	case "READ_ONLY_SNAPSHOT":
-		return publicError(CodeReadOnlySnapshot, safeDatabaseMessage(message), err)
+	case lithograph.CategoryInvalidArgument:
+		return publicError(CodeInvalidArgument, message, err)
+	case lithograph.CategoryParse:
+		return publicError(CodeParse, message, err)
+	case lithograph.CategorySemantic:
+		return publicError(CodeSemantic, message, err)
+	case lithograph.CategoryType:
+		return publicError(CodeType, message, err)
+	case lithograph.CategorySchema:
+		return publicError(CodeSchema, message, err)
+	case lithograph.CategoryConstraint:
+		return publicError(CodeConstraint, message, err)
+	case lithograph.CategoryResource:
+		return publicError(CodeResource, message, err)
+	case lithograph.CategoryIO:
+		return publicError(CodeIO, message, err)
+	case lithograph.CategoryBranchNotFound:
+		return publicError(CodeBranchNotFound, message, err)
+	case lithograph.CategoryTagNotFound:
+		return publicError(CodeTagNotFound, message, err)
+	case lithograph.CategoryReadOnlySnapshot:
+		return publicError(CodeReadOnlySnapshot, message, err)
 	default:
 		return publicError(CodeInternal, "internal KG OS error", err)
 	}
-}
-
-func lithographCategory(message string) string {
-	index := strings.Index(message, "LITHOGRAPH_")
-	if index < 0 {
-		return ""
-	}
-	rest := message[index+len("LITHOGRAPH_"):]
-	end := strings.IndexByte(rest, ':')
-	if end < 0 {
-		return ""
-	}
-	return rest[:end]
-}
-
-func safeDatabaseMessage(message string) string {
-	index := strings.Index(message, "LITHOGRAPH_")
-	if index < 0 {
-		return "database operation failed"
-	}
-	rest := message[index:]
-	if colon := strings.Index(rest, ": "); colon >= 0 {
-		return rest[colon+2:]
-	}
-	return "database operation failed"
 }
 
 func HTTPStatus(err error) int {

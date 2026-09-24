@@ -694,3 +694,14 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 - 备选：保留 Object list作为管理枚举；保留 exact-Ref search；为 Knowledge新增 create/update/delete命令或第二套 CRUD JSON API。本次均不采用。
 - 取舍：Object surface更小，调用方必须通过 Ontology/Graph获得未知对象的 Ref；换取 discovery/query/mutation职责清晰、无需维护无界枚举与重复搜索语义，并让单个 Object batch操作共享明确的 State / transaction边界。
 - 当前合同：[Object](object.md#object-公共调用合同)、[CLI Object](cli.md#object-cli)、[工程映射](implementation.md)、[Phase 04](../development/phases/04-object.md)。
+
+<a id="d74-evolution-state-create-writer-boundary"></a>
+
+### D74 Evolution state.create 使用单 Version Procedure 的短 SQLite writer boundary（2026-09-24）
+
+- 决定：`state.create` 仍然只调用 Lithograph v0.3.0 `commit.create([data])` 建立一个 empty-delta Commit，但 KG OS Host 在调用该**单个** Version Procedure 前用同一 write connection 开启短 `BEGIN IMMEDIATE`，在 writer ownership 内重新读取目标 Branch head并与此前已经完成 KG OS consistency validation 的 immutable parent Commit比较；不一致返回 `BRANCH_HEAD_MOVED`，一致才执行 `commit.create`，校验返回 Commit 的唯一 parent 后提交外层 SQLite transaction。任一失败整体 rollback。
+- 依据：v0.3.0 `commit.create` 自身没有 `expectedHead` 参数，而 `state.create` 必须保证真正成为新 Commit parent 的 head 已经过 KG OS-valid 校验；同时可选 State Data 只能通过 `commit.create(data)` 与新 Commit原子建立。Lithograph SQL explicit transaction虽然支持 `expectedHead`，但 active explicit transaction禁止 Version Procedure / Commit Data mutation，因此不能同时满足这两个约束。
+- 边界：这个 writer boundary不合并多个 Lithograph Commit、不承载 Object/Graph mutation、不替代 Lithograph explicit transaction、不保存跨请求状态，也不使用 `branch.checkout`。其它 Evolution Version Procedure继续在自己的 autocommit lifecycle执行。caller-owned transaction在这里仅提供“已验证 parent 与唯一 `commit.create` publication 之间”的短 writer/CAS 边界。
+- 备选：校验后直接 autocommit `commit.create`（存在 check-then-use 漂移）；用 SQL explicit transaction制造 empty-delta Commit后再 `commit.data.set`（Data与新 State不原子）；修改 Lithograph新增 `commit.create(expectedHead)`（超出KG OS当前任务且改变独立数据库公共合同）。本次均不采用。
+- 取舍：KG OS Host承担一个极窄的 SQLite transaction编排特例；换取不修改 Lithograph v0.3.0 API即可同时保持 D31 parent consistency、empty-delta State与初始 State Data原子性。
+- 当前合同：[Evolution](evolution.md)、[工程映射](implementation.md)、[Phase 06](../development/phases/06-evolution-core.md)。

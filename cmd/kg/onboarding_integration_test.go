@@ -129,15 +129,16 @@ func TestFreshInstalledProfileAutoStartsRealRuntime(t *testing.T) {
 		stdout string
 		stderr string
 	}
-	results := make(chan commandResult, 2)
+	results := make(chan commandResult, 3)
 	var callers sync.WaitGroup
-	for index := range 2 {
+	for index := range 3 {
 		callers.Add(1)
 		go func(index int) {
 			defer callers.Done()
 			var callerStdout, callerStderr strings.Builder
 			code := 0
-			if index == 0 {
+			switch index {
+			case 0:
 				code = runOntology(
 					context.Background(),
 					[]string{"--at", "branch/main"},
@@ -146,10 +147,19 @@ func TestFreshInstalledProfileAutoStartsRealRuntime(t *testing.T) {
 					&callerStdout,
 					&callerStderr,
 				)
-			} else {
+			case 1:
 				code = runGraph(
 					context.Background(),
 					[]string{"query", "--at", "branch/main", "--cypher", "RETURN 1 AS value"},
+					strings.NewReader(""),
+					true,
+					&callerStdout,
+					&callerStderr,
+				)
+			case 2:
+				code = runEvolution(
+					context.Background(),
+					[]string{"overview"},
 					strings.NewReader(""),
 					true,
 					&callerStdout,

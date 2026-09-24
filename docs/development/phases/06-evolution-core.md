@@ -1,6 +1,6 @@
 # Phase 06：Evolution Core
 
-**状态：`ready`**
+**状态：`in_progress`**
 
 ## 1. 目标与范围
 
@@ -57,6 +57,7 @@ kg evolution tag delete
 - [D13 State 引用显式且所有状态写入返回最终 State](../../design/decisions.md#d13-state-引用显式且所有状态写入返回最终-state)；
 - [D31 Invalid Snapshot 只允许 Evolution 诊断](../../design/decisions.md#d31-invalid-lithograph-snapshot-只允许-evolution-诊断不继续演进)；
 - [D35 StateRef 直接复用 Lithograph Version Descriptor](../../design/decisions.md#d35-公共-stateref-直接复用-lithograph-version-descriptor)；
+- [D74 Evolution state.create writer boundary](../../design/decisions.md#d74-evolution-state-create-writer-boundary)；
 - [实现范围映射](../../design/implementation.md#实现范围映射)；
 - [Phase 01 Runtime & Lithograph Host](01-runtime-lithograph-host.md)；
 - [Phase 04 General Object Read & Patch](04-object.md)；
@@ -76,7 +77,7 @@ kg evolution tag delete
 - 当前 Ontology pagination 已有 opaque cursor 的 State/scope binding模式，可作为 Evolution cursor engineering reference，但 Evolution cursor仍必须满足自己的 root/before/after/filter pinning合同；
 - 当前 KG OS 还没有公共 Evolution Kernel / HTTP / CLI，实现存在于本 Phase 之后才能作为完成证据。
 
-Design Inputs、依赖顺序与 Acceptance 已齐全；当前没有需要重新确认的 Evolution Core 产品语义，因此 Phase 06 状态为 `ready`。
+Design Inputs、依赖顺序与 Acceptance 已齐全；当前没有需要重新确认的 Evolution Core 产品语义。Phase 06 实现已经进入工作树，因此当前状态为 `in_progress`。
 
 ### 3.2 Lithograph baseline
 
@@ -148,7 +149,7 @@ Evolution version/ref adapter
 ### Feature 06.1 Evolution Foundation / Version-Ref Adapter
 
 - 在现有 `internal/lithograph.Host` 上增加最小 Version/ref read-write primitive；继续使用同一 SQLite/Lithograph connection pools 与 `lithograph()` public SQL surface，不建立第二个 host。
-- Version Procedure 必须在其自己的 autocommit lifecycle 中执行；不得塞入 Object Patch explicit transaction，也不得用 Graph 的 connection-local checkout 作为公共 Evolution state。
+- Version/ref operation默认在其自己的 autocommit lifecycle 中执行；不得塞入 Object Patch explicit transaction，也不得用 Graph 的 connection-local checkout 作为公共 Evolution state。实现核对 v0.3.0 后确认唯一例外为 `state.create`：按 [D74](../../design/decisions.md#d74-evolution-state-create-writer-boundary) 用短 caller-owned SQLite writer boundary只包裹一个 `commit.create([data])`，用于在 publication 前原子复核已校验 parent并保留初始 Commit Data原子性；不得借此组合多个 Version Procedure、Graph/Object mutation或跨请求状态。
 - 读取优先复用现有 `ResolveState` / metadata query能力；Branch / Tag / Commit Data mutation使用现有 write pool上的专用 version operation，完成后不依赖或泄漏 connection-local checkout。
 - 定义 Phase 06 需要的内部 request/result projection：State summary/detail、Branch/Tag item、Change、HistoryEntry 与分页 cursor；逻辑字段严格沿用 Evolution owner。
 - 统一解码 Lithograph Version Procedure result column；缺字段、非法 Commit identity、非法 JSON / typed value或不满足冻结 v0.3.0 contract时 fail closed，不伪造 State。
@@ -351,8 +352,8 @@ Phase 06只有同时满足以下条件才能进入 `done`：
 
 ## 11. 当前状态
 
-2026-09-24：Phase 00–05 已为 `done`；Evolution / CLI / implementation owner中的State、State Data、Branch、Tag、Ancestry、History、Diff合同已确认。当前KG OS尚无公共Evolution Kernel / HTTP / CLI实现。
+2026-09-24：Phase 00–05 已为 `done`；Evolution / CLI / implementation owner中的State、State Data、Branch、Tag、Ancestry、History、Diff合同已确认。当前工作树已经实现公共 Evolution Kernel / HTTP / CLI Core surface，并进入 Phase 级验收与 Review 收口。
 
 本计划已核对当前KG OS实现基线与Lithograph公开Version Procedure：Phase 06需要的Commit metadata/Data、Branch/Tag、bounded DAG log与structured diff均已有底层public SQL contract，可复用现有Host与Snapshot/Object primitive；Merge Session不属于本Phase。
 
-因此当前状态为 `ready`：下一步从06.1开始实现，并以本文件Acceptance作为Phase完成标准。
+当前本地实现与 Review 已收口：`pnpm check:go`、`pnpm check:quick`、主工作树完整 `pnpm validate` 与独立 `.cache/phase06-fresh-20260924-1022` 的 `pnpm run setup && pnpm validate` 均成功；Go statement coverage **90.0%**、jscpd 0 clones，race、govulncheck、TypeScript/V8/type coverage、Playwright、真实 bundled Lithograph v0.3.0 native suite、package、licenses、npm audit 与 diff gate 均通过。真实场景覆盖 empty-delta State/Data、invalid State诊断、ref lifecycle、pinned Ancestry/History、shared Index、Relationship replacement、rename/name reuse、multi-parent History、authenticated HTTP、fresh installed profile Runtime auto-start 与 CLI E2E。最终 Phase Review 未发现新的 task-affecting implementation finding，生产代码没有第二套 Version store/History index、Evolution Merge/checkout/rebase/squash/reset/revert/gc surface或新依赖。仍缺最终 pushed SHA 的 Ubuntu 24.04 x64 GitHub Actions Validate，因此状态保持 `in_progress`，不能提前标记 `done`。

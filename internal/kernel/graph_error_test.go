@@ -1,40 +1,46 @@
 package kernel
 
 import (
-	"errors"
 	"net/http"
 	"testing"
+
+	"github.com/bYiyLi/kg-os/internal/lithograph"
 )
 
 func TestGraphDatabaseErrorProjectionPreservesGraphCategories(t *testing.T) {
 	for _, test := range []struct {
-		message string
-		code    ErrorCode
-		status  int
+		category lithograph.ErrorCategory
+		message  string
+		code     ErrorCode
+		status   int
 	}{
 		{
-			message: "execute: LITHOGRAPH_BRANCH_HEAD_MOVED: branch head moved",
-			code:    CodeBranchHeadMoved,
-			status:  http.StatusConflict,
+			category: lithograph.CategoryBranchHeadMoved,
+			message:  "branch head moved",
+			code:     CodeBranchHeadMoved,
+			status:   http.StatusConflict,
 		},
 		{
-			message: "execute: LITHOGRAPH_MERGE_CONFLICT: merge conflict",
-			code:    CodeMergeConflict,
-			status:  http.StatusConflict,
+			category: lithograph.CategoryMergeConflict,
+			message:  "merge conflict",
+			code:     CodeMergeConflict,
+			status:   http.StatusConflict,
 		},
 		{
-			message: "execute: LITHOGRAPH_MERGE_SESSION_NOT_FOUND: missing session",
-			code:    CodeMergeSessionNotFound,
-			status:  http.StatusNotFound,
+			category: lithograph.CategoryMergeSessionNotFound,
+			message:  "missing session",
+			code:     CodeMergeSessionNotFound,
+			status:   http.StatusNotFound,
 		},
 		{
-			message: "execute: LITHOGRAPH_MERGE_SESSION_CHANGED: changed session",
-			code:    CodeMergeSessionChanged,
-			status:  http.StatusConflict,
+			category: lithograph.CategoryMergeSessionChanged,
+			message:  "changed session",
+			code:     CodeMergeSessionChanged,
+			status:   http.StatusConflict,
 		},
 	} {
 		t.Run(string(test.code), func(t *testing.T) {
-			projected := graphPublicError(errors.New(test.message))
+			projected := graphPublicError(&lithograph.DatabaseError{Category: test.category, Message: test.message, SQLiteCode: 1})
 			if projected.Code != test.code {
 				t.Fatalf("code = %s, want %s", projected.Code, test.code)
 			}
@@ -46,7 +52,7 @@ func TestGraphDatabaseErrorProjectionPreservesGraphCategories(t *testing.T) {
 }
 
 func TestGraphDatabaseErrorProjectionKeepsSharedMappingsAndPublicErrors(t *testing.T) {
-	shared := graphPublicError(errors.New("execute: LITHOGRAPH_VERSION_NOT_FOUND: missing"))
+	shared := graphPublicError(&lithograph.DatabaseError{Category: lithograph.CategoryVersionNotFound, Message: "missing", SQLiteCode: 1})
 	if shared.Code != CodeStateNotFound {
 		t.Fatalf("shared code = %s", shared.Code)
 	}
