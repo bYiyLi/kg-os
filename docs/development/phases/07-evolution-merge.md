@@ -1,6 +1,6 @@
 # Phase 07：Evolution Merge Session
 
-**状态：`in_progress`**
+**状态：`done`**
 
 ## 1. 目标与范围
 
@@ -370,8 +370,8 @@ Phase 07只有同时满足以下条件才能进入 `done`：
 
 ## 11. 当前状态
 
-2026-09-24：Phase 07 为 `in_progress`。Phase 00–06均已完成；Evolution owner、CLI owner、公共错误合同与D41继续冻结 Merge Session logical contract。当前工作树已经实现 Lithograph Merge Session adapter、`start/list/get/conflicts/resolve/finalize/abort` Kernel、公共 conflict/reverse mapping、exact-revision candidate consistency validation、七个 authenticated HTTP route 与正式 `kg evolution merge` CLI。
+2026-09-24：Phase 00–07 均已为 `done`。Evolution owner、CLI owner、公共错误合同与D41继续冻结 Merge Session logical contract；Lithograph Merge Session adapter、`start/list/get/conflicts/resolve/finalize/abort` Kernel、公共 conflict/reverse mapping、exact-revision candidate consistency validation、七个 authenticated HTTP route 与正式 `kg evolution merge` CLI 已全部实现并完成 Phase 级验收与 Review。
 
-当前本地证据：真实 bundled Lithograph v0.3.0 native suite通过；conflicted / ready / merged、fast-forward、up-to-date、restart recovery、stale revision/cursor、no-op resolution、D31 direct-Lithograph invalid Session、candidate-invalid、shared Index、Knowledge Node delete-vs-update 与 Relationship Property conflict均有 integration 覆盖。主工作树完整 `pnpm validate` 成功；独立 fresh Git checkout 叠加当前 tracked/untracked Phase 07 source 后，`pnpm run setup && pnpm validate` 同样成功；Go statement coverage **90.1%**，race、govulncheck、Playwright、native、package、license、audit、diff gates全部通过。多轮 Review 已修正 public Property aggregate path、Definition rename两侧Ref、shared Index单侧展示Ref、末页 conflict cursor、CLI resolutions unknown-field strict decode与 explicit null/absence serialization contract，并删除无用 helper；最终 `git diff --check`、dependency diff、生产 surface scan与 final diff/review没有新的 task-affecting finding。当前唯一未满足完成条件是最终 pushed SHA 的 Ubuntu 24.04 x64 CI，因此 Phase 仍保持 `in_progress`。
+Phase 07 实现提交 `bd31b748359f85ae95cca919c7deffb62f3c7a0c` 已推送到 `main`。真实 bundled Lithograph v0.3.0 native suite通过；conflicted / ready / merged、fast-forward、up-to-date、restart recovery、stale revision/cursor、no-op resolution、D31 direct-Lithograph invalid Session、candidate-invalid、shared Index、Knowledge Node delete-vs-update 与 Relationship Property conflict均有 integration 覆盖。主工作树完整 `pnpm validate` 成功；独立 fresh Git checkout 叠加 Phase 07 source 后，`pnpm run setup && pnpm validate` 同样成功；Go statement coverage **90.1%**，race、govulncheck、Playwright、native、package、license、audit、diff gates全部通过。多轮 Review 已修正 public Property aggregate path、Definition rename两侧Ref、shared Index单侧展示Ref、末页 conflict cursor、CLI resolutions unknown-field strict decode与 explicit null/absence serialization contract，并删除无用 helper；最终 `git diff --check`、dependency diff、生产 surface scan与 final diff/review没有新的 task-affecting finding。Ubuntu 24.04 x64 GitHub Actions run `35982570257` / Validate job `107577711342` 对该实现提交成功，因此 A–K Acceptance 与本 Phase 全部完成条件均已满足。
 
 本计划已核对当前Lithograph v0.3.0 `main`：durable Merge Session、expected-head CAS、bounded conflict pagination、incremental resolution、candidate `mergeSession` read context、revision/head finalize CAS、restart recovery与GC root均已有公开SQL合同和Phase 09验收证据。Phase 07可以复用现有Host/Snapshot/Object/Evolution primitive完成，不需要修改Lithograph或新增产品设计。
