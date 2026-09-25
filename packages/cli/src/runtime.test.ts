@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { mkdtemp } from "node:fs/promises";
 
 import { afterEach, describe, expect, it } from "vitest";
+import { KGOS_VERSION } from "@kgos/sdk";
 
 import {
   currentRuntimeTarget,
@@ -97,7 +98,7 @@ describe("CLI Runtime discovery", () => {
     const endpoint = `http://127.0.0.1:${String(serverPort(server))}`;
     await writeFile(
       join(root, "kgosd.lock"),
-      JSON.stringify({ pid: process.pid, endpoint, version: "0.0.0" }) + "\n"
+      JSON.stringify({ pid: process.pid, endpoint, version: KGOS_VERSION }) + "\n"
     );
     await writeFile(join(root, "auth.json"), '{"token":"secret"}\n');
 

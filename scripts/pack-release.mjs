@@ -2,7 +2,7 @@ import { access, chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
-import { run, runCapture } from "./process.mjs";
+import { run, runCapture, waitForProcessExit } from "./process.mjs";
 import { currentRuntimeTarget } from "./runtime-package.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -37,17 +37,22 @@ const cliStage = await stageTypescriptPackage("cli");
 const runtimeStage = resolve(root, "artifacts", "npm", "runtime-" + target);
 await assertRuntimeStage(runtimeStage);
 
-const sdkTarball = await packPackage(sdkStage);
-const runtimeTarball = await packPackage(runtimeStage);
-const cliTarball = await packPackage(cliStage);
+const sdkPackage = await packPackage(sdkStage);
+const runtimePackage = await packPackage(runtimeStage);
+const cliPackage = await packPackage(cliStage);
 
 await verifyTarballContents(
-  cliTarball,
+  sdkPackage.tarball,
+  ["package/dist/index.js", "package/package.json"],
+  ["package/kgosd"]
+);
+await verifyTarballContents(
+  cliPackage.tarball,
   ["package/dist/bin.js", "package/package.json"],
   ["package/kgosd"]
 );
 await verifyTarballContents(
-  runtimeTarball,
+  runtimePackage.tarball,
   [
     "package/kgosd",
     "package/manifest.json",
@@ -56,11 +61,37 @@ await verifyTarballContents(
   ],
   ["package/kg"]
 );
-await verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball });
+await verifyPackedSmoke({
+  sdkTarball: sdkPackage.tarball,
+  runtimeTarball: runtimePackage.tarball,
+  cliTarball: cliPackage.tarball
+});
 
 if (temporary) {
   await rm(workRoot, { force: true, recursive: true });
 } else {
+  const revision = (await runCapture("git", ["rev-parse", "HEAD"], { cwd: root })).stdout.trim();
+  const dirty =
+    (await runCapture("git", ["status", "--porcelain"], { cwd: root })).stdout.trim() !== "";
+  const runtimeManifest = JSON.parse(
+    await readFile(resolve(runtimeStage, "manifest.json"), "utf8")
+  );
+  await writeFile(
+    resolve(packDirectory, "candidate.json"),
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        revision,
+        dirty,
+        version,
+        target,
+        packages: [sdkPackage.metadata, runtimePackage.metadata, cliPackage.metadata],
+        runtimeManifest
+      },
+      null,
+      2
+    ) + "\n"
+  );
   process.stdout.write("Packed KG OS npm candidates: " + packDirectory + "\n");
 }
 
@@ -115,13 +146,31 @@ async function packPackage(directory) {
     { cwd: root }
   );
   const parsed = JSON.parse(result.stdout);
-  const first = Object.values(parsed)[0];
-  const filename =
-    typeof first === "object" && first !== null && "filename" in first ? first.filename : undefined;
-  if (typeof filename !== "string" || filename === "") {
-    throw new Error("npm pack did not return a tarball filename");
+  const first =
+    Array.isArray(parsed) && parsed.length > 0
+      ? parsed[0]
+      : typeof parsed === "object" && parsed !== null
+        ? Object.values(parsed)[0]
+        : undefined;
+  if (
+    typeof first?.name !== "string" ||
+    typeof first.version !== "string" ||
+    typeof first.filename !== "string" ||
+    first.filename === "" ||
+    typeof first.integrity !== "string" ||
+    !first.integrity.startsWith("sha512-")
+  ) {
+    throw new Error("npm pack did not return complete package metadata");
   }
-  return resolve(packDirectory, filename);
+  return {
+    tarball: resolve(packDirectory, first.filename),
+    metadata: {
+      name: first.name,
+      version: first.version,
+      filename: first.filename,
+      integrity: first.integrity
+    }
+  };
 }
 
 async function verifyTarballContents(tarball, requiredPrefixes, forbiddenPrefixes) {
@@ -280,7 +329,7 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
   }
 
   killPackedDaemon(locatorA.pid);
-  await waitForProcessExit(locatorA.pid);
+  await waitForProcessExit(locatorA.pid, "packed kgosd did not exit after SIGTERM");
   const restarted = await runKgJSON(rootA, ["evolution", "overview"]);
   const restartedLocator = await readPackedLocator(rootA);
   if (
@@ -293,6 +342,10 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
 
   killPackedDaemon(restartedLocator.pid);
   killPackedDaemon(locatorB.pid);
+  await Promise.all([
+    waitForProcessExit(restartedLocator.pid, "restarted packed kgosd did not exit after SIGTERM"),
+    waitForProcessExit(locatorB.pid, "second packed kgosd did not exit after SIGTERM")
+  ]);
 }
 
 async function initPackedInstance(instanceRoot) {
@@ -383,20 +436,4 @@ function killPackedDaemon(pid) {
       throw error;
     }
   }
-}
-
-async function waitForProcessExit(pid) {
-  const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
-    try {
-      process.kill(pid, 0);
-    } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ESRCH") {
-        return;
-      }
-      throw error;
-    }
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 40));
-  }
-  throw new Error("packed kgosd did not exit after SIGTERM");
 }

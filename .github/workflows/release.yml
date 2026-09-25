@@ -1,0 +1,380 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_DIST_TAG: latest
+
+jobs:
+  preflight:
+    name: Release preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    outputs:
+      revision: ${{ steps.baseline.outputs.revision }}
+      version: ${{ steps.baseline.outputs.version }}
+
+    steps:
+      - name: Require main branch
+        run: node -e 'if (process.env.GITHUB_REF !== "refs/heads/main") process.exit(1)'
+
+      - name: Check out release revision
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.34.5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          cache: pnpm
+          node-version-file: .node-version
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          cache-dependency-path: go.sum
+          go-version: 1.27.1
+
+      - name: Install CGO toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps --only-shell chromium
+
+      - name: Verify release baseline
+        id: baseline
+        run: |
+          node scripts/release.mjs preflight --dist-tag "$RELEASE_DIST_TAG"
+          VERSION=$(node -p 'require("./package.json").version')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "revision=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release revision
+        run: pnpm validate
+
+  candidate:
+    name: Release candidate / ${{ matrix.target }}
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin-arm64
+          - runner: macos-15-intel
+            target: darwin-x64
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+          - runner: ubuntu-24.04
+            target: linux-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out release revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.revision }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.34.5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          cache: pnpm
+          node-version-file: .node-version
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          cache-dependency-path: go.sum
+          go-version: 1.27.1
+
+      - name: Install Linux CGO toolchain
+        if: startsWith(matrix.target, 'linux-')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify native runner target
+        run: test "$(node -p 'process.platform + "-" + process.arch')" = "${{ matrix.target }}"
+
+      - name: Build Runtime candidate
+        run: pnpm build
+
+      - name: Run native Lithograph suite
+        run: pnpm test:native
+
+      - name: Pack and smoke-test candidate
+        run: node scripts/pack-release.mjs --output artifacts/release
+
+      - name: Upload immutable candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-candidate-${{ matrix.target }}
+          path: artifacts/release
+          if-no-files-found: error
+          retention-days: 7
+
+  aggregate:
+    name: Aggregate release candidates
+    needs:
+      - preflight
+      - candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out release tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.revision }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Download platform candidates
+        uses: actions/download-artifact@v7
+        with:
+          pattern: release-candidate-*
+          path: artifacts/candidates
+
+      - name: Aggregate exact release set
+        run: |
+          node scripts/release.mjs aggregate \
+            --input artifacts/candidates \
+            --output artifacts/final \
+            --revision "${{ needs.preflight.outputs.revision }}" \
+            --version "${{ needs.preflight.outputs.version }}"
+
+      - name: Upload release set
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-set
+          path: artifacts/final
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish exact npm versions
+    needs:
+      - preflight
+      - aggregate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out release tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.revision }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+
+      - name: Download release set
+        uses: actions/download-artifact@v7
+        with:
+          name: release-set
+          path: artifacts/final
+
+      - name: Verify npm scope authority
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/release.mjs authority
+
+      - name: Dry-run registry release state
+        run: |
+          node scripts/release.mjs publish \
+            --directory artifacts/final \
+            --staging-tag "kgos-release-${{ github.run_id }}" \
+            --dry-run
+
+      - name: Publish or recover matching partial release
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          node scripts/release.mjs publish \
+            --directory artifacts/final \
+            --staging-tag "kgos-release-${{ github.run_id }}"
+
+      - name: Verify exact registry package set
+        run: |
+          node scripts/release.mjs verify-registry \
+            --directory artifacts/final \
+            --expect-final-tag-pending
+
+  registry-smoke:
+    name: Registry smoke / ${{ matrix.target }}
+    needs:
+      - preflight
+      - publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin-arm64
+          - runner: macos-15-intel
+            target: darwin-x64
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+          - runner: ubuntu-24.04
+            target: linux-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out registry smoke tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.revision }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Run clean public-registry npx smoke
+        run: |
+          test "$(node -p 'process.platform + "-" + process.arch')" = "${{ matrix.target }}"
+          node scripts/release-registry-smoke.mjs --version "${{ needs.preflight.outputs.version }}"
+
+  promote:
+    name: Promote final npm dist-tag
+    needs:
+      - preflight
+      - aggregate
+      - registry-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out release tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.revision }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+
+      - name: Download release set
+        uses: actions/download-artifact@v7
+        with:
+          name: release-set
+          path: artifacts/final
+
+      - name: Promote and verify final dist-tag
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          node scripts/release.mjs promote \
+            --directory artifacts/final \
+            --dist-tag "$RELEASE_DIST_TAG"
+
+  finalize:
+    name: Create GitHub Release
+    needs:
+      - preflight
+      - aggregate
+      - promote
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out release revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.revision }}
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Download release set
+        uses: actions/download-artifact@v7
+        with:
+          name: release-set
+          path: artifacts/final
+
+      - name: Reverify promoted registry state
+        run: |
+          node scripts/release.mjs verify-registry \
+            --directory artifacts/final \
+            --dist-tag "$RELEASE_DIST_TAG"
+
+      - name: Fail closed on an existing release tag
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          git fetch --tags origin
+          test -z "$(git tag --list "v$VERSION")"
+
+      - name: Create Git tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          KG OS $VERSION
+
+          Public npm packages:
+          - @kgos/sdk@$VERSION
+          - @kgos/cli@$VERSION
+          - @kgos/runtime-darwin-arm64@$VERSION
+          - @kgos/runtime-darwin-x64@$VERSION
+          - @kgos/runtime-linux-arm64@$VERSION
+          - @kgos/runtime-linux-x64@$VERSION
+
+          Supported native targets: macOS arm64/x64 and Linux glibc arm64/x64.
+          EOF
+          gh release create "v$VERSION" \
+            --target "${{ needs.preflight.outputs.revision }}" \
+            --title "KG OS v$VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+
+      - name: Verify GitHub Release revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+          REVISION: ${{ needs.preflight.outputs.revision }}
+        run: |
+          TAG_SHA=$(gh api "repos/${{ github.repository }}/git/ref/tags/v$VERSION" --jq .object.sha)
+          test "$TAG_SHA" = "$REVISION"
+          gh release view "v$VERSION" --json tagName --jq '.tagName' | grep -Fx "v$VERSION"

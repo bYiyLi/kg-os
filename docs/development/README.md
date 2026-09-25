@@ -73,7 +73,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 08 TypeScript Client & npm Runtime Distribution 当前为 `done`。** 公共 `@kgos/sdk`、TypeScript `@kgos/cli`、显式 `--root`、`init/doctor`、per-root dynamic daemon、platform npm Runtime package builder / candidate smoke 已实现，并在 parity 通过后删除 Go `kg`。实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均成功，Go statement coverage **90.0%**、TypeScript statements/lines/functions **100%**、jscpd **0 clones**，race/govulncheck/Playwright/native/package/license/audit/diff gates 全绿，final review 无剩余 task-affecting finding。GitHub Actions run `36103842748` 的 Validate job `107971924426` 与四个平台 native/package jobs（macOS x64 `107971924614`、Linux arm64 `107971924657`、macOS arm64 `107971924688`、Linux x64 `107971924773`）全部成功。完整范围与 Acceptance 见[Phase 08](phases/08-typescript-client-npm-runtime.md)。
 
-**Phase 09 MVP Release Closure 当前为 `planned`。** 本阶段只把 Phase 08 已验证的 candidate 关闭为真实 public npm / GitHub Release：正式 version、Release workflow、六包 publish、四平台 registry `npx` 验收、Git tag / GitHub Release 与发布状态同步。当前 repository 仍使用 `0.0.0` 占位，且没有 `@kgos` npm scope publish authority 证据，因此尚未进入 `ready`。完整范围与 Acceptance 见[Phase 09](phases/09-mvp-release-closure.md)。
+**Phase 09 MVP Release Closure 当前为 `blocked`。** 首个公开 MVP baseline 已冻结为 `0.1.0` + `latest`，Release workflow、candidate provenance/aggregation、partial publish recovery、registry verification、四平台 clean `npx` smoke 与 GitHub Release dependency chain 已在当前工作树实现；真实 public Release 仍缺少 `@kgos` npm scope publish authority 证据，因此六包 publish、post-publish matrix、dist-tag promotion 与 GitHub Release 均未执行。完整范围与 Acceptance 见[Phase 09](phases/09-mvp-release-closure.md)。
 
 ## 5. 路线总览
 
@@ -88,7 +88,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [06 Evolution Core](phases/06-evolution-core.md) | `done` | State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff、authenticated HTTP 与 `kg evolution` Core CLI；本地/fresh-source/Ubuntu CI 验收完成，不含 Merge | [Evolution](../design/evolution.md)、[Evolution CLI](../design/cli.md#evolution-cli)、[公共错误合同](../design/contracts.md#公共错误合同) |
 | [07 Evolution Merge Session](phases/07-evolution-merge.md) | `done` | Merge Session adapter、public conflict projection、渐进 resolution、exact-revision candidate consistency、finalize/abort、authenticated HTTP 与 `kg evolution merge` CLI；本地/fresh-source/Ubuntu CI 验收完成 | [Evolution Merge](../design/evolution.md#evolution-公共调用合同)、[Merge CLI](../design/cli.md#merge-session)、[D41](../design/decisions.md#d41-evolution-merge-使用-lithograph-merge-session-渐进解决冲突) |
 | [08 TypeScript Client & npm Runtime Distribution](phases/08-typescript-client-npm-runtime.md) | `done` | 真实 `@kgos/sdk`、TypeScript `@kgos/cli`、explicit `--root`、`init`、per-root daemon/dynamic endpoint、platform npm native Runtime package、Go CLI parity迁移与清理；本地/fresh-source/final review与 macOS arm64/x64 + Linux glibc arm64/x64 CI matrix均完成 | [Client](../design/client.md)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md)、[D75](../design/decisions.md#d75-typescript-client)、[D76](../design/decisions.md#d76-npm-distribution)、[D77](../design/decisions.md#d77-explicit-instance-root) |
-| [09 MVP Release Closure](phases/09-mvp-release-closure.md) | `planned` | 首个公开MVP Release：version closure、正式Release workflow、六个public npm package、四平台registry npx验收、Git tag / GitHub Release与发布状态同步 | [Client版本关系](../design/client.md#版本关系)、[发布与验证边界](../design/client.md#发布与验证边界)、[Phase 08](phases/08-typescript-client-npm-runtime.md) |
+| [09 MVP Release Closure](phases/09-mvp-release-closure.md) | `blocked` | `0.1.0` / `latest` baseline与Release tooling已实现；真实六包public publish、四平台registry npx、Git tag / GitHub Release等待npm authority后执行 | [Client版本关系](../design/client.md#版本关系)、[发布与验证边界](../design/client.md#发布与验证边界)、[Phase 08](phases/08-typescript-client-npm-runtime.md) |
 
 当前实现依赖顺序：
 
@@ -114,7 +114,7 @@ Go Engineering Foundation
   -> later Web / Skill phases
 ```
 
-Phase 02–08 均已完成；Phase 08 的本地实现、迁移清理、主工作树完整 validation、独立 fresh-source、final review 与实际 pushed revision 的跨平台远端 matrix 均已有真实成功证据。Phase 09 已建立为 `planned`，负责把已验证 candidate 关闭为真实 public npm / GitHub Release；当前正式版本仍为 `0.0.0` 占位，且 `@kgos` npm scope publish authority 尚无证据，因此真实 publish 前仍需关闭这两个前置。Web / Skill 不属于 Phase 09。
+Phase 02–08 均已完成；Phase 08 的本地实现、迁移清理、主工作树完整 validation、独立 fresh-source、final review 与实际 pushed revision 的跨平台远端 matrix 均已有真实成功证据。Phase 09 当前为 `blocked`：`0.1.0` / `latest` 与仓库内 Release tooling 已实现，但 `@kgos` npm scope publish authority 尚无证据，真实 registry publish / post-publish matrix / tag / GitHub Release尚未执行。Web / Skill 不属于 Phase 09。
 
 ## 6. Phase 通用完成标准
 

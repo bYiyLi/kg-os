@@ -55,6 +55,8 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 **Phase 08 TypeScript Client & npm Runtime Distribution 当前为 `done`。** SDK/CLI/root/runtime/npm candidate/Go CLI cleanup 已完成：实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均通过，Go statement coverage **90.0%**、TypeScript statements/lines/functions **100%**、jscpd **0 clones**，race/govulncheck/Playwright/native/packed npm/license/audit/diff gates 全绿。GitHub Actions run `36103842748` 的 Validate job `107971924426`、macOS x64 `107971924614`、Linux arm64 `107971924657`、macOS arm64 `107971924688`、Linux x64 `107971924773` 全部成功，final review 无剩余 task-affecting finding。npm registry publish 未执行，也不属于本 Phase 完成动作。完整范围与 Acceptance 见[Phase 08](docs/development/phases/08-typescript-client-npm-runtime.md)。
 
+**Phase 09 MVP Release Closure 当前为 `blocked`。** 首个公开 MVP Release baseline 已冻结为 `0.1.0` 与 npm dist-tag `latest`，仓库内已实现手工 Release workflow、同 revision/version candidate 聚合、npm immutable artifact partial-recovery、public-registry exact-version verification、四平台 clean `npx` smoke 与 registry acceptance 后的 GitHub Release finalization。当前没有 `@kgos` npm scope publish authority 的真实证据，因此六个 package 尚未公开发布，`latest`、`v0.1.0` Git tag 与 GitHub Release均未创建；完整状态与 Acceptance 见[Phase 09](docs/development/phases/09-mvp-release-closure.md)。
+
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、Client迁移、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
 相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go Runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、D67–D74，以及 [D75 TypeScript Client](docs/design/decisions.md#d75-typescript-client)、[D76 npm distribution](docs/design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](docs/design/decisions.md#d77-explicit-instance-root)。D75–D77 替换 D65/D72 中与 Go CLI、传统安装、`KG_HOME/KG_TOKEN` 和 fixed endpoint 相关的部分；Go Runtime / Kernel、single-token Bearer、Runtime auto-start与数据库边界继续有效。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
@@ -85,5 +87,6 @@ KG OS 采用双许可模式：
 - [Phase 06 计划](docs/development/phases/06-evolution-core.md)：Evolution Core 的 State / State Data、Branch / Tag、History / Diff、HTTP 与 CLI 范围和验收。
 - [Phase 07 计划](docs/development/phases/07-evolution-merge.md)：Evolution Merge Session 的冲突投影、渐进 resolution、candidate validation、finalize/abort、HTTP 与 CLI 范围和验收。
 - [Phase 08 计划](docs/development/phases/08-typescript-client-npm-runtime.md)：TypeScript SDK/CLI、npm native Runtime distribution、explicit Instance Root 与 Go CLI迁移范围和验收。
+- [Phase 09 计划](docs/development/phases/09-mvp-release-closure.md)：首个公开 MVP Release 的 version closure、npm publish/recovery、registry npx matrix、Git tag / GitHub Release与发布状态闭环。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

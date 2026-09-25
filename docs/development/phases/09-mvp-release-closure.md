@@ -28,14 +28,11 @@ Git tag + GitHub Release + docs status
 
 ## 2. 状态
 
-`planned`
+`blocked`
 
-Phase 08 已为 `done`，当前代码与 candidate pipeline 已具备进入 Release Closure 的实现基础；但 Phase 09 仍有两个必须在真实 publish 前取得证据的发布前置：
+Phase 09 的仓库内 Release engineering 已进入实现与验证阶段：首个公开 MVP baseline 已冻结为 exact version `0.1.0` 与正式 dist-tag `latest`，版本源、candidate provenance / aggregation、partial-release recovery、public-registry smoke 与手工 Release workflow 已实现。当前真实 Release 仍被外部 npm authority 阻塞：本机 npm 尚未认证，因此尚无 `@kgos` scope public publish permission 的真实证据。
 
-1. 当前 repository / package 版本仍为 `0.0.0` 占位，正式 Release version 与 dist-tag 尚未冻结；
-2. `@kgos` 是设计中的目标 npm scope，但当前没有其 registry ownership / publish permission 证据。若该 namespace 不可发布，必须先回到 Client 设计真源裁决 package namespace，不能在 Phase 内静默改名。
-
-因此当前不把 Phase 09 标为 `ready` 或 `in_progress`。
+在取得 authority 并实际执行 registry publish、四平台 post-publish smoke、dist-tag promotion、Git tag 与 GitHub Release 前，本 Phase 不得进入 `done`，也不得把仓库状态写成“已发布”。
 
 ## 3. Design Inputs
 
@@ -50,14 +47,14 @@ Phase 08 已为 `done`，当前代码与 candidate pipeline 已具备进入 Rele
 
 ## 4. 当前基线
 
-截至 2026-09-25：
+截至 2026-09-25 当前工作树：
 
 - Phase 00–08 均为 `done`；
-- `main` 与 `origin/main` 同步，Phase 08 pushed revision 已完成 Validate + 四平台 native/package matrix；
-- 当前仅有 `.github/workflows/ci.yml`，没有正式 Release workflow；
-- root、SDK、CLI、Web 与四个 Runtime package 当前版本均为 `0.0.0`；
+- Phase 08 pushed revision 已完成 Validate + 四平台 native/package matrix；本地 `main` 还包含 Phase 09 计划提交并叠加本轮未提交实现，不把该工作树冒充已 pushed Release revision；
+- exact Release version 已冻结为 `0.1.0`，正式 dist-tag 已冻结为 `latest`；root、SDK、CLI、Web、四个 Runtime package、SDK public version constant 与 Go build info 已同步；
+- 已新增仅允许 `workflow_dispatch` 启动的正式 Release workflow，并实现 release preflight、npm authority、candidate aggregation、publish / partial recovery、registry verification、四平台 clean `npx` smoke、dist-tag promotion 与 GitHub Release finalization；
 - Git repository 当前没有 Release tag；
-- Phase 08 已提供当前平台 Runtime build、`npm pack` candidate、repo 外 packed smoke 与四平台 candidate artifact upload；
+- 当前 macOS arm64 已真实完成 `0.1.0` Runtime build、三包 `npm pack`、repo 外 packed smoke 与 candidate provenance 输出；candidate 因未提交工作树正确记录 `dirty: true`，不能进入正式聚合；
 - 当前 npm registry 查询 `@kgos/cli`、`@kgos/sdk` 与四个 Runtime package 均未发现已发布 package/version；这只证明当前尚未发布，不证明 `@kgos` scope 的 ownership 或 publish permission。
 
 ## 5. 前置依赖
@@ -271,8 +268,10 @@ Phase 09 只有同时满足以下条件才能进入 `done`：
 
 ## 13. 当前状态
 
-2026-09-25：`planned`。
+2026-09-25：`blocked`。
 
-当前已确认的可复用证据来自 Phase 08：SDK / CLI / 四个平台 Runtime candidate build、packed smoke、full validation、fresh-source与四平台远端matrix均成功。Phase 09尚未实现正式Release workflow，repository仍为 `0.0.0`，没有Git tag，也没有六个package的public npm registry发布证据。
+当前已完成 09.1 与 09.2–09.6 所需的仓库内 Release tooling：`0.1.0` / `latest` baseline、同 revision/version candidate contract、Runtime manifest/native SHA-256 与 npm integrity聚合校验、immutable registry identity 驱动的 partial recovery、正式 dist-tag 防提前推进、clean public-registry `npx` smoke 以及 registry acceptance 后才允许创建 GitHub Release 的依赖链。当前平台真实 packed candidate smoke 已成功，targeted release tests、ESLint、format 与 version consistency checks 已通过。
 
-进入真实 publish 前还必须确认 exact Release version / dist-tag 与 `@kgos` scope publish authority；这两项未取得证据前，不把 Phase 状态提升为 `ready`。
+当前工作树完整 `git diff --check && pnpm validate` 已成功；独立 fresh-source 从 `HEAD + 当前 tracked/untracked Phase 09 变更` 重建后，`pnpm run setup && pnpm validate` 也成功。两轮都覆盖 Go check/race/coverage/security、TypeScript type/lint/test/coverage、Playwright、真实 Lithograph v0.3.0 native suite、packed npm smoke、license/audit/diff 等既有完整门禁。final review 继续闭环跨平台 client candidate identity、Runtime manifest 三文件 SHA-256、workflow 非 main fail-closed、registry smoke/packed smoke daemon cleanup 等边界；当前 reviewed repository scope 没有剩余 task-affecting code finding。
+
+尚未执行且不能伪装为完成的部分包括：`@kgos` npm publish authority、六包真实 public publish、四平台 post-publish registry smoke、`latest` promotion、`v0.1.0` Git tag 与 GitHub Release。当前本机 npm 未登录，真实 publish/finalization 因而保持阻塞；这些外部 Acceptance 未取得证据前 Phase 09 保持 `blocked`。
