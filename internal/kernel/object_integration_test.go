@@ -10,14 +10,13 @@ import (
 	"testing"
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
-	runtimehost "github.com/bYiyLi/kg-os/internal/runtime"
 )
 
 func TestPhase04KnowledgeBatchCreateReadAndRelationshipReplacement(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -70,6 +69,23 @@ func TestPhase04KnowledgeBatchCreateReadAndRelationshipReplacement(t *testing.T)
 	if read.State != created.State || len(read.Results) != 3 {
 		t.Fatalf("read = %#v", read)
 	}
+	textRead, err := runtime.Kernel.ReadObjectTexts(ctx, kernel.ObjectReadRequest{
+		At:   created.State,
+		Refs: []string{refs["alice"], refs["knows"], refs["bob"]},
+	})
+	if err != nil {
+		t.Fatalf("batch text read: %v", err)
+	}
+	if textRead.State != created.State || len(textRead.Results) != 3 {
+		t.Fatalf("text read = %#v", textRead)
+	}
+	if textRead.Results[0].Ref != refs["alice"] ||
+		!strings.Contains(textRead.Results[0].Body, "name") ||
+		textRead.Results[1].Ref != refs["knows"] ||
+		!strings.Contains(textRead.Results[1].Body, "type:") ||
+		textRead.Results[2].Ref != refs["bob"] {
+		t.Fatalf("unexpected text read = %#v", textRead)
+	}
 	var relationship kernel.KnowledgeRelationship
 	if err := json.Unmarshal(read.Results[1].Value, &relationship); err != nil {
 		t.Fatalf("decode relationship: %v", err)
@@ -117,7 +133,7 @@ func TestPhase04MixedOntologyKnowledgeBatchReadSafetyAndAtomicity(t *testing.T) 
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -332,7 +348,7 @@ func TestPhase04RelationshipDefinitionRenameMergesDirectKnowledgeUpdate(t *testi
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -466,7 +482,7 @@ func TestPhase04ObjectCancellationDoesNotMoveBranch(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -522,7 +538,7 @@ func TestPhase04KnowledgeUpdateRestructureAndMissingEndpointRollback(t *testing.
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}

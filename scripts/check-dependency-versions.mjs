@@ -2,7 +2,16 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const packagePaths = ["package.json", "packages/sdk/package.json", "packages/web/package.json"];
+const packagePaths = [
+  "package.json",
+  "packages/sdk/package.json",
+  "packages/cli/package.json",
+  "packages/web/package.json",
+  "packages/runtime-darwin-arm64/package.json",
+  "packages/runtime-darwin-x64/package.json",
+  "packages/runtime-linux-arm64/package.json",
+  "packages/runtime-linux-x64/package.json"
+];
 const exactVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
 async function readPackage(path) {
@@ -28,7 +37,8 @@ for (const [index, packageJson] of packages.entries()) {
   }
   for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
     for (const [name, version] of Object.entries(packageJson[field] ?? {})) {
-      if (version !== "workspace:*" && !exactVersion.test(version)) {
+      const workspaceExact = version === "workspace:" + rootPackage.version;
+      if (version !== "workspace:*" && !workspaceExact && !exactVersion.test(version)) {
         throw new Error(
           packagePaths[index] + " " + field + "." + name + " is not exact: " + version
         );

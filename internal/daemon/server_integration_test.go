@@ -5,22 +5,19 @@ package daemon
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	runtimehost "github.com/bYiyLi/kg-os/internal/runtime"
+	"github.com/bYiyLi/kg-os/internal/runtimeprofile"
 )
 
 func TestServePublishesEndpointAndStopsGracefully(t *testing.T) {
-	port := freePort(t)
-	runtime := openDaemonRuntime(t, port)
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -58,8 +55,7 @@ func TestServePublishesEndpointAndStopsGracefully(t *testing.T) {
 }
 
 func TestServeCancellationCancelsActiveRequestContext(t *testing.T) {
-	port := freePort(t)
-	runtime := openDaemonRuntime(t, port)
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -110,33 +106,15 @@ func TestServeCancellationCancelsActiveRequestContext(t *testing.T) {
 	}
 }
 
-func TestServeRejectsOccupiedPortAndClosedRuntimePublication(t *testing.T) {
-	t.Run("occupied port", func(t *testing.T) {
-		listener, err := net.Listen("tcp4", "127.0.0.1:0")
-		if err != nil {
-			t.Fatalf("reserve port: %v", err)
-		}
-		defer listener.Close()
-		port := listener.Addr().(*net.TCPAddr).Port
-		runtime := openDaemonRuntime(t, port)
-		defer runtime.Close()
-		err = Serve(context.Background(), runtime, http.NotFoundHandler(), nil)
-		if err == nil || !strings.Contains(err.Error(), "listen on") {
-			t.Fatalf("occupied-port error = %v", err)
-		}
-	})
-
-	t.Run("closed runtime", func(t *testing.T) {
-		port := freePort(t)
-		runtime := openDaemonRuntime(t, port)
-		if err := runtime.Close(); err != nil {
-			t.Fatalf("close runtime: %v", err)
-		}
-		err := Serve(context.Background(), runtime, http.NotFoundHandler(), nil)
-		if err == nil || !strings.Contains(err.Error(), "publish daemon endpoint") {
-			t.Fatalf("closed-runtime error = %v", err)
-		}
-	})
+func TestServeRejectsClosedRuntimePublication(t *testing.T) {
+	runtime := openDaemonRuntime(t)
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("close runtime: %v", err)
+	}
+	err := Serve(context.Background(), runtime, http.NotFoundHandler(), nil)
+	if err == nil || !strings.Contains(err.Error(), "publish daemon endpoint") {
+		t.Fatalf("closed-runtime error = %v", err)
+	}
 }
 
 func waitForEndpoint(t *testing.T, runtime *runtimehost.Runtime) string {
@@ -153,52 +131,34 @@ func waitForEndpoint(t *testing.T, runtime *runtimehost.Runtime) string {
 	return ""
 }
 
-func freePort(t *testing.T) int {
+func openDaemonRuntime(t *testing.T) *runtimehost.Runtime {
 	t.Helper()
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("allocate free port: %v", err)
-	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	if err := listener.Close(); err != nil {
-		t.Fatalf("release free port: %v", err)
-	}
-	return port
-}
-
-func openDaemonRuntime(t *testing.T, port int) *runtimehost.Runtime {
-	t.Helper()
-	home := t.TempDir()
-	writeDaemonConfig(t, home, port)
-	runtime, err := runtimehost.Open(context.Background(), home, nil)
+	root := t.TempDir()
+	writeDaemonConfig(t, root)
+	mainLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_LIBRARY"))
+	providerLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY"))
+	runtime, err := runtimehost.OpenWithOfficialExtensions(
+		context.Background(),
+		root,
+		[]runtimeprofile.ExtensionConfig{
+			{Source: mainLibrary, Entrypoint: runtimeprofile.LithographEntrypoint},
+			{Source: providerLibrary, Entrypoint: runtimeprofile.ProviderEntrypoint},
+		},
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("open daemon runtime: %v", err)
 	}
 	return runtime
 }
 
-func writeDaemonConfig(t *testing.T, home string, port int) {
+func writeDaemonConfig(t *testing.T, root string) {
 	t.Helper()
-	mainLibrary := os.Getenv("KGOS_LITHOGRAPH_LIBRARY")
-	providerLibrary := os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY")
-	if mainLibrary == "" || providerLibrary == "" {
-		t.Fatal("Lithograph integration libraries are required")
-	}
-	mainLibrary, _ = filepath.Abs(mainLibrary)
-	providerLibrary, _ = filepath.Abs(providerLibrary)
-	body := fmt.Sprintf(
-		"[server]\nhost = \"127.0.0.1\"\nport = %d\n\n"+
-			"[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n"+
-			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithograph_init\"\n\n"+
-			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithographopenaicompatible_init\"\n\n"+
-			"[fulltext]\nanalyzer = \"unicode61\"\n\n"+
-			"[embedding]\nbase_url = \"https://example.invalid/v1\"\n"+
-			"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n",
-		port,
-		strconv.Quote(mainLibrary),
-		strconv.Quote(providerLibrary),
-	)
-	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(body), 0o600); err != nil {
+	body := "[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n" +
+		"[fulltext]\nanalyzer = \"unicode61\"\n\n" +
+		"[embedding]\nbase_url = \"https://example.invalid/v1\"\n" +
+		"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n"
+	if err := os.WriteFile(filepath.Join(root, "config.toml"), []byte(body), 0o600); err != nil {
 		t.Fatalf("write daemon config: %v", err)
 	}
 }

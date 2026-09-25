@@ -18,46 +18,46 @@ const (
 	ProviderEntrypoint   = "sqlite3_lithographopenaicompatible_init"
 )
 
-type Distribution struct {
+type RuntimePackage struct {
 	Root             string
-	KG               string
 	Daemon           string
 	Lithograph       string
 	LithographSHA256 string
 	Provider         string
 	ProviderSHA256   string
 	Manifest         string
+	Version          string
 }
 
-type distributionManifestFile struct {
+type runtimeManifestFile struct {
 	File   string `json:"file"`
 	SHA256 string `json:"sha256"`
 }
 
-type distributionManifest struct {
-	Arch     string                     `json:"arch"`
-	Files    []distributionManifestFile `json:"files"`
-	Go       string                     `json:"go"`
-	Platform string                     `json:"platform"`
-	Version  string                     `json:"version"`
+type runtimeManifest struct {
+	Arch     string                `json:"arch"`
+	Files    []runtimeManifestFile `json:"files"`
+	Go       string                `json:"go"`
+	Platform string                `json:"platform"`
+	Version  string                `json:"version"`
 }
 
-func DiscoverDistribution() (Distribution, error) {
+func DiscoverRuntimePackage() (RuntimePackage, error) {
 	executable, err := os.Executable()
 	if err != nil {
-		return Distribution{}, fmt.Errorf("locate kg executable: %w", err)
+		return RuntimePackage{}, fmt.Errorf("locate kgosd executable: %w", err)
 	}
-	return DiscoverDistributionFromExecutable(executable)
+	return DiscoverRuntimePackageFromExecutable(executable)
 }
 
-func DiscoverDistributionFromExecutable(executable string) (Distribution, error) {
+func DiscoverRuntimePackageFromExecutable(executable string) (RuntimePackage, error) {
 	canonical, err := filepath.EvalSymlinks(executable)
 	if err != nil {
-		return Distribution{}, fmt.Errorf("resolve kg executable: %w", err)
+		return RuntimePackage{}, fmt.Errorf("resolve kgosd executable: %w", err)
 	}
 	canonical, err = filepath.Abs(canonical)
 	if err != nil {
-		return Distribution{}, fmt.Errorf("resolve kg executable path: %w", err)
+		return RuntimePackage{}, fmt.Errorf("resolve kgosd executable path: %w", err)
 	}
 	root := filepath.Dir(filepath.Clean(canonical))
 	binarySuffix := ""
@@ -66,11 +66,10 @@ func DiscoverDistributionFromExecutable(executable string) (Distribution, error)
 	}
 	librarySuffix, err := nativeLibrarySuffix(runtime.GOOS)
 	if err != nil {
-		return Distribution{}, err
+		return RuntimePackage{}, err
 	}
-	distribution := Distribution{
+	pkg := RuntimePackage{
 		Root:       root,
-		KG:         filepath.Join(root, "kg"+binarySuffix),
 		Daemon:     filepath.Join(root, "kgosd"+binarySuffix),
 		Lithograph: filepath.Join(root, "extensions", "lithograph"+librarySuffix),
 		Provider: filepath.Join(
@@ -80,67 +79,89 @@ func DiscoverDistributionFromExecutable(executable string) (Distribution, error)
 		),
 		Manifest: filepath.Join(root, "manifest.json"),
 	}
-	if err := distribution.verify(); err != nil {
-		return Distribution{}, err
+	if err := pkg.verify(); err != nil {
+		return RuntimePackage{}, err
 	}
-	return distribution, nil
+	return pkg, nil
 }
 
-func (distribution *Distribution) verify() error {
-	body, err := os.ReadFile(distribution.Manifest)
+func (pkg RuntimePackage) OfficialExtensions() []ExtensionConfig {
+	return []ExtensionConfig{
+		{
+			Source:     pkg.Lithograph,
+			Entrypoint: LithographEntrypoint,
+			SHA256:     pkg.LithographSHA256,
+		},
+		{
+			Source:     pkg.Provider,
+			Entrypoint: ProviderEntrypoint,
+			SHA256:     pkg.ProviderSHA256,
+		},
+	}
+}
+
+func (pkg *RuntimePackage) verify() error {
+	body, err := os.ReadFile(pkg.Manifest)
 	if err != nil {
-		return fmt.Errorf("read distribution manifest: %w", err)
+		return fmt.Errorf("read runtime manifest: %w", err)
 	}
 	decoder := json.NewDecoder(strings.NewReader(string(body)))
 	decoder.DisallowUnknownFields()
-	var parsed distributionManifest
+	var parsed runtimeManifest
 	if err := decoder.Decode(&parsed); err != nil {
-		return fmt.Errorf("decode distribution manifest: %w", err)
+		return fmt.Errorf("decode runtime manifest: %w", err)
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return fmt.Errorf("distribution manifest must contain exactly one JSON object")
+		return fmt.Errorf("runtime manifest must contain exactly one JSON object")
 	}
-	if parsed.Platform != runtime.GOOS || parsed.Arch != distributionArch(runtime.GOARCH) {
+	if parsed.Version == "" {
+		return fmt.Errorf("runtime manifest version must be non-empty")
+	}
+	if parsed.Platform != runtime.GOOS || parsed.Arch != runtimePackageArch(runtime.GOARCH) {
 		return fmt.Errorf(
-			"distribution target %s/%s does not match runtime %s/%s",
+			"runtime target %s/%s does not match process %s/%s",
 			parsed.Platform,
 			parsed.Arch,
 			runtime.GOOS,
 			runtime.GOARCH,
 		)
 	}
+	pkg.Version = parsed.Version
+
 	expected := map[string]*string{
-		relativeSlash(distribution.Root, distribution.KG):         nil,
-		relativeSlash(distribution.Root, distribution.Daemon):     nil,
-		relativeSlash(distribution.Root, distribution.Lithograph): &distribution.LithographSHA256,
-		relativeSlash(distribution.Root, distribution.Provider):   &distribution.ProviderSHA256,
+		relativeSlash(pkg.Root, pkg.Daemon):     nil,
+		relativeSlash(pkg.Root, pkg.Lithograph): &pkg.LithographSHA256,
+		relativeSlash(pkg.Root, pkg.Provider):   &pkg.ProviderSHA256,
 	}
 	manifestHashes := make(map[string]string, len(parsed.Files))
 	for _, file := range parsed.Files {
 		if file.File == "" || len(file.SHA256) != 64 {
-			return fmt.Errorf("distribution manifest contains invalid file entry")
+			return fmt.Errorf("runtime manifest contains invalid file entry")
 		}
 		if _, err := hex.DecodeString(file.SHA256); err != nil ||
 			strings.ToLower(file.SHA256) != file.SHA256 {
-			return fmt.Errorf("distribution manifest contains invalid sha256 for %q", file.File)
+			return fmt.Errorf("runtime manifest contains invalid sha256 for %q", file.File)
 		}
 		if _, exists := manifestHashes[file.File]; exists {
-			return fmt.Errorf("distribution manifest contains duplicate file %q", file.File)
+			return fmt.Errorf("runtime manifest contains duplicate file %q", file.File)
 		}
 		manifestHashes[file.File] = file.SHA256
+	}
+	if len(manifestHashes) != len(expected) {
+		return fmt.Errorf("runtime manifest must contain exactly the required native files")
 	}
 	for file, targetHash := range expected {
 		want, ok := manifestHashes[file]
 		if !ok {
-			return fmt.Errorf("distribution manifest is missing %q", file)
+			return fmt.Errorf("runtime manifest is missing %q", file)
 		}
-		actual, err := LocalFileSHA256(filepath.Join(distribution.Root, filepath.FromSlash(file)))
+		actual, err := LocalFileSHA256(filepath.Join(pkg.Root, filepath.FromSlash(file)))
 		if err != nil {
-			return fmt.Errorf("verify distribution file %q: %w", file, err)
+			return fmt.Errorf("verify runtime file %q: %w", file, err)
 		}
 		if actual != want {
-			return fmt.Errorf("distribution file %q failed SHA-256 verification", file)
+			return fmt.Errorf("runtime file %q failed SHA-256 verification", file)
 		}
 		if targetHash != nil {
 			*targetHash = want
@@ -149,7 +170,7 @@ func (distribution *Distribution) verify() error {
 	return nil
 }
 
-func distributionArch(goarch string) string {
+func runtimePackageArch(goarch string) string {
 	if goarch == "amd64" {
 		return "x64"
 	}
@@ -183,9 +204,7 @@ func nativeLibrarySuffix(goos string) (string, error) {
 		return ".dylib", nil
 	case "linux":
 		return ".so", nil
-	case "windows":
-		return ".dll", nil
 	default:
-		return "", fmt.Errorf("unsupported distribution platform %q", goos)
+		return "", fmt.Errorf("unsupported runtime platform %q", goos)
 	}
 }

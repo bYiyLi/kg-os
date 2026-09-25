@@ -8,6 +8,7 @@ const paths = [
   "coverage",
   "playwright-report",
   "test-results",
+  "packages/cli/dist",
   "packages/sdk/dist",
   "packages/web/dist"
 ];

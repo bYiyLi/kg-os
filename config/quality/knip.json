@@ -15,6 +15,9 @@
     "packages/sdk": {
       "project": ["src/**/*.ts"]
     },
+    "packages/cli": {
+      "project": ["src/**/*.ts"]
+    },
     "packages/web": {
       "project": ["src/**/*.tsx"]
     }

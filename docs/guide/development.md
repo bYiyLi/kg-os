@@ -1,64 +1,48 @@
 # 本地开发 KG OS
 
-本文帮助 KG OS 开发者完成本地安装、开发启动、调试、检查、测试、构建和本地候选交付物验证。阶段顺序与完成状态见[开发计划](../development/README.md)，工程基线见 [Phase 00](../development/phases/00-engineering-foundation.md)，当前 Runtime / Lithograph Host 见 [Phase 01](../development/phases/01-runtime-lithograph-host.md)；产品与运行时边界仍以[设计入口](../design.md)为准。
+本文说明当前 KG OS 工作树的安装、开发启动、调试、验证、构建和本地 npm 候选包流程。阶段状态与完成证据见[开发计划](../development/README.md)，产品与运行时合同以[设计入口](../design.md)为准。
 
-## 当前边界
+## 当前工程边界
 
-当前工程基线已经迁移为：
+当前代码分层为：
 
 ```text
 Go
 ├── cmd/kgosd
-├── internal/（Kernel / command / Web host 等服务端边界）
-└── cmd/kg
+└── internal/
+    ├── daemon / kernel
+    ├── lithograph
+    ├── runtime / runtimeprofile
+    └── webui
 
 TypeScript
-├── packages/sdk
-└── packages/web（React + Vite）
+├── packages/sdk                 # @kgos/sdk
+├── packages/cli                 # @kgos/cli，唯一正式 kg CLI
+└── packages/web                 # React + Vite
+
+Native npm package metadata
+├── packages/runtime-darwin-arm64
+├── packages/runtime-darwin-x64
+├── packages/runtime-linux-arm64
+└── packages/runtime-linux-x64
 ```
 
-`kgosd`、Kernel 与 `kg` CLI 不再使用旧 TypeScript 实现。产品运行时不依赖 Node.js；Node/pnpm 只用于 SDK、Web 和仓库工程工具。
+正式 Client 层使用 TypeScript：`@kgos/cli -> @kgos/sdk -> HTTP -> kgosd`。Go 只拥有 daemon、Kernel、SQLite / Lithograph Host 与服务端编译/投影逻辑；仓库不再包含 Go `kg` CLI。
 
-Phase 01 已把 `kgosd` 从工程壳层推进为真实本地 Runtime / Lithograph Host；Phase 02 已完成 Knowledge Base bootstrap / reopen validation、authenticated Ontology routes 与 `kg ontology`；Phase 03 已完成 `kg doctor`、`kg install`、本机 credential fallback 与业务命令 Runtime auto-start；Phase 04 已完成 `/api/v1/object/read`、`/api/v1/object/patch` 与 `kg object read/patch`，支持五类 Object 的 batch read 和 Knowledge Node/Relationship mutation。Graph / Evolution、SDK/Web/Skill 业务交互仍属于后续 Phase；Object不提供 list/search或第二套 CRUD。
-
-## 工程目录
-
-```text
-cmd/
-├── kg/
-└── kgosd/
-
-internal/
-├── buildinfo/
-├── command/
-├── daemon/
-├── kernel/
-├── lithograph/
-├── lithographtest/
-├── runtime/
-├── runtimeprofile/
-└── webui/
-
-packages/
-├── sdk/
-└── web/
-```
-
-`internal/lithograph` 是正式 Lithograph SQL host / execution / explicit-transaction adapter，`internal/runtimeprofile` 负责 `KG_HOME`、config、credential、lock 与 extension resolver，`internal/runtime` 组合 profile 与 database host，`internal/daemon` 拥有 HTTP listener lifecycle。`internal/lithographtest` 只保留 bundled SQLite build-profile 测试，不是第二套数据库 adapter。
+Instance 只由显式 `--root <path>` 定位。不存在默认 `KG_HOME`、`KG_TOKEN` 或固定本机 server port。每个 root 拥有自己的 `config.toml`、`auth.json`、`kgos.db`、`kgosd.lock`、cache/extensions/logs；active daemon 只监听 OS 分配的 loopback dynamic endpoint。
 
 ## 工具链
 
 | 工具 | 固定版本或要求 |
 | --- | --- |
-| Go | `1.27.1`；仓库任务通过 `GOTOOLCHAIN=go1.27.1` 执行并核对实际版本 |
-| C compiler | CGO 必需；macOS 使用 Apple Clang，Ubuntu CI 安装 GCC |
+| Go | `1.27.1`；仓库任务通过 `GOTOOLCHAIN=go1.27.1` 执行 |
+| C compiler | CGO 必需；macOS 使用 Apple Clang，Linux runner 使用 GCC |
 | Node.js | `24.15.0`，由 [`.node-version`](../../.node-version) 固定 |
 | pnpm | `10.34.5`，由根 `packageManager` / `engines` 固定 |
 | SQLite driver | `github.com/mattn/go-sqlite3 v1.14.52`，bundled SQLite + CGO + `sqlite_fts5` |
-| Go quality tools | Staticcheck `2026.2.1` (`v0.8.1`)；govulncheck `v1.8.0`，都由 `go.mod` tool dependency 固定 |
-| Lithograph fixture | `v0.3.0` release artifact；Phase 00 本地目标为 macOS arm64，CI 为 Ubuntu 24.04 x64 |
+| Lithograph | `v0.3.0` release artifacts，覆盖 macOS / Linux arm64/x64 |
 
-先确认 Node/pnpm，并确保本机有可用 C compiler：
+先确认基础工具：
 
 ```sh
 node --version
@@ -66,25 +50,15 @@ pnpm --version
 cc --version
 ```
 
-Node 与 pnpm 必须分别为 `v24.15.0`、`10.34.5`。然后执行：
+然后执行：
 
 ```sh
 pnpm run setup
 ```
 
-必须写成 `pnpm run setup`；裸 `pnpm setup` 是 pnpm 自己的内置命令，不会执行 KG OS 的 `package.json` setup script。
+必须写成 `pnpm run setup`；裸 `pnpm setup` 是 pnpm 自己的命令。
 
-setup 会：
-
-- frozen-lockfile 安装 npm workspace；
-- 下载/选择并核对 Go `1.27.1`；
-- 验证 C compiler、Go module、Staticcheck 与 govulncheck；
-- 真实编译 `go-sqlite3` 的 `sqlite_fts5` profile，并确认没有 `OMIT_LOAD_EXTENSION`；
-- 安装 Lefthook；
-- 安装 Playwright Chromium headless shell；
-- 下载、SHA-256 校验并缓存当前平台的 Lithograph v0.3.0 release fixture。
-
-Linux 若缺 Chromium 系统库，可额外运行：
+setup 会安装 frozen-lockfile workspace、校验 Go/C toolchain、安装仓库 Go quality tools和 Playwright，并下载/校验当前平台的 Lithograph v0.3.0 fixture。Linux 缺 Chromium system libraries 时可额外运行：
 
 ```sh
 pnpm exec playwright install --with-deps --only-shell chromium
@@ -96,131 +70,208 @@ pnpm exec playwright install --with-deps --only-shell chromium
 pnpm dev
 ```
 
-开发入口同时启动：
+当前 `pnpm dev`：
 
-- Go Phase 02 runtime：`http://127.0.0.1:4765`
-- Vite/React HMR：`http://127.0.0.1:5173`
+1. 执行当前平台完整 build；
+2. 生成仓库内已忽略的 `.kgos-dev/config.toml`；
+3. 从 `artifacts/npm/runtime-<target>/` 启动完整 packaged `kgosd --root <absolute-root>`；
+4. 等待 `.kgos-dev/kgosd.lock` 发布 dynamic endpoint；
+5. 启动 Vite `http://127.0.0.1:5173`，把 `/api` 代理到该 endpoint。
 
-浏览器开发时访问 `5173`。Vite 只把 `/api` 代理到 Go 进程；D72 已删除未发布的 `/control` daemon-control surface 与对应开发代理。
+daemon 实际 endpoint 每次由 OS 分配，并打印到终端；不要假设固定端口。Ctrl-C/SIGTERM 会联动停止 daemon 与 Vite。
 
-`pnpm dev` 强制把 `KG_HOME` 指向仓库内已忽略的 `.kgos-dev/`，先用真实 Lithograph v0.3.0 fixture 生成 `config.toml`，再启动无额外兼容参数的 `kgosd`；首次启动会在 fresh Root baseline 上执行 Phase 02 bootstrap。Web 源码修改由 Vite HMR 处理；Go 源码修改后重新启动 `pnpm dev`。Ctrl-C/SIGTERM 会联动停止 Go 与 Vite 子进程，正常退出后不应保留 `4765` / `5173` listener。
+开发 server 运行时，可以直接用 workspace 编译后的 TypeScript CLI访问同一 active Instance：
 
-Vite 只是开发工具，不改变产品边界：生产/本地正式交付仍只有一个 `kgosd`，Web 静态产物直接嵌入 Go binary。
+```sh
+node packages/cli/dist/bin.js \
+  --root "$PWD/.kgos-dev" \
+  evolution overview
+```
+
+这里业务命令会复用已经运行的 daemon。需要验证 Runtime package discovery、`doctor`、lazy-start 或首次初始化时，使用下一节的 packed npm candidate，而不是绕过 package topology。
 
 ## 验证首次本地使用
 
-构建本地候选包：
+先生成当前平台 npm 候选包：
 
 ```sh
+pnpm build
 pnpm pack:release
+ls artifacts/release/*.tgz
 ```
 
-生成的 `artifacts/release/` 同时包含 `kg`、`kgosd`、Lithograph 与 OpenAI-compatible Provider native library，以及记录四项 artifact SHA-256 的 `manifest.json`。安装器从自身所在 distribution 定位这些文件，不依赖仓库 cwd 或 `.cache/lithograph`。
+`pack:release` 会生成当前平台的：
 
-使用一个新的 `KG_HOME` 验证首次流程：
+- `@kgos/sdk` tarball；
+- `@kgos/cli` tarball；
+- 当前 `@kgos/runtime-<platform>-<arch>` tarball。
+
+它同时在 workspace 外执行真实 `npm install --ignore-scripts` 和 CLI/Runtime smoke，不会发布 registry、创建 Git commit 或 push。
+
+手工检查 candidate 时：
 
 ```sh
-# 选择一个当前尚不存在的临时目录。
-export KG_HOME="/tmp/kgos-development-profile"
+REPO="$PWD"
+SMOKE="$(mktemp -d)"
+cd "$SMOKE"
+npm init -y >/dev/null
+npm install --ignore-scripts "$REPO"/artifacts/release/*.tgz
 
-artifacts/release/kg doctor --json
-artifacts/release/kg install
+ROOT="$SMOKE/instance"
 
-# 如果 embedding.api_key_env 配置为非空变量名，在首次业务命令前提供该变量。
-export OPENAI_API_KEY="<development credential>"
+# doctor 对不存在 root 只诊断，不创建 Instance。
+npm exec --yes -- kg --root "$ROOT" doctor --json
 
-artifacts/release/kg doctor --json
-artifacts/release/kg ontology --at branch/main
+npm exec --yes -- kg --root "$ROOT" init \
+  --cache-path cache/openai-compatible.db \
+  --cache-max-size-mb 4096 \
+  --fulltext-analyzer unicode61 \
+  --embedding-base-url https://example.invalid/v1 \
+  --embedding-model local-fixture \
+  --embedding-dimensions 3 \
+  --embedding-similarity cosine \
+  --embedding-api-key-env ""
+
+# init 只创建完整 config 与 runtime-owned 目录。
+# 第一个业务命令才创建 auth.json / kgos.db、启动 daemon 并 bootstrap。
+npm exec --yes -- kg --root "$ROOT" evolution overview
+npm exec --yes -- kg --root "$ROOT" ontology --at branch/main
 ```
 
-首次 `doctor` 只诊断，不创建 `KG_HOME` 内容。交互 `install` 会完整取得所有 startup config；进入 Full-text / Embedding 配置前只提示一次“初始化后禁止修改”，安装结束只存在 config 与 runtime-owned目录，不生成 `auth.json`、`kgos.db` 或 active daemon。第一次业务命令才自动确保 `kgosd` 运行；fresh daemon 创建 `auth.json` / `kgos.db`、执行 bootstrap，然后 CLI 在没有显式 `KG_TOKEN` 时读取本机 `auth.json` 完成原始请求。
+如果 `embedding.api_key_env` 配置为非空变量名，应在需要 Semantic Provider 的 daemon startup 前提供同名环境变量。KG OS 只持久化环境变量名称，不持久化 secret。
 
-AI / CI 应完整提供所有 installer flags；全部参数齐全时 `kg install` 不读取 stdin、不进入 prompt，stdout 返回稳定 JSON。交互向导中 `embedding.api_key_env` 输入 `""` 表示显式选择无需认证的 endpoint，直接 Enter 则采用推荐的 `OPENAI_API_KEY`。具体参数、推荐值、错误与 locale 合同见 [CLI 设计](../design/cli.md#install)。
+正式 registry 发布后，AI / CI 的设计入口为：
+
+```text
+npx --yes @kgos/cli@<version> --root <instance-root> <command>
+```
+
+当前 Phase 本地验收只生成/安装 tarball candidate，不冒充 npm registry 已发布。
+
+## Runtime npm package
+
+`pnpm build` 会生成当前平台 staging package：
+
+```text
+artifacts/npm/runtime-<platform>-<arch>/
+├── package.json
+├── LICENSE
+├── kgosd
+├── manifest.json
+└── extensions/
+    ├── lithograph.<dylib|so>
+    └── lithograph-openai-compatible.<dylib|so>
+```
+
+manifest 固定 package version/platform/arch 和三个 native file 的 SHA-256。Runtime package不包含 native `kg`，也没有 preinstall/install/postinstall 下载脚本。
+
+source workspace 下的四个 `packages/runtime-*` 只维护 npm metadata；native binary 是 build artifact，不提交 Git。
 
 ## 调试
 
 [`.vscode/launch.json`](../../.vscode/launch.json)提供：
 
-- `KG OS daemon (Go)`：先运行 `KG OS: prepare runtime` 生成 `.kgos-dev/config.toml`，再以 `sqlite_fts5` build tag、无旧兼容参数启动当前 daemon；
-- `KG OS CLI (Go)`：以 `--help` 启动 Go CLI；
-- `KG OS Web`：打开 Vite `5173` 页面调试浏览器代码。
+- `KG OS CLI (TypeScript)`：先执行 `pnpm build`，再启动编译后的 CLI；
+- `KG OS Web`：连接 `pnpm dev` 的 Vite 5173 页面。
 
-VS Code 推荐安装 Go、ESLint、Prettier 与 CSpell 扩展。
+Go daemon 的生产启动依赖与 binary 同目录的 Runtime manifest/native artifacts，因此不要用临时 dlv binary冒充 packaged `kgosd`。Go 逻辑调试优先运行对应 package test；完整 daemon 行为使用 `pnpm test:native` 或 packed candidate。
 
 ## 检查与测试
 
 | 命令 | 检查内容 |
 | --- | --- |
-| `pnpm check:go` | Go 1.27.1、gofmt check、`go mod verify/tidy -diff`、vet、Staticcheck、快速 Go tests |
-| `pnpm test:go` | Go unit/integration tests，`CGO_ENABLED=1` + `sqlite_fts5` |
+| `pnpm check:go` | Go version、gofmt、module、vet、Staticcheck、快速 Go tests |
+| `pnpm test:go` | Go unit/integration tests，CGO + `sqlite_fts5` |
 | `pnpm test:go:race` | uncached Go race detector |
-| `pnpm test:go:coverage` | `coverpkg=./...` 的 Go total statement coverage，强制 `>= 90%` |
-| `pnpm check:go:security` | pinned govulncheck，包含 production + test reachable code |
-| `pnpm typecheck` | SDK/Web/测试配置的 strict TypeScript typecheck |
-| `pnpm lint` | ESLint、Prettier、模块边界、workspace、Markdown、CSpell、Secretlint |
-| `pnpm test` | SDK/Web Vitest |
-| `pnpm test:coverage` | TypeScript/Web V8 coverage |
-| `pnpm test:e2e` | 重建后用 Playwright 验证内嵌 Web 与未实现 API 边界 |
-| `pnpm test:native` | Go bundled SQLite 真实加载 Lithograph v0.3.0 + Provider，验证 FTS5、SQL execution、`lithograph_rows()` 与 cancellation |
-| `pnpm check:quick` | Go quick gate + TS typecheck/lint/test；也是 pre-commit 唯一入口 |
-| `pnpm validate` | race、coverage、security、build、Playwright、真实 Lithograph、artifact、license、audit、diff 等完整仓库 gate |
+| `pnpm test:go:coverage` | Go total statement coverage，仓库门禁 `>= 90%` |
+| `pnpm check:go:security` | pinned govulncheck |
+| `pnpm typecheck` | SDK/CLI/Web/测试 strict TypeScript |
+| `pnpm lint` | ESLint、Prettier、imports/workspace、Markdown、CSpell、Secretlint |
+| `pnpm test` | SDK/CLI/Web Vitest |
+| `pnpm test:coverage` | 现有 SDK/Web V8 coverage gate |
+| `pnpm test:e2e` | build 后用 Playwright 验证内置 Web |
+| `pnpm test:native` | 真实 Lithograph + Provider、Runtime/Kernel/Daemon 集成 |
+| `pnpm check:package` | workspace 外临时 npm tarball install + Runtime/CLI smoke |
+| `pnpm check:quick` | Go quick gate + TS typecheck/lint/test；pre-commit入口 |
+| `pnpm validate` | race、coverage、安全、build、E2E、native/package/license/audit/diff等完整门禁 |
 
-`coverage/`、`playwright-report/`、`test-results/` 与 `artifacts/` 都是生成物，不提交 Git。
-
-Secret scan 由 `scripts/check-secrets.mjs` 先确认 Secretlint 配置可读，再执行扫描；配置缺失不能静默通过。npm production license gate 实际扫描 Web workspace 的 React/ReactDOM 依赖；Go runtime/test-native license gate固定审查 `BurntSushi/toml`（MIT）、`go-sqlite3`（MIT）、`zeebo/blake3`（CC0-1.0）、`klauspost/cpuid/v2`（MIT）、`gopkg.in/yaml.v3`（MIT + Apache-2.0）与 `golang.org/x/sys`（BSD-3-Clause）及其 pinned version。
+`coverage/`、`playwright-report/`、`test-results/`、`artifacts/` 都是生成物，不提交 Git。
 
 ## Lithograph v0.3.0 fixture
 
-[`scripts/lithograph-artifacts.mjs`](../../scripts/lithograph-artifacts.mjs)固定 macOS/Linux arm64/x64 的 Lithograph `v0.3.0` release URL 与 SHA-256。准备脚本校验 archive 路径、`VERSION`、主扩展和 `lithograph-openai-compatible` Provider extension，并缓存到 `.cache/lithograph/`；测试不读取相邻 Lithograph 工作树。
+[`scripts/lithograph-artifacts.mjs`](../../scripts/lithograph-artifacts.mjs) 固定 macOS/Linux arm64/x64 的 Lithograph v0.3.0 release artifact 与 SHA-256。[`scripts/prepare-lithograph.mjs`](../../scripts/prepare-lithograph.mjs) 校验 archive entry、`VERSION`、Lithograph 与 OpenAI-compatible Provider library，再缓存到 `.cache/lithograph/`。
 
-`pnpm test:native` 使用 `go-sqlite3` bundled SQLite，按显式 entrypoint 依次加载：
+`pnpm test:native` 使用 bundled SQLite，并由测试 Runtime显式加载 official Lithograph → official Provider；caller configured extensions仍走通用 resolver。native suite覆盖 bootstrap/reopen、Object/Ontology、Graph streaming/cancellation、Evolution/Merge、HTTP auth、dynamic daemon endpoint 与 shutdown。
 
-```text
-sqlite3_lithograph_init
-sqlite3_lithographopenaicompatible_init
-```
-
-native suite 真实覆盖 SQLite >= 3.45、FTS5、Lithograph `0.3.0` / `CY25-2026.08` / storage format 3、`lithograph_validate(query)`、`lithograph()`、`lithograph_rows()`、query/execute context、Semantic Provider readiness/cache、explicit transaction、context cancellation、early-close rollback、shutdown cleanup 与 reopen；Phase 02 的 Kernel bootstrap/decoder/compiler、Ontology Patch/data-safety、HTTP auth和真实 daemon + `kg ontology` E2E，以及 Phase 04 的 Knowledge Object read/patch、mixed Ontology+Knowledge transaction 与 Object daemon/CLI integration均进入同一 native gate。最终 Phase 状态仍以对应 Phase Acceptance 和要求的远端 CI 为准。
-
-## 构建与本地候选交付物
+## 构建
 
 ```sh
 pnpm clean
 pnpm build
 ```
 
-构建顺序是 SDK/Web → Vite static assets → `internal/webui/dist` → Go native binary。输出：
+build 顺序：
 
 ```text
-artifacts/build/kgosd
-artifacts/build/kg
+SDK + CLI TypeScript
+→ Web static assets
+→ internal/webui/dist
+→ Lithograph current-platform fixture
+→ Go kgosd
+→ current-platform npm Runtime package
 ```
 
-Web 资源已经嵌入 `kgosd`；构建后 Playwright 直接用该 native binary 提供页面，不依赖源码目录中的开发 server。
+主要输出：
 
-生成本地候选交付物：
+```text
+packages/sdk/dist/
+packages/cli/dist/
+packages/web/dist/
+artifacts/build/kgosd
+artifacts/npm/runtime-<target>/
+```
+
+## 本地候选交付物
 
 ```sh
 pnpm pack:release
 ```
 
-结果写入 `artifacts/release/`，包含当前平台 `kgosd`、`kg`、`extensions/` 下的 Lithograph / OpenAI-compatible Provider native library、记录四项 artifact SHA-256 的 manifest，以及许可证/README。脚本会在 workspace 外临时目录验证版本、完整参数 install、doctor stopped readiness、manifest/hash 与真实 embedded-Web Runtime。它只生成本地候选物，不发布、不提交、不推送。
+输出为 `artifacts/release/*.tgz`。脚本在 workspace 外重新安装 tarballs并验证：
+
+- CLI/SDK/Runtime version topology；
+- `init` 不创建 auth/db 或启动 daemon；
+- `doctor` stopped readiness；
+- 并发 lazy-start；
+- 双 root 的独立 endpoint/token/database；
+- wrong-endpoint + same-root token fail-closed；
+- Ontology/Object/Graph/Evolution/Merge 主链路；
+- daemon crash/restart 后 credential identity保持；
+- Runtime package不包含 native `kg`，CLI package不夹带 native Runtime；
+- Instance config不持久化 npm/node_modules package path。
 
 ## Git hooks 与 CI
 
-`pnpm run setup` 安装 [Lefthook](../../lefthook.yml)。pre-commit 只运行：
+`pnpm run setup` 安装 Lefthook，pre-commit 只运行：
 
 ```sh
 pnpm check:quick
 ```
 
-[GitHub Actions](../../.github/workflows/ci.yml)使用 Ubuntu 24.04 x64，安装 Node `24.15.0`、pnpm `10.34.5`、Go `1.27.1`、GCC 和 Chromium system dependencies，然后运行完整 `pnpm validate`。任何要求该远端门禁的 Phase 都只有在最终 pushed revision 的对应 CI 成功后才能标记 `done`。
+GitHub Actions 保留 Ubuntu 24.04 x64 的完整 `pnpm validate`，并增加四平台 native/package matrix：
+
+- macOS arm64：`macos-15`
+- macOS x64：`macos-15-intel`
+- Linux glibc arm64：`ubuntu-24.04-arm`
+- Linux glibc x64：`ubuntu-24.04`
+
+四平台 job 真实执行 current-target build、`pnpm test:native` 与 `pnpm pack:release`，并上传 npm candidate。Phase 只有在要求的 pushed revision 对应远端 matrix真实成功后才能记为 `done`。
 
 ## 常见问题
 
-- `pnpm install` 报 engine mismatch：切换到 `.node-version` 指定的 Node `24.15.0`。
-- Go 本机版本不是 1.27.1：仓库任务使用 `GOTOOLCHAIN=go1.27.1` 获取/选择固定工具链；网络不可用且本地没有该 toolchain 时 setup 会失败。
-- 缺 C compiler：先安装平台对应的 C toolchain；Phase 00 不提供 pure-Go SQLite fallback。
-- Playwright 找不到浏览器或 Linux system library：重新执行 setup；Linux 需要时运行上面的 `--with-deps` 安装命令。
-- Lithograph fixture 校验失败：准备脚本会拒绝不匹配 artifact，不会回退相邻工作树或其它版本。
-- 想清理生成物：运行 `pnpm clean`；依赖与 `.cache/lithograph/` 保留，避免无意义重复下载。
+- `pnpm install` engine mismatch：切换到 `.node-version` 指定的 Node。
+- 缺 C compiler：安装当前平台 C toolchain；没有 pure-Go SQLite fallback。
+- Playwright 缺浏览器/system library：重新执行 setup；Linux 需要时运行 `playwright install --with-deps`。
+- Lithograph fixture hash失败：准备脚本会 fail closed，不回退相邻工作树或其它版本。
+- npm Runtime optional package被 omit/缺失：CLI会在需要启动 daemon 时 fail closed，不联网偷偷下载 binary。
+- 想清理生成物：运行 `pnpm clean`；依赖和 `.cache/lithograph/` 保留以避免重复下载。

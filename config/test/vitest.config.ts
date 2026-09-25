@@ -18,6 +18,7 @@ export default defineConfig({
         // Thin process/browser entrypoints delegate to covered modules.
         "**/src/bin.ts",
         "**/src/dev.ts",
+        "**/src/types.ts",
         "packages/web/src/main.tsx",
         "**/dist/**"
       ],

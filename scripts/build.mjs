@@ -2,6 +2,7 @@ import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { run } from "./process.mjs";
+import { buildCurrentRuntimePackage } from "./runtime-package.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const webOutput = resolve(root, "packages/web/dist");
@@ -19,6 +20,7 @@ await run("pnpm", ["exec", "tsc", "-p", "packages/web/tsconfig.json", "--pretty"
   cwd: root
 });
 await run("pnpm", ["--filter", "@kgos/web", "build"], { cwd: root });
+await run("node", ["scripts/prepare-lithograph.mjs"], { cwd: root });
 
 await mkdir(embeddedWeb, { recursive: true });
 for (const entry of await readdir(embeddedWeb)) {
@@ -34,7 +36,7 @@ await run(
   ["build", "-tags=sqlite_fts5", "-o", resolve(buildOutput, "kgosd"), "./cmd/kgosd"],
   { cwd: root, env: goEnv }
 );
-await run("go", ["build", "-tags=sqlite_fts5", "-o", resolve(buildOutput, "kg"), "./cmd/kg"], {
-  cwd: root,
-  env: goEnv
+await buildCurrentRuntimePackage({
+  root,
+  daemon: resolve(buildOutput, "kgosd")
 });

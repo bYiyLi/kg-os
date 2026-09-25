@@ -1,39 +1,8 @@
 package command
 
 import (
-	"strings"
 	"testing"
 )
-
-func TestEvaluateKG(t *testing.T) {
-	t.Parallel()
-
-	for _, test := range []struct {
-		name string
-		args []string
-		code int
-		want string
-	}{
-		{name: "version", args: []string{"--version"}, want: "0.0.0\n"},
-		{name: "short version", args: []string{"-V"}, want: "0.0.0\n"},
-		{name: "empty unsupported", code: 2, want: "not available"},
-		{name: "help unsupported internally", args: []string{"--help"}, code: 2, want: "not available"},
-		{name: "unsupported", args: []string{"object", "read"}, code: 2, want: "not available"},
-	} {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			result := EvaluateKG(test.args)
-			if result.ExitCode != test.code {
-				t.Fatalf("exit code = %d, want %d", result.ExitCode, test.code)
-			}
-			combined := result.Stdout + result.Stderr
-			if !strings.Contains(combined, test.want) {
-				t.Fatalf("output %q does not contain %q", combined, test.want)
-			}
-		})
-	}
-}
 
 func TestEvaluateKGOSD(t *testing.T) {
 	t.Parallel()
@@ -44,7 +13,8 @@ func TestEvaluateKGOSD(t *testing.T) {
 		mode DaemonMode
 		code int
 	}{
-		{name: "run daemon", mode: DaemonModeRun},
+		{name: "run daemon", args: []string{"--root", "/tmp/kgos"}, mode: DaemonModeRun},
+		{name: "missing root", mode: DaemonModeResult, code: 2},
 		{name: "help", args: []string{"--help"}, mode: DaemonModeResult},
 		{name: "version", args: []string{"--version"}, mode: DaemonModeResult},
 		{name: "old phase0 shell rejected", args: []string{"--phase0-shell"}, mode: DaemonModeResult, code: 2},

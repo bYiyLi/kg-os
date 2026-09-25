@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bYiyLi/kg-os/internal/buildinfo"
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/bYiyLi/kg-os/internal/lithograph"
 	"github.com/bYiyLi/kg-os/internal/runtimeprofile"
@@ -25,13 +26,38 @@ type Runtime struct {
 	closed bool
 }
 
-func Open(ctx context.Context, explicitHome string, client *http.Client) (_ *Runtime, returnErr error) {
-	paths, err := runtimeprofile.ResolvePaths(explicitHome)
+func Open(ctx context.Context, root string, client *http.Client) (_ *Runtime, returnErr error) {
+	pkg, err := runtimeprofile.DiscoverRuntimePackage()
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(paths.Home, 0o700); err != nil {
-		return nil, fmt.Errorf("create KG_HOME: %w", err)
+	if pkg.Version != buildinfo.Version {
+		return nil, fmt.Errorf(
+			"runtime package version %q does not match kgosd version %q",
+			pkg.Version,
+			buildinfo.Version,
+		)
+	}
+	return OpenWithOfficialExtensions(ctx, root, pkg.OfficialExtensions(), client)
+}
+
+func OpenWithOfficialExtensions(
+	ctx context.Context,
+	root string,
+	official []runtimeprofile.ExtensionConfig,
+	client *http.Client,
+) (_ *Runtime, returnErr error) {
+	if len(official) != 2 ||
+		official[0].Entrypoint != runtimeprofile.LithographEntrypoint ||
+		official[1].Entrypoint != runtimeprofile.ProviderEntrypoint {
+		return nil, fmt.Errorf("official runtime extensions must be Lithograph then Provider")
+	}
+	paths, err := runtimeprofile.ResolvePaths(root)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(paths.Root, 0o700); err != nil {
+		return nil, fmt.Errorf("create instance root: %w", err)
 	}
 	lock, err := runtimeprofile.AcquireLock(paths.Lock)
 	if err != nil {
@@ -42,6 +68,9 @@ func Open(ctx context.Context, explicitHome string, client *http.Client) (_ *Run
 			_ = lock.Close()
 		}
 	}()
+	if err := lock.PublishStarting(os.Getpid(), buildinfo.Version); err != nil {
+		return nil, fmt.Errorf("publish daemon starting locator: %w", err)
+	}
 	if err := runtimeprofile.EnsureDirectories(paths); err != nil {
 		return nil, err
 	}
@@ -56,7 +85,10 @@ func Open(ctx context.Context, explicitHome string, client *http.Client) (_ *Run
 	if err := os.MkdirAll(filepath.Dir(config.Cache.Path), 0o700); err != nil {
 		return nil, fmt.Errorf("create Provider cache parent directory: %w", err)
 	}
-	extensions, err := runtimeprofile.ResolveExtensions(ctx, paths, config.SQLite.Extensions, client)
+	configs := make([]runtimeprofile.ExtensionConfig, 0, len(official)+len(config.SQLite.Extensions))
+	configs = append(configs, official...)
+	configs = append(configs, config.SQLite.Extensions...)
+	extensions, err := runtimeprofile.ResolveExtensions(ctx, paths, configs, client)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +128,7 @@ func (runtime *Runtime) PublishEndpoint(endpoint string) error {
 	if runtime.closed {
 		return fmt.Errorf("runtime is closed")
 	}
-	return runtime.lock.PublishEndpoint(endpoint)
+	return runtime.lock.PublishRunning(os.Getpid(), endpoint, buildinfo.Version)
 }
 
 func (runtime *Runtime) Endpoint() (string, error) {
@@ -107,11 +139,7 @@ func (runtime *Runtime) Endpoint() (string, error) {
 }
 
 func (runtime *Runtime) LocalEndpoint(port int) string {
-	host := runtime.Config.Server.Host
-	if host == "0.0.0.0" {
-		host = "127.0.0.1"
-	}
-	return "http://" + host + ":" + fmt.Sprint(port)
+	return "http://127.0.0.1:" + fmt.Sprint(port)
 }
 
 func (runtime *Runtime) Close() error {

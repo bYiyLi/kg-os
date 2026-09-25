@@ -18,7 +18,7 @@ func Serve(
 	handler http.Handler,
 	output io.Writer,
 ) error {
-	address := fmt.Sprintf("%s:%d", runtime.Config.Server.Host, runtime.Config.Server.Port)
+	address := "127.0.0.1:0"
 	listener, err := net.Listen("tcp4", address)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", address, err)

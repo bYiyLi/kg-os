@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -14,8 +13,6 @@ import (
 )
 
 const (
-	RecommendedServerHost       = "127.0.0.1"
-	RecommendedServerPort       = 4765
 	RecommendedCachePath        = "cache/openai-compatible.db"
 	RecommendedCacheMaxSizeMB   = int64(4096)
 	RecommendedFullTextAnalyzer = "unicode61"
@@ -29,16 +26,10 @@ const (
 type LookupEnv func(string) (string, bool)
 
 type Config struct {
-	Server    ServerConfig    `toml:"server"`
 	Cache     CacheConfig     `toml:"cache"`
 	SQLite    SQLiteConfig    `toml:"sqlite"`
 	FullText  FullTextConfig  `toml:"fulltext"`
 	Embedding EmbeddingConfig `toml:"embedding"`
-}
-
-type ServerConfig struct {
-	Host string `toml:"host"`
-	Port int    `toml:"port"`
 }
 
 type CacheConfig struct {
@@ -109,8 +100,6 @@ func ParseConfig(paths Paths, body []byte) (Config, error) {
 		return Config{}, fmt.Errorf("config.toml contains unknown field %q", undecoded[0].String())
 	}
 	required := [][]string{
-		{"server", "host"},
-		{"server", "port"},
 		{"cache", "path"},
 		{"cache", "max_size_mb"},
 		{"fulltext", "analyzer"},
@@ -132,18 +121,11 @@ func ParseConfig(paths Paths, body []byte) (Config, error) {
 }
 
 func (config *Config) normalizeAndValidate(paths Paths) error {
-	if ip := net.ParseIP(config.Server.Host); ip == nil || ip.To4() == nil || strings.Contains(config.Server.Host, ":") {
-		return fmt.Errorf("server.host must be an IPv4 address")
-	}
-	if config.Server.Port < 1 || config.Server.Port > 65535 {
-		return fmt.Errorf("server.port must be between 1 and 65535")
-	}
-
 	if strings.TrimSpace(config.Cache.Path) == "" || strings.ContainsRune(config.Cache.Path, 0) {
 		return fmt.Errorf("cache.path must be non-empty and contain no NUL")
 	}
 	if !filepath.IsAbs(config.Cache.Path) {
-		config.Cache.Path = filepath.Join(paths.Home, config.Cache.Path)
+		config.Cache.Path = filepath.Join(paths.Root, config.Cache.Path)
 	}
 	absoluteCache, err := filepath.Abs(config.Cache.Path)
 	if err != nil {
@@ -160,10 +142,14 @@ func (config *Config) normalizeAndValidate(paths Paths) error {
 		return fmt.Errorf("cache.path must not point at kgos.db")
 	}
 
-	if len(config.SQLite.Extensions) == 0 {
-		return fmt.Errorf("sqlite.extensions must contain at least one extension")
-	}
 	for index := range config.SQLite.Extensions {
+		entrypoint := config.SQLite.Extensions[index].Entrypoint
+		if entrypoint == LithographEntrypoint || entrypoint == ProviderEntrypoint {
+			return fmt.Errorf(
+				"sqlite.extensions[%d]: official Runtime extensions cannot be configured as caller extensions",
+				index,
+			)
+		}
 		if err := validateExtensionConfig(&config.SQLite.Extensions[index]); err != nil {
 			return fmt.Errorf("sqlite.extensions[%d]: %w", index, err)
 		}

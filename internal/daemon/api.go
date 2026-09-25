@@ -110,6 +110,10 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 		}
 		writeJSON(response, http.StatusOK, result)
 	})
+	mux.HandleFunc(
+		"/api/v1/object/read-text",
+		postJSONHandler(runtime.Credential.Token, runtime.Kernel.ReadObjectTexts),
+	)
 	mux.HandleFunc("/api/v1/object/patch", patchHandler(runtime.Kernel.PatchObjects))
 	mux.HandleFunc("/api/v1/ontology/read", func(response http.ResponseWriter, request *http.Request) {
 		if !authenticate(response, request, runtime.Credential.Token) {

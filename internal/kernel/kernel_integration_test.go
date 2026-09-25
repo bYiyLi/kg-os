@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -22,7 +21,7 @@ func TestPhase02BootstrapRejectsFreshLookingRootWithExtraBranch(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -70,7 +69,7 @@ func TestPhase02BootstrapRejectsFreshLookingRootWithExtraBranch(t *testing.T) {
 		t.Fatalf("close fixture runtime: %v", err)
 	}
 
-	reopened, err := runtimehost.Open(ctx, home, nil)
+	reopened, err := openKernelIntegrationRuntime(ctx, home)
 	if reopened != nil {
 		_ = reopened.Close()
 	}
@@ -91,7 +90,7 @@ func TestPhase02ValidMainReopensWithExtraHistoryBranch(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -111,7 +110,7 @@ func TestPhase02ValidMainReopensWithExtraHistoryBranch(t *testing.T) {
 	if err := runtime.Close(); err != nil {
 		t.Fatalf("close runtime: %v", err)
 	}
-	reopened, err := runtimehost.Open(ctx, home, nil)
+	reopened, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("reopen valid main with extra history: %v", err)
 	}
@@ -125,7 +124,7 @@ func TestPhase02DirectBindingDriftFailsReadAndReopen(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -176,7 +175,7 @@ func TestPhase02DirectBindingDriftFailsReadAndReopen(t *testing.T) {
 	if err := runtime.Close(); err != nil {
 		t.Fatalf("close drifted runtime: %v", err)
 	}
-	reopened, err := runtimehost.Open(ctx, home, nil)
+	reopened, err := openKernelIntegrationRuntime(ctx, home)
 	if reopened != nil {
 		_ = reopened.Close()
 	}
@@ -189,7 +188,7 @@ func TestPhase02ReservedGraphTypeEndpointDriftFailsReadAndReopen(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -234,7 +233,7 @@ func TestPhase02ReservedGraphTypeEndpointDriftFailsReadAndReopen(t *testing.T) {
 	if err := runtime.Close(); err != nil {
 		t.Fatalf("close drifted runtime: %v", err)
 	}
-	reopened, err := runtimehost.Open(ctx, home, nil)
+	reopened, err := openKernelIntegrationRuntime(ctx, home)
 	if reopened != nil {
 		_ = reopened.Close()
 	}
@@ -247,7 +246,7 @@ func TestPhase02ConstraintAndIndexProfilesRoundTrip(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -529,7 +528,7 @@ func TestPhase02SearchHiddenConfigSurvivesRuntimeDefaultChanges(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -591,7 +590,7 @@ func TestPhase02SearchHiddenConfigSurvivesRuntimeDefaultChanges(t *testing.T) {
 		t.Fatalf("rewrite config: %v", err)
 	}
 
-	reopened, err := runtimehost.Open(ctx, home, nil)
+	reopened, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("reopen with changed defaults: %v", err)
 	}
@@ -632,7 +631,7 @@ func TestPhase02RenameMaintainsKnowledgeAndBindingIdentity(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -788,7 +787,7 @@ func TestPhase02NodeRenameMaintainsDomainAndRelationshipEndpoint(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -915,7 +914,7 @@ func TestPhase02RelationshipTypeRenamePreservesKnowledgeAndBinding(t *testing.T)
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -1025,7 +1024,7 @@ func TestPhase02PropertyRenameSwapPreservesValuesAndBindings(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -1142,7 +1141,7 @@ func TestPhase02PropertyRenameRejectsOverlappingDefinitionDataLoss(t *testing.T)
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -1216,7 +1215,7 @@ func TestPhase02RelationshipRenamePreservesKnowledgeAndBinding(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -1376,7 +1375,7 @@ func TestPhase02DeleteWithKnowledgeFailsWithoutAdvancingBranch(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -1439,7 +1438,7 @@ func TestPhase02PropertyDeleteDataSafety(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -1538,7 +1537,7 @@ func TestPhase02ModelTighteningWithExistingKnowledgeFailsClosed(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -1623,7 +1622,7 @@ func TestPhase02OntologyCreateReadAndReopen(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -1844,7 +1843,7 @@ func TestPhase02OntologyCreateReadAndReopen(t *testing.T) {
 		t.Fatalf("close runtime: %v", err)
 	}
 
-	reopened, err := runtimehost.Open(ctx, home, nil)
+	reopened, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("reopen runtime: %v", err)
 	}
@@ -2070,10 +2069,14 @@ func openRawLithograph(t *testing.T, home string) *lithograph.Host {
 	if err != nil {
 		t.Fatalf("load raw Lithograph config: %v", err)
 	}
+	configs := append(
+		kernelIntegrationOfficialExtensions(),
+		config.SQLite.Extensions...,
+	)
 	extensions, err := runtimeprofile.ResolveExtensions(
 		ctx,
 		paths,
-		config.SQLite.Extensions,
+		configs,
 		nil,
 	)
 	if err != nil {
@@ -2151,27 +2154,31 @@ func queryIndexOptions(
 	return output
 }
 
-func writeKernelIntegrationConfig(t *testing.T, home string) {
+func writeKernelIntegrationConfig(t *testing.T, root string) {
 	t.Helper()
-	mainLibrary := os.Getenv("KGOS_LITHOGRAPH_LIBRARY")
-	providerLibrary := os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY")
-	if mainLibrary == "" || providerLibrary == "" {
-		t.Fatal("Lithograph integration libraries are required")
-	}
-	mainLibrary, _ = filepath.Abs(mainLibrary)
-	providerLibrary, _ = filepath.Abs(providerLibrary)
-	body := fmt.Sprintf(
-		"[server]\nhost = \"127.0.0.1\"\nport = 4765\n\n"+
-			"[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n"+
-			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithograph_init\"\n\n"+
-			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithographopenaicompatible_init\"\n\n"+
-			"[fulltext]\nanalyzer = \"unicode61\"\n\n"+
-			"[embedding]\nbase_url = \"https://example.invalid/v1\"\n"+
-			"model = \"phase02-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n",
-		strconv.Quote(mainLibrary),
-		strconv.Quote(providerLibrary),
-	)
-	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(body), 0o600); err != nil {
+	body := "[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n" +
+		"[fulltext]\nanalyzer = \"unicode61\"\n\n" +
+		"[embedding]\nbase_url = \"https://example.invalid/v1\"\n" +
+		"model = \"phase02-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n"
+	if err := os.WriteFile(filepath.Join(root, "config.toml"), []byte(body), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
+	}
+}
+
+func openKernelIntegrationRuntime(ctx context.Context, root string) (*runtimehost.Runtime, error) {
+	return runtimehost.OpenWithOfficialExtensions(
+		ctx,
+		root,
+		kernelIntegrationOfficialExtensions(),
+		nil,
+	)
+}
+
+func kernelIntegrationOfficialExtensions() []runtimeprofile.ExtensionConfig {
+	mainLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_LIBRARY"))
+	providerLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY"))
+	return []runtimeprofile.ExtensionConfig{
+		{Source: mainLibrary, Entrypoint: runtimeprofile.LithographEntrypoint},
+		{Source: providerLibrary, Entrypoint: runtimeprofile.ProviderEntrypoint},
 	}
 }

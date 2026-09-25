@@ -26,7 +26,7 @@ func TestReadActiveEndpointRequiresActiveOwner(t *testing.T) {
 		t.Fatalf("listen: %v", err)
 	}
 	endpoint := fmt.Sprintf("http://%s", listener.Addr())
-	if err := owner.PublishEndpoint(endpoint); err != nil {
+	if err := owner.PublishRunning(1, endpoint, "0.0.0"); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
 	gotEndpoint, err := ReadActiveEndpoint(path)

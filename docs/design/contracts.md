@@ -36,7 +36,7 @@ EMBEDDING_CONFIG_ERROR
 
 Lithograph explicit-transaction begin options 中 `expectedHead=baseState` 的 mismatch，或 no-op strict-head check mismatch，在 KG OS 公共语义中映射为 `STALE_BASE_STATE`；Lithograph `VERSION_NOT_FOUND` 映射为 `STATE_NOT_FOUND`。Git hunk 无法精确应用到 `baseState` 重新生成的 canonical YAML 时返回 `PATCH_BASE_MISMATCH`，不能 fuzzy/offset apply，也不能误报为 Branch stale；高层 Ontology / Object / Evolution 的 Binding coverage、reserved internal graph/schema 等 KG OS invariants 失败映射为 `CONSISTENCY_ERROR`；Graph 不以这项检查拦截底层执行。HTTP status 与 SDK exception class 仍属于各 adapter mapping；CLI 的 stdout/stderr 与 coarse exit-code mapping 由 [CLI](cli.md#error-与-exit-code) 冻结，但都不能改变上述稳定 error `code`。
 
-`AUTHENTICATION_FAILED` 是 `kgosd` single-token authentication 的唯一失败类别：HTTP API request 缺少 Bearer credential、header malformed、token 为空或 token 与 `$KG_HOME/auth.json` 不匹配都返回同一 code；HTTP adapter 使用 `401 Unauthorized`，`message/details` 不区分“missing”与“wrong”也不回显任何 secret。本机 CLI 在非空 `KG_TOKEN` 与当前 `$KG_HOME/auth.json` 都无法提供 credential 时，同样使用该稳定 code 作为本地 pre-dispatch error并返回 exit `2`；请求已发送而被 daemon 拒绝时返回 exit `1`。显式错误 `KG_TOKEN` 不回退本地文件。认证只判断是否持有实例 token，不建立 user/role/scope authorization。
+`AUTHENTICATION_FAILED` 是 `kgosd` single-token authentication 的唯一失败类别：HTTP API request 缺少 Bearer credential、header malformed、token 为空或 token 与当前 Instance Root 的 `auth.json` 不匹配都返回同一 code；HTTP adapter 使用 `401 Unauthorized`，`message/details` 不区分“missing”与“wrong”也不回显任何 secret。本机 `@kgos/cli` 只从显式 `--root` 对应的 `auth.json` 取得 credential；该文件缺失、非法或 token 为空时使用同一稳定 code 作为本地 pre-dispatch error并返回 exit `2`，请求已发送而被 daemon 拒绝时返回 exit `1`。CLI 不读取 `KG_TOKEN`，也不跨 root fallback。认证只判断是否持有实例 token，不建立 user/role/scope authorization。
 
 SQLite Extension / Full-text 运行时错误固定区分：
 

@@ -1,0 +1,32 @@
+{
+  "name": "@kgos/cli",
+  "version": "0.0.0",
+  "description": "KG OS command-line client",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "kg": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "dependencies": {
+    "@kgos/sdk": "workspace:0.0.0",
+    "smol-toml": "1.8.0"
+  },
+  "optionalDependencies": {
+    "@kgos/runtime-darwin-arm64": "workspace:0.0.0",
+    "@kgos/runtime-darwin-x64": "workspace:0.0.0",
+    "@kgos/runtime-linux-arm64": "workspace:0.0.0",
+    "@kgos/runtime-linux-x64": "workspace:0.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  }
+}

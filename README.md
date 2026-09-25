@@ -27,15 +27,15 @@ Node / Relationship Definition 一起表达字段、约束和索引。单字段�
 
 托管语义检索由 Lithograph 执行。KG OS 把全局 embedding / Provider cache 配置和 Ontology 的文本字段声明编译成 Semantic Index；调用方传普通查询字符串。KG OS 不生成内部向量 Property，不在保存或合并正文时调用模型，也不实现 text→Vector cache。OpenAI-compatible Provider 可以按 versioned `providerConfig.cache` 使用独立 SQLite cache database，与 `kgos.db` 隔离。Embedding credential 只通过显式 `api_key_env` 字段引用环境变量，实际凭证不进入索引历史。
 
-KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 TypeScript。**`kgosd` 自带 Web**：页面与 API 随同一个 daemon 交付、启动并使用同一端口，不需要单独部署 Web 服务；具体边界见 [运行架构](docs/design/architecture.md#v1-运行时与技术分层)和 [Web hosting](docs/design/runtime.md#web-hosting)。
+KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Host 使用 Go；`@kgos/sdk`、`@kgos/cli` 与浏览器 Web 使用 TypeScript。**`kgosd` 自带 Web**：页面与 API 由每个 Instance 自己的 daemon 同 endpoint 提供，不需要单独部署 Web 服务；具体边界见 [运行架构](docs/design/architecture.md#v1-运行时与技术分层)、[Client](docs/design/client.md) 和 [Web hosting](docs/design/runtime.md#web-hosting)。
 
-一个 `KG_HOME`（默认 `~/.kgosd`）对应一个 `kgosd` 和根目录 `kgos.db`；所有 daemon API request 使用 Bearer authentication。本机 CLI 显式 `KG_TOKEN` 优先，否则使用当前 profile 的 `auth.json`。首次安装通过 `kg doctor` + `kg install` 完成，业务命令自动确保本地 Runtime 可用。
+正式 AI / CI Client 分发形态为 `npx --yes @kgos/cli@<version> --root <instance-root> ...`；`--yes` 属于 npm 自身的首次 package acquisition 确认，普通人类交互可省略。一个显式 root 对应一个 `config.toml`、`auth.json`、`kgos.db` 与最多一个 active `kgosd`；不同 root 使用独立 daemon、dynamic loopback endpoint 与随机 token。不存在默认 `KG_HOME` / `KG_TOKEN`。Instance 首次建立使用 `init`，业务命令自动确保对应 root 的 Runtime 可用。当前工作树已通过本地 packed tarball 模拟这一 topology，但尚未执行 npm registry publish。
 
 配置、模型与调用示例，以及设计职责索引，统一从 [设计入口](docs/design.md)进入。本文只维护产品定义，具体配置、数据和接口规则由各 owner 文档维护。
 
 ## 当前状态
 
-**KG OS 已切换到 Go 服务端/Kernel/CLI + TypeScript SDK/Web，并对齐 Lithograph v0.3.0 SQL-only integration；Phase 00–07 均已完成。** 当前 `main` 已实现 Ontology、General Object Read & Patch、Graph Query & Execute、Evolution Core 与 Evolution Merge Session；Merge 直接复用 Lithograph v0.3.0 durable Session / revision CAS / candidate read / finalize，不建立第二套 Merge workspace。
+**Phase 00–07 均已完成；Phase 08 TypeScript Client & npm Runtime Distribution 当前为 `in_progress`。** 当前工作树已经实现真实 `@kgos/sdk`、TypeScript `@kgos/cli`、显式 `--root`、`init/doctor`、per-instance dynamic `kgosd`、四个platform npm Runtime package定义与当前平台candidate builder；Go `kg` 已在 parity 证明后删除。Ontology、Object、Graph、Evolution / Merge 业务能力继续复用原 HTTP/Kernel合同。主工作树完整 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate` 与 final review 已通过；Phase 08 尚未标记 `done`，因为实际 pushed revision 的四平台 native/package matrix 仍需取得远端证据。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
@@ -53,9 +53,11 @@ KG OS 的 `kgosd`、Kernel 与 `kg` CLI 使用 Go；SDK 与浏览器 Web 使用 
 
 **Phase 07 Evolution Merge Session 当前为 `done`。** `merge start/list/get/conflicts/resolve/finalize/abort`、公共 conflict 双向投影、exact-revision candidate consistency validation、authenticated HTTP 与正式 `kg evolution merge` CLI 已完成实现与多轮 Review hardening。实现提交 `bd31b748359f85ae95cca919c7deffb62f3c7a0c` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh Git checkout 的 `pnpm run setup && pnpm validate` 均通过，Go statement coverage **90.1%**、race、govulncheck、Playwright、真实 Lithograph v0.3.0 native suite、package/license/audit/diff gates 全绿。Review 已闭环 aggregate Property path、Definition rename continuity、shared Index 单侧展示 Ref、末页 conflict cursor、CLI resolutions strict JSON 与 explicit null/absence JSON contract 等边界；Ubuntu 24.04 x64 GitHub Actions run `35982570257` / Validate job `107577711342` 成功。完整范围和 Acceptance 见[阶段计划](docs/development/phases/07-evolution-merge.md)。
 
-首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
+**Phase 08 TypeScript Client & npm Runtime Distribution 当前为 `in_progress`。** SDK/CLI/root/runtime/npm candidate/Go CLI cleanup 的本地实现与本地 Acceptance 已完成：主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均通过，Go statement coverage **90.0%**、TypeScript statements/lines/functions **100%**、jscpd **0 clones**，race/govulncheck/Playwright/native/packed npm/license/audit/diff gates 全绿，final review 无剩余 task-affecting finding。CI workflow 已配置 macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix；剩余完成条件只有实际 pushed revision 的四平台 matrix 成功证据。完整范围与Acceptance见[Phase 08](docs/development/phases/08-typescript-client-npm-runtime.md)。
 
-相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、[D67 Ontology Index profile](docs/design/decisions.md#d67-ontology-index-profile)、[D68 reserved Ontology Schema](docs/design/decisions.md#d68-reserved-ontology-schema)、[D69 Ontology Constraint profile](docs/design/decisions.md#d69-ontology-constraint-profile)、[D70 bootstrap orphan-history boundary](docs/design/decisions.md#d70-bootstrap-orphan-history)、[D71 generated Constraint identity](docs/design/decisions.md#d71-lithograph-generated-constraint-identity)、[D72 Local install / Runtime onboarding](docs/design/decisions.md#d72-local-install-runtime-onboarding)、[D73 Object batch read / patch surface](docs/design/decisions.md#d73-object-read-patch-surface) 与 [D74 Evolution state.create writer boundary](docs/design/decisions.md#d74-evolution-state-create-writer-boundary)。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
+首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、Client迁移、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
+
+相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go Runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、D67–D74，以及 [D75 TypeScript Client](docs/design/decisions.md#d75-typescript-client)、[D76 npm distribution](docs/design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](docs/design/decisions.md#d77-explicit-instance-root)。D75–D77 替换 D65/D72 中与 Go CLI、传统安装、`KG_HOME/KG_TOKEN` 和 fixed endpoint 相关的部分；Go Runtime / Kernel、single-token Bearer、Runtime auto-start与数据库边界继续有效。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
 ## License
 
@@ -82,5 +84,6 @@ KG OS 采用双许可模式：
 - [Phase 05 计划](docs/development/phases/05-graph.md)：Graph query/execute、authenticated HTTP、NDJSON streaming、Full-text / Semantic公共路径与 transport/cancellation 验收。
 - [Phase 06 计划](docs/development/phases/06-evolution-core.md)：Evolution Core 的 State / State Data、Branch / Tag、History / Diff、HTTP 与 CLI 范围和验收。
 - [Phase 07 计划](docs/development/phases/07-evolution-merge.md)：Evolution Merge Session 的冲突投影、渐进 resolution、candidate validation、finalize/abort、HTTP 与 CLI 范围和验收。
+- [Phase 08 计划](docs/development/phases/08-typescript-client-npm-runtime.md)：TypeScript SDK/CLI、npm native Runtime distribution、explicit Instance Root 与 Go CLI迁移范围和验收。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

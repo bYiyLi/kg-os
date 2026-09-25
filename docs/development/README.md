@@ -57,7 +57,7 @@ Feature 是实现单元，Phase 是默认交付与验收单元。Feature 完成�
 
 旧 Phase 01 TypeScript / `ffi-rs` / 自制 SQLite runtime / v0.2.x 实现尝试已经从当前工程基线清理；原 Phase 00 重复 Lithograph execution smoke也已在 Phase 01实现时删除，`internal/lithographtest`只保留 bundled SQLite build-profile测试。正式 bundled SQLite connection lifecycle、Runtime host与transaction adapter已经进入当前 `main` 基线；业务数据库语义与Knowledge Base bootstrap仍由后续 Phase拥有。
 
-Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime secret ownership；Phase 02 已在其上完成 Ontology data routes 的统一 Bearer authentication、Knowledge Base bootstrap 与正式 `kg ontology` client surface。当前设计已经用 [D72](../design/decisions.md#d72-local-install-runtime-onboarding) 替换公开 daemon control 方案：普通用户通过 `doctor/install` 完成本地 onboarding，业务 CLI 自动确保 Runtime 可用。该调整已在 Phase 03 完成并进入 `main` 基线；[D73](../design/decisions.md#d73-object-read-patch-surface)进一步把通用 Object surface收敛为 batch read / patch，Phase 04负责首次开放 Knowledge Object；Phase 05 已完成 Graph public surface，Phase 06 已完成 Evolution Core，Phase 07 已完成 Evolution Merge Session。SDK/Web/Skill业务交互仍属于后续阶段。
+Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime secret ownership；Phase 02 已在其上完成 Ontology data routes 的统一 Bearer authentication、Knowledge Base bootstrap 与正式 `kg ontology` client surface。D72 的 `doctor/install + KG_HOME/KG_TOKEN` 模型曾由 Phase 03 完成并进入 `main`，因此相关完成证据仍是当前实现事实；2026-09-24 已由 [D75](../design/decisions.md#d75-typescript-client)、[D76](../design/decisions.md#d76-npm-distribution)、[D77](../design/decisions.md#d77-explicit-instance-root) 决定在 Phase 08 迁移为 TypeScript SDK/CLI + npm/npx + explicit `--root`。这项新设计不回写或取消 Phase 03 的历史完成证据。
 
 **Phase 02 当前为 `done`。** Knowledge Base bootstrap、internal semantic graph / Binding、Ontology read/edit、Ontology-scoped Object Patch、Schema/Constraint/Index compiler、authenticated HTTP 与正式 `kg ontology` CLI均已实现并完成本地/远端验收。实现提交 `8e776043337bcda24a271f84af1c04fc0da515cc` 已推送到 `main`；主工作树完整 `pnpm validate`、独立 fresh-source setup + full validation、forced pre-commit、final diff/review与真实 Lithograph v0.3.0 native suite均成功，Ubuntu 24.04 x64 GitHub Actions run `35804756510` / Validate job `107002937680` 成功。Knowledge Object、Graph 与 Evolution Core 后续已分别在 Phase 04 / 05 / 06 完成；SDK/Web/Skill仍在后续。
 
@@ -71,6 +71,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 07 Evolution Merge Session 当前为 `done`。** Merge Session 的产品合同、CLI surface、公共错误与 invalid State 边界继续由 Evolution / CLI / Contracts / D41 冻结；public conflict projection / resolution reverse mapping、exact-revision candidate consistency validation、authenticated HTTP 与正式 `kg evolution merge` 七个命令已完成。实现提交 `bd31b748359f85ae95cca919c7deffb62f3c7a0c` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh Git checkout 的 `pnpm run setup && pnpm validate` 均成功，Go statement coverage **90.1%**、race/govulncheck/Playwright/native/package/license/audit/diff gates 全部通过；final diff/review 无剩余 task-affecting finding。Review 已闭环 public aggregate path、rename continuity、shared resource display ref、conflict pagination cursor、strict CLI resolution input 与 explicit null/absence serialization 等边界；Ubuntu 24.04 x64 GitHub Actions run `35982570257` / Validate job `107577711342` 成功。
 
+**Phase 08 TypeScript Client & npm Runtime Distribution 当前为 `in_progress`。** 当前工作树已实现公共 `@kgos/sdk`、TypeScript `@kgos/cli`、显式 `--root`、`init/doctor`、per-root dynamic daemon、platform npm Runtime package builder / candidate smoke，并在 parity 通过后删除 Go `kg`。主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均成功；Go statement coverage **90.0%**、TypeScript statements/lines/functions **100%**、jscpd **0 clones**，race/govulncheck/Playwright/native/package/license/audit/diff gates 全绿，final review 无剩余 task-affecting finding。CI workflow 已加入 macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix。Phase 仍不能 `done`，因为实际 pushed revision 的四平台 matrix 成功证据尚未取得。完整范围与Acceptance见[Phase 08](phases/08-typescript-client-npm-runtime.md)。
+
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |
@@ -83,12 +85,13 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [05 Graph Query & Execute](phases/05-graph.md) | `done` | `kg graph query/execute`、authenticated HTTP、JSON/NDJSON、Full-text / Semantic / Lithograph JSON passthrough、cancellation与transport hardening；本地/fresh-source/Ubuntu CI验收完成 | [Graph](../design/graph.md)、[Graph CLI](../design/cli.md#graph-cli)、[Streaming](../design/runtime.md#graph-http-streaming-framing) |
 | [06 Evolution Core](phases/06-evolution-core.md) | `done` | State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff、authenticated HTTP 与 `kg evolution` Core CLI；本地/fresh-source/Ubuntu CI 验收完成，不含 Merge | [Evolution](../design/evolution.md)、[Evolution CLI](../design/cli.md#evolution-cli)、[公共错误合同](../design/contracts.md#公共错误合同) |
 | [07 Evolution Merge Session](phases/07-evolution-merge.md) | `done` | Merge Session adapter、public conflict projection、渐进 resolution、exact-revision candidate consistency、finalize/abort、authenticated HTTP 与 `kg evolution merge` CLI；本地/fresh-source/Ubuntu CI 验收完成 | [Evolution Merge](../design/evolution.md#evolution-公共调用合同)、[Merge CLI](../design/cli.md#merge-session)、[D41](../design/decisions.md#d41-evolution-merge-使用-lithograph-merge-session-渐进解决冲突) |
+| [08 TypeScript Client & npm Runtime Distribution](phases/08-typescript-client-npm-runtime.md) | `in_progress` | 真实 `@kgos/sdk`、TypeScript `@kgos/cli`、explicit `--root`、`init`、per-root daemon/dynamic endpoint、platform npm native Runtime package、Go CLI parity迁移与清理；本地 full + fresh-source + final review 已完成，仅待 pushed 四平台 matrix | [Client](../design/client.md)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md)、[D75](../design/decisions.md#d75-typescript-client)、[D76](../design/decisions.md#d76-npm-distribution)、[D77](../design/decisions.md#d77-explicit-instance-root) |
 
 当前实现依赖顺序：
 
 ```text
 Go Engineering Foundation
-  -> runtime / KG_HOME / extension loading / Lithograph SQL adapter
+  -> runtime / explicit Instance Root / extension loading / Lithograph SQL adapter
   -> Phase 02: Knowledge Base bootstrap + complete Ontology
        (reserved schema / semantic graph / Binding / read / edit / Patch / compiler)
   -> Phase 03: Installation & Runtime Onboarding
@@ -101,10 +104,12 @@ Go Engineering Foundation
        (State / State Data / Branch / Tag / Ancestry / History / Diff)
   -> Phase 07: Evolution Merge Session
        (start / list / get / conflicts / resolve / candidate validation / finalize / abort)
-  -> complete SDK / Web / Skill and release closure
+  -> Phase 08: TypeScript Client & npm Runtime Distribution
+       (@kgos/sdk / @kgos/cli / --root / init / per-instance kgosd / npm native runtime)
+  -> complete Web / Skill and release closure
 ```
 
-Phase 02、Phase 03、Phase 04、Phase 05、Phase 06 与 Phase 07 均已完成。Phase 08 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
+Phase 02–07 均已完成；Phase 08 当前为 `in_progress`，本地实现、迁移清理、主工作树完整 validation、独立 fresh-source 与 final review 已完成，仅剩实际 pushed revision 的跨平台远端 matrix 证据。Phase 09 及之后仍不提前建立空 Phase，开始后续阶段前再从对应 Design Inputs 建立计划与 Acceptance。
 
 ## 6. Phase 通用完成标准
 
@@ -130,5 +135,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 05：Graph Query & Execute](phases/05-graph.md)
 - [Phase 06：Evolution Core](phases/06-evolution-core.md)
 - [Phase 07：Evolution Merge Session](phases/07-evolution-merge.md)
+- [Phase 08：TypeScript Client & npm Runtime Distribution](phases/08-typescript-client-npm-runtime.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

@@ -76,13 +76,14 @@ Ontology 阅读提供全局 → 可选 Domain → Definition 的明确入口；�
 
 ### v1 运行时与技术分层
 
-KG OS v1 使用 **Go 实现 `kgosd`、Kernel 与 `kg` CLI**；TypeScript / npm 继续用于 SDK 与浏览器 Web。Web 构建产物随 `kgosd` 一起交付，由同一 daemon、同一 configured host/port 提供页面、静态资源与 API；浏览器是客户端，不对应另一个 Web 服务。当前运行时结构为：
+KG OS v1 使用 **Go 实现 `kgosd`、Kernel 与 SQLite / Lithograph Host**；TypeScript / npm 负责 `@kgos/sdk`、`@kgos/cli` 与浏览器 Web。Web 构建产物随 `kgosd` 一起交付，由每个 Instance 自己的 daemon endpoint 提供页面、静态资源与 API；浏览器是客户端，不对应另一个 Web 服务。当前目标运行时结构为：
 
 ```text
-AI / Agent / Skill → kg CLI (Go) / SDK (TypeScript) ── HTTP ──┐
-Browser ─────────── Web (TypeScript) + API HTTP ──────────────┤
-                                                             ▼
-kgosd — Go，本地服务
+AI / Agent / Skill → @kgos/cli (TypeScript) ─┐
+TypeScript App ─────→ @kgos/sdk ─────────────┼── HTTP ──┐
+Browser ───────────→ Web / @kgos/sdk ────────┘          │
+                                                         ▼
+kgosd — Go，每个 Instance 独立本地服务
     ├── net/http API
     ├── 内置 Web 静态资源（同进程、同端口）
     ├── KG OS Kernel（Go）
@@ -103,17 +104,17 @@ kgosd — Go，本地服务
       └──── Embedding Provider / FTS tokenizer
 ```
 
-- **`kgosd` 是 KG OS v1 的本地统一访问入口。** 它承载 Kernel，并负责解析 `KG_HOME`、读取该 profile 的 `config.toml` / `auth.json`、解析并加载 SQLite extensions、打开唯一 Knowledge Base `kgos.db`、维护读写 connection / transaction lifecycle，以及执行 KG OS 到 Lithograph 的 projection / compiler / consistency orchestration。Lithograph 自身也通过通用 SQLite Extension lifecycle 提供，不静态内嵌为 KG OS 私有数据库模块。
-- **Go 是 daemon / Kernel / CLI 的服务端实现基线。** HTTP 使用标准库 `net/http`；SQLite host 使用 `database/sql` + `github.com/mattn/go-sqlite3`，通过 CGO 运行 driver 自带的 bundled SQLite amalgamation并加载 Lithograph。构建固定启用 `sqlite_fts5`，不使用 `libsqlite3` 系统 SQLite，也不得启用 `sqlite_omit_load_extension`。请求取消、daemon stop 与长查询取消沿 `context.Context` 传播到 driver / SQLite interrupt；不得为数据库执行另建 Node worker/child-process IPC、FFI shim 或第二套 private SQLite runtime。
+- **`kgosd` 是 KG OS v1 的本地统一访问入口。** 它承载 Kernel，并要求显式 `--root <instance-root>`，读取该 Instance 的 `config.toml` / `auth.json`、解析并加载 SQLite extensions、打开该 root 唯一 Knowledge Base `kgos.db`、维护读写 connection / transaction lifecycle，以及执行 KG OS 到 Lithograph 的 projection / compiler / consistency orchestration。Lithograph 自身也通过通用 SQLite Extension lifecycle 提供，不静态内嵌为 KG OS 私有数据库模块。
+- **Go 是 daemon / Kernel / Database Host 的实现基线。** HTTP 使用标准库 `net/http`；SQLite host 使用 `database/sql` + `github.com/mattn/go-sqlite3`，通过 CGO 运行 driver 自带的 bundled SQLite amalgamation并加载 Lithograph。构建固定启用 `sqlite_fts5`，不使用 `libsqlite3` 系统 SQLite，也不得启用 `sqlite_omit_load_extension`。请求取消、daemon stop 与长查询取消沿 `context.Context` 传播到 driver / SQLite interrupt；不得为数据库执行另建 Node worker/child-process IPC、FFI shim 或第二套 private SQLite runtime。
 - **SQLite Extension 只是一层运行时能力装配机制。** KG OS 不按“全文插件 / 向量插件 / Lithograph 插件”建立多套 loader；所有 loadable extension 都从 startup config 的 ordered source list 解析为本地 immutable artifact，每项显式提供 init `entrypoint`，再按原顺序加载到每个 SQLite connection。Extension 可以提供 tokenizer、SQL function、virtual table 或其它 SQLite capability；通用 loader 不理解业务语义。全部加载完成后再通过公开 SQL probe 验证 Lithograph 与当前 Full-text / Managed Semantic runtime capability。
 - **Lithograph v0.3.0 对 KG OS 只暴露 SQL execution surface。** 完整结果使用 `lithograph()`，真正 streaming 使用 `lithograph_rows()`，校验使用 `lithograph_validate(query)`；多 execution 单 Commit 使用 `lithograph_tx_begin() -> lithograph()/lithograph_rows()* -> lithograph_tx_commit()/abort()`。KG OS 不绑定 application-facing Native query ABI、不取得 `sqlite3*`、不维护 `lithograph_tx_execute()` compatibility path。
-- **Full-text analyzer 是 Knowledge Base 初始化配置。** Ontology 只声明 `type: fulltext` 及其真实 index name/targets/properties；安装时必须显式选择 `[fulltext].analyzer`，并提示初始化后禁止修改。KG OS 创建或因业务 Schema 变化重建 Full-text IndexDefinition 时使用当前配置；已经存在的 versioned IndexDefinition 保留创建时 analyzer。
+- **Full-text analyzer 是 Knowledge Base 初始化配置。** Ontology 只声明 `type: fulltext` 及其真实 index name/targets/properties；Instance `init` 时必须显式选择 `[fulltext].analyzer`，并提示初始化后禁止修改。KG OS 创建或因业务 Schema 变化重建 Full-text IndexDefinition 时使用当前配置；已经存在的 versioned IndexDefinition 保留创建时 analyzer。
 - **Embedding 交给 Lithograph 与 Provider extension，persistent text -> Vector cache 由 Provider 自己拥有。** `kgosd` 通过同一 SQLite extension loader 装配 Lithograph 和 `lithograph-openai-compatible`；`[embedding]` 同样是必须完整提供、初始化后禁止修改的配置，`[cache]` 必须显式提供 path / budget 且始终启用。KG OS 把这些值编译进新建 / 必须重建的 Semantic Index `providerConfig`。Provider cache 使用独立 SQLite database，不写 Lithograph `main`；Lithograph 继续拥有 Raw Vector、HNSW 与 query-local/TEMP Semantic materialization。KG OS 不实现 Embeddings HTTP client或缓存算法。
-- **v1 不提供 Full-text / Embedding 配置版本管理或迁移。** “初始化后禁止修改”是安装合同，不通过 fingerprint、历史配置副本、修改检测或启动拒绝来强制；已有索引和历史查询继续使用各自 versioned 配置，KG OS 不自动重写历史或全库重算。
-- **CLI / SDK / 浏览器 Web 消费同一公共合同。** `kg` CLI 使用 Go；SDK 与 Web 使用 TypeScript。语言不同不改变 client ↔ daemon 的 HTTP 边界，也不建立第二套产品语义。客户端不直接打开 SQLite、加载 Lithograph 或依赖 `_lithograph_*` 内部状态。Web 构建产物进入 daemon 交付物，不拆成独立部署服务。本机 `kg` 额外拥有 `doctor / install / Runtime ensure`：doctor只诊断，install建立完整 profile，业务命令在 daemon stopped 时自动拉起 Runtime；这些本地职责不形成数据库旁路。
-- **client ↔ `kgosd` 使用 HTTP，标准安装推荐绑定本机 loopback。** configurable host / port、Web hosting、`KG_HOME`、single-token Bearer authentication 与 credential 边界由 [本地运行时](runtime.md)唯一负责；所有 API 调用都必须认证。v1 不再建立独立 daemon-control HTTP namespace。
+- **v1 不提供 Full-text / Embedding 配置版本管理或迁移。** “初始化后禁止修改”是 Instance init 合同，不通过 fingerprint、历史配置副本、修改检测或启动拒绝来强制；已有索引和历史查询继续使用各自 versioned 配置，KG OS 不自动重写历史或全库重算。
+- **CLI / SDK / 浏览器 Web 消费同一公共合同。** `@kgos/sdk` 是唯一 TypeScript HTTP Client；`@kgos/cli` 与 Web 复用 SDK，不建立第二套产品语义。客户端不直接打开 SQLite、加载 Lithograph 或依赖 `_lithograph_*` 内部状态。CLI额外拥有 `--root`、`doctor / init / Runtime ensure` 与 native Runtime package resolution；这些本地职责不进入 SDK，也不形成数据库旁路。
+- **client ↔ `kgosd` 使用 authenticated HTTP。** 每个显式 Instance Root 最多一个 active daemon；CLI-managed daemon绑定 `127.0.0.1:0`，实际 endpoint由 `kgosd.lock` 发布，token只从同一 root 的 `auth.json` 取得。Instance寻址、Web hosting、single-token Bearer authentication 与 lifecycle由 [本地运行时](runtime.md)唯一负责；v1 不建立公开 daemon-control namespace。
 
-[D65](decisions.md#d65-go-runtime) 替换 D63 的服务端/CLI TypeScript 语言决定，但保留“单 daemon + 内置 Web”的交付边界；[D66](decisions.md#d66-lithograph-v030-sql-only) 替换旧 Native query / Core embedding-cache 接入假设。
+[D65](decisions.md#d65-go-runtime) 继续拥有 Go Runtime / Database Host 依据；[D75](decisions.md#d75-typescript-client)把 Client 层重新统一为 TypeScript，[D76](decisions.md#d76-npm-distribution)与[D77](decisions.md#d77-explicit-instance-root)分别冻结 npm 分发和显式 Instance Root；[D66](decisions.md#d66-lithograph-v030-sql-only)继续拥有 SQL-only database integration。
 
 ## Lithograph 边界
 
@@ -158,11 +159,11 @@ State Snapshot Data Semantics
 └── Knowledge   → 世界中实际存在的 Node / Relationship / Property values
 ```
 
-v1 的 runtime target 已冻结：**一个 `KG_HOME` 只拥有一个 Knowledge Base，物理 target 是 `$KG_HOME/kgos.db`；一个 active `kgosd` 只打开这个库。** `KG_HOME` 未设置时默认 `~/.kgosd`。切换 Knowledge Base 等价于切换整个 `KG_HOME` profile，而不是在一个 daemon 内选择 name/alias；因此 v1 不建立 Knowledge Base registry、selector、`--base` 或 `base use`。`KG_HOME`、`config.toml`、`auth.json`、extension artifact cache、lock 与 logs 都是 runtime/profile 状态，不进入 State Snapshot；Provider-owned embedding cache 位于 `$KG_HOME/cache/`（或 operator 显式配置的路径）并与 `kgos.db` 隔离，同样不是 Snapshot 数据。
+v1 的 runtime target 已冻结：**一个显式 Instance Root 只拥有一个 Knowledge Base，物理 target 是 `<root>/kgos.db`；一个 active `kgosd --root <root>` 只打开这个库。** 调用方每次通过 CLI 全局 `--root` 选择 Instance，不存在默认 home profile、current base、Knowledge Base registry、selector、`--base` 或 `base use`。root 下的 `config.toml`、`auth.json`、extension artifact cache、lock 与 logs 都是 runtime/instance 状态，不进入 State Snapshot；Provider-owned embedding cache位于root-local cache（或 Instance config显式配置的路径）并与 `kgos.db` 隔离，同样不是 Snapshot 数据。
 
 `config.toml` 文件本身不属于 State Snapshot。Full-text analyzer 与 Semantic provider/config/dimensions/similarity 则由 Lithograph 正常保存为 versioned IndexDefinition；KG OS 不在 State Data 或 reserved metadata 里再存一份运行配置。正文与索引定义随 State 演进，生成的 embedding 与 cache 不随 Commit 演进。
 
-`[fulltext]` / `[embedding]` 在安装时被明确标为初始化后禁止修改；KG OS 不保存初始化副本来比较当前文件，也不自动修复、迁移或拒绝人工修改后的配置。后续查询始终使用所选 State 中实际保存的 IndexDefinition；数据库不快照外部模型或扩展资源。
+`[fulltext]` / `[embedding]` 在 Instance `init` 时被明确标为初始化后禁止修改；KG OS 不保存初始化副本来比较当前文件，也不自动修复、迁移或拒绝人工修改后的配置。后续查询始终使用所选 State 中实际保存的 IndexDefinition；数据库不快照外部模型或扩展资源。
 
 Ontology 与 Knowledge 仍是 KG OS 的核心产品语义和数据责任，但**不是另外两套平行公共 CRUD API**。一个 State Snapshot 内也不存在 Object、Graph、Evolution、Ontology、Knowledge 五份数据；Object / Graph 是访问同一 Ontology / Knowledge Snapshot 的公共能力，Evolution 管理 Snapshot 的版本演进。当前存储模型是：
 

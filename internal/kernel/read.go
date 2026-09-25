@@ -81,13 +81,7 @@ func (service *Service) ReadOntology(ctx context.Context, request OntologyReadRe
 		case KindDomain:
 			item, err = renderDomain(snapshot, ref, limit, request.Cursor)
 		case KindNodeDefinition, KindRelationshipDefinition:
-			if request.Cursor != "" {
-				err = publicError(CodeInvalidArgument, "Definition read does not accept cursor", nil)
-			} else {
-				item, err = renderDefinition(snapshot, ref)
-			}
-		default:
-			err = publicError(CodeInvalidArgument, "invalid Ontology Ref kind", nil)
+			item, err = renderDefinition(snapshot, ref)
 		}
 		if err != nil {
 			return OntologyReadResult{}, err
@@ -203,6 +197,45 @@ func (service *Service) ReadObjects(ctx context.Context, request ObjectReadReque
 		return ObjectReadResult{}, publicError(CodeResource, "Object read result exceeds response resource limit", nil)
 	}
 	return result, nil
+}
+
+func (service *Service) ReadObjectTexts(
+	ctx context.Context,
+	request ObjectReadRequest,
+) (ObjectTextReadResult, error) {
+	result, err := service.ReadObjects(ctx, request)
+	if err != nil {
+		return ObjectTextReadResult{}, err
+	}
+	text := ObjectTextReadResult{
+		State:   result.State,
+		Results: make([]ObjectTextReadItem, 0, len(result.Results)),
+	}
+	totalBytes := 0
+	for _, item := range result.Results {
+		value, parseErr := ParseObjectJSON(item.Kind, item.Value)
+		if parseErr != nil {
+			return ObjectTextReadResult{}, parseErr
+		}
+		body, renderErr := RenderObjectYAML(value)
+		if renderErr != nil {
+			return ObjectTextReadResult{}, renderErr
+		}
+		totalBytes += len(body)
+		if totalBytes > maxReadBytes {
+			return ObjectTextReadResult{}, publicError(
+				CodeResource,
+				"Object text read result exceeds response resource limit",
+				nil,
+			)
+		}
+		text.Results = append(text.Results, ObjectTextReadItem{
+			Kind: item.Kind,
+			Ref:  item.Ref,
+			Body: string(body),
+		})
+	}
+	return text, nil
 }
 
 func (service *Service) readKnowledgeObject(ctx context.Context, state string, ref ObjectRef) (ObjectValue, error) {

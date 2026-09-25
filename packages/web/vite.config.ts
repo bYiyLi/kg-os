@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+const devEndpoint = process.env["KGOS_DEV_ENDPOINT"];
+
 export default defineConfig({
   build: {
     emptyOutDir: true,
@@ -18,8 +20,6 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 5173,
-    proxy: {
-      "/api": "http://127.0.0.1:4765"
-    }
+    ...(devEndpoint === undefined ? {} : { proxy: { "/api": devEndpoint } })
   }
 });

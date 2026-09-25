@@ -19,7 +19,7 @@ func TestRuntimeOpenLockResolverCredentialAndReopen(t *testing.T) {
 	home := t.TempDir()
 	writeIntegrationConfig(t, home, "")
 
-	first, err := Open(context.Background(), home, nil)
+	first, err := openIntegrationRuntime(context.Background(), home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestRuntimeOpenLockResolverCredentialAndReopen(t *testing.T) {
 		}
 	}
 
-	second, err := Open(context.Background(), home, nil)
+	second, err := openIntegrationRuntime(context.Background(), home)
 	if second != nil {
 		_ = second.Close()
 	}
@@ -57,7 +57,7 @@ func TestRuntimeOpenLockResolverCredentialAndReopen(t *testing.T) {
 		t.Fatalf("second runtime open error = %v", err)
 	}
 
-	const endpoint = "http://127.0.0.1:4765"
+	const endpoint = "http://127.0.0.1:51423"
 	if err := first.PublishEndpoint(endpoint); err != nil {
 		t.Fatalf("publish endpoint: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestRuntimeOpenLockResolverCredentialAndReopen(t *testing.T) {
 		t.Fatalf("close runtime twice: %v", err)
 	}
 
-	reopened, err := Open(context.Background(), home, nil)
+	reopened, err := openIntegrationRuntime(context.Background(), home)
 	if err != nil {
 		t.Fatalf("reopen runtime: %v", err)
 	}
@@ -90,10 +90,10 @@ func TestRuntimeOpenLockResolverCredentialAndReopen(t *testing.T) {
 
 func TestRuntimeStartupFailureReleasesLock(t *testing.T) {
 	home := t.TempDir()
-	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("[server]\nport = 0\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("[cache]\npath = \"cache/x.db\"\n"), 0o600); err != nil {
 		t.Fatalf("write invalid config: %v", err)
 	}
-	opened, err := Open(context.Background(), home, nil)
+	opened, err := openIntegrationRuntime(context.Background(), home)
 	if opened != nil {
 		_ = opened.Close()
 	}
@@ -120,7 +120,7 @@ func TestRuntimeStartupFailuresAfterConfigReleaseLock(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte("{"), 0o600); err != nil {
 			t.Fatalf("write malformed auth.json: %v", err)
 		}
-		opened, err := Open(context.Background(), home, nil)
+		opened, err := openIntegrationRuntime(context.Background(), home)
 		if opened != nil {
 			_ = opened.Close()
 		}
@@ -138,7 +138,7 @@ func TestRuntimeStartupFailuresAfterConfigReleaseLock(t *testing.T) {
 		}
 		cachePath := filepath.Join(blocking, "provider.db")
 		writeIntegrationConfig(t, home, cachePath)
-		opened, err := Open(context.Background(), home, nil)
+		opened, err := openIntegrationRuntime(context.Background(), home)
 		if opened != nil {
 			_ = opened.Close()
 		}
@@ -156,13 +156,14 @@ func TestRuntimeStartupFailuresAfterConfigReleaseLock(t *testing.T) {
 			t.Fatalf("read config.toml: %v", err)
 		}
 		missing := filepath.Join(t.TempDir(), "missing-extension.dylib")
-		mainLibrary := os.Getenv("KGOS_LITHOGRAPH_LIBRARY")
-		mainLibrary, _ = filepath.Abs(mainLibrary)
-		body = []byte(strings.Replace(string(body), strconv.Quote(mainLibrary), strconv.Quote(missing), 1))
+		body = append(body, []byte(
+			"\n[[sqlite.extensions]]\nsource = "+strconv.Quote(missing)+
+				"\nentrypoint = \"sqlite3_fixture_init\"\n",
+		)...)
 		if err := os.WriteFile(filepath.Join(home, "config.toml"), body, 0o600); err != nil {
 			t.Fatalf("rewrite config.toml: %v", err)
 		}
-		opened, err := Open(context.Background(), home, nil)
+		opened, err := openIntegrationRuntime(context.Background(), home)
 		if opened != nil {
 			_ = opened.Close()
 		}
@@ -192,7 +193,7 @@ func TestRuntimeCreatesExternalProviderCacheParentWithoutCreatingCacheDatabase(t
 	home := t.TempDir()
 	external := filepath.Join(t.TempDir(), "nested", "provider", "cache.db")
 	writeIntegrationConfig(t, home, external)
-	opened, err := Open(context.Background(), home, nil)
+	opened, err := openIntegrationRuntime(context.Background(), home)
 	if err != nil {
 		t.Fatalf("open runtime with external cache path: %v", err)
 	}
@@ -210,27 +211,29 @@ func TestRuntimeCreatesExternalProviderCacheParentWithoutCreatingCacheDatabase(t
 
 func writeIntegrationConfig(t *testing.T, home string, cachePath string) {
 	t.Helper()
-	mainLibrary := os.Getenv("KGOS_LITHOGRAPH_LIBRARY")
-	providerLibrary := os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY")
-	if mainLibrary == "" || providerLibrary == "" {
-		t.Fatal("KGOS_LITHOGRAPH_LIBRARY and KGOS_LITHOGRAPH_PROVIDER_LIBRARY are required")
-	}
-	mainLibrary, _ = filepath.Abs(mainLibrary)
-	providerLibrary, _ = filepath.Abs(providerLibrary)
 	if cachePath == "" {
 		cachePath = "cache/openai-compatible.db"
 	}
 	cache := "[cache]\npath = " + strconv.Quote(cachePath) + "\nmax_size_mb = 16\n\n"
-	body := "[server]\nhost = \"127.0.0.1\"\nport = 4765\n\n" +
-		cache +
-		"[[sqlite.extensions]]\nsource = " + strconv.Quote(mainLibrary) + "\n" +
-		"entrypoint = \"sqlite3_lithograph_init\"\n\n" +
-		"[[sqlite.extensions]]\nsource = " + strconv.Quote(providerLibrary) + "\n" +
-		"entrypoint = \"sqlite3_lithographopenaicompatible_init\"\n\n" +
+	body := cache +
 		"[fulltext]\nanalyzer = \"unicode61\"\n\n" +
 		"[embedding]\nbase_url = \"https://example.invalid/v1\"\n" +
 		"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n"
 	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(body), 0o600); err != nil {
 		t.Fatalf("write config.toml: %v", err)
 	}
+}
+
+func openIntegrationRuntime(ctx context.Context, root string) (*Runtime, error) {
+	mainLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_LIBRARY"))
+	providerLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY"))
+	return OpenWithOfficialExtensions(
+		ctx,
+		root,
+		[]runtimeprofile.ExtensionConfig{
+			{Source: mainLibrary, Entrypoint: runtimeprofile.LithographEntrypoint},
+			{Source: providerLibrary, Entrypoint: runtimeprofile.ProviderEntrypoint},
+		},
+		nil,
+	)
 }

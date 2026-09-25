@@ -2,9 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "KG OS: prepare runtime",
+      "label": "KG OS: build",
       "type": "shell",
-      "command": "node scripts/runtime-profile.mjs",
+      "command": "pnpm build",
       "problemMatcher": []
     },
     {

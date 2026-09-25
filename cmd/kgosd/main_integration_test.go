@@ -5,100 +5,145 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"net"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
+	"runtime"
 	"testing"
 	"time"
+
+	"github.com/bYiyLi/kg-os/internal/buildinfo"
 )
 
-func TestRunStartsRealRuntimeAndStopsOnContext(t *testing.T) {
-	home := t.TempDir()
-	port := freeMainPort(t)
-	writeMainIntegrationConfig(t, home, port)
-	t.Setenv("KG_HOME", home)
-
+func TestRunStartsPackagedRuntimeAndStopsOnContextCancellation(t *testing.T) {
+	prepareKGOSDTestRuntimePackage(t)
+	root := t.TempDir()
+	writeKGOSDIntegrationConfig(t, root)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
 	done := make(chan int, 1)
+	var stderr bytes.Buffer
 	go func() {
-		done <- run(ctx, nil, &stdout, &stderr)
+		done <- run(ctx, []string{"--root", root}, nil, &stderr)
 	}()
 
-	address := fmt.Sprintf("127.0.0.1:%d", port)
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		select {
-		case code := <-done:
-			t.Fatalf("kgosd exited before listening: code=%d stderr=%q", code, stderr.String())
-		default:
-		}
-		connection, err := net.DialTimeout("tcp4", address, 50*time.Millisecond)
-		if err == nil {
-			_ = connection.Close()
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("kgosd did not begin listening: %v", err)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	waitForKGOSDLocator(t, root)
 	cancel()
-
-	var code int
 	select {
-	case code = <-done:
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("run exit code = %d, stderr = %q", code, stderr.String())
+		}
 	case <-time.After(10 * time.Second):
-		t.Fatal("kgosd did not stop after context cancellation")
-	}
-	if code != 0 {
-		t.Fatalf("exit code = %d stderr=%q", code, stderr.String())
-	}
-	if !strings.Contains(stdout.String(), fmt.Sprintf("http://127.0.0.1:%d", port)) {
-		t.Fatalf("stdout = %q", stdout.String())
+		t.Fatal("kgosd run did not stop after cancellation")
 	}
 }
 
-func freeMainPort(t *testing.T) int {
+func prepareKGOSDTestRuntimePackage(t *testing.T) {
 	t.Helper()
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	executable, err := os.Executable()
 	if err != nil {
-		t.Fatalf("allocate port: %v", err)
+		t.Fatal(err)
 	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	if err := listener.Close(); err != nil {
-		t.Fatalf("release port: %v", err)
+	packageRoot := filepath.Dir(executable)
+	suffix := ".so"
+	if runtime.GOOS == "darwin" {
+		suffix = ".dylib"
 	}
-	return port
+	daemon := filepath.Join(packageRoot, "kgosd")
+	extensions := filepath.Join(packageRoot, "extensions")
+	manifestPath := filepath.Join(packageRoot, "manifest.json")
+	if err := os.MkdirAll(extensions, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Remove(daemon)
+		_ = os.Remove(manifestPath)
+		_ = os.RemoveAll(extensions)
+	})
+	if err := os.WriteFile(daemon, []byte("kgosd test runtime"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	files := []struct {
+		source string
+		target string
+	}{
+		{
+			source: os.Getenv("KGOS_LITHOGRAPH_LIBRARY"),
+			target: filepath.Join(extensions, "lithograph"+suffix),
+		},
+		{
+			source: os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY"),
+			target: filepath.Join(extensions, "lithograph-openai-compatible"+suffix),
+		},
+	}
+	for _, file := range files {
+		body, err := os.ReadFile(file.source)
+		if err != nil {
+			t.Fatalf("read native fixture %q: %v", file.source, err)
+		}
+		if err := os.WriteFile(file.target, body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		arch = "x64"
+	}
+	manifestFiles := make([]map[string]string, 0, 3)
+	for _, path := range []string{daemon, files[0].target, files[1].target} {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		relative, err := filepath.Rel(packageRoot, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		digest := sha256.Sum256(body)
+		manifestFiles = append(manifestFiles, map[string]string{
+			"file": filepath.ToSlash(relative), "sha256": hex.EncodeToString(digest[:]),
+		})
+	}
+	manifest := map[string]any{
+		"arch": arch, "files": manifestFiles, "platform": runtime.GOOS, "version": buildinfo.Version,
+	}
+	body, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, append(body, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
-func writeMainIntegrationConfig(t *testing.T, home string, port int) {
+func writeKGOSDIntegrationConfig(t *testing.T, root string) {
 	t.Helper()
-	mainLibrary := os.Getenv("KGOS_LITHOGRAPH_LIBRARY")
-	providerLibrary := os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY")
-	if mainLibrary == "" || providerLibrary == "" {
-		t.Fatal("Lithograph integration libraries are required")
+	body := "[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n" +
+		"[fulltext]\nanalyzer = \"unicode61\"\n\n" +
+		"[embedding]\nbase_url = \"https://example.invalid/v1\"\n" +
+		"model = \"kgosd-integration\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n"
+	if err := os.WriteFile(filepath.Join(root, "config.toml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	mainLibrary, _ = filepath.Abs(mainLibrary)
-	providerLibrary, _ = filepath.Abs(providerLibrary)
-	body := fmt.Sprintf(
-		"[server]\nhost = \"127.0.0.1\"\nport = %d\n\n"+
-			"[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n"+
-			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithograph_init\"\n\n"+
-			"[[sqlite.extensions]]\nsource = %s\nentrypoint = \"sqlite3_lithographopenaicompatible_init\"\n\n"+
-			"[fulltext]\nanalyzer = \"unicode61\"\n\n"+
-			"[embedding]\nbase_url = \"https://example.invalid/v1\"\n"+
-			"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n",
-		port,
-		strconv.Quote(mainLibrary),
-		strconv.Quote(providerLibrary),
-	)
-	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(body), 0o600); err != nil {
-		t.Fatalf("write config.toml: %v", err)
+}
+
+func waitForKGOSDLocator(t *testing.T, root string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		body, err := os.ReadFile(filepath.Join(root, "kgosd.lock"))
+		if err == nil {
+			var locator map[string]any
+			if json.Unmarshal(body, &locator) == nil {
+				if endpoint, ok := locator["endpoint"].(string); ok && endpoint != "" {
+					return
+				}
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
+	t.Fatal("kgosd did not publish a Runtime locator")
 }

@@ -70,3 +70,76 @@ jobs:
             playwright-report
             test-results
           retention-days: 7
+
+  native-runtime:
+    name: Native Runtime / ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin-arm64
+          - runner: macos-15-intel
+            target: darwin-x64
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+          - runner: ubuntu-24.04
+            target: linux-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.34.5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          cache: pnpm
+          node-version-file: .node-version
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          cache-dependency-path: go.sum
+          go-version: 1.27.1
+
+      - name: Install Linux CGO toolchain
+        if: startsWith(matrix.target, 'linux-')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc
+
+      - name: Verify native target
+        run: |
+          go version
+          cc --version
+          test "$(go env GOVERSION)" = "go1.27.1"
+          test "$(node -p "process.platform + '-' + process.arch")" = "${{ matrix.target }}"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build current Runtime package
+        run: pnpm build
+
+      - name: Run native Lithograph suite
+        run: pnpm test:native
+
+      - name: Pack and smoke-test npm candidates
+        run: pnpm pack:release
+
+      - name: Upload npm candidates
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-candidates-${{ matrix.target }}
+          path: artifacts/release/*.tgz
+          if-no-files-found: error
+          retention-days: 7

@@ -1,11 +1,13 @@
 {
   "name": "@kgos/sdk",
   "version": "0.0.0",
-  "private": true,
-  "description": "KG OS TypeScript SDK boundary",
+  "description": "KG OS TypeScript SDK",
   "license": "AGPL-3.0-only",
   "type": "module",
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],

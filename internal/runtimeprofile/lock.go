@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	ErrLocked         = errors.New("KG_HOME is already owned by another kgosd")
-	ErrNoActiveDaemon = errors.New("KG_HOME has no active kgosd")
+	ErrLocked         = errors.New("instance root is already owned by another kgosd")
+	ErrNoActiveDaemon = errors.New("instance root has no active kgosd")
 )
 
 const daemonEndpointProbeTimeout = 250 * time.Millisecond
@@ -25,8 +25,10 @@ type InstanceLock struct {
 	closed bool
 }
 
-type lockRecord struct {
-	Endpoint string `json:"endpoint"`
+type Locator struct {
+	PID      int    `json:"pid"`
+	Endpoint string `json:"endpoint,omitempty"`
+	Version  string `json:"version"`
 }
 
 type DaemonState string
@@ -40,7 +42,9 @@ const (
 
 type DaemonStatus struct {
 	State    DaemonState
+	PID      int
 	Endpoint string
+	Version  string
 	Err      error
 }
 
@@ -64,11 +68,25 @@ func AcquireLock(path string) (*InstanceLock, error) {
 	return lock, nil
 }
 
-func (lock *InstanceLock) PublishEndpoint(endpoint string) error {
-	if endpoint == "" {
-		return fmt.Errorf("endpoint must be non-empty")
+func (lock *InstanceLock) PublishStarting(pid int, version string) error {
+	if pid <= 0 || version == "" {
+		return fmt.Errorf("daemon pid and version must be present")
 	}
-	body, err := json.Marshal(lockRecord{Endpoint: endpoint})
+	return lock.publish(Locator{PID: pid, Version: version})
+}
+
+func (lock *InstanceLock) PublishRunning(pid int, endpoint, version string) error {
+	if pid <= 0 || endpoint == "" || version == "" {
+		return fmt.Errorf("daemon pid, endpoint, and version must be present")
+	}
+	if err := validateDaemonEndpoint(endpoint); err != nil {
+		return err
+	}
+	return lock.publish(Locator{PID: pid, Endpoint: endpoint, Version: version})
+}
+
+func (lock *InstanceLock) publish(locator Locator) error {
+	body, err := json.Marshal(locator)
 	if err != nil {
 		return fmt.Errorf("encode kgosd.lock: %w", err)
 	}
@@ -87,14 +105,14 @@ func (lock *InstanceLock) Endpoint() (string, error) {
 	}
 	decoder := json.NewDecoder(lock.file)
 	decoder.DisallowUnknownFields()
-	var record lockRecord
-	if err := decoder.Decode(&record); err != nil {
+	var locator Locator
+	if err := decoder.Decode(&locator); err != nil {
 		return "", fmt.Errorf("decode kgosd.lock: %w", err)
 	}
-	if record.Endpoint == "" {
+	if locator.Endpoint == "" {
 		return "", fmt.Errorf("kgosd.lock endpoint is empty")
 	}
-	return record.Endpoint, nil
+	return locator.Endpoint, nil
 }
 
 func ReadActiveEndpoint(path string) (string, error) {
@@ -134,8 +152,8 @@ func InspectDaemon(path string) DaemonStatus {
 	}
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
-	var record lockRecord
-	if err := decoder.Decode(&record); err != nil {
+	var locator Locator
+	if err := decoder.Decode(&locator); err != nil {
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return DaemonStatus{State: DaemonStarting}
 		}
@@ -144,8 +162,8 @@ func InspectDaemon(path string) DaemonStatus {
 			Err:   fmt.Errorf("decode active kgosd.lock: %w", err),
 		}
 	}
-	if record.Endpoint == "" {
-		return DaemonStatus{State: DaemonStarting}
+	if locator.PID <= 0 || locator.Version == "" {
+		return DaemonStatus{State: DaemonUnavailable, Err: fmt.Errorf("active kgosd.lock has invalid pid/version")}
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
@@ -154,26 +172,47 @@ func InspectDaemon(path string) DaemonStatus {
 			Err:   fmt.Errorf("active kgosd.lock must contain exactly one JSON object"),
 		}
 	}
-	if err := probeDaemonEndpoint(record.Endpoint); err != nil {
+	if locator.Endpoint == "" {
+		return DaemonStatus{State: DaemonStarting, PID: locator.PID, Version: locator.Version}
+	}
+	if err := probeDaemonEndpoint(locator.Endpoint); err != nil {
 		return DaemonStatus{
 			State:    DaemonUnavailable,
-			Endpoint: record.Endpoint,
+			PID:      locator.PID,
+			Endpoint: locator.Endpoint,
+			Version:  locator.Version,
 			Err:      err,
 		}
 	}
-	return DaemonStatus{State: DaemonRunning, Endpoint: record.Endpoint}
+	return DaemonStatus{
+		State: DaemonRunning, PID: locator.PID, Endpoint: locator.Endpoint, Version: locator.Version,
+	}
 }
 
 func probeDaemonEndpoint(endpoint string) error {
-	parsed, err := url.Parse(endpoint)
-	if err != nil || parsed.Scheme != "http" || parsed.Host == "" {
-		return fmt.Errorf("active kgosd endpoint is invalid")
+	if err := validateDaemonEndpoint(endpoint); err != nil {
+		return err
 	}
+	parsed, _ := url.Parse(endpoint)
 	connection, err := net.DialTimeout("tcp4", parsed.Host, daemonEndpointProbeTimeout)
 	if err != nil {
 		return fmt.Errorf("connect active kgosd endpoint: %w", err)
 	}
 	return connection.Close()
+}
+
+func validateDaemonEndpoint(endpoint string) error {
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Scheme != "http" || parsed.Host == "" ||
+		parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") ||
+		parsed.RawQuery != "" || parsed.Fragment != "" {
+		return fmt.Errorf("active kgosd endpoint is invalid")
+	}
+	ip := net.ParseIP(parsed.Hostname())
+	if ip == nil || !ip.IsLoopback() {
+		return fmt.Errorf("active kgosd endpoint must use loopback")
+	}
+	return nil
 }
 
 func (lock *InstanceLock) replace(body []byte) error {

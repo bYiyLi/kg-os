@@ -2,7 +2,7 @@
 
 本文件记录 KG OS 架构决策的**决定、依据、备选、取舍与被替换基线**。具体运行行为仍由对应职责设计文件拥有；本文件不建立第二份操作合同。
 
-2026-09-21 的当前运行架构由 [D65 Go runtime](#d65-go-runtime) 与 [D66 Lithograph v0.3.0 SQL-only](#d66-lithograph-v030-sql-only)定义；[D63](#d63-typescript-integrated-web) / [D64](#d64-phase0-development-environment) 保留 TypeScript 工程基线及历史完成证据，但其被 D65/D66 调整的部分不再作为当前合同。此前 D59–D62 与更早条目继续保留仍未被后续决定替换的产品语义。
+当前运行架构由 [D65 Go runtime](#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](#d66-lithograph-v030-sql-only) 与 2026-09-24 新增的 [D75 TypeScript Client](#d75-typescript-client)、[D76 npm distribution](#d76-npm-distribution)、[D77 explicit Instance Root](#d77-explicit-instance-root) 共同定义：Go 保留 daemon / Kernel / Database Host，Client 统一 TypeScript，npm/npx 负责分发，Instance 由显式 root 定位。早期 D44/D45/D51/D54/D55/D63/D72 等被后续决定替换的部分只保留历史依据。
 
 ## 底层架构替换背景
 
@@ -18,17 +18,17 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 → SQLite
 ```
 
-当前基线（含 D65 / D66 的语言、SQL execution 与 Provider cache 调整）：
+当前目标基线（含 D65 / D66 与 D75–D77）：
 
 ```text
-kg CLI (Go) / SDK (TypeScript) / Browser / Skill
-→ kgosd (Go，内置 Web + HTTP API + Kernel)
+@kgos/cli / @kgos/sdk / Browser / Skill (TypeScript)
+→ kgosd (Go，--root + 内置 Web + HTTP API + Kernel)
 → Object / Graph / Evolution + Ontology / Knowledge semantics
 → Lithograph public capabilities
 → SQLite
 ```
 
-底层替换保留 KG OS 的产品核心：AI-first、Graph-first、调用方定义领域模型、Agent 在 Kernel 外部，以及“一切皆可被定义”。通用数据库能力回归 Lithograph，KG OS 聚焦知识库语义、编排与交互。`kgosd` 本地 daemon 的职责边界继续保留；服务端与 CLI 当前由 D65 冻结为 Go，SDK / Web 保留 TypeScript；Web 与 API 继续由同一 daemon 交付和运行。
+底层替换保留 KG OS 的产品核心：AI-first、Graph-first、调用方定义领域模型、Agent 在 Kernel 外部，以及“一切皆可被定义”。通用数据库能力回归 Lithograph，KG OS 聚焦知识库语义、编排与交互。`kgosd` 本地 daemon 的职责边界继续保留；D75 只替换 D65 的 CLI 语言部分，Go Runtime / Kernel / SQLite Host 继续有效；Web 与 API 继续由同一 daemon 交付和运行。
 
 本次 Ontology 交互基线修正见 D46；以下决定为修正后的当前结论，不将早期讨论中的提案自动视为已确认行为。
 
@@ -354,6 +354,8 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D44 `kgosd` 使用可配置 HTTP bind 与 `~/.kgosd/` 本地运行目录
 
+> 后续调整：[D54](#d54-kg-home) / [D55](#d55-single-token-auth) 曾分别替换固定home与no-auth；[D77](#d77-explicit-instance-root) 进一步删除默认home / `KG_HOME` 与fixed/configured bind，改为显式 Instance Root + CLI-managed `127.0.0.1:0` dynamic endpoint。D44 现在只保留“Web/API 同daemon同origin、HTTP作为client transport”的历史来源。
+
 - 决定：KG OS v1 的 `kg` / SDK / Web 统一通过 `kgosd` 的 IPv4 HTTP 访问 Kernel；`~/.kgosd/config.toml` 同时支持 `server.host` 与 `server.port`，默认分别为 `127.0.0.1` 与 `4765`。`server.host` 是 IPv4 bind address，可以显式配置 LAN address 或 `0.0.0.0`；端口占用时启动失败，不自动切换随机端口。`kgosd` 同时提供 Web 与 API，使 Browser 使用同 origin。daemon home 固定为 `~/.kgosd/`，职责分为 `config.toml`、`kgosd.lock`、`logs/` 与 `data/`。v1 不定义 token、API key、登录或其它 authentication / authorization。
 - 依据：默认 loopback 满足本机使用；`host` 配置允许用户明确选择其它 bind address，而不需要新增第二套 daemon/runtime 模式。Web 是正式 Human-facing interface，需要稳定的 configured origin；CLI/SDK/Web 共用 HTTP 可以避免 Unix socket、Named Pipe、gRPC 与 Web transport 多套实现。一个明确 daemon home 让配置、当前运行状态、日志和持久 runtime data 有统一可发现位置。用户明确选择 v1 不引入 token/auth。
 - 备选：每次启动随机端口 + runtime descriptor；CLI 使用 Unix Domain Socket、Web 另走 HTTP；gRPC；把配置/运行状态分散到各平台 config/data/run 目录；本地 token authentication。
@@ -361,6 +363,8 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 - 后续替换：D54 将固定 `~/.kgosd/` 收敛为可通过 `KG_HOME` 选择的单 profile/单 Knowledge Base target，并关闭 `data/` layout gap；D55 用 persistent single-token authentication 取代本条的 no-auth 决定。D44 其余 HTTP bind、固定端口失败与 same-origin Web/API 规则继续有效。
 
 ### D45 `kgosd` lifecycle 使用 startup-only config、OS file lock 与显式 CLI 控制
+
+> 后续调整：[D72](#d72-local-install-runtime-onboarding) 已删除公开 daemon-control CLI并改为业务命令auto-start；[D77](#d77-explicit-instance-root) 又把lock作用域改为显式root，并允许locator发布 `pid/endpoint/version`。下文显式start/status/stop/restart、lock不保存PID/version与fixed configured endpoint的描述只保留历史依据。
 
 - 决定：`kgosd` 是 foreground server，不 self-daemonize。每个 `~/.kgosd/` profile 通过 `kgosd.lock` 的 OS-level exclusive lock 保证单实例，并在 active lock 文件中只发布当前本机可连接 endpoint，不保存 PID/version/startedAt。`config.toml` 只在 daemon 启动时读取；运行中修改不 hot reload、不改变 effective config、也不触发自动退出。`kg daemon start/status/stop/restart` 是 v1 明确的 lifecycle commands：start 负责 background spawn 并等待 ready，status 使用 lock ownership + HTTP control 判断真实状态，stop 通过当前 active endpoint graceful shutdown，restart 显式 stop 后重新启动并应用最新 config。普通业务命令从 active lock 解析当前 endpoint，daemon 不存在时失败，绝不隐式 auto-start。
 - 依据：只依赖 `config.toml` 无法在运行中配置已改变后找到旧 daemon；保存完整 `daemon.json` 又复制 endpoint、PID 和可过期状态。OS file lock 天然随进程死亡释放，可以把“实例是否 active”交给 OS，同时只保存解决当前定位问题所需的 endpoint。startup-only config 避免为 host/port 引入 listener hot-reload、partial config write、bind rollback 与隐式 shutdown 复杂度；显式 restart 让配置生效边界可观察。
@@ -414,7 +418,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D51 SQLite Extension 统一由 startup source resolver 装配（2026-09-17）
 
-> 后续调整：[D63](#d63-typescript-integrated-web) 曾将宿主改为 TypeScript / Node.js；[D65](#d65-go-runtime) 现将服务端 / CLI 改为 Go；[D66](#d66-lithograph-v030-sql-only) 进一步删除 application-facing Native query ABI / `sqlite3*` 要求。source resolver、每 connection 加载同一批 immutable artifacts 与 startup-only extension-loading trust boundary 继续有效。为与当前 Go driver 的公开 extension-loading API 保持确定映射，当前 Runtime 已把 `entrypoint` 从本条历史上的 optional 改为 required non-empty；下文 optional entrypoint 与 Native ABI 描述只保留历史依据，不再是当前配置合同。
+> 后续调整：[D63](#d63-typescript-integrated-web) 曾将宿主改为 TypeScript / Node.js；[D65](#d65-go-runtime) 曾将服务端 / CLI 改为 Go；[D75](#d75-typescript-client) 随后只把 Client CLI 迁回 TypeScript而保留Go Runtime；[D66](#d66-lithograph-v030-sql-only) 进一步删除 application-facing Native query ABI / `sqlite3*` 要求；[D76](#d76-npm-distribution) 又把 official Lithograph / Provider source 从 Instance config 移到 platform native Runtime package。source resolver、content-addressed cache、每 connection加载同一批immutable artifacts与startup-only trust boundary继续有效；当前config中的 `[[sqlite.extensions]]` 只表示caller additional extensions，official artifacts先按固定顺序加载。下文“Lithograph也必须由config声明”、optional entrypoint与Native ABI描述只保留历史依据。
 
 - 决定：`~/.kgosd/config.toml` 使用 ordered `[[sqlite.extensions]]` 作为 **唯一 SQLite loadable-extension 配置入口**。Lithograph 自身、第三方 FTS5 tokenizer 与其它 SQLite extension 都使用同一机制；KG OS 不再把 Lithograph shared library 内嵌进 binary、写死安装路径，也不为“全文插件 / 向量插件 / Lithograph 插件”建立多套 loader。每个 entry 只表达 artifact source 与 SQLite load 参数，不声明业务 `kind/capability`；全部加载完成后由 `kgosd` 单独验证 KG OS 必需的 Lithograph public capability。
 - Source contract：`source` 是 absolute local file path 或 absolute HTTPS URL。Remote source 必须配置 artifact SHA-256；local source 可选配置 expected SHA-256，但 resolver 总会计算实际 content hash。Direct `.so/.dylib/.dll` 直接形成 load artifact；`.tar.gz/.zip` 必须用精确 relative `library` 指出 archive 内要加载的 shared library。`entrypoint` optional，省略时使用 SQLite 标准 resolution。数组顺序就是每个 connection 的加载顺序，所有 entry 都是 required；v1 不增加自动发现、plugin registry、可选插件、任意 download headers 或 package dependency solver。
@@ -426,7 +430,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D52 Full-text analyzer 是 kgosd 全局运行配置，Ontology 不暴露分词实现（2026-09-17）
 
-> 后续调整：[D72](#d72-local-install-runtime-onboarding) 保留 Ontology 不暴露 analyzer 与现有 versioned IndexDefinition 语义，但把 `[fulltext].analyzer` 改为 install 时必须显式给出、初始化后禁止修改的配置；不再以缺失 `[fulltext]` 默认 `unicode61`，也不把“修改 runtime analyzer”作为正常用户流程。
+> 后续调整：[D72](#d72-local-install-runtime-onboarding) 保留 Ontology 不暴露 analyzer 与现有 versioned IndexDefinition 语义，并把 `[fulltext].analyzer` 改为初始化时必须显式给出；[D77](#d77-explicit-instance-root) 只把该初始化动作从 `install` 改名为 Instance `init`。下文缺失配置默认值等早期描述只保留历史依据。
 
 - 决定：KG OS v1 的 Ontology Full-text Index 只声明真实 `name/targets/properties` 与 `type: fulltext`；不提供 per-index `analyzer/options/eventually_consistent/tokenizer plugin` 字段。Daemon startup config 的 `[fulltext].analyzer` 决定 KG OS **新建或因业务定义变化重建** Full-text IndexDefinition 时写入的 `fulltext.analyzer`，省略整段默认 `unicode61`；`fulltext.eventually_consistent` 固定为 false。Analyzer 是完整 FTS5 tokenizer specification string，但第三方 tokenizer implementation 由 D51 的 `sqlite.extensions` 在每个 SQLite connection 上提供，KG OS 不根据 analyzer 名称查找/安装插件，也不因配置变化覆盖已有 IndexDefinition。
 - State contract：analyzer 不进入公共 Ontology，也不另存 fulltext-space fingerprint/generation。Lithograph Full-text IndexDefinition 自己正常保存创建时的 analyzer，这是数据库执行所需的 versioned Schema 内容，不是 KG OS runtime config 的第二份副本。已有 Index 不因 restart/config change 自动改写；KG OS 新建或因业务 targets/properties 变化重建 Index 时使用当前 `[fulltext].analyzer`。因此同一 Knowledge Base 的不同历史 State，甚至同一 State 的不同 Full-text Index，都可能来自不同 runtime analyzer；这种差异本身不是 KG OS consistency violation。
@@ -438,7 +442,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D53 Full-text / Embedding 只使用当前 runtime config，v1 不做配置迁移（2026-09-17）
 
-> 后续调整：Embedding 现在由实际 versioned IndexDefinition 保存 provider/config，历史 query 不使用当前 runtime 默认值，见 [D57](#d57-managed-semantic)。[D72](#d72-local-install-runtime-onboarding) 进一步把 Full-text / Embedding 定义为初始化后禁止修改的安装配置，同时继续保持“不保存 fingerprint、不检测修改、不做自动迁移”；下文把配置修改视为正常流程的描述只保留历史依据。
+> 后续调整：Embedding 现在由实际 versioned IndexDefinition 保存 provider/config，历史 query 不使用当前 runtime 默认值，见 [D57](#d57-managed-semantic)。[D72](#d72-local-install-runtime-onboarding) 进一步把 Full-text / Embedding 定义为初始化后禁止修改；[D77](#d77-explicit-instance-root) 把该动作收敛为 Instance `init`。继续保持“不保存 fingerprint、不检测修改、不做自动迁移”；下文把配置修改视为正常流程的描述只保留历史依据。
 
 - 决定：`[fulltext]` 与 `[embedding]` 只属于 `kgosd` startup runtime config。KG OS 不把它们复制、摘要或冻结到 Knowledge Base，不保存 search-space fingerprint/generation，也不在打开已有库时比较“这个 State/Index/Vector 是由哪套 config 生成的”。配置修改后 restart 正常启动并直接使用新值，不返回 config-space mismatch。
 - Full-text：已有 Lithograph Full-text IndexDefinition 保留它创建时 versioned analyzer；当前 `[fulltext].analyzer` 只影响以后由 KG OS 新建或因业务定义变化而重建的 Full-text Index。KG OS 不因为 runtime analyzer 改变批量重建历史 Index。
@@ -448,9 +452,11 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 - 被替换方案：此前讨论过“把配置身份写入 State 并阻止 mismatch”、以及“创建新库后重放完整 Commit DAG 的可恢复全历史迁移”。两者都为当前不存在的配置升级需求引入显著状态机、历史重写和运维复杂度，因此不采用。
 - 取舍：v1 无法防止 operator 把已有 managed vectors 与新的 query embedding 配到不同语义空间，也不会统一历史 Full-text analyzer；这是刻意接受的简化。换取 runtime、State、Evolution 与 daemon lifecycle 都不需要配置版本管理。
 
+<a id="d54-kg-home"></a>
+
 ### D54 `KG_HOME` 是单 runtime profile 与单 Knowledge Base target（2026-09-17）
 
-> 后续调整：单 profile、单 daemon、单 kgos.db 的决定延续；目录中的独立 cache.db 已随 [D57](#d57-managed-semantic) 的缓存责任转移取消。
+> 后续调整：单Instance、单daemon、单 `kgos.db` 的决定延续；目录中的独立cache.db已随[D57](#d57-managed-semantic)取消；[D77](#d77-explicit-instance-root)删除 `KG_HOME`与默认 `~/.kgosd`，改为每次CLI显式 `--root`定位同一组config/auth/lock/db/cache状态。下文环境变量/default profile部分只保留历史依据。
 
 - 决定：KG OS v1 使用环境变量 `KG_HOME` 选择完整 runtime profile；未设置时默认当前 OS 用户 home 下的 `~/.kgosd`。一个 effective `KG_HOME` 同时最多一个 active `kgosd`，并固定只承载 `$KG_HOME/kgos.db` 这一个 Knowledge Base；**不增加 `data/` 中间目录**。profile 根目录同时拥有 `config.toml`、`auth.json`、`kgosd.lock`、`kgos.db`、`cache.db`，以及 `extensions/`、`logs/`；其中 `cache.db` 的 derived cache 语义由 D56 负责。`KG_HOME` 不写入 `config.toml`，因为它负责定位整个 profile。v1 不建立 Knowledge Base name/registry/selector，不提供 `base list/use`、`--base` 或单-daemon多库切换。
 - 授权依据：用户明确决定“`kgosd` 就打开一个库”，并要求默认 home 为 `~/.kgosd`、同时允许通过 `KG_HOME` 指定其它 profile。
@@ -458,9 +464,11 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 - 被替换：D44 中“daemon home 固定 `~/.kgosd`”与“`data/` layout / 单库还是多库待设计”的部分。其它文档或旧决定中出现 `~/.kgosd/...` 时，若没有特指历史方案，现行语义均为 `$KG_HOME/...`，默认 profile 才实际落在 `~/.kgosd`。
 - 取舍：同一进程不能同时服务多个 Knowledge Base，跨库聚合/切换需要多个独立 profile/process；换取 target identity、文件布局、lock、config、credential 与数据 ownership 全部天然一致，不引入额外 registry、selector、命名冲突和跨库 lifecycle。
 
+<a id="d55-single-token-auth"></a>
+
 ### D55 `auth.json` + `KG_TOKEN` 提供持久单 Token 实例认证（2026-09-17）
 
-> 后续调整：[D72](#d72-local-install-runtime-onboarding) 保留 single-token Bearer 服务端认证，但本机 `kg` 改为非空 `KG_TOKEN` 优先、否则读取当前 `$KG_HOME/auth.json`；同时删除普通用户 `kg daemon ...` lifecycle surface。下文 env-only client onboarding 只保留历史依据。
+> 后续调整：[D72](#d72-local-install-runtime-onboarding) 保留 single-token Bearer服务端认证并增加本地auth fallback；[D77](#d77-explicit-instance-root)继续保留每Instance唯一 `auth.json`与Bearer认证，但删除 `KG_TOKEN`和 `KG_HOME`，CLI只读取显式root自己的token并与同root endpoint组合。下文env/profile client onboarding只保留历史依据。
 
 - 决定：每个 `KG_HOME` 有且只有一个 server credential，保存在 `$KG_HOME/auth.json` 的 `token` 字段。首次 daemon startup 缺文件时用 CSPRNG 生成至少 256 bit entropy 的 opaque token并原子写入；后续 restart 复用，不自动 rotate。已有 `auth.json` malformed/unreadable/empty 时 fail closed。v1 不提供 user/password、role/scope、refresh token、OAuth、多 token registry 或 rotation API。
 - Client contract：所有 `kgosd` data/control HTTP request 使用 `Authorization: Bearer <token>`。CLI 只从 `KG_TOKEN` 环境变量取得 credential，不读 `auth.json`、不提供 `--token`；SDK 由调用方显式提供 token；Web 也必须取得相同 token 后访问 API，不存在 credential-free data/control 旁路。`kgosd` 自身 startup，以及当前 profile **没有 active daemon 时**首次/后续 `kg daemon start` 的本地 process spawn，不是 HTTP request，因此可以先创建 server credential；该 local start 以 child 成功取得 lock 并在完成 startup validation + HTTP bind 后发布 endpoint 作为 ready signal，不调用 credential-free health API。一旦 active daemon 存在，`daemon start/status/stop/restart` 的 control HTTP 与其它客户端调用一样必须认证。后续客户端由 operator 把该 secret 放入 `KG_TOKEN` 或其它 SDK/Web 输入。
@@ -586,6 +594,8 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D65 KG OS 服务端与 CLI 改用 Go（2026-09-21）
 
+> 后续调整：[D75](#d75-typescript-client) 保留 Go `kgosd` / Kernel / SQLite Host，但把正式 CLI 迁回 TypeScript 并建立 `@kgos/sdk` 作为客户端公共实现。下文“`kg` CLI 使用 Go”的部分只保留 Phase 00–07 历史依据。
+
 - 决定：`kgosd`、Kernel、SQLite / Lithograph adapter、Object/Ontology projection/compiler、Evolution projection 与 consistency validation 使用 Go；`kg` CLI 同样使用 Go。TypeScript / npm 继续用于 SDK 与浏览器 Web；Web 构建产物仍随 `kgosd` 一起交付，由同一 daemon、同一 configured host/port 提供页面、静态资源与 API/control。
 - 服务端基线：优先使用 Go 标准库，HTTP 使用 `net/http`，SQLite host 使用 `database/sql` + `github.com/mattn/go-sqlite3`。KG OS 使用 driver 自带的 bundled SQLite amalgamation，不使用 `libsqlite3` 系统库；构建必须启用 `sqlite_fts5`，且不得启用 `sqlite_omit_load_extension`。SQLite driver 必须支持同 connection ordered loadable extension、`context.Context` cancellation、真实 `sqlite3_interrupt()` 路径、只读 / 读写连接和 CGO native build；不再为 SQLite 自建 Node worker/child-process IPC、FFI shim 或第二套 private SQLite runtime。
 - 客户端边界：SDK / Web 继续消费 HTTP 公共合同，不直接打开 SQLite。Go 服务端与 TypeScript client 不因为语言不同而复制第二套产品语义；公共 request/result/error 合同仍由当前 Design owner 定义，跨语言 wire mapping 通过集成测试保持一致，不为了共享源码引入代码生成或新的 schema registry。
@@ -599,7 +609,7 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D66 KG OS 对齐 Lithograph v0.3.0 SQL-only execution 与 Provider-owned cache（2026-09-21）
 
-> 后续调整：[D72](#d72-local-install-runtime-onboarding) 不改变 Provider-owned cache ownership，但把 KG OS 安装配置改为 cache 始终启用、`path/max_size_mb` 必填显式值；下文 optional path / enabled config 描述只保留 D66 当时的历史依据。
+> 后续调整：[D72](#d72-local-install-runtime-onboarding) 不改变 Provider-owned cache ownership，但把配置改为cache始终启用、`path/max_size_mb`必填；[D77](#d77-explicit-instance-root)把relative cache path基准从 `KG_HOME`替换为显式Instance Root。下文optional path / enabled与 `KG_HOME` path描述只保留D66当时的历史依据。
 
 - 决定：KG OS 的 application-facing Lithograph integration 只使用 SQLite SQL surface：完整结果使用 `lithograph()`，真正流式结果使用 `lithograph_rows()`，校验使用 `lithograph_validate(query)`；多 execution 单 Commit 使用 `lithograph_tx_begin() -> lithograph()/lithograph_rows()* -> lithograph_tx_commit()/abort()`。不再绑定或探测 application-facing Native query ABI，不要求取得 `sqlite3*`，也不存在 `lithograph_tx_execute()`。
 - Graph 映射：`graph query` 使用物理只读 connection，先通过 `lithograph.commit.get(StateRef)` 解析并 pin exact `commit/...`，再以该 commit 作为 `options.at` 执行原始 Cypher；`graph execute` 使用独占读写 connection，在 SQLite autocommit 状态先执行 `lithograph.branch.checkout(requestedBranch)`，随后不附加 `options.branch` 地执行原始 Cypher。这样 Branch / Tag / Merge 等拥有自身 target 的 procedure 不会被 KG OS 无条件 branch option 破坏，也不需要 procedure-name parser / allowlist。streaming 两者都消费 `lithograph_rows()`，非 streaming 使用 `lithograph()`。
@@ -670,6 +680,8 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 
 ### D72 本地安装由 doctor / install 驱动，业务 CLI 自动管理 Runtime（2026-09-23）
 
+> 后续调整：[D76](#d76-npm-distribution) 与 [D77](#d77-explicit-instance-root) 保留“CLI 自动确保 Runtime”和 single-token Bearer 原则，但删除软件安装 / `KG_HOME` / `KG_TOKEN` / fixed endpoint 模型；正式入口改为 npm/npx、`install` 改为 Instance `init`、实例由显式 `--root` 唯一定位。下文旧 onboarding 只保留 Phase 03 历史依据。
+
 - 决定：普通用户的本地入口收敛为 `kg doctor`、`kg install` 与业务命令。v1 不把 `kg daemon start/status/stop/restart` 暴露为普通 CLI surface，也不建立独立 daemon-control HTTP namespace；`kgosd` 继续作为 foreground daemon 与内部 Runtime executable 存在，开发环境或外部 OS service manager 仍可直接管理它。任何需要本地 Runtime 的业务命令先检查当前 `KG_HOME` 的 active lock；`running` 直接使用，`stopped` 时由 CLI 后台拉起 `kgosd` 并等待 endpoint publication，`starting` 时等待 ready，`unavailable` 按明确 lifecycle/transport error 失败。并发 caller 仍由现有 single-instance OS lock 保证最多启动一个 daemon。
 - `doctor`：只观察当前安装与运行条件，不创建或修改 `config.toml`、不下载 artifact、不创建 `auth.json/kgos.db`、不 bootstrap Knowledge Base、不启动 daemon。它检查 effective `KG_HOME`、完整配置、安装 artifact / extension source、所需环境变量、active Runtime 状态和可确定的当前 readiness；`stopped` 是非阻塞状态，因为业务 CLI 会自动拉起。诊断的人类文案支持中英文；机器字段、配置 key 与 error code 保持稳定英文 identifier。
 - `install`：只负责建立当前 `KG_HOME` 的 Runtime profile 与完整 startup configuration，不启动 daemon，也不创建 `kgos.db` 或执行 Knowledge Base bootstrap。所有用户可配置项必须解析成显式值；没有“skip / disable / configure later”的功能模式。命令行已提供的字段直接采用且不再询问；缺失字段在 TTY 中逐项询问，非 TTY 中返回稳定的 missing-key 结果。全部参数已给全时零交互直接 validate + install。推荐值只用于交互提示；用户按 Enter 表示明确采用该值，最终 `config.toml` 仍写出完整字段。KG OS 安装包自带并由 installer 确定的 `kgosd`、Lithograph 与官方 Provider artifact 位置属于 installer-derived 值，不要求用户输入底层 library path / entrypoint。
@@ -705,3 +717,41 @@ kg CLI (Go) / SDK (TypeScript) / Browser / Skill
 - 备选：校验后直接 autocommit `commit.create`（存在 check-then-use 漂移）；用 SQL explicit transaction制造 empty-delta Commit后再 `commit.data.set`（Data与新 State不原子）；修改 Lithograph新增 `commit.create(expectedHead)`（超出KG OS当前任务且改变独立数据库公共合同）。本次均不采用。
 - 取舍：KG OS Host承担一个极窄的 SQLite transaction编排特例；换取不修改 Lithograph v0.3.0 API即可同时保持 D31 parent consistency、empty-delta State与初始 State Data原子性。
 - 当前合同：[Evolution](evolution.md)、[工程映射](implementation.md)、[Phase 06](../development/phases/06-evolution-core.md)。
+
+<a id="d75-typescript-client"></a>
+
+### D75 Client 统一 TypeScript，Go 保留 Runtime / Kernel（2026-09-24）
+
+- 决定：`kgosd`、Kernel、SQLite / Lithograph Host、compiler / projection / consistency 继续使用 Go；正式 Client 层统一使用 TypeScript。新增 publishable `@kgos/sdk` 作为唯一 TypeScript HTTP Client，`@kgos/cli` 基于 SDK 实现 CLI，浏览器 Web 与第三方 TypeScript application 也复用 SDK。Phase 00–07 已完成的 Go `kg` 只作为迁移行为基准，Phase 08 parity 完成后删除，不长期维护双 CLI。
+- SDK 边界：SDK 只接受显式 `endpoint + token`，映射 Ontology / Object / Graph / Evolution 既有 HTTP logical contract；不读取 Instance 文件、不管理 daemon、不解析 npm native package。Node-only `fs/child_process` 等本机职责只属于 CLI。
+- CLI 边界：CLI 拥有 `--root`、doctor/init、stdin/file、presentation/i18n/exit code、native Runtime package resolution、daemon ensure 与本地 credential/endpoint discovery；业务 request/response/streaming transport 通过 SDK，不复制第二套 TypeScript HTTP client。
+- 依据：Go 选型解决的核心问题是 daemon + SQLite/Lithograph Host 的 streaming/cancellation/native lifecycle，而不是 CLI 本身。当前 Phase 00–07 已稳定 HTTP surface，SDK/Web 尚未真正实现；在 npm/npx 成为客户端入口后，让 SDK / CLI / Web 共用 TypeScript Client 可消除 Go CLI client + TS SDK/Web 的重复 transport 实现，同时保留 Go Runtime 的既有优势。
+- 备选：继续 Go CLI，只增加薄 TS npx launcher。该方案迁移成本更低，但仍要求长期维护 Go CLI HTTP client 与 TypeScript SDK 两套客户端实现；当前已确认 SDK 要成为公共 Client，因此不采用。
+- 取舍：需要把已验收 Go CLI 行为完整迁移并重新做 parity / streaming / error / integration 验收；换取 Client 语言边界统一、SDK 可直接服务 CLI/Web/第三方应用，并减少长期重复实现。
+- 当前合同：[Architecture](architecture.md#v1-运行时与技术分层)、[Client](client.md)、[CLI](cli.md)、[Phase 08](../development/phases/08-typescript-client-npm-runtime.md)。
+
+<a id="d76-npm-distribution"></a>
+
+### D76 npm / npx 是正式 Client 分发入口，kgosd 作为平台 native package 交付（2026-09-24）
+
+- 决定：用户不再先下载 native distribution、配置 PATH 或安装 `kg` binary；AI / CI 正式入口固定为 `npx --yes @kgos/cli@<version> ...`，其中 `--yes` 属于 npm 首次 package acquisition 的非交互确认，人类交互可省略。发布单元包括 `@kgos/sdk`、`@kgos/cli` 与 macOS arm64/x64、Linux glibc arm64/x64 四个 `@kgos/runtime-<os>-<arch>` native package。
+- Native package：平台 package 只携带同版本 `kgosd`、Lithograph、OpenAI-compatible Provider 与 manifest，不再携带 native `kg`。CLI 用 exact-version `optionalDependencies` + npm `os/cpu` metadata选择当前平台；Linux package还必须用 `libc` metadata与真实构建目标一致，v1只承诺glibc而不把musl/Alpine自动算作“Linux已支持”。所有package都是预构建artifact，不通过preinstall/install/postinstall下载或选择binary；CLI继续验证 target/version/hash；不支持或optional package缺失的平台fail closed，不即时源码编译或下载任意远端binary。
+- Runtime path：npm / `node_modules` / cache path 只是本次软件分发位置，不进入 Instance `config.toml`、State 或 State Data。daemon 从自身 package取得 official extension并在 startup 固定到 Instance content-addressed extension cache；caller extra extension仍走通用 resolver。
+- 依据：AI-first 调用更适合明确版本的 npx 入口，npm 已负责 package acquisition / version selection；把 native Runtime封装为平台 package可以保留 Go / CGO / Lithograph，同时避免用户手工选择 release archive与维护 PATH。
+- 备选：GitHub Release tarball 作为主要安装入口；npm只提供下载器；把 `kgosd` 复制到每个 Instance Root。前两者增加用户安装步骤，后者把软件与 Instance data耦合并重复 native artifacts，均不采用。
+- 取舍：正式发布需要维护 npm package metadata、四平台 native matrix 与 registry release；还必须在发布时确认有权使用 `@kgos` npm scope。当前设计不把 registry scope ownership 当作已经取得的事实。换取统一 `npx` 使用方式、版本可显式 pin，以及软件分发状态与 Instance data分离。
+- 当前合同：[Client npm package topology](client.md#npm-package-topology)、[Runtime native package](runtime.md#native-runtime-package)、[Phase 08](../development/phases/08-typescript-client-npm-runtime.md)。
+
+<a id="d77-explicit-instance-root"></a>
+
+### D77 Instance 只由显式 --root 定位，每个 root 独立 daemon / endpoint / token（2026-09-24）
+
+- 决定：删除 `KG_HOME`、默认 `~/.kgosd` 与本机 `KG_TOKEN` override。所有 Instance 命令必须显式传 `--root <instance-root>`；`--help` / `--version` 等不访问实例的 discovery 命令例外。root 是 KG OS Instance Root 本身，不是项目目录或软件安装目录。
+- Instance identity：one root = one `config.toml` = one `auth.json` = one `kgos.db` = at most one active `kgosd`。不同 root 可以同时运行不同 daemon process，数据、token、lock、endpoint 与 cache 全部隔离。
+- daemon：`kgosd` 要求显式 `--root`；CLI-managed Runtime 只绑定 `127.0.0.1:0`，由 OS 分配当前端口，Instance config不再保存 server host/port。daemon持有 root 下 `kgosd.lock` 的 OS exclusive lock，并在 ready 后发布当前 `pid/endpoint/version`；lock不保存 secret。
+- 认证：`auth.json` 是该 root 唯一 server credential 真源；本机 CLI只能把同一 root 的 lock endpoint与 auth token组合后创建SDK client。即使 stale lock / port reuse 指向另一 KG OS daemon，随机 per-root token 也必须使请求 `AUTHENTICATION_FAILED`，不得 fallback其它 token/root。
+- onboarding：软件无需 install；原 `kg install` 语义改为 `init`，只创建当前 root 的完整 Instance config / 目录，不启动daemon、不创建auth/db、不bootstrap。第一次业务命令才 auto-start daemon、secure-create auth、创建/打开db、bootstrap并继续原始request。
+- 依据：显式 root让每次AI调用都自带完整Instance context，避免环境变量残留和“当前库”隐藏状态；动态 loopback endpoint允许多个Instance并发运行；token与endpoint同root读取提供连接错实例时的fail-closed边界。
+- 备选：保留 `KGOS_HOME` 默认实例；把 `kgosd` binary复制到root；固定每库port。前者继续引入隐藏上下文，第二项混合软件/数据 lifecycle，第三项造成多Instance端口冲突，均不采用。
+- 取舍：每条本地命令更显式，用户/Agent需要提供root；不同Runtime版本同时面对同一active daemon时必须做版本检查并fail closed，v1不静默kill/upgrade正在运行的daemon。换取Instance identity、credential与runtime discovery完全确定。
+- 当前合同：[Runtime Instance Root](runtime.md#instance-root)、[CLI global root](cli.md#global-root)、[Client](client.md)、[Phase 08](../development/phases/08-typescript-client-npm-runtime.md)。

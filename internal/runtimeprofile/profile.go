@@ -6,10 +6,8 @@ import (
 	"path/filepath"
 )
 
-const defaultDirectoryName = ".kgosd"
-
 type Paths struct {
-	Home          string
+	Root          string
 	Config        string
 	Auth          string
 	Lock          string
@@ -19,24 +17,17 @@ type Paths struct {
 	LogsDir       string
 }
 
-func ResolvePaths(explicitHome string) (Paths, error) {
-	home := explicitHome
-	if home == "" {
-		userHome, err := os.UserHomeDir()
-		if err != nil {
-			return Paths{}, fmt.Errorf("resolve user home: %w", err)
-		}
-		home = filepath.Join(userHome, defaultDirectoryName)
+func ResolvePaths(root string) (Paths, error) {
+	if root == "" {
+		return Paths{}, fmt.Errorf("instance root is required")
 	}
-
-	absolute, err := filepath.Abs(home)
-	if err != nil {
-		return Paths{}, fmt.Errorf("resolve KG_HOME: %w", err)
+	if !filepath.IsAbs(root) {
+		return Paths{}, fmt.Errorf("instance root must be an absolute path")
 	}
-	absolute = filepath.Clean(absolute)
+	absolute := filepath.Clean(root)
 
 	return Paths{
-		Home:          absolute,
+		Root:          absolute,
 		Config:        filepath.Join(absolute, "config.toml"),
 		Auth:          filepath.Join(absolute, "auth.json"),
 		Lock:          filepath.Join(absolute, "kgosd.lock"),
@@ -48,7 +39,7 @@ func ResolvePaths(explicitHome string) (Paths, error) {
 }
 
 func EnsureDirectories(paths Paths) error {
-	for _, path := range []string{paths.Home, paths.CacheDir, paths.ExtensionsDir, paths.LogsDir} {
+	for _, path := range []string{paths.Root, paths.CacheDir, paths.ExtensionsDir, paths.LogsDir} {
 		if err := os.MkdirAll(path, 0o700); err != nil {
 			return fmt.Errorf("create runtime directory %q: %w", path, err)
 		}

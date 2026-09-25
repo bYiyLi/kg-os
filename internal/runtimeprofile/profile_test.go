@@ -11,41 +11,24 @@ import (
 )
 
 func TestResolvePathsAndEnsureDirectories(t *testing.T) {
-	working := t.TempDir()
-	previous, err := os.Getwd()
+	root := filepath.Join(t.TempDir(), "instance")
+	paths, err := ResolvePaths(root)
 	if err != nil {
-		t.Fatalf("get working directory: %v", err)
+		t.Fatalf("resolve explicit Instance Root: %v", err)
 	}
-	if err := os.Chdir(working); err != nil {
-		t.Fatalf("change working directory: %v", err)
+	if paths.Root != root {
+		t.Fatalf("root = %q, want %q", paths.Root, root)
 	}
-	t.Cleanup(func() {
-		if err := os.Chdir(previous); err != nil {
-			t.Errorf("restore working directory: %v", err)
-		}
-	})
-
-	paths, err := ResolvePaths("profile")
-	if err != nil {
-		t.Fatalf("resolve explicit KG_HOME: %v", err)
-	}
-	wantHome, err := filepath.Abs("profile")
-	if err != nil {
-		t.Fatalf("resolve expected home: %v", err)
-	}
-	if paths.Home != wantHome {
-		t.Fatalf("home = %q, want %q", paths.Home, wantHome)
-	}
-	if paths.Config != filepath.Join(wantHome, "config.toml") ||
-		paths.Auth != filepath.Join(wantHome, "auth.json") ||
-		paths.Lock != filepath.Join(wantHome, "kgosd.lock") ||
-		paths.Database != filepath.Join(wantHome, "kgos.db") {
+	if paths.Config != filepath.Join(root, "config.toml") ||
+		paths.Auth != filepath.Join(root, "auth.json") ||
+		paths.Lock != filepath.Join(root, "kgosd.lock") ||
+		paths.Database != filepath.Join(root, "kgos.db") {
 		t.Fatalf("unexpected profile paths: %#v", paths)
 	}
 	if err := EnsureDirectories(paths); err != nil {
 		t.Fatalf("ensure runtime directories: %v", err)
 	}
-	for _, directory := range []string{paths.Home, paths.CacheDir, paths.ExtensionsDir, paths.LogsDir} {
+	for _, directory := range []string{paths.Root, paths.CacheDir, paths.ExtensionsDir, paths.LogsDir} {
 		info, err := os.Stat(directory)
 		if err != nil {
 			t.Fatalf("stat %q: %v", directory, err)
@@ -56,18 +39,11 @@ func TestResolvePathsAndEnsureDirectories(t *testing.T) {
 	}
 }
 
-func TestResolvePathsDefaultHome(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("os.UserHomeDir does not consistently follow HOME on Windows")
-	}
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	paths, err := ResolvePaths("")
-	if err != nil {
-		t.Fatalf("resolve default KG_HOME: %v", err)
-	}
-	if paths.Home != filepath.Join(home, defaultDirectoryName) {
-		t.Fatalf("home = %q", paths.Home)
+func TestResolvePathsRequiresAbsoluteExplicitRoot(t *testing.T) {
+	for _, root := range []string{"", "relative"} {
+		if _, err := ResolvePaths(root); err == nil {
+			t.Fatalf("ResolvePaths(%q) unexpectedly succeeded", root)
+		}
 	}
 }
 
@@ -86,10 +62,7 @@ func TestLoadConfigRequiresExplicitValuesAndMapsSemanticDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	if config.Server.Host != "127.0.0.1" || config.Server.Port != 4765 {
-		t.Fatalf("server = %#v", config.Server)
-	}
-	wantCache := filepath.Join(paths.Home, "cache/openai-compatible.db")
+	wantCache := filepath.Join(paths.Root, "cache/openai-compatible.db")
 	if config.Cache.Path != wantCache || config.Cache.MaxSizeMB != 4096 {
 		t.Fatalf("cache = %#v", config.Cache)
 	}
@@ -117,10 +90,6 @@ func TestLoadConfigExplicitValues(t *testing.T) {
 		t.Fatalf("write extension fixture: %v", err)
 	}
 	configText := strings.Join([]string{
-		"[server]",
-		"host = \"0.0.0.0\"",
-		"port = 9000",
-		"",
 		"[cache]",
 		"path = \"derived/provider.db\"",
 		"max_size_mb = 2",
@@ -148,7 +117,7 @@ func TestLoadConfigExplicitValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	if config.Cache.Path != filepath.Join(paths.Home, "derived/provider.db") {
+	if config.Cache.Path != filepath.Join(paths.Root, "derived/provider.db") {
 		t.Fatalf("cache path = %q", config.Cache.Path)
 	}
 	semantic := config.SemanticDefaults()
@@ -174,9 +143,9 @@ func TestLoadConfigRejectsInvalidInputs(t *testing.T) {
 		wantSubstr string
 	}{
 		{
-			name:       "missing required field",
-			config:     strings.Replace(valid, "host = \"127.0.0.1\"\n", "", 1),
-			wantSubstr: "missing required field server.host",
+			name:       "missing required cache field",
+			config:     strings.Replace(valid, "max_size_mb = 4096\n", "", 1),
+			wantSubstr: "missing required field cache.max_size_mb",
 		},
 		{
 			name:       "removed cache enabled",
@@ -189,19 +158,12 @@ func TestLoadConfigRejectsInvalidInputs(t *testing.T) {
 			wantSubstr: "unknown field",
 		},
 		{
-			name:       "hostname",
-			config:     strings.Replace(valid, "host = \"127.0.0.1\"", "host = \"localhost\"", 1),
-			wantSubstr: "IPv4",
-		},
-		{
-			name:       "invalid port",
-			config:     strings.Replace(valid, "port = 4765", "port = 0", 1),
-			wantSubstr: "server.port",
-		},
-		{
-			name:       "missing extension",
-			config:     completeRuntimeConfig("", ""),
-			wantSubstr: "sqlite.extensions",
+			name: "official extension reserved",
+			config: completeRuntimeConfig(
+				"[[sqlite.extensions]]\nsource = "+quoteTOML(extension)+"\nentrypoint = \""+LithographEntrypoint+"\"",
+				"",
+			),
+			wantSubstr: "official Runtime extensions",
 		},
 		{
 			name:       "cache main collision",
@@ -295,10 +257,6 @@ func TestLoadConfigRejectsInvalidInputs(t *testing.T) {
 
 func completeRuntimeConfig(extensionBlock, suffix string) string {
 	parts := []string{
-		"[server]",
-		"host = \"127.0.0.1\"",
-		"port = 4765",
-		"",
 		"[cache]",
 		"path = \"cache/openai-compatible.db\"",
 		"max_size_mb = 4096",
@@ -412,8 +370,8 @@ func TestInstanceLockLifecycle(t *testing.T) {
 	if _, err := AcquireLock(paths.Lock); !errors.Is(err, ErrLocked) {
 		t.Fatalf("second acquire error = %v", err)
 	}
-	const endpoint = "http://127.0.0.1:4765"
-	if err := lock.PublishEndpoint(endpoint); err != nil {
+	const endpoint = "http://127.0.0.1:51423"
+	if err := lock.PublishRunning(1, endpoint, "0.0.0"); err != nil {
 		t.Fatalf("publish endpoint: %v", err)
 	}
 	gotEndpoint, err := lock.Endpoint()
@@ -429,7 +387,7 @@ func TestInstanceLockLifecycle(t *testing.T) {
 	if err := lock.Close(); err != nil {
 		t.Fatalf("close lock twice: %v", err)
 	}
-	if err := lock.PublishEndpoint(endpoint); !errors.Is(err, os.ErrClosed) {
+	if err := lock.PublishRunning(1, endpoint, "0.0.0"); !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("publish after close error = %v", err)
 	}
 	reacquired, err := AcquireLock(paths.Lock)

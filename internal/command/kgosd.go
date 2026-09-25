@@ -5,12 +5,12 @@ import (
 )
 
 const kgosdHelp = "KG OS daemon\n\n" +
-	"Usage: kgosd\n" +
+	"Usage: kgosd --root <absolute-instance-root>\n" +
 	"       kgosd [--help] [--version]\n\n" +
 	"Options:\n" +
+	"      --root     Absolute KG OS Instance Root\n" +
 	"  -h, --help     Show this help\n" +
-	"  -V, --version  Show the installed version\n\n" +
-	"Runtime configuration is loaded from $KG_HOME/config.toml.\n"
+	"  -V, --version  Show the installed version\n"
 
 type DaemonMode uint8
 
@@ -21,13 +21,11 @@ const (
 
 type DaemonEvaluation struct {
 	Mode   DaemonMode
+	Root   string
 	Result Result
 }
 
 func EvaluateKGOSD(args []string) DaemonEvaluation {
-	if len(args) == 0 {
-		return DaemonEvaluation{Mode: DaemonModeRun}
-	}
 	if containsHelp(args) {
 		return DaemonEvaluation{Mode: DaemonModeResult, Result: Result{Stdout: kgosdHelp}}
 	}
@@ -37,9 +35,11 @@ func EvaluateKGOSD(args []string) DaemonEvaluation {
 			Result: Result{Stdout: buildinfo.Version + "\n"},
 		}
 	}
-
+	if len(args) == 2 && args[0] == "--root" && args[1] != "" {
+		return DaemonEvaluation{Mode: DaemonModeRun, Root: args[1]}
+	}
 	return DaemonEvaluation{
 		Mode:   DaemonModeResult,
-		Result: Result{ExitCode: 2, Stderr: "kgosd: unsupported arguments\n"},
+		Result: Result{ExitCode: 2, Stderr: "kgosd: --root <absolute-instance-root> is required\n"},
 	}
 }

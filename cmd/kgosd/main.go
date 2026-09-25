@@ -21,7 +21,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		_, _ = io.WriteString(stderr, evaluation.Result.Stderr)
 		return evaluation.Result.ExitCode
 	}
-	runtime, err := runtimehost.Open(ctx, os.Getenv("KG_HOME"), nil)
+	runtime, err := runtimehost.Open(ctx, evaluation.Root, nil)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "kgosd: %v\n", err)
 		return 1

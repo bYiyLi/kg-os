@@ -93,6 +93,36 @@ importers:
         specifier: 5.0.1
         version: 5.0.1(@types/node@24.13.6)(@vitest/coverage-v8@5.0.1)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1))
 
+  packages/cli:
+    dependencies:
+      '@kgos/sdk':
+        specifier: workspace:0.0.0
+        version: link:../sdk
+      smol-toml:
+        specifier: 1.8.0
+        version: 1.8.0
+    optionalDependencies:
+      '@kgos/runtime-darwin-arm64':
+        specifier: workspace:0.0.0
+        version: link:../runtime-darwin-arm64
+      '@kgos/runtime-darwin-x64':
+        specifier: workspace:0.0.0
+        version: link:../runtime-darwin-x64
+      '@kgos/runtime-linux-arm64':
+        specifier: workspace:0.0.0
+        version: link:../runtime-linux-arm64
+      '@kgos/runtime-linux-x64':
+        specifier: workspace:0.0.0
+        version: link:../runtime-linux-x64
+
+  packages/runtime-darwin-arm64: {}
+
+  packages/runtime-darwin-x64: {}
+
+  packages/runtime-linux-arm64: {}
+
+  packages/runtime-linux-x64: {}
+
   packages/sdk: {}
 
   packages/web:

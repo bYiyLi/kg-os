@@ -17,8 +17,7 @@ import (
 )
 
 func TestPhase05GraphDaemonShutdownCancelsActiveStream(t *testing.T) {
-	port := freePort(t)
-	runtime := openDaemonRuntime(t, port)
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 	serverCtx, cancelServer := context.WithCancel(context.Background())
 	serveDone := make(chan error, 1)

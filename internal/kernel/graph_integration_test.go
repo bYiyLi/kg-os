@@ -310,7 +310,7 @@ func TestPhase05GraphManagedSemanticPassthrough(t *testing.T) {
 
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
-	runtime, err := runtimehost.Open(context.Background(), home, nil)
+	runtime, err := openKernelIntegrationRuntime(context.Background(), home)
 	if err != nil {
 		t.Fatalf("open Semantic runtime: %v", err)
 	}
@@ -413,7 +413,7 @@ func TestPhase05GraphManagedSemanticPassthrough(t *testing.T) {
 		t.Fatalf("close Semantic runtime: %v", err)
 	}
 	closed = true
-	reopened, err := runtimehost.Open(context.Background(), home, nil)
+	reopened, err := openKernelIntegrationRuntime(context.Background(), home)
 	if err != nil {
 		t.Fatalf("reopen Semantic runtime: %v", err)
 	}
@@ -604,7 +604,7 @@ func openPhase05Runtime(t *testing.T) *runtimehost.Runtime {
 	t.Helper()
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
-	runtime, err := runtimehost.Open(context.Background(), home, nil)
+	runtime, err := openKernelIntegrationRuntime(context.Background(), home)
 	if err != nil {
 		t.Fatalf("open Phase 05 runtime: %v", err)
 	}

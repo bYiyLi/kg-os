@@ -573,7 +573,41 @@ func TestCredentialAndLockFailurePaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("acquire lock: %v", err)
 	}
-	if err := lock.PublishEndpoint(""); err == nil {
+	if err := lock.PublishStarting(0, "0.0.0"); err == nil {
+		t.Fatal("zero pid starting locator was published")
+	}
+	if err := lock.PublishStarting(1, ""); err == nil {
+		t.Fatal("empty version starting locator was published")
+	}
+	if err := lock.PublishStarting(1, "0.0.0"); err != nil {
+		t.Fatalf("publish starting: %v", err)
+	}
+	if _, err := lock.Endpoint(); err == nil || !strings.Contains(err.Error(), "endpoint is empty") {
+		t.Fatalf("starting endpoint error = %v", err)
+	}
+	starting := InspectDaemon(paths.Lock)
+	if starting.State != DaemonStarting || starting.PID != 1 || starting.Version != "0.0.0" {
+		t.Fatalf("starting daemon status = %#v", starting)
+	}
+	for _, endpoint := range []string{
+		"https://127.0.0.1:1",
+		"http://example.test:1",
+		"http://127.0.0.1:1/path",
+		"http://user@127.0.0.1:1",
+		"http://127.0.0.1:1?query=1",
+		"http://127.0.0.1:1#fragment",
+	} {
+		if err := lock.PublishRunning(1, endpoint, "0.0.0"); err == nil {
+			t.Fatalf("invalid endpoint %q was published", endpoint)
+		}
+	}
+	if err := lock.PublishRunning(0, "http://127.0.0.1:1", "0.0.0"); err == nil {
+		t.Fatal("zero pid running locator was published")
+	}
+	if err := lock.PublishRunning(1, "http://127.0.0.1:1", ""); err == nil {
+		t.Fatal("empty version running locator was published")
+	}
+	if err := lock.PublishRunning(1, "", "0.0.0"); err == nil {
 		t.Fatal("empty endpoint was published")
 	}
 	if err := lock.Close(); err != nil {
@@ -582,7 +616,7 @@ func TestCredentialAndLockFailurePaths(t *testing.T) {
 	if _, err := lock.Endpoint(); !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("closed endpoint error = %v", err)
 	}
-	if err := lock.PublishEndpoint("http://127.0.0.1:1"); !errors.Is(err, os.ErrClosed) {
+	if err := lock.PublishRunning(1, "http://127.0.0.1:1", "0.0.0"); !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("closed publish error = %v", err)
 	}
 
@@ -718,12 +752,9 @@ func TestValidateLibraryPathRejectsUnsafeForms(t *testing.T) {
 	}
 }
 
-func TestRuntimeProfileRejectsMissingHomeAndNULConfig(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Setenv("HOME", "")
-		if _, err := ResolvePaths(""); err == nil || !strings.Contains(err.Error(), "user home") {
-			t.Fatalf("missing HOME error = %v", err)
-		}
+func TestRuntimeProfileRejectsMissingRootAndNULConfig(t *testing.T) {
+	if _, err := ResolvePaths(""); err == nil || !strings.Contains(err.Error(), "instance root") {
+		t.Fatalf("missing Instance Root error = %v", err)
 	}
 
 	if _, _, err := validateAndClassifyExtensionConfig(&ExtensionConfig{

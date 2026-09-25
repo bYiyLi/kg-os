@@ -11,14 +11,13 @@ import (
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/bYiyLi/kg-os/internal/lithograph"
-	runtimehost "github.com/bYiyLi/kg-os/internal/runtime"
 )
 
 func TestPhase06StateCreateExpectedParentCAS(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -49,7 +48,7 @@ func TestPhase06EvolutionStateDataRefsAndPinnedAncestry(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -184,7 +183,7 @@ func TestPhase06EvolutionInvalidStateBoundaryAndAnnotation(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -262,7 +261,7 @@ func TestPhase06EvolutionSharedIndexAndChangePagination(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -368,7 +367,7 @@ func TestPhase06EvolutionKnowledgeReplacementAndPinnedHistory(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -492,7 +491,7 @@ func TestPhase06EvolutionRenameContinuityAndNameReuse(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -592,7 +591,7 @@ func TestPhase06EvolutionMultiParentHistoryPreservesTopology(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -680,7 +679,7 @@ func TestPhase06EvolutionObjectHistoryAnchorAncestryAndRefFailures(t *testing.T)
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -789,7 +788,7 @@ func TestPhase06EvolutionKnowledgeAndDomainObjectContinuity(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -922,7 +921,7 @@ func TestPhase06EvolutionValidationAndCursorMisuse(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -1052,7 +1051,7 @@ func TestPhase06EvolutionClosedHostFailsCleanly(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}

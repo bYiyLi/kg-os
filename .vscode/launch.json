@@ -2,34 +2,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "KG OS daemon (Go)",
-      "type": "go",
+      "name": "KG OS CLI (TypeScript)",
+      "type": "node",
       "request": "launch",
-      "mode": "debug",
-      "program": "${workspaceFolder}/cmd/kgosd",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "KG OS: prepare runtime",
-      "buildFlags": "-tags=sqlite_fts5",
-      "env": {
-        "CGO_ENABLED": "1",
-        "GOTOOLCHAIN": "go1.27.1",
-        "KG_HOME": "${workspaceFolder}/.kgos-dev"
-      }
-    },
-    {
-      "name": "KG OS CLI (Go)",
-      "type": "go",
-      "request": "launch",
-      "mode": "debug",
-      "program": "${workspaceFolder}/cmd/kg",
+      "program": "${workspaceFolder}/packages/cli/dist/bin.js",
       "args": ["--help"],
       "cwd": "${workspaceFolder}",
-      "buildFlags": "-tags=sqlite_fts5",
-      "env": {
-        "CGO_ENABLED": "1",
-        "GOTOOLCHAIN": "go1.27.1"
-      }
+      "preLaunchTask": "KG OS: build"
     },
     {
       "name": "KG OS Web",

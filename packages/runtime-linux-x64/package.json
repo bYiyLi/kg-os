@@ -1,0 +1,26 @@
+{
+  "name": "@kgos/runtime-linux-x64",
+  "version": "0.0.0",
+  "description": "KG OS native runtime for Linux glibc x64",
+  "license": "AGPL-3.0-only",
+  "publishConfig": {
+    "access": "public"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "kgosd",
+    "extensions",
+    "manifest.json"
+  ],
+  "exports": {
+    "./package.json": "./package.json"
+  }
+}

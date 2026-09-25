@@ -139,6 +139,17 @@ type ObjectReadResult struct {
 	Results []ObjectReadItem `json:"results"`
 }
 
+type ObjectTextReadItem struct {
+	Kind ObjectKind `json:"kind"`
+	Ref  string     `json:"ref"`
+	Body string     `json:"body"`
+}
+
+type ObjectTextReadResult struct {
+	State   string               `json:"state"`
+	Results []ObjectTextReadItem `json:"results"`
+}
+
 type ObjectBody struct {
 	State string
 	Ref   string
@@ -270,14 +281,6 @@ func normalizeDomain(domain *Domain) error {
 	if err := validatePublicName(domain.Name, "domain name"); err != nil {
 		return err
 	}
-	if length := len([]byte(domain.Name)); length < 1 || length > 255 {
-		return publicError(CodeType, "domain name must be 1..255 UTF-8 bytes", nil)
-	}
-	for _, r := range domain.Name {
-		if r < 0x20 || r == 0x7f {
-			return publicError(CodeType, "domain name must not contain ASCII control characters", nil)
-		}
-	}
 	if err := normalizeSet(&domain.Includes, "includes"); err != nil {
 		return err
 	}
@@ -285,12 +288,8 @@ func normalizeDomain(domain *Domain) error {
 		if strings.HasPrefix(ref, "new:") {
 			continue
 		}
-		parsed, err := ParseOntologyRef(ref)
-		if err != nil {
+		if _, err := ParseOntologyRef(ref); err != nil {
 			return err
-		}
-		if parsed.Kind != KindDomain && parsed.Kind != KindNodeDefinition && parsed.Kind != KindRelationshipDefinition {
-			return publicError(CodeType, "Domain includes must reference an Ontology object", nil)
 		}
 	}
 	return nil

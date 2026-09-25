@@ -15,7 +15,7 @@ import (
 )
 
 func TestPhase04ObjectAPIReadPatchRoundTrip(t *testing.T) {
-	runtime := openDaemonRuntime(t, freePort(t))
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 	server := httptest.NewServer(NewHandler(runtime, http.NotFoundHandler()))
 	defer server.Close()
@@ -104,6 +104,35 @@ func TestPhase04ObjectAPIReadPatchRoundTrip(t *testing.T) {
 		read.Results[0].Ref != ref || read.Results[0].Kind != kernel.KindKnowledgeNode ||
 		!bytes.Contains(read.Results[0].Value, []byte("\"name\":\"Alice\"")) {
 		t.Fatalf("read result = %#v", read)
+	}
+
+	request, err = http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		server.URL+"/api/v1/object/read-text",
+		bytes.NewReader(readPayload),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+runtime.Credential.Token)
+	request.Header.Set("Content-Type", "application/json")
+	response, err = http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("object text read request: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("object text read status = %d", response.StatusCode)
+	}
+	var textRead kernel.ObjectTextReadResult
+	if err := json.NewDecoder(response.Body).Decode(&textRead); err != nil {
+		t.Fatalf("decode object text read: %v", err)
+	}
+	if textRead.State != patched.State || len(textRead.Results) != 1 ||
+		textRead.Results[0].Ref != ref || textRead.Results[0].Kind != kernel.KindKnowledgeNode ||
+		!strings.Contains(textRead.Results[0].Body, "Alice") {
+		t.Fatalf("text read result = %#v", textRead)
 	}
 
 	objectPayload, err := json.Marshal(map[string]string{

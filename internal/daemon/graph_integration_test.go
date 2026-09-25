@@ -19,7 +19,7 @@ import (
 )
 
 func TestPhase05GraphHTTPJSONAndNDJSON(t *testing.T) {
-	runtime := openDaemonRuntime(t, freePort(t))
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 	handler := NewHandler(runtime, http.NotFoundHandler())
 
@@ -118,7 +118,7 @@ func TestPhase05GraphHTTPJSONAndNDJSON(t *testing.T) {
 }
 
 func TestPhase05GraphHTTPWriteFailureStopsPullingAndPreservesTransactionSemantics(t *testing.T) {
-	runtime := openDaemonRuntime(t, freePort(t))
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 	handler := NewHandler(runtime, http.NotFoundHandler())
 
@@ -204,7 +204,7 @@ func TestPhase05GraphHTTPWriteFailureStopsPullingAndPreservesTransactionSemantic
 }
 
 func TestPhase05GraphHTTPClientDisconnectCancelsOrdinaryWrite(t *testing.T) {
-	runtime := openDaemonRuntime(t, freePort(t))
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 	baseHandler := NewHandler(runtime, http.NotFoundHandler())
 	handlerDone := make(chan struct{})

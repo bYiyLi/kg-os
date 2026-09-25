@@ -9,16 +9,20 @@ const allowed =
   "(BSD-2-Clause OR MIT OR Apache-2.0);(MIT AND CC-BY-3.0);" +
   "Custom: https://github.com/streetsidesoftware/cspell";
 
-await run(
-  "pnpm",
-  [
-    "exec",
-    "license-checker-rseidelsohn",
-    "--production",
-    "--excludePrivatePackages",
-    "--onlyAllow",
-    allowed,
-    "--summary"
-  ],
-  { cwd: resolve(root, "packages/web") }
-);
+for (const name of ["cli", "web"]) {
+  await run(
+    "pnpm",
+    [
+      "exec",
+      "license-checker-rseidelsohn",
+      "--production",
+      "--excludePrivatePackages",
+      "--excludePackagesStartingWith",
+      "@kgos/",
+      "--onlyAllow",
+      allowed,
+      "--summary"
+    ],
+    { cwd: resolve(root, "packages", name) }
+  );
+}

@@ -17,7 +17,7 @@ import (
 )
 
 func TestPhase05GraphHTTPClientCancellationStopsExecution(t *testing.T) {
-	runtime := openDaemonRuntime(t, freePort(t))
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 	requestDone := make(chan struct{})
 	base := NewHandler(runtime, http.NotFoundHandler())

@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "outDir": "dist",
     "rootDir": "src",
     "tsBuildInfoFile": "../../.cache/tsbuildinfo/sdk.tsbuildinfo"

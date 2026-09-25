@@ -1,42 +1,32 @@
 import { spawn } from "node:child_process";
-import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { run } from "./process.mjs";
+import { waitForRuntimeEndpoint } from "./runtime-locator.mjs";
 import { prepareRuntimeProfile } from "./runtime-profile.mjs";
+import { currentRuntimeTarget } from "./runtime-package.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const kgHome = resolve(root, ".kgos-dev");
-await mkdir(kgHome, { recursive: true });
-await prepareRuntimeProfile({
-  root,
-  home: kgHome,
-  host: "127.0.0.1",
-  port: 4765
+const instanceRoot = resolve(root, ".kgos-dev");
+
+await run("pnpm", ["build"], { cwd: root });
+await prepareRuntimeProfile({ instanceRoot });
+
+const runtimeRoot = resolve(root, "artifacts", "npm", "runtime-" + currentRuntimeTarget());
+const daemon = spawn(resolve(runtimeRoot, "kgosd"), ["--root", instanceRoot], {
+  cwd: root,
+  detached: process.platform !== "win32",
+  env: process.env,
+  stdio: "inherit"
+});
+daemon.once("error", (error) => {
+  process.stderr.write("Go daemon: " + error.message + "\n");
 });
 
-const env = {
-  ...process.env,
-  CGO_ENABLED: "1",
-  GOTOOLCHAIN: "go1.27.1",
-  KG_HOME: kgHome
-};
-
-function start(label, command, args) {
-  const child = spawn(command, args, {
-    cwd: root,
-    detached: process.platform !== "win32",
-    env,
-    stdio: "inherit"
-  });
-  child.once("error", (error) => {
-    process.stderr.write(label + ": " + error.message + "\n");
-  });
-  return { child, label };
-}
-
-const children = [
-  start("Go daemon", "go", ["run", "-tags=sqlite_fts5", "./cmd/kgosd"]),
-  start("Vite", "pnpm", [
+const endpoint = await waitForRuntimeEndpoint(instanceRoot, daemon);
+const vite = spawn(
+  "pnpm",
+  [
     "--filter",
     "@kgos/web",
     "exec",
@@ -46,9 +36,19 @@ const children = [
     "--port",
     "5173",
     "--strictPort"
-  ])
-];
+  ],
+  {
+    cwd: root,
+    detached: process.platform !== "win32",
+    env: { ...process.env, KGOS_DEV_ENDPOINT: endpoint },
+    stdio: "inherit"
+  }
+);
+vite.once("error", (error) => {
+  process.stderr.write("Vite: " + error.message + "\n");
+});
 
+process.stdout.write("KG OS daemon: " + endpoint + "\n");
 process.stdout.write("KG OS Web dev: http://127.0.0.1:5173\n");
 
 let stopping = false;
@@ -57,18 +57,19 @@ function stopAll(signal) {
     return;
   }
   stopping = true;
-  for (const { child } of children) {
-    if (child.exitCode === null && child.signalCode === null) {
-      if (process.platform === "win32" || child.pid === undefined) {
-        child.kill(signal);
-      } else {
-        try {
-          process.kill(-child.pid, signal);
-        } catch (error) {
-          if (error.code !== "ESRCH") {
-            throw error;
-          }
-        }
+  for (const child of [daemon, vite]) {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      continue;
+    }
+    if (process.platform === "win32" || child.pid === undefined) {
+      child.kill(signal);
+      continue;
+    }
+    try {
+      process.kill(-child.pid, signal);
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) {
+        throw error;
       }
     }
   }
@@ -86,7 +87,10 @@ const requestedStop = new Promise((resolveStop) => {
 });
 
 const childExit = Promise.race(
-  children.map(
+  [
+    { child: daemon, label: "Go daemon" },
+    { child: vite, label: "Vite" }
+  ].map(
     ({ child, label }) =>
       new Promise((resolveExit) => {
         child.once("exit", (code, signal) => resolveExit({ code, label, signal }));
@@ -109,8 +113,8 @@ if (!("requested" in outcome)) {
 }
 
 await Promise.all(
-  children.map(
-    ({ child }) =>
+  [daemon, vite].map(
+    (child) =>
       new Promise((resolveExit) => {
         if (child.exitCode !== null || child.signalCode !== null) {
           resolveExit();

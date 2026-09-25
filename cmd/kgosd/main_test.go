@@ -17,7 +17,8 @@ func TestRunMetadataModes(t *testing.T) {
 	}{
 		{name: "help", args: []string{"--help"}, wantStdout: "KG OS daemon"},
 		{name: "version", args: []string{"--version"}, wantStdout: "0.0.0"},
-		{name: "unsupported", args: []string{"--phase0-shell"}, wantCode: 2, wantStderr: "unsupported"},
+		{name: "unsupported", args: []string{"--phase0-shell"}, wantCode: 2, wantStderr: "--root"},
+		{name: "missing root", wantCode: 2, wantStderr: "--root"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -37,16 +38,15 @@ func TestRunMetadataModes(t *testing.T) {
 	}
 }
 
-func TestRunReportsRuntimeStartupFailure(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("KG_HOME", home)
+func TestRunReportsRuntimePackageFailure(t *testing.T) {
+	root := t.TempDir()
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run(context.Background(), nil, &stdout, &stderr)
+	code := run(context.Background(), []string{"--root", root}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
-	if !strings.Contains(stderr.String(), "config.toml") {
+	if !strings.Contains(stderr.String(), "runtime manifest") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }

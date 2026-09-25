@@ -10,14 +10,13 @@ import (
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/bYiyLi/kg-os/internal/lithograph"
-	runtimehost "github.com/bYiyLi/kg-os/internal/runtime"
 )
 
 func TestPhase07EvolutionMergeConflictResolveFinalizeAndRecovery(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -101,7 +100,7 @@ func TestPhase07EvolutionMergeConflictResolveFinalizeAndRecovery(t *testing.T) {
 	if err := runtime.Close(); err != nil {
 		t.Fatalf("close runtime before recovery: %v", err)
 	}
-	runtime, err = runtimehost.Open(ctx, home, nil)
+	runtime, err = openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("reopen runtime: %v", err)
 	}
@@ -259,7 +258,7 @@ func TestPhase07EvolutionMergeFastForwardUpToDateAndAbort(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -353,7 +352,7 @@ func TestPhase07EvolutionMergeInvalidDirectSessionBoundary(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -446,7 +445,7 @@ func TestPhase07EvolutionMergeRejectsInvalidRenameCandidate(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -560,7 +559,7 @@ func TestPhase07EvolutionMergeSharedIndexProjectsOneConflict(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -719,7 +718,7 @@ func TestPhase07EvolutionMergeKnowledgeRelationshipPropertyConflict(t *testing.T
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}
@@ -831,7 +830,7 @@ func TestPhase07EvolutionMergeKnowledgeNodeDeleteVersusUpdate(t *testing.T) {
 	home := t.TempDir()
 	writeKernelIntegrationConfig(t, home)
 	ctx := context.Background()
-	runtime, err := runtimehost.Open(ctx, home, nil)
+	runtime, err := openKernelIntegrationRuntime(ctx, home)
 	if err != nil {
 		t.Fatalf("open runtime: %v", err)
 	}

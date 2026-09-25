@@ -14,7 +14,7 @@ import (
 )
 
 func TestPhase06EvolutionHTTPContract(t *testing.T) {
-	runtime := openDaemonRuntime(t, freePort(t))
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 	handler := NewHandler(runtime, http.NotFoundHandler())
 
@@ -69,7 +69,7 @@ func TestPhase06EvolutionHTTPContract(t *testing.T) {
 }
 
 func TestPhase07EvolutionMergeHTTPContract(t *testing.T) {
-	runtime := openDaemonRuntime(t, freePort(t))
+	runtime := openDaemonRuntime(t)
 	defer runtime.Close()
 	handler := NewHandler(runtime, http.NotFoundHandler())
 	token := runtime.Credential.Token
