@@ -271,18 +271,34 @@ GitHub Actions 保留 Ubuntu 24.04 x64 的完整 `pnpm validate`，并增加四�
 
 首个公开 Release baseline 固定为 `0.1.0`，正式 npm dist-tag 固定为 `latest`。版本仍由仓库既有 root/package、SDK public constant 与 Go build info 合同共同校验，不增加独立版本文件。
 
-发布前可在本地执行无发布副作用的检查：
+发布前先在 `main` 完成普通验证与 npm organization authority 检查：
 
 ```sh
-node scripts/release.mjs preflight --dist-tag latest
+pnpm validate
 pnpm release:authority
 ```
 
-`preflight` 要求当前 revision 等于 `origin/main`、工作树干净、版本一致且目标 Git tag 尚不存在；开发中的未提交工作树失败属于预期 fail-closed。`release:authority` 只检查当前 npm identity 是否能够证明 `@kgos` user/org membership，不发布 package。
+`release:authority` 只检查当前 npm CLI identity 是否能够证明 `@kgos` user/org membership，不发布 package；没有本地 npm session 时可以由 npm Web 的 organization owner 证据完成发布前人工核对。
 
-正式 Release 只通过 [`.github/workflows/release.yml`](../../.github/workflows/release.yml) 的手工 `workflow_dispatch` 入口执行；普通 pull request 与 `main` push 不会触发 publish。workflow 按同一 source revision 依次完成四平台 candidate、聚合与 native hash/integrity 校验、npm authority、使用非最终 staging tag 的六包 publish/partial recovery、exact-version registry verification、四平台 public-registry `npx` smoke、`latest` promotion，最后才创建 `v0.1.0` Git tag 与 GitHub Release。
+正式 Release 由 Git tag 触发。版本已准备并且目标 commit 已在 `main` 后，创建并 push 与 package version 完全一致的 tag：
 
-Release workflow 的 npm credential 由 GitHub Actions secret 提供；token 不写入仓库、candidate、release notes 或 Instance。只完成本地 candidate、workflow 配置、部分 npm publish 或单独 Git tag 都不等于公开 Release 完成；真实状态以 [Phase 09](../development/phases/09-mvp-release-closure.md) 的 registry/tag/Release 证据为准。
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml) 监听 `v*` tag push；普通 pull request 与 `main` push 不会 publish。`workflow_dispatch` 只接受一个**已经存在**的 release tag，用于恢复同一次 partial release，不产生新的 version。workflow preflight 要求 tag 名等于 `v<package-version>`、tag revision 属于 `origin/main` 历史且 source clean，然后按同一 revision 完成四平台 candidate、聚合与 native hash/integrity 校验、Runtime → SDK → CLI-last publish / partial recovery、六包 exact-version + `latest` registry verification、四平台 public-registry `npx` smoke，最后基于已有 tag 创建 GitHub Release。
+
+publish job 具备 GitHub Actions OIDC `id-token: write`，长期认证使用 npm Trusted Publishing。六个 package 的 `repository.url` 都绑定当前 `bYiyLi/kg-os` GitHub repository。首次 `0.1.0` 发布时 package 尚不存在，无法先在 package settings 建立 Trusted Publisher，因此允许临时使用一个短期 granular token 作为 GitHub Actions secret `NPM_TOKEN`；token 只用于 bootstrap，不写入仓库、candidate、release notes 或 Instance。六包首次存在后，应逐包配置 GitHub Actions Trusted Publisher：
+
+- GitHub owner：`bYiyLi`
+- Repository：`kg-os`
+- Workflow filename：`release.yml`
+- Allowed action：允许 `npm publish`
+
+配置完成后删除 repository secret `NPM_TOKEN`；后续 `v*` Release 使用 OIDC，无需长期 npm publish token。
+
+只完成本地 candidate、workflow 配置、部分 npm publish 或单独 Git tag 都不等于公开 Release 完成；真实状态以 [Phase 09](../development/phases/09-mvp-release-closure.md) 的 registry/tag/Release 证据为准。
 
 ## 常见问题
 

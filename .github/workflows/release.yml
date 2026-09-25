@@ -1,7 +1,15 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v* release tag to recover
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -16,16 +24,28 @@ jobs:
     timeout-minutes: 35
     outputs:
       revision: ${{ steps.baseline.outputs.revision }}
+      tag: ${{ steps.release-tag.outputs.tag }}
       version: ${{ steps.baseline.outputs.version }}
 
     steps:
-      - name: Require main branch
-        run: node -e 'if (process.env.GITHUB_REF !== "refs/heads/main") process.exit(1)'
+      - name: Resolve release tag
+        id: release-tag
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
+          PUSH_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          RELEASE_TAG="${PUSH_TAG:-$DISPATCH_TAG}"
+          case "$RELEASE_TAG" in
+            v*) ;;
+            *) echo "Release tag must start with v" >&2; exit 1 ;;
+          esac
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Check out release revision
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ steps.release-tag.outputs.tag }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -59,11 +79,17 @@ jobs:
 
       - name: Verify release baseline
         id: baseline
+        env:
+          RELEASE_TAG: ${{ steps.release-tag.outputs.tag }}
         run: |
-          node scripts/release.mjs preflight --dist-tag "$RELEASE_DIST_TAG"
+          git fetch origin main --tags
+          node scripts/release.mjs preflight \
+            --dist-tag "$RELEASE_DIST_TAG" \
+            --release-tag "$RELEASE_TAG"
           VERSION=$(node -p 'require("./package.json").version')
+          REVISION=$(git rev-parse HEAD)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "revision=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
 
       - name: Validate release revision
         run: pnpm validate
@@ -188,6 +214,9 @@ jobs:
       - aggregate
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out release tooling
@@ -207,16 +236,11 @@ jobs:
           name: release-set
           path: artifacts/final
 
-      - name: Verify npm scope authority
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: node scripts/release.mjs authority
-
       - name: Dry-run registry release state
         run: |
           node scripts/release.mjs publish \
             --directory artifacts/final \
-            --staging-tag "kgos-release-${{ github.run_id }}" \
+            --dist-tag "$RELEASE_DIST_TAG" \
             --dry-run
 
       - name: Publish or recover matching partial release
@@ -225,13 +249,13 @@ jobs:
         run: |
           node scripts/release.mjs publish \
             --directory artifacts/final \
-            --staging-tag "kgos-release-${{ github.run_id }}"
+            --dist-tag "$RELEASE_DIST_TAG"
 
       - name: Verify exact registry package set
         run: |
           node scripts/release.mjs verify-registry \
             --directory artifacts/final \
-            --expect-final-tag-pending
+            --dist-tag "$RELEASE_DIST_TAG"
 
   registry-smoke:
     name: Registry smoke / ${{ matrix.target }}
@@ -269,47 +293,12 @@ jobs:
           test "$(node -p 'process.platform + "-" + process.arch')" = "${{ matrix.target }}"
           node scripts/release-registry-smoke.mjs --version "${{ needs.preflight.outputs.version }}"
 
-  promote:
-    name: Promote final npm dist-tag
-    needs:
-      - preflight
-      - aggregate
-      - registry-smoke
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-
-    steps:
-      - name: Check out release tooling
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.preflight.outputs.revision }}
-
-      - name: Install Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .node-version
-          registry-url: https://registry.npmjs.org
-
-      - name: Download release set
-        uses: actions/download-artifact@v7
-        with:
-          name: release-set
-          path: artifacts/final
-
-      - name: Promote and verify final dist-tag
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          node scripts/release.mjs promote \
-            --directory artifacts/final \
-            --dist-tag "$RELEASE_DIST_TAG"
-
   finalize:
     name: Create GitHub Release
     needs:
       - preflight
       - aggregate
-      - promote
+      - registry-smoke
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -333,22 +322,24 @@ jobs:
           name: release-set
           path: artifacts/final
 
-      - name: Reverify promoted registry state
+      - name: Reverify registry release state
         run: |
           node scripts/release.mjs verify-registry \
             --directory artifacts/final \
             --dist-tag "$RELEASE_DIST_TAG"
 
-      - name: Fail closed on an existing release tag
+      - name: Verify pushed release tag
         env:
-          VERSION: ${{ needs.preflight.outputs.version }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+          REVISION: ${{ needs.preflight.outputs.revision }}
         run: |
           git fetch --tags origin
-          test -z "$(git tag --list "v$VERSION")"
+          test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$REVISION"
 
-      - name: Create Git tag and GitHub Release
+      - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
           VERSION: ${{ needs.preflight.outputs.version }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
@@ -364,17 +355,18 @@ jobs:
 
           Supported native targets: macOS arm64/x64 and Linux glibc arm64/x64.
           EOF
-          gh release create "v$VERSION" \
-            --target "${{ needs.preflight.outputs.revision }}" \
-            --title "KG OS v$VERSION" \
-            --notes-file "$RUNNER_TEMP/release-notes.md"
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "KG OS $RELEASE_TAG" \
+              --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
 
       - name: Verify GitHub Release revision
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.preflight.outputs.version }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
           REVISION: ${{ needs.preflight.outputs.revision }}
         run: |
-          TAG_SHA=$(gh api "repos/${{ github.repository }}/git/ref/tags/v$VERSION" --jq .object.sha)
-          test "$TAG_SHA" = "$REVISION"
-          gh release view "v$VERSION" --json tagName --jq '.tagName' | grep -Fx "v$VERSION"
+          test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$REVISION"
+          gh release view "$RELEASE_TAG" --json tagName --jq '.tagName' | grep -Fx "$RELEASE_TAG"

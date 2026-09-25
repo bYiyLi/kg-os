@@ -73,7 +73,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 08 TypeScript Client & npm Runtime Distribution 当前为 `done`。** 公共 `@kgos/sdk`、TypeScript `@kgos/cli`、显式 `--root`、`init/doctor`、per-root dynamic daemon、platform npm Runtime package builder / candidate smoke 已实现，并在 parity 通过后删除 Go `kg`。实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均成功，Go statement coverage **90.0%**、TypeScript statements/lines/functions **100%**、jscpd **0 clones**，race/govulncheck/Playwright/native/package/license/audit/diff gates 全绿，final review 无剩余 task-affecting finding。GitHub Actions run `36103842748` 的 Validate job `107971924426` 与四个平台 native/package jobs（macOS x64 `107971924614`、Linux arm64 `107971924657`、macOS arm64 `107971924688`、Linux x64 `107971924773`）全部成功。完整范围与 Acceptance 见[Phase 08](phases/08-typescript-client-npm-runtime.md)。
 
-**Phase 09 MVP Release Closure 当前为 `blocked`。** 首个公开 MVP baseline 已冻结为 `0.1.0` + `latest`，Release workflow、candidate provenance/aggregation、partial publish recovery、registry verification、四平台 clean `npx` smoke 与 GitHub Release dependency chain 已在当前工作树实现；真实 public Release 仍缺少 `@kgos` npm scope publish authority 证据，因此六包 publish、post-publish matrix、dist-tag promotion 与 GitHub Release 均未执行。完整范围与 Acceptance 见[Phase 09](phases/09-mvp-release-closure.md)。
+**Phase 09 MVP Release Closure 当前为 `blocked`。** 首个公开 MVP baseline 已冻结为 `0.1.0` + `latest`；`v*` tag-trigger / existing-tag recovery、candidate provenance/aggregation、partial publish recovery、OIDC-ready publish、registry verification、四平台 clean `npx` smoke 与 GitHub Release dependency chain 已实现。`@kgos` organization 已真实创建且当前 npm account 为 owner；当前只剩首次六包 publish 所需的短期 bootstrap credential、`v0.1.0` tag、真实 registry acceptance、六包 Trusted Publisher 配置与 GitHub Release 尚未执行。完整范围与 Acceptance 见[Phase 09](phases/09-mvp-release-closure.md)。
 
 ## 5. 路线总览
 
@@ -114,7 +114,7 @@ Go Engineering Foundation
   -> later Web / Skill phases
 ```
 
-Phase 02–08 均已完成；Phase 08 的本地实现、迁移清理、主工作树完整 validation、独立 fresh-source、final review 与实际 pushed revision 的跨平台远端 matrix 均已有真实成功证据。Phase 09 当前为 `blocked`：`0.1.0` / `latest` 与仓库内 Release tooling 已实现，但 `@kgos` npm scope publish authority 尚无证据，真实 registry publish / post-publish matrix / tag / GitHub Release尚未执行。Web / Skill 不属于 Phase 09。
+Phase 02–08 均已完成；Phase 08 的本地实现、迁移清理、主工作树完整 validation、独立 fresh-source、final review 与实际 pushed revision 的跨平台远端 matrix 均已有真实成功证据。Phase 09 当前为 `blocked`：`0.1.0` / `latest`、tag-triggered Release tooling 与 `@kgos` owner authority 已取得真实证据，但首次 registry bootstrap、`v0.1.0` tag push、post-publish matrix、Trusted Publisher 配置与 GitHub Release尚未执行。Web / Skill 不属于 Phase 09。
 
 ## 6. Phase 通用完成标准
 

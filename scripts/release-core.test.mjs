@@ -11,7 +11,6 @@ import {
   assertCliRegistryDependencies,
   assertDistTag,
   assertReleaseVersion,
-  assertStagingTag,
   classifyRegistryVersion,
   validateReleaseManifest
 } from "./release-core.mjs";
@@ -75,13 +74,11 @@ describe("release core", () => {
   it("accepts the first MVP release baseline and rejects placeholders", () => {
     expect(assertReleaseVersion("0.1.0")).toBe("0.1.0");
     expect(assertDistTag("latest")).toBe("latest");
-    expect(assertStagingTag("kgos-release-123")).toBe("kgos-release-123");
     expect(() => assertReleaseVersion("0.0.0")).toThrow(/non-placeholder/);
     expect(() => assertReleaseVersion("01.1.0")).toThrow(/SemVer/);
     expect(() => assertReleaseVersion("1.0.0-01")).toThrow(/SemVer/);
     expect(() => assertReleaseVersion("v0.1.0")).toThrow(/SemVer/);
     expect(() => assertDistTag("0.1.0")).toThrow(/non-SemVer/);
-    expect(() => assertStagingTag("latest")).toThrow(/differ/);
   });
 
   it("aggregates exactly one clean candidate for every supported target", () => {
@@ -178,22 +175,39 @@ describe("release core", () => {
     ).not.toThrow();
   });
 
-  it("keeps the Release workflow manual and ordered after registry acceptance", async () => {
+  it("keeps every public package bound to the GitHub repository for trusted publishing", async () => {
+    const packageFiles = [
+      "packages/sdk/package.json",
+      "packages/cli/package.json",
+      ...RUNTIME_TARGETS.map((target) => "packages/runtime-" + target + "/package.json")
+    ];
+    for (const packageFile of packageFiles) {
+      const metadata = JSON.parse(
+        await readFile(resolve(import.meta.dirname, "..", packageFile), "utf8")
+      );
+      expect(metadata.repository?.url).toBe("git+https://github.com/bYiyLi/kg-os.git");
+    }
+  });
+
+  it("publishes only from release tags or explicit tag recovery and keeps CLI last", async () => {
     const workflow = await readFile(
       resolve(import.meta.dirname, "..", ".github", "workflows", "release.yml"),
       "utf8"
     );
-    expect(workflow).toContain("on:\n  workflow_dispatch:");
+    expect(workflow).toContain('push:\n    tags:\n      - "v*"');
+    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).toContain("tag:");
     expect(workflow).not.toContain("pull_request:");
-    expect(workflow).not.toContain("push:");
-    expect(workflow).toContain("Require main branch");
-    expect(workflow).toContain("release.mjs authority");
+    expect(workflow).toContain('--release-tag "$RELEASE_TAG"');
+    expect(workflow).toContain("REVISION=$(git rev-parse HEAD)");
+    expect(workflow).toContain("id-token: write");
     expect(workflow).toContain('--revision "${{ needs.preflight.outputs.revision }}"');
     expect(workflow).toContain('--version "${{ needs.preflight.outputs.version }}"');
     expect(workflow).toContain("--dry-run");
-    expect(workflow).toContain("--expect-final-tag-pending");
+    expect(workflow).toContain('--dist-tag "$RELEASE_DIST_TAG"');
     expect(workflow).toContain("      - publish");
     expect(workflow).toContain("      - registry-smoke");
-    expect(workflow).toContain("      - promote");
+    expect(workflow).not.toContain("      - promote");
+    expect(workflow).toContain("--verify-tag");
   });
 });

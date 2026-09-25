@@ -42,14 +42,6 @@ export function assertDistTag(value) {
   return value;
 }
 
-export function assertStagingTag(value, finalTag = RELEASE_DIST_TAG) {
-  const stagingTag = assertDistTag(value);
-  if (stagingTag === assertDistTag(finalTag)) {
-    throw new Error("npm staging dist-tag must differ from the final dist-tag");
-  }
-  return stagingTag;
-}
-
 export function validateCandidateDocument(candidate) {
   if (candidate?.schemaVersion !== 1) {
     throw new Error("Unsupported release candidate schema");

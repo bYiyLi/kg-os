@@ -11,7 +11,6 @@ import {
   assertCliRegistryDependencies,
   assertDistTag,
   assertReleaseVersion,
-  assertStagingTag,
   classifyRegistryVersion,
   fileIntegrity,
   validateCandidateDocument,
@@ -38,12 +37,9 @@ switch (command) {
   case "verify-registry":
     await verifyRegistryCommand();
     break;
-  case "promote":
-    await promote();
-    break;
   default:
     throw new Error(
-      "Usage: node scripts/release.mjs <preflight|authority|aggregate|publish|verify-registry|promote>"
+      "Usage: node scripts/release.mjs <preflight|authority|aggregate|publish|verify-registry>"
     );
 }
 
@@ -51,6 +47,10 @@ async function preflight() {
   const rootPackage = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
   const version = assertReleaseVersion(rootPackage.version);
   const finalTag = assertDistTag(option("--dist-tag") ?? RELEASE_DIST_TAG);
+  const releaseTag = requiredOption("--release-tag");
+  if (releaseTag !== "v" + version) {
+    throw new Error("Release tag must exactly match package version: v" + version);
+  }
 
   await run("pnpm", ["check:dependencies"], { cwd: root });
   const revision = (await runCapture("git", ["rev-parse", "HEAD"], { cwd: root })).stdout.trim();
@@ -58,21 +58,23 @@ async function preflight() {
     await runCapture("git", ["rev-parse", "--verify", "origin/main"], { cwd: root })
   ).stdout.trim();
   const status = (await runCapture("git", ["status", "--porcelain"], { cwd: root })).stdout.trim();
-  const existingTag = (
-    await runCapture("git", ["tag", "--list", "v" + version], { cwd: root })
+  const tagRevision = (
+    await runCapture("git", ["rev-list", "-n", "1", releaseTag], { cwd: root })
   ).stdout.trim();
 
-  if (revision !== originMain) {
-    throw new Error("Release revision must equal origin/main");
+  try {
+    await run("git", ["merge-base", "--is-ancestor", revision, originMain], { cwd: root });
+  } catch {
+    throw new Error("Release revision must be reachable from origin/main");
   }
   if (status !== "") {
     throw new Error("Release preflight requires a clean worktree");
   }
-  if (existingTag !== "") {
-    throw new Error("Release tag already exists: v" + version);
+  if (tagRevision !== revision) {
+    throw new Error("Release tag must point to the checked-out release revision");
   }
 
-  process.stdout.write(JSON.stringify({ version, distTag: finalTag, revision }) + "\n");
+  process.stdout.write(JSON.stringify({ version, distTag: finalTag, releaseTag, revision }) + "\n");
 }
 
 async function verifyNpmAuthority() {
@@ -163,7 +165,7 @@ async function aggregate() {
 
 async function publish() {
   const directory = resolve(requiredOption("--directory"));
-  const stagingTag = assertStagingTag(requiredOption("--staging-tag"));
+  const finalTag = assertDistTag(option("--dist-tag") ?? RELEASE_DIST_TAG);
   const dryRun = process.argv.includes("--dry-run");
   const release = await loadRelease(directory);
   const states = await readRegistryStates(release);
@@ -178,14 +180,24 @@ async function publish() {
           release.version
       );
     }
+    if (state.state === "matching") {
+      const packageMetadata = await registryPackage(entry.name);
+      if (packageMetadata?.["dist-tags"]?.[finalTag] !== release.version) {
+        throw new Error(
+          "Matching registry artifact does not carry the release dist-tag: " +
+            entry.name +
+            "@" +
+            release.version
+        );
+      }
+    }
   }
-  await assertFinalTagPending(release);
 
   if (dryRun) {
     process.stdout.write(
       JSON.stringify({
         version: release.version,
-        stagingTag,
+        distTag: finalTag,
         packages: RELEASE_PACKAGE_ORDER.map((name) => ({
           name,
           state: states.get(name).state
@@ -219,55 +231,28 @@ async function publish() {
         "--access",
         "public",
         "--tag",
-        stagingTag,
+        finalTag,
         "--registry",
         RELEASE_REGISTRY
       ],
       { cwd: root }
     );
-    await waitForRegistryArtifact(entry);
+    await waitForRegistryArtifact(entry, finalTag);
   }
 }
 
 async function verifyRegistryCommand() {
   const directory = resolve(requiredOption("--directory"));
   const finalTag = option("--dist-tag");
-  const expectFinalTagPending = process.argv.includes("--expect-final-tag-pending");
   if (finalTag !== undefined) {
     assertDistTag(finalTag);
   }
-  if (finalTag !== undefined && expectFinalTagPending) {
-    throw new Error("--dist-tag and --expect-final-tag-pending are mutually exclusive");
-  }
   const release = await loadRelease(directory);
   await verifyRegistry(release, finalTag);
-  if (expectFinalTagPending) {
-    await assertFinalTagPending(release);
-  }
   process.stdout.write(
     JSON.stringify({ version: release.version, distTag: finalTag ?? null, status: "verified" }) +
       "\n"
   );
-}
-
-async function promote() {
-  const directory = resolve(requiredOption("--directory"));
-  const finalTag = assertDistTag(option("--dist-tag") ?? RELEASE_DIST_TAG);
-  const release = await loadRelease(directory);
-
-  await verifyRegistry(release);
-  for (const name of RELEASE_PACKAGE_ORDER) {
-    const packageMetadata = await registryPackage(name);
-    if (packageMetadata?.["dist-tags"]?.[finalTag] === release.version) {
-      continue;
-    }
-    await run(
-      "npm",
-      ["dist-tag", "add", name + "@" + release.version, finalTag, "--registry", RELEASE_REGISTRY],
-      { cwd: root }
-    );
-  }
-  await verifyRegistry(release, finalTag);
 }
 
 async function loadRelease(directory) {
@@ -312,12 +297,13 @@ async function verifyRegistry(release, finalTag) {
   assertCliRegistryDependencies(cliMetadata, release.version);
 }
 
-async function waitForRegistryArtifact(entry) {
+async function waitForRegistryArtifact(entry, finalTag) {
   const attempts = 12;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const metadata = await registryVersion(entry.name, entry.version);
+    const packageMetadata = await registryPackage(entry.name);
+    const metadata = packageMetadata?.versions?.[entry.version] ?? null;
     const state = classifyRegistryVersion(entry.integrity, metadata);
-    if (state === "matching") {
+    if (state === "matching" && packageMetadata?.["dist-tags"]?.[finalTag] === entry.version) {
       return;
     }
     if (state === "conflicting") {
@@ -429,20 +415,6 @@ async function verifyRuntimeCandidate(directory, candidate) {
     }
   } finally {
     await rm(extraction, { force: true, recursive: true });
-  }
-}
-
-async function assertFinalTagPending(release) {
-  for (const name of RELEASE_PACKAGE_ORDER) {
-    const packageMetadata = await registryPackage(name);
-    if (packageMetadata?.["dist-tags"]?.[RELEASE_DIST_TAG] === release.version) {
-      throw new Error(
-        "Final npm dist-tag was promoted before registry acceptance: " +
-          name +
-          "@" +
-          release.version
-      );
-    }
   }
 }
 
