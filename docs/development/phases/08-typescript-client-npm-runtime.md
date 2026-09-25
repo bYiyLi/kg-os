@@ -23,9 +23,9 @@ KG OS Kernel / Lithograph
 
 ## 2. 状态
 
-`in_progress`
+`done`
 
-Design Inputs、Phase 00–07 前置能力、工作顺序与 Acceptance 已齐全，且08.1–08.7的当前工作树实现已经落地：真实 `@kgos/sdk`、TypeScript `@kgos/cli`、显式Instance Root、dynamic `kgosd`、npm native Runtime packages、Runtime ensure与Go CLI cleanup均已实现。当前正在执行08.8最终验收；在完整 validation、fresh-source与 pushed 四平台 native matrix没有全部取得真实成功证据前，本Phase不得标记 `done`。
+Design Inputs、Phase 00–07 前置能力、08.1–08.8实现、Acceptance、Review、本地/fresh-source验证与要求的 pushed 四平台 native/package matrix均已取得真实成功证据。Phase 08 完成，不包含 npm registry publish、Git tag、dist-tag 或 release announcement。
 
 ## 3. Design Inputs
 
@@ -250,7 +250,7 @@ Phase 08只有同时满足以下条件才能进入`done`：
 
 ## 12. 当前状态
 
-2026-09-25：状态为`in_progress`。当前工作树已经完成08.1–08.8的本地实现、验收与Review：
+2026-09-25：状态为`done`。08.1–08.8实现、阶段验收、Review与远端矩阵均已闭环：
 
 - `@kgos/sdk` 已实现完整公共HTTP client、错误映射与Graph async streaming；
 - `@kgos/cli` 已迁移 doctor/init/Ontology/Object/Graph/Evolution/Merge 并复用SDK；
@@ -262,6 +262,8 @@ Phase 08只有同时满足以下条件才能进入`done`：
 - 主工作树完整 `pnpm validate` 已成功：Go statement coverage **90.0%**，TypeScript statements/lines/functions **100%**，type coverage **99.70%**，jscpd **0 clones**，race、govulncheck、Playwright **2/2**、真实 Lithograph native、publint/packed package、license、audit与diff gate全部通过；
 - 独立 fresh-source 快照在不复用主工作树 `node_modules` / build artifact / cache 的前提下完成 `pnpm run setup && pnpm validate`，同样全链路通过；
 - final defect-first review已复核SDK browser-safe边界、旧Go CLI/KG_HOME/KG_TOKEN残留、per-root endpoint/token、Runtime package contents、npm path不持久化、CI package matrix与仓库卫生，没有剩余task-affecting finding；
-- CI workflow已配置 macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix，当前GitHub hosted runner labels也已核对为有效。
+- 实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`；GitHub Actions run `36103842748` 成功，Validate job `107971924426` 用时 4m2s；
+- 同一 run 的四个平台 native/package jobs 全部成功：macOS x64 `107971924614`（5m35s）、Linux arm64 `107971924657`（2m38s）、macOS arm64 `107971924688`（2m45s）、Linux x64 `107971924773`（1m50s）；每个平台都完成 target verification、Runtime package build、真实 Lithograph suite、repo 外 packed npm smoke 与 candidate upload；
+- 因此 A–K Acceptance、11 项完成条件与 Phase 08 要求的远端门禁全部满足。
 
-尚未完成的阶段证据只剩：实际 pushed revision 对应的 macOS arm64/x64 + Linux glibc arm64/x64 matrix成功结果。没有该远端证据时不得将Phase 08记为`done`。本Phase也没有执行npm registry publish、commit或push。
+本Phase没有执行npm registry publish、Git tag、dist-tag或release announcement；这些动作继续需要独立授权与外部registry/release证据。
