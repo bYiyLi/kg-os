@@ -256,7 +256,7 @@ Phase 09 只有同时满足以下条件才能进入 `done`：
 2. 正式 Release version / dist-tag 已冻结且不再使用 `0.0.0`；
 3. `@kgos` scope publish authority 已取得真实证据；
 4. 六个 npm package 在 public registry 以同一 exact version真实存在；
-5. CLI 的 exact SDK / Runtime dependency与registry metadata一致，六个package的正式dist-tag只在registry smoke成功后统一指向本次version；
+5. CLI 的 exact SDK / Runtime dependency与registry metadata一致，六个package的正式dist-tag随本次publish指向同一exact version，并在registry acceptance中重新验证；
 6. partial-release冲突/恢复边界已验证，不存在需要覆盖已发布version的路径；
 7. 四个支持平台都从public registry完成真实 `npx` Runtime selection与代表性业务smoke；
 8. `v<version>` Git tag真实存在、作为Release trigger并指向release revision；
@@ -276,4 +276,6 @@ Phase 09 只有同时满足以下条件才能进入 `done`：
 
 当前工作树完整 `git diff --check && pnpm validate` 已成功；独立 fresh-source 从 `HEAD + 当前 tracked/untracked Phase 09 变更` 重建后，`pnpm run setup && pnpm validate` 也成功。两轮都覆盖 Go check/race/coverage/security、TypeScript type/lint/test/coverage、Playwright、真实 Lithograph v0.3.0 native suite、packed npm smoke、license/audit/diff 等既有完整门禁。final review 继续闭环跨平台 client candidate identity、Runtime manifest 三文件 SHA-256、workflow 非 main fail-closed、registry smoke/packed smoke daemon cleanup 等边界；当前 reviewed repository scope 没有剩余 task-affecting code finding。
 
-已确认 `@kgos` npm organization真实存在，当前 npm account 为owner且启用2FA。尚未执行且不能伪装为完成的部分包括：为首次六包 publish 准备短期 bootstrap GitHub Actions credential、创建并 push `v0.1.0` tag、六包真实 public publish、四平台 post-publish registry smoke、为六包配置 GitHub Actions Trusted Publisher，以及 GitHub Release。首次 package 尚不存在，Trusted Publisher 需要在 package 建立后配置，因此 Phase 09 在 bootstrap credential 与真实 Release acceptance 完成前保持 `blocked`。
+已确认 `@kgos` npm organization真实存在，当前 npm account 为owner且启用2FA；短期 bootstrap credential 已配置为 GitHub Actions secret，`v0.1.0` tag 已真实 push 并指向 release revision。尚未完成且不能伪装为完成的部分包括：六包真实 public publish、四平台 post-publish registry smoke、为六包配置 GitHub Actions Trusted Publisher，以及 GitHub Release。首次 package 尚不存在，Trusted Publisher 需要在 package 建立后配置，因此 Phase 09 在真实 registry acceptance 完成前保持 `blocked`。
+
+`v0.1.0` 首次 Release run 已真实执行到四平台 candidate 全部成功，但 aggregate 在 publish 前 fail closed：CLI 的 `dist/.tsbuildinfo` 被误打入 npm tarball，TypeScript build cache 在 macOS 与 Linux 间不同，导致 client package byte-integrity 不一致。没有任何 npm package 被发布。修复把 CLI build info 移到仓库 cache，并在 packing 与 existing-tag recovery workflow 中显式排除该非运行时文件；同一 `v0.1.0` tag 将通过 recovery dispatch 继续，不移动 release source tag。

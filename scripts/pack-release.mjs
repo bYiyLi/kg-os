@@ -44,12 +44,12 @@ const cliPackage = await packPackage(cliStage);
 await verifyTarballContents(
   sdkPackage.tarball,
   ["package/dist/index.js", "package/package.json"],
-  ["package/kgosd"]
+  ["package/kgosd", "package/dist/.tsbuildinfo"]
 );
 await verifyTarballContents(
   cliPackage.tarball,
   ["package/dist/bin.js", "package/package.json"],
-  ["package/kgosd"]
+  ["package/kgosd", "package/dist/.tsbuildinfo"]
 );
 await verifyTarballContents(
   runtimePackage.tarball,
@@ -106,6 +106,7 @@ async function stageTypescriptPackage(name) {
   rewriteWorkspaceVersions(packageJSON.optionalDependencies);
   await mkdir(destination, { recursive: true });
   await cp(resolve(source, "dist"), resolve(destination, "dist"), { recursive: true });
+  await rm(resolve(destination, "dist", ".tsbuildinfo"), { force: true });
   await cp(resolve(root, "LICENSE"), resolve(destination, "LICENSE"));
   if (name === "cli") {
     await chmod(resolve(destination, "dist", "bin.js"), 0o755);

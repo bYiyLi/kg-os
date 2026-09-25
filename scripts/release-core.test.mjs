@@ -201,6 +201,8 @@ describe("release core", () => {
     expect(workflow).toContain('--release-tag "$RELEASE_TAG"');
     expect(workflow).toContain("REVISION=$(git rev-parse HEAD)");
     expect(workflow).toContain("id-token: write");
+    expect(workflow).toContain("Remove non-package build metadata");
+    expect(workflow).toContain("packages/cli/dist/.tsbuildinfo");
     expect(workflow).toContain('--revision "${{ needs.preflight.outputs.revision }}"');
     expect(workflow).toContain('--version "${{ needs.preflight.outputs.version }}"');
     expect(workflow).toContain("--dry-run");

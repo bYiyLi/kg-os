@@ -155,6 +155,9 @@ jobs:
       - name: Run native Lithograph suite
         run: pnpm test:native
 
+      - name: Remove non-package build metadata
+        run: rm -f packages/sdk/dist/.tsbuildinfo packages/cli/dist/.tsbuildinfo
+
       - name: Pack and smoke-test candidate
         run: node scripts/pack-release.mjs --output artifacts/release
 
