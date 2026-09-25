@@ -30,7 +30,7 @@ Git tag + GitHub Release + docs status
 
 `blocked`
 
-Phase 09 的仓库内 Release engineering 已进入实现与验证阶段：首个公开 MVP baseline 已冻结为 exact version `0.1.0` 与正式 dist-tag `latest`，版本源、candidate provenance / aggregation、partial-release recovery、public-registry smoke 与 Release workflow 已实现。正式入口已调整为 push 已存在的 `v<version>` Git tag；`workflow_dispatch` 只恢复一个已有 tag。当前 `@kgos` npm organization 已真实创建，当前 npm account 为 owner 且已启用 2FA；真实 Release 仍被首次 publish 的 bootstrap credential / 后续 Trusted Publishing 配置与实际 publish acceptance 阻塞。
+Phase 09 的仓库内 Release engineering 已进入真实 registry acceptance 阶段：首个公开 MVP baseline 已冻结为 exact version `0.1.0` 与正式 dist-tag `latest`，版本源、candidate provenance / aggregation、partial-release recovery、public-registry smoke 与 Release workflow 已实现。正式入口为 push 已存在的 `v<version>` Git tag；`workflow_dispatch` 只恢复一个已有 tag。当前 `@kgos` npm organization、owner authority、bootstrap credential 与 `v0.1.0` tag均已验证，六个 `0.1.0` package 已全部真实发布并能由 public registry 解析；Phase 09 仍被四平台 post-publish smoke、Trusted Publishing 配置与 GitHub Release finalization 阻塞。
 
 在取得首次 publish credential 并实际 push release tag、执行 registry publish、四平台 post-publish smoke、Trusted Publisher 配置与 GitHub Release 前，本 Phase 不得进入 `done`，也不得把仓库状态写成“已发布”。
 
@@ -57,7 +57,7 @@ Phase 09 的仓库内 Release engineering 已进入实现与验证阶段：首�
 - publish 顺序固定为四个 Runtime → SDK → CLI；每个 package 直接带正式 `latest` dist-tag 发布，CLI 最后切换，因此不再依赖 post-publish `npm dist-tag add`；
 - Git repository 当前没有 Release tag；
 - 当前 macOS arm64 已真实完成 `0.1.0` Runtime build、三包 `npm pack`、repo 外 packed smoke 与 candidate provenance 输出；candidate 因未提交工作树正确记录 `dirty: true`，不能进入正式聚合；
-- 当前 npm registry 查询 `@kgos/cli`、`@kgos/sdk` 与四个 Runtime package 均未发现已发布 package/version；`@kgos` organization ownership 已通过 npm Web 实际页面确认，但首次 publish 仍需一个可供 GitHub Actions 使用的 bootstrap credential。
+- `@kgos/cli`、`@kgos/sdk` 与四个 Runtime package 的 `0.1.0` 均已真实进入 public npm registry；六包正式 `latest` 均指向 `0.1.0`。CLI registry metadata已验证 exact `@kgos/sdk: 0.1.0` 与四个 Runtime exact optional dependency。
 
 ## 5. 前置依赖
 
@@ -276,6 +276,6 @@ Phase 09 只有同时满足以下条件才能进入 `done`：
 
 当前工作树完整 `git diff --check && pnpm validate` 已成功；独立 fresh-source 从 `HEAD + 当前 tracked/untracked Phase 09 变更` 重建后，`pnpm run setup && pnpm validate` 也成功。两轮都覆盖 Go check/race/coverage/security、TypeScript type/lint/test/coverage、Playwright、真实 Lithograph v0.3.0 native suite、packed npm smoke、license/audit/diff 等既有完整门禁。final review 继续闭环跨平台 client candidate identity、Runtime manifest 三文件 SHA-256、workflow 非 main fail-closed、registry smoke/packed smoke daemon cleanup 等边界；当前 reviewed repository scope 没有剩余 task-affecting code finding。
 
-已确认 `@kgos` npm organization真实存在，当前 npm account 为owner且启用2FA；短期 bootstrap credential 已配置为 GitHub Actions secret，`v0.1.0` tag 已真实 push 并指向 release revision。尚未完成且不能伪装为完成的部分包括：六包真实 public publish、四平台 post-publish registry smoke、为六包配置 GitHub Actions Trusted Publisher，以及 GitHub Release。首次 package 尚不存在，Trusted Publisher 需要在 package 建立后配置，因此 Phase 09 在真实 registry acceptance 完成前保持 `blocked`。
+已确认 `@kgos` npm organization真实存在，当前 npm account 为owner且启用2FA；短期 bootstrap credential 已配置为 GitHub Actions secret，`v0.1.0` tag 已真实 push 并指向 release revision。六包真实 public publish 已完成。首次发布暴露 npm Web 与不同 registry 区域之间约数分钟的 metadata 传播延迟：package 已公开时个别 GitHub runner仍可能得到 404，导致旧的60秒等待窗口超时或重复 publish 已存在版本。Recovery tooling 因此改为更长的有界 registry retry，并只在最终出现 integrity + dist-tag 完全匹配的 immutable artifact 时接受非零 publish 结果；`workflow_dispatch` 的 publish step使用 `main` 最新 recovery tooling，candidate/release source仍严格绑定原 `v0.1.0` revision。尚未完成且不能伪装为完成的部分包括：四平台 post-publish registry smoke、六包 GitHub Actions Trusted Publisher 配置，以及 GitHub Release。
 
 `v0.1.0` 首次 Release run 已真实执行到四平台 candidate 全部成功，但 aggregate 在 publish 前 fail closed：CLI 的 `dist/.tsbuildinfo` 被误打入 npm tarball，TypeScript build cache 在 macOS 与 Linux 间不同，导致 client package byte-integrity 不一致。没有任何 npm package 被发布。修复把 CLI build info 移到仓库 cache，并在 packing 与 existing-tag recovery workflow 中显式排除该非运行时文件；同一 `v0.1.0` tag 将通过 recovery dispatch 继续，不移动 release source tag。

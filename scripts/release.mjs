@@ -223,21 +223,47 @@ async function publish() {
       }
     }
 
-    await run(
-      "npm",
-      [
-        "publish",
-        resolve(directory, entry.filename),
-        "--access",
-        "public",
-        "--tag",
-        finalTag,
-        "--registry",
-        RELEASE_REGISTRY
-      ],
-      { cwd: root }
-    );
-    await waitForRegistryArtifact(entry, finalTag);
+    let publishError = null;
+    try {
+      await run(
+        "npm",
+        [
+          "publish",
+          resolve(directory, entry.filename),
+          "--access",
+          "public",
+          "--tag",
+          finalTag,
+          "--registry",
+          RELEASE_REGISTRY
+        ],
+        { cwd: root }
+      );
+    } catch (error) {
+      publishError = error;
+    }
+
+    try {
+      await waitForRegistryArtifact(entry, finalTag);
+    } catch (registryError) {
+      if (publishError !== null) {
+        throw new Error(
+          publishError.message + "\nRegistry recovery failed: " + registryError.message,
+          { cause: registryError }
+        );
+      }
+      throw registryError;
+    }
+
+    if (publishError !== null) {
+      process.stderr.write(
+        "npm publish returned non-zero, but the matching immutable registry artifact became visible: " +
+          entry.name +
+          "@" +
+          entry.version +
+          "\n"
+      );
+    }
   }
 }
 
@@ -298,9 +324,21 @@ async function verifyRegistry(release, finalTag) {
 }
 
 async function waitForRegistryArtifact(entry, finalTag) {
-  const attempts = 12;
+  const attempts = 72;
+  let lastRegistryError = null;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const packageMetadata = await registryPackage(entry.name);
+    let packageMetadata;
+    try {
+      packageMetadata = await registryPackage(entry.name);
+      lastRegistryError = null;
+    } catch (error) {
+      lastRegistryError = error;
+      if (attempt + 1 < attempts) {
+        await new Promise((resolveDelay) => setTimeout(resolveDelay, 5000));
+        continue;
+      }
+      throw error;
+    }
     const metadata = packageMetadata?.versions?.[entry.version] ?? null;
     const state = classifyRegistryVersion(entry.integrity, metadata);
     if (state === "matching" && packageMetadata?.["dist-tags"]?.[finalTag] === entry.version) {
@@ -315,7 +353,13 @@ async function waitForRegistryArtifact(entry, finalTag) {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 5000));
     }
   }
-  throw new Error("Registry propagation timed out for " + entry.name + "@" + entry.version);
+  throw new Error(
+    "Registry propagation timed out for " +
+      entry.name +
+      "@" +
+      entry.version +
+      (lastRegistryError instanceof Error ? ": " + lastRegistryError.message : "")
+  );
 }
 
 async function registryVersion(name, version) {
