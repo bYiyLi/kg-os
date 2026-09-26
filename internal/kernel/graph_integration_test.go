@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -236,6 +237,9 @@ func TestPhase05GraphSearchLoadCSVSchemaAndTransactions(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := (&url.URL{Scheme: "file", Path: csvPath}).String()
+	if goruntime.GOOS == "windows" {
+		source = (&url.URL{Scheme: "file", Path: "/" + filepath.ToSlash(csvPath)}).String()
+	}
 	imported := graphExecute(
 		t,
 		runtime,

@@ -9,9 +9,14 @@ const version = (await runCapture("rustc", ["--version"], { cwd: root })).stdout
 if (!version.startsWith("rustc 1.97.1 ")) {
   throw new Error("KG OS Jieba build requires Rust 1.97.1; got " + version);
 }
+const cargoEnv = { ...process.env, CARGO_TARGET_DIR: targetDirectory };
+if (process.platform === "win32" && process.arch === "arm64") {
+  // The workflow's CC targets Go's MinGW ABI; Cargo uses its own Windows compiler.
+  delete cargoEnv.CC;
+}
 await run("cargo", ["build", "--manifest-path", manifest, "--release", "--locked"], {
   cwd: root,
-  env: { ...process.env, CARGO_TARGET_DIR: targetDirectory }
+  env: cargoEnv
 });
 
 export const JIEBA_LIBRARY = resolve(
