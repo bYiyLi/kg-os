@@ -33,7 +33,10 @@ async function validCache() {
 }
 
 function validateArchiveEntries(listing) {
-  const entries = listing.split("\n").filter((entry) => entry.length > 0);
+  const entries = listing
+    .split("\n")
+    .map((entry) => entry.replace(/\r$/, ""))
+    .filter((entry) => entry.length > 0);
   for (const entry of entries) {
     const parts = entry.split("/");
     if (entry.startsWith("/") || entry.includes("\\") || parts.includes("..")) {
@@ -41,10 +44,14 @@ function validateArchiveEntries(listing) {
     }
   }
   if (!entries.includes(artifact.library)) {
-    throw new Error(`Lithograph release archive does not contain ${artifact.library}`);
+    throw new Error(
+      `Lithograph release archive does not contain ${artifact.library}: ${JSON.stringify(entries)}`
+    );
   }
   if (!entries.includes(artifact.providerLibrary)) {
-    throw new Error(`Lithograph release archive does not contain ${artifact.providerLibrary}`);
+    throw new Error(
+      `Lithograph release archive does not contain ${artifact.providerLibrary}: ${JSON.stringify(entries)}`
+    );
   }
   if (!entries.includes("VERSION")) {
     throw new Error("Lithograph release archive does not contain VERSION");
