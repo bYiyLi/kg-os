@@ -180,7 +180,7 @@ try {
     }
     await waitForProcessExit(daemonPid, "Registry smoke daemon did not stop");
   }
-  await rm(workRoot, { force: true, recursive: true });
+  await rm(workRoot, { force: true, recursive: true, maxRetries: 20, retryDelay: 100 });
 } catch (error) {
   smokeFailure ??= error;
 }
