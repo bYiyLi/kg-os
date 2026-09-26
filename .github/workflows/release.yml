@@ -293,6 +293,7 @@ jobs:
     needs:
       - preflight
       - aggregate
+    if: ${{ always() && needs.preflight.result == 'success' && needs.aggregate.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -345,6 +346,7 @@ jobs:
     needs:
       - preflight
       - publish
+    if: ${{ always() && needs.preflight.result == 'success' && needs.publish.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -389,6 +391,7 @@ jobs:
       - preflight
       - aggregate
       - registry-smoke
+    if: ${{ always() && needs.preflight.result == 'success' && needs.aggregate.result == 'success' && needs.registry-smoke.result == 'success' }}
     permissions:
       contents: write
     runs-on: ubuntu-24.04
