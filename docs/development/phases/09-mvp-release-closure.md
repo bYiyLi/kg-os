@@ -30,9 +30,9 @@ Git tag + GitHub Release + docs status
 
 `blocked`
 
-Phase 09 的仓库内 Release engineering 已进入真实 registry acceptance 阶段：首个公开 MVP baseline 已冻结为 exact version `0.1.0` 与正式 dist-tag `latest`，版本源、candidate provenance / aggregation、partial-release recovery、public-registry smoke 与 Release workflow 已实现。正式入口为 push 已存在的 `v<version>` Git tag；`workflow_dispatch` 只恢复一个已有 tag。当前 `@kgos` npm organization、owner authority、bootstrap credential 与 `v0.1.0` tag均已验证，六个 `0.1.0` package 已全部真实发布并能由 public registry 解析；Phase 09 仍被四平台 post-publish smoke、Trusted Publishing 配置与 GitHub Release finalization 阻塞。
+Phase 09 的公开 Release acceptance 已完成：`v0.1.0` 六包真实发布，正式 dist-tag `latest` 全部指向 `0.1.0`，四平台 public-registry `npx` smoke 与 GitHub Release finalization 已成功；六包 GitHub Actions Trusted Publisher 与严格 publishing access也已配置，bootstrap credential 已清理。当前保持 `blocked` 的唯一原因是长期 OIDC publish workflow 的去 token closure 与本次状态文档尚未提交/推送并取得最终远端 CI 证据。
 
-在取得首次 publish credential 并实际 push release tag、执行 registry publish、四平台 post-publish smoke、Trusted Publisher 配置与 GitHub Release 前，本 Phase 不得进入 `done`，也不得把仓库状态写成“已发布”。
+公开 Release 已有真实 registry / tag / smoke / GitHub Release 证据，因此可以陈述“`v0.1.0` 已发布”；但在最终 closure revision 推送并通过阶段要求的远端门禁前，本 Phase 仍不得进入 `done`。
 
 ## 3. Design Inputs
 
@@ -47,17 +47,18 @@ Phase 09 的仓库内 Release engineering 已进入真实 registry acceptance �
 
 ## 4. 当前基线
 
-截至 2026-09-25 当前工作树：
+截至 2026-09-26 当前 release closure：
 
 - Phase 00–08 均为 `done`；
 - Phase 08 pushed revision 已完成 Validate + 四平台 native/package matrix；Phase 09 release engineering 实现提交 `37290ef0ed31f1e6627654109011bc212089d2d7` 已推送到 `main`，对应 GitHub Actions run `36136264908` 的 Validate 与四平台 native/package jobs 全部成功；
 - exact Release version 已冻结为 `0.1.0`，正式 dist-tag 已冻结为 `latest`；root、SDK、CLI、Web、四个 Runtime package、SDK public version constant 与 Go build info 已同步；
-- Release workflow 已改为 `v*` tag push 自动触发，`workflow_dispatch` 只接受一个已存在 tag 用于 recovery；preflight 验证 tag/version/source identity，publish job 支持 GitHub Actions OIDC，并保留首次 publish 可使用短期 `NPM_TOKEN` bootstrap fallback；
+- Release workflow 由 `v*` tag push 自动触发，`workflow_dispatch` 只接受一个已存在 tag 用于 recovery；preflight 验证 tag/version/source identity，publish job具备 `id-token: write`。首次 `0.1.0` 已用短期 bootstrap credential完成；六包 Trusted Publisher建立后，长期 publish closure 已移除 `NPM_TOKEN` / `NODE_AUTH_TOKEN` 注入，只保留 npm OIDC；
 - 六个 public package 已补齐与 `bYiyLi/kg-os` 一致的 `repository.url`，满足 npm Trusted Publishing 的 repository identity 要求；
 - publish 顺序固定为四个 Runtime → SDK → CLI；每个 package 直接带正式 `latest` dist-tag 发布，CLI 最后切换，因此不再依赖 post-publish `npm dist-tag add`；
-- Git repository 当前没有 Release tag；
-- 当前 macOS arm64 已真实完成 `0.1.0` Runtime build、三包 `npm pack`、repo 外 packed smoke 与 candidate provenance 输出；candidate 因未提交工作树正确记录 `dirty: true`，不能进入正式聚合；
+- `v0.1.0` 本地与远端 tag均指向原 release revision `d35e254e1b486aa2d8597e68d23a6e4efc1990c3`，未因 recovery tooling 移动；
+- Release Run `36219384704` 已成功完成 preflight、四平台 candidate、aggregate、publish verification、四平台 public-registry smoke 与 GitHub Release finalization；
 - `@kgos/cli`、`@kgos/sdk` 与四个 Runtime package 的 `0.1.0` 均已真实进入 public npm registry；六包正式 `latest` 均指向 `0.1.0`。CLI registry metadata已验证 exact `@kgos/sdk: 0.1.0` 与四个 Runtime exact optional dependency。
+- 六包 Trusted Publisher均绑定 GitHub Actions `bYiyLi/kg-os` / `release.yml`，允许直接 `npm publish`；六包 publishing access均为必须 2FA、禁止 bypass token。GitHub repository `NPM_TOKEN` secret已删除，npm `kgos-v0.1.0-bootstrap` granular token已删除。
 
 ## 5. 前置依赖
 
@@ -270,12 +271,12 @@ Phase 09 只有同时满足以下条件才能进入 `done`：
 
 ## 13. 当前状态
 
-2026-09-25：`blocked`。
+2026-09-26：`blocked`，仅等待最终 closure revision commit/push 与远端 CI。
 
-当前已完成 09.1 与 09.2–09.6 所需的仓库内 Release tooling：`0.1.0` / `latest` baseline、`v*` tag-trigger / existing-tag recovery、tag/version/main-history preflight、同 revision/version candidate contract、Runtime manifest/native SHA-256 与 npm integrity聚合校验、immutable registry identity 驱动的 partial recovery、Runtime→SDK→CLI-last direct final-tag publish、OIDC-ready package repository identity、clean public-registry `npx` smoke以及registry acceptance后才允许创建GitHub Release的依赖链。
+09.1–09.6 的真实 Release acceptance 已完成。Release Run `36219384704` 为 `success`：四平台 candidate / aggregate / publish verification全部通过，macOS arm64、macOS x64、Linux arm64、Linux x64 的 public-registry `npx` smoke全部成功，GitHub Release `KG OS v0.1.0` 于 2026-09-26 发布。六个 package当前重新读取 registry仍为 exact `0.1.0` 且 `latest=0.1.0`；`v0.1.0` tag仍绑定原 source revision，没有移动。
 
-当前工作树完整 `git diff --check && pnpm validate` 已成功；独立 fresh-source 从 `HEAD + 当前 tracked/untracked Phase 09 变更` 重建后，`pnpm run setup && pnpm validate` 也成功。两轮都覆盖 Go check/race/coverage/security、TypeScript type/lint/test/coverage、Playwright、真实 Lithograph v0.3.0 native suite、packed npm smoke、license/audit/diff 等既有完整门禁。final review 继续闭环跨平台 client candidate identity、Runtime manifest 三文件 SHA-256、workflow 非 main fail-closed、registry smoke/packed smoke daemon cleanup 等边界；当前 reviewed repository scope 没有剩余 task-affecting code finding。
+六包 Trusted Publisher 已逐包复核：repository/workflow identity均为 `bYiyLi/kg-os` + `release.yml`，允许直接 `npm publish`，publishing access均收紧为必须 2FA、禁止 bypass token。临时 GitHub Actions `NPM_TOKEN` secret与 npm `kgos-v0.1.0-bootstrap` token均已删除。npm官方 OIDC合同要求的 `id-token: write`、GitHub-hosted runner、npm/Node版本与 repository metadata均已满足；长期 publish step不再注入 `NODE_AUTH_TOKEN`。由于 `0.1.0` 已是 immutable published version，本次不制造第二个版本仅为重复测试 OIDC，OIDC 的首次真实 publish execution 将由下一次正式 Release完成；Phase 09验收的是当前 package-level Trusted Publisher配置与长期 workflow合同。
 
-已确认 `@kgos` npm organization真实存在，当前 npm account 为owner且启用2FA；短期 bootstrap credential 已配置为 GitHub Actions secret，`v0.1.0` tag 已真实 push 并指向 release revision。六包真实 public publish 已完成。首次发布暴露 npm Web 与不同 registry 区域之间约数分钟的 metadata 传播延迟：package 已公开时个别 GitHub runner仍可能得到 404，导致旧的60秒等待窗口超时或重复 publish 已存在版本。Recovery tooling 因此改为更长的有界 registry retry，并只在最终出现 integrity + dist-tag 完全匹配的 immutable artifact 时接受非零 publish 结果；`workflow_dispatch` 的 publish step使用 `main` 最新 recovery tooling，candidate/release source仍严格绑定原 `v0.1.0` revision。尚未完成且不能伪装为完成的部分包括：四平台 post-publish registry smoke、六包 GitHub Actions Trusted Publisher 配置，以及 GitHub Release。
+首次发布期间暴露并已闭环两个 recovery finding：CLI `dist/.tsbuildinfo` 跨平台污染 candidate byte identity，以及 npm Web / registry region之间的首发 metadata传播延迟。前者由 build metadata移出 package staging并显式清理解决；后者由更长的有界 registry retry与“只有最终 integrity + dist-tag完全匹配才接受非零 publish结果”的 fail-closed recovery解决。最终 recovery使用 `main` 最新 tooling，但 candidate/release source始终绑定原 `v0.1.0` revision。
 
-`v0.1.0` 首次 Release run 已真实执行到四平台 candidate 全部成功，但 aggregate 在 publish 前 fail closed：CLI 的 `dist/.tsbuildinfo` 被误打入 npm tarball，TypeScript build cache 在 macOS 与 Linux 间不同，导致 client package byte-integrity 不一致。没有任何 npm package 被发布。修复把 CLI build info 移到仓库 cache，并在 packing 与 existing-tag recovery workflow 中显式排除该非运行时文件；同一 `v0.1.0` tag 将通过 recovery dispatch 继续，不移动 release source tag。
+当前只剩本次长期 OIDC 去 token closure与状态同步的 repository revision尚未 commit/push；按开发路线的 `done` 规则，必须在该 revision取得最终远端 CI成功证据后再把 Phase状态从 `blocked` 切换为 `done`。

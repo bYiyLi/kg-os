@@ -145,7 +145,7 @@ npm 是正式分发入口；GitHub artifacts 可以继续作为 CI / provenance 
 
 发布顺序固定为四个 Runtime package、SDK、CLI 最后。四平台 immutable candidate、native load 与 packed smoke 全部通过后，六个 package 直接使用本次正式 dist-tag 发布；CLI 只有在其 exact SDK / Runtime dependency 已经能从 registry 解析到同版本 artifact 后才允许发布。这样在 CLI 切换前，用户正式入口不会提前指向一个依赖不完整的新版本，也不需要发布完成后再执行单独的 npm `dist-tag add`。
 
-GitHub Actions 的长期 npm 发布认证优先使用 npm Trusted Publishing / OIDC；published package 的 `repository.url` 必须绑定当前 GitHub repository，Release publish job 必须拥有 `id-token: write`。首个 package 尚未存在、无法在 package settings 建立 trusted publisher 时，允许使用一次短期 bootstrap credential完成首次 publish；bootstrap credential 只能保存在 GitHub Actions secret，不进入 repository、artifact 或 log，并在六个 package 都配置 trusted publisher 后删除。
+GitHub Actions 的长期 npm 发布认证使用 npm Trusted Publishing / OIDC；published package 的 `repository.url` 必须绑定当前 GitHub repository，Release publish job 必须拥有 `id-token: write`，正式 publish step 不注入长期 `NODE_AUTH_TOKEN`。首个 package 尚未存在、无法在 package settings 建立 trusted publisher 时，允许使用一次短期 bootstrap credential完成首次 publish；bootstrap credential 只能保存在 GitHub Actions secret，不进入 repository、artifact 或 log，并在六个 package 都配置 trusted publisher 后删除。
 
 实际 npm registry publish、public-registry smoke 与 GitHub Release 是发布动作；只有真实执行并取得 registry evidence 后才能声称已发布。Git tag 是发布指令与 source identity，不再表示“发布完成后才补建的结果”。
 

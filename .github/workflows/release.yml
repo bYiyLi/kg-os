@@ -247,8 +247,6 @@ jobs:
             --dry-run
 
       - name: Publish or recover matching partial release
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node scripts/release.mjs publish \
             --directory artifacts/final \

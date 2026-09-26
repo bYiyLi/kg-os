@@ -201,6 +201,8 @@ describe("release core", () => {
     expect(workflow).toContain('--release-tag "$RELEASE_TAG"');
     expect(workflow).toContain("REVISION=$(git rev-parse HEAD)");
     expect(workflow).toContain("id-token: write");
+    expect(workflow).not.toContain("NPM_TOKEN");
+    expect(workflow).not.toContain("NODE_AUTH_TOKEN");
     expect(workflow).toContain("github.event_name == 'workflow_dispatch' && github.sha");
     expect(workflow).toContain("Remove non-package build metadata");
     expect(workflow).toContain("packages/cli/dist/.tsbuildinfo");
