@@ -177,6 +177,15 @@ jobs:
       - name: Pack and smoke-test npm candidates
         run: pnpm pack:release
 
+      - name: Inspect Windows process failure
+        if: failure() && startsWith(matrix.target, 'win32-')
+        shell: pwsh
+        run: |
+          Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = (Get-Date).AddMinutes(-20); Id = 1000, 1001 } -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match 'kgosd\.exe|node\.exe' } |
+            Select-Object -First 10 TimeCreated, Id, ProviderName, Message |
+            Format-List
+
       - name: Upload npm candidates
         uses: actions/upload-artifact@v7
         with:

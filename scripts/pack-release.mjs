@@ -419,6 +419,13 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
       ...ontologyBody.map((line) => "+" + line),
       ""
     ].join("\n");
+    let ontologyPatchArgs = ["--patch", ontologyPatch];
+    if (process.platform === "win32") {
+      // npm exec uses cmd.exe, which does not preserve a multiline argument.
+      const ontologyPatchPath = resolve(smokeRoot, "phase10-ontology.patch");
+      await writeFile(ontologyPatchPath, ontologyPatch);
+      ontologyPatchArgs = ["--patch-file", ontologyPatchPath];
+    }
     const patchedOntology = await runKgJSON(rootA, [
       "ontology",
       "patch",
@@ -426,8 +433,7 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
       restarted.state,
       "--branch",
       "main",
-      "--patch",
-      ontologyPatch
+      ...ontologyPatchArgs
     ]);
     if (typeof patchedOntology.state !== "string") {
       throw new Error("packed Ontology Patch did not create a State");
