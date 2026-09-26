@@ -66,7 +66,7 @@ npx --yes @kgos/cli@<version> --root <instance-root> <command>
 例如：
 
 ```sh
-npx --yes @kgos/cli@0.1.0 --root ./.kgos ontology --at branch/main
+npx --yes @kgos/cli@0.1.1 --root ./.kgos ontology --at branch/main
 ```
 
 `--yes` 是 npm/npx 自身的非交互确认选项，必须位于 package specifier 之前；它不是 KG OS CLI flag。npm 在未安装 package 时可能先提示确认，因此 AI / CI 显式使用 `--yes`；非 TTY / CI 环境即使 npm 自动假定 yes，也保持这一 canonical spelling 以避免环境差异。人类交互使用可以省略 `--yes`。AI / CI 还应固定明确版本；`@latest` 可以用于人工试用，但不作为可复现自动化的推荐形式。
@@ -107,16 +107,16 @@ CLI 的业务命令通过 `@kgos/sdk` 调用 daemon。只有 `doctor`、`init`�
 
 package 不再包含 native `kg` binary。`kgosd` 与三个 required official extension 使用同一 KG OS package version；manifest 记录 target、version 与每个 native artifact 的 SHA-256，缺失、target/version 不匹配或 hash 不匹配必须 fail closed。official Jieba 的 tokenizer code / dictionary data必须随当前 platform package形成可复现 artifact，不依赖宿主预装资源或运行时下载。
 
-当前源码的 native package target 为 macOS arm64/x64、Linux **glibc** arm64/x64 与 Windows arm64/x64。Windows 使用 Node/npm 的 `win32` target 名、`.dll` 扩展和 `kgosd.exe`；Linux native package除 `os/cpu` 外还必须声明与实际构建一致的 npm `libc` metadata。公开 v0.1.0 仍只有已发布的四个 macOS/Linux Runtime package，Windows 需后续新版本发布；Phase 08 的历史四平台结论不被追溯扩张。没有对应 native package 的平台返回明确 unsupported-platform local error，不从源码即时编译、不回退任意远端 binary。
+当前源码的 native package target 为 macOS arm64/x64、Linux **glibc** arm64/x64 与 Windows arm64/x64。Windows 使用 Node/npm 的 `win32` target 名、`.dll` 扩展和 `kgosd.exe`；Linux native package除 `os/cpu` 外还必须声明与实际构建一致的 npm `libc` metadata。公开 v0.1.1 已发布六个平台的 Runtime package；v0.1.0 与 Phase 08 的历史四平台结论不被追溯扩张。没有对应 native package 的平台返回明确 unsupported-platform local error，不从源码即时编译、不回退任意远端 binary。
 
 ## Runtime package 与 Instance 分离
 
 npm package location 属于软件分发状态，不能进入 Instance 持久配置：
 
 ```text
-npx --yes @kgos/cli@0.1.0
+npx --yes @kgos/cli@0.1.1
         │
-        └── @kgos/runtime-<os>-<arch>@0.1.0
+        └── @kgos/runtime-<os>-<arch>@0.1.1
                  └── kgosd + official extensions
 
 --root /data/world/.kgos

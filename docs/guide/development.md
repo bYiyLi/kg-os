@@ -300,16 +300,22 @@ git tag "v${KGOS_VERSION}"
 git push origin "v${KGOS_VERSION}"
 ```
 
-[`.github/workflows/release.yml`](../../.github/workflows/release.yml) 监听 `v*` tag push；普通 pull request 与 `main` push 不会 publish。`workflow_dispatch` 只接受一个**已经存在**的 release tag，用于恢复同一次 partial release，不产生新的 version。workflow preflight 要求 tag 名等于 `v<package-version>`、tag revision 属于 `origin/main` 历史且 source clean。当前源码的后续 Release workflow 要求六平台 candidate、聚合与 native hash/integrity 校验、Runtime → SDK → CLI-last publish / partial recovery、八包 exact-version + `latest` registry verification、六平台 public-registry `npx` smoke，最后基于已有 tag 创建 GitHub Release；这不改变已发布 v0.1.0 的六包/四平台事实。Windows 两个新 package 正式首次发布前还需建立对应 npm 发布认证。
+[`release.yml`](../../.github/workflows/release.yml) 监听 `v*` tag push；普通 pull request 与 `main` push 不会 publish。`workflow_dispatch` 要求一个**已经存在**的 release tag，不产生新的 version。workflow preflight 要求 tag 名等于 `v<package-version>`、tag revision 属于 `origin/main` 历史且 source clean。首次运行要完成六平台 candidate、聚合与 native hash/integrity 校验，然后按 Runtime → SDK → CLI 顺序发布、验证八包 exact-version 与 `latest`、运行六平台 public-registry `npx` smoke，最后创建 GitHub Release。
 
-publish job 具备 GitHub Actions OIDC `id-token: write`，长期认证使用 npm Trusted Publishing。当前八个 package 的 `repository.url` 都绑定 `bYiyLi/kg-os` GitHub repository。首次 `0.1.0` 发布时原六包尚不存在，无法先在 package settings 建立 Trusted Publisher，因此曾使用短期 granular token 完成 bootstrap。`0.1.1` 的两个 Windows 包也需要首发：GitHub Actions secret `NPM_TOKEN` 只在它们尚未存在时注入对应 publish 子进程；缺少该 secret 时，dry-run 在发布任何包之前失败。token 不写入仓库、candidate、release notes 或 Instance。每个 Windows package 存在后，应配置对应的 GitHub Actions Trusted Publisher：
+若某次 Release 已经发布部分 package，恢复时传入该次**已结束**且聚合成功的 run ID，复用它的 `release-set`。恢复工作流会核对来源 workflow、tag revision、version 与每个 tarball 的完整性，再继续缺失的 package。native 构建产物在不同 run 间可能有不同哈希，部分发布后不能用重新构建的候选替代已发布产物。
+
+```sh
+gh workflow run release.yml --ref main -f tag="v${KGOS_VERSION}" -f reuse_release_run="<run-id>"
+```
+
+publish job 具备 GitHub Actions OIDC `id-token: write`，长期认证使用 npm Trusted Publishing。当前八个 package 的 `repository.url` 都绑定 `bYiyLi/kg-os` GitHub repository。首次 `0.1.0` 的原六包与 `0.1.1` 的两个 Windows 包在 package settings 尚不可用时，都曾使用短期 granular token 完成首发。GitHub Actions secret `NPM_TOKEN` 只在 Windows package 尚不存在时注入对应 publish 子进程；token 不写入仓库、candidate、release notes 或 Instance。Windows package 首发后，需分别配置 GitHub Actions Trusted Publisher：
 
 - GitHub owner：`bYiyLi`
 - Repository：`kg-os`
 - Workflow filename：`release.yml`
 - Allowed action：允许 `npm publish`
 
-全部配置完成后删除 repository secret `NPM_TOKEN`；后续 `v*` Release 使用 OIDC，无需长期 npm publish token。
+全部配置完成并核对后，删除 repository secret `NPM_TOKEN`，撤销 npm 上的短期 bootstrap token；后续 `v*` Release 使用 OIDC，无需长期 npm publish token。
 
 只完成本地 candidate、workflow 配置、部分 npm publish 或单独 Git tag 都不等于公开 Release 完成；`0.1.0` 真实状态以 [Phase 09](../development/phases/09-mvp-release-closure.md)、`0.1.1` 以 [Phase 11](../development/phases/11-windows-runtime-acceptance.md) 的 registry/tag/Release 证据为准。
 

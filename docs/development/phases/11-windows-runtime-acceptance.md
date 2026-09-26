@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-`in_progress`。把现有 CLI + native Runtime package 路径扩展到 Windows x64 / arm64，并在对应 GitHub Actions runner 上取得真实 build、native load、packed npm 使用链与回归证据。六平台候选验收后，按既定 Release workflow 发布 `0.1.1` 的八个 npm package，并完成六平台 public-registry `npx` smoke 与 GitHub Release。Phase 10 的四平台完成结论保持原适用范围；公开 `0.1.0` 仍只有 macOS / Linux Runtime package。
+`in_progress`。Windows x64 / arm64 的 native Runtime package、真实 runner 验收、`0.1.1` 八包发布、六平台 public-registry `npx` smoke 与 GitHub Release 已完成。剩余首发认证收尾：为两个 Windows package 配置 Trusted Publisher，并删除短期 bootstrap credential。Phase 10 的四平台完成结论保持原适用范围。
 
 本阶段不增加 Windows Service 或系统级安装方式。Git tag、npm publish 和 GitHub Release 必须在同一经过六平台 CI 验收的 source revision 上进行；仅有本地候选或 CI 配置不构成发布完成。
 
@@ -29,7 +29,9 @@ CI matrix 使用 `windows-2025` x64 与 `windows-11-vs2026-arm` arm64，并继�
 
 ## 当前证据
 
-- 上游 Lithograph v0.3.0 的 Windows x64 / arm64 ZIP 已下载并核对固定 SHA-256，均含 `lithograph.dll`、`lithograph-openai-compatible.dll` 和 `VERSION`。
-- `0.1.1` 代码候选的 macOS arm64 `pnpm validate` 已通过，提交 `1ad53b2890324eec2628f865833d0fd17d2bce3a` 已推送。首次六平台 CI run `36262650545` 的 Windows x64/arm64 在 Lithograph ZIP 读取阶段失败：Git Bash `tar` 把 Windows 盘符当作远端设备。修复提交 `934e3ba3758dad44a0099d47f722c1d0a9a7b142` 改用 Windows 系统 `tar.exe`，第二次 CI run `36263099654` 的两个 Windows job 已读出 ZIP，却因列表 CRLF 行尾未匹配 `lithograph.dll`。修复提交 `41e5b82632a222dedc44477af43fb9b7b4abff4f` 后，第三次 CI run `36263422963` 的 Windows x64 已完成 native build，但测试暴露出 Windows file URI、credential ACL / directory sync、绝对路径与平台 fixture 问题；Windows arm64 的 native build 使用了 x64 GCC，无法编译 ARM64 汇编。上述问题的最小修复与 arm64 CGO toolchain 正在验证。`v0.1.1` 发布与 registry smoke 尚未运行，本阶段尚未完成。
-- 修复提交 `398079010b8cdb10cf180d9dbf21300ba945a85a` 已推送；第四次 CI run `36264716226` 的 Validate 与 Linux arm64/x64、macOS arm64/x64 native/package job 已通过，Windows arm64 的目标 CGO toolchain 已在 runner 安装并通过 target 校验。Windows x64 native suite 进一步暴露：`LockFileEx` 锁住 locator 正文导致其它 handle 不能读取；LOAD CSV 测试需要标准 Windows `file:///C:/...` URI；daemon 集成测试也因 locator 无法读取超时。Windows arm64 在 build 时把 Go 的 MinGW `CC` 传给 Rust 的 Windows Jieba 构建，导致 C 标准头缺失。当前正验证这些修复，第四次 CI 不能作为发布依据。
-- 修复提交 `ea7a6ad7a5922a0782aab918361b0c6be67c868a` 已推送；第五次 CI run `36265371571` 的 Validate、macOS/Linux 四平台 native/package，以及 Windows x64/arm64 native suite 均通过。Windows packed smoke 仍失败：arm64 经 npm Windows 命令包装传递多行 inline Patch 后得到 metadata-only Patch 错误，已改用正式支持的 `--patch-file`；x64 在 `evolution merge start` 的 `npm exec` 子进程收到 Windows fail-fast 退出码 `0xC0000409`，日志未给出崩溃进程，下一轮 CI 将收集 Windows 应用事件以定位。两个 Windows package 尚未通过 packed smoke，不能发布。
+- Windows x64 / arm64 使用 `windows-2025` 与 `windows-11-vs2026-arm` runner；Lithograph v0.3.0 固定 ZIP 的 SHA-256、三个 DLL、arm64 CGO target 与两个 Runtime package manifest 均在真实 runner 上验证。前五次 CI 暴露并修复了 Windows `tar.exe` / CRLF、file URI、credential ACL、locator 锁、arm64 CGO 与 Jieba Rust 编译、packed Patch file 等问题；历史失败 run 为 `36262650545`、`36263099654`、`36263422963`、`36264716226`、`36265371571`。
+- 发布源码提交 `1509eaf80a1aadf6a8f126a479cf8854c016ed2a` 的 CI run `36266146250`：Validate 与 macOS arm64/x64、Linux glibc arm64/x64、Windows arm64/x64 的 native/package jobs 全部成功；`v0.1.1` tag 仍指向该提交。后续发布工具/清理修复提交 `98f6fd9`、`3d1259a`、`356dd26`、`b43d3fe` 均已推送；`b43d3fe` 的 CI run `36271435413` 同样六平台全绿。
+- 首次 Release run `36266771760` 的六个平台候选成功，但 Windows `npm pack` 只在 CLI `dist/bin.js` 可执行位上与 Unix tarball 不同，聚合失败。修复后 run `36268144455` 的六候选与聚合成功；npm 精简元数据缓存使 publish 在七包后达到 job 时限。恢复工作流复用该 run 的原始 `release-set`，按 tag revision、version、tarball hash 验证后继续，避免重新构建的 native tarball 与已发布版本冲突。
+- 恢复 run `36270787994` 完成第八个 `@kgos/cli@0.1.1` 包及八包 exact-version / `latest` 校验；macOS/Linux 四个平台 public-registry smoke 通过。Windows 首轮 smoke 的业务步骤已运行，但清理时 DLL 短暂占用导致权限错误，后续给 Windows 临时目录清理加入有上限的重试。
+- 最终 Release run `36271452963` 的第二次尝试为 `success`：八包与 `latest=0.1.1` 的完整性核对、macOS/Linux/Windows arm64/x64 六平台 public-registry `npx` smoke，以及非 draft、非 prerelease 的 GitHub Release `KG OS v0.1.1` 均成功。Windows x64 首次尝试在 `npx --version` 遇到无输出的 `0xC0000409` fail-fast，重试同一 job 后完整 smoke 成功；崩溃进程与原因仍无诊断证据，不把该一次成功外推成稳定性证明。
+- 两个 Windows package 的首次发布使用短期 npm bootstrap token。GitHub Actions secret `NPM_TOKEN` 已删除，`gh secret list --repo bYiyLi/kg-os` 确认不再列出它；Windows package Trusted Publisher 设置与 npm bootstrap token 撤销仍待 npm Web 安全密钥验证。完成并核对后再将本阶段状态改为 `done`。

@@ -273,7 +273,7 @@ Phase 09 只有同时满足以下条件才能进入 `done`：
 
 2026-09-26：`done`。
 
-09.1–09.6 的真实 Release acceptance 已完成。Release Run `36219384704` 为 `success`：四平台 candidate / aggregate / publish verification全部通过，macOS arm64、macOS x64、Linux arm64、Linux x64 的 public-registry `npx` smoke全部成功，GitHub Release `KG OS v0.1.0` 于 2026-09-26 发布。六个 package当前重新读取 registry仍为 exact `0.1.0` 且 `latest=0.1.0`；`v0.1.0` tag仍绑定原 source revision，没有移动。
+09.1–09.6 的真实 Release acceptance 已完成。Release Run `36219384704` 为 `success`：四平台 candidate / aggregate / publish verification全部通过，macOS arm64、macOS x64、Linux arm64、Linux x64 的 public-registry `npx` smoke全部成功，GitHub Release `KG OS v0.1.0` 于 2026-09-26 发布。Phase 09 验收时六个 package 的 exact version 与 `latest` 均为 `0.1.0`；`v0.1.0` tag仍绑定原 source revision，没有移动。
 
 六包 Trusted Publisher 已逐包复核：repository/workflow identity均为 `bYiyLi/kg-os` + `release.yml`，允许直接 `npm publish`，publishing access均收紧为必须 2FA、禁止 bypass token。临时 GitHub Actions `NPM_TOKEN` secret与 npm `kgos-v0.1.0-bootstrap` token均已删除。npm官方 OIDC合同要求的 `id-token: write`、GitHub-hosted runner、npm/Node版本与 repository metadata均已满足；长期 publish step不再注入 `NODE_AUTH_TOKEN`。由于 `0.1.0` 已是 immutable published version，本次不制造第二个版本仅为重复测试 OIDC，OIDC 的首次真实 publish execution 将由下一次正式 Release完成；Phase 09验收的是当前 package-level Trusted Publisher配置与长期 workflow合同。
 
