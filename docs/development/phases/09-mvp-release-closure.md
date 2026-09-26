@@ -28,11 +28,11 @@ Git tag + GitHub Release + docs status
 
 ## 2. 状态
 
-`blocked`
+`done`
 
-Phase 09 的公开 Release acceptance 已完成：`v0.1.0` 六包真实发布，正式 dist-tag `latest` 全部指向 `0.1.0`，四平台 public-registry `npx` smoke 与 GitHub Release finalization 已成功；六包 GitHub Actions Trusted Publisher 与严格 publishing access也已配置，bootstrap credential 已清理。当前保持 `blocked` 的唯一原因是长期 OIDC publish workflow 的去 token closure 与本次状态文档尚未提交/推送并取得最终远端 CI 证据。
+Phase 09 的公开 Release acceptance 与长期发布安全 closure 已完成：`v0.1.0` 六包真实发布，正式 dist-tag `latest` 全部指向 `0.1.0`，四平台 public-registry `npx` smoke 与 GitHub Release finalization 已成功；六包 GitHub Actions Trusted Publisher 与严格 publishing access均已配置，bootstrap credential 已清理。长期 OIDC workflow closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 已推送，CI Run `36226930183` 的 Validate 与四个平台 Native Runtime jobs全部成功。
 
-公开 Release 已有真实 registry / tag / smoke / GitHub Release 证据，因此可以陈述“`v0.1.0` 已发布”；但在最终 closure revision 推送并通过阶段要求的远端门禁前，本 Phase 仍不得进入 `done`。
+公开 Release、credential cleanup、长期 OIDC workflow与最终远端门禁均已有真实证据，因此本 Phase 正式进入 `done`。
 
 ## 3. Design Inputs
 
@@ -271,7 +271,7 @@ Phase 09 只有同时满足以下条件才能进入 `done`：
 
 ## 13. 当前状态
 
-2026-09-26：`blocked`，仅等待最终 closure revision commit/push 与远端 CI。
+2026-09-26：`done`。
 
 09.1–09.6 的真实 Release acceptance 已完成。Release Run `36219384704` 为 `success`：四平台 candidate / aggregate / publish verification全部通过，macOS arm64、macOS x64、Linux arm64、Linux x64 的 public-registry `npx` smoke全部成功，GitHub Release `KG OS v0.1.0` 于 2026-09-26 发布。六个 package当前重新读取 registry仍为 exact `0.1.0` 且 `latest=0.1.0`；`v0.1.0` tag仍绑定原 source revision，没有移动。
 
@@ -279,4 +279,4 @@ Phase 09 只有同时满足以下条件才能进入 `done`：
 
 首次发布期间暴露并已闭环两个 recovery finding：CLI `dist/.tsbuildinfo` 跨平台污染 candidate byte identity，以及 npm Web / registry region之间的首发 metadata传播延迟。前者由 build metadata移出 package staging并显式清理解决；后者由更长的有界 registry retry与“只有最终 integrity + dist-tag完全匹配才接受非零 publish结果”的 fail-closed recovery解决。最终 recovery使用 `main` 最新 tooling，但 candidate/release source始终绑定原 `v0.1.0` revision。
 
-当前只剩本次长期 OIDC 去 token closure与状态同步的 repository revision尚未 commit/push；按开发路线的 `done` 规则，必须在该 revision取得最终远端 CI成功证据后再把 Phase状态从 `blocked` 切换为 `done`。
+长期 OIDC 去 token closure 已作为提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 推送到 `main`。GitHub Actions CI Run `36226930183` 已完成：Validate job `108362650639`、darwin-x64 `108362650701`、linux-arm64 `108362650707`、linux-x64 `108362650727`、darwin-arm64 `108362650754` 全部为 `success`。至此 Phase 09 的实现、Release acceptance、Review、安全清理、文档同步与远端门禁全部满足完成条件。

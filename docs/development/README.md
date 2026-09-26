@@ -73,7 +73,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 08 TypeScript Client & npm Runtime Distribution 当前为 `done`。** 公共 `@kgos/sdk`、TypeScript `@kgos/cli`、显式 `--root`、`init/doctor`、per-root dynamic daemon、platform npm Runtime package builder / candidate smoke 已实现，并在 parity 通过后删除 Go `kg`。实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均成功，Go statement coverage **90.0%**、TypeScript statements/lines/functions **100%**、jscpd **0 clones**，race/govulncheck/Playwright/native/package/license/audit/diff gates 全绿，final review 无剩余 task-affecting finding。GitHub Actions run `36103842748` 的 Validate job `107971924426` 与四个平台 native/package jobs（macOS x64 `107971924614`、Linux arm64 `107971924657`、macOS arm64 `107971924688`、Linux x64 `107971924773`）全部成功。完整范围与 Acceptance 见[Phase 08](phases/08-typescript-client-npm-runtime.md)。
 
-**Phase 09 MVP Release Closure 当前为 `blocked`，但公开 Release acceptance 已完成。** Release Run `36219384704` 为 `success`，六个 `0.1.0` package 与 `latest` 已重新验证，四平台 public-registry `npx` smoke全部成功，GitHub Release `KG OS v0.1.0` 已发布。六包 Trusted Publisher 均绑定 `bYiyLi/kg-os` / `release.yml` 并启用直接 `npm publish`，publishing access 已收紧为必须 2FA、禁止 bypass token；临时 GitHub `NPM_TOKEN` secret 与 npm `kgos-v0.1.0-bootstrap` token均已删除。当前唯一剩余项是提交/推送长期 OIDC publish workflow 的去 token closure 与本次状态文档，并取得对应远端 CI 证据。完整范围与 Acceptance 见[Phase 09](phases/09-mvp-release-closure.md)。
+**Phase 09 MVP Release Closure 当前为 `done`。** Release Run `36219384704` 为 `success`，六个 `0.1.0` package 与 `latest` 已重新验证，四平台 public-registry `npx` smoke全部成功，GitHub Release `KG OS v0.1.0` 已发布。六包 Trusted Publisher 均绑定 `bYiyLi/kg-os` / `release.yml` 并启用直接 `npm publish`，publishing access 已收紧为必须 2FA、禁止 bypass token；临时 GitHub `NPM_TOKEN` secret 与 npm `kgos-v0.1.0-bootstrap` token均已删除。长期 OIDC publish workflow closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 已推送到 `main`，GitHub Actions CI Run `36226930183` 的 Validate 与四个平台 Native Runtime jobs 全部成功。完整范围与 Acceptance 见[Phase 09](phases/09-mvp-release-closure.md)。
 
 ## 5. 路线总览
 
@@ -88,7 +88,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [06 Evolution Core](phases/06-evolution-core.md) | `done` | State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff、authenticated HTTP 与 `kg evolution` Core CLI；本地/fresh-source/Ubuntu CI 验收完成，不含 Merge | [Evolution](../design/evolution.md)、[Evolution CLI](../design/cli.md#evolution-cli)、[公共错误合同](../design/contracts.md#公共错误合同) |
 | [07 Evolution Merge Session](phases/07-evolution-merge.md) | `done` | Merge Session adapter、public conflict projection、渐进 resolution、exact-revision candidate consistency、finalize/abort、authenticated HTTP 与 `kg evolution merge` CLI；本地/fresh-source/Ubuntu CI 验收完成 | [Evolution Merge](../design/evolution.md#evolution-公共调用合同)、[Merge CLI](../design/cli.md#merge-session)、[D41](../design/decisions.md#d41-evolution-merge-使用-lithograph-merge-session-渐进解决冲突) |
 | [08 TypeScript Client & npm Runtime Distribution](phases/08-typescript-client-npm-runtime.md) | `done` | 真实 `@kgos/sdk`、TypeScript `@kgos/cli`、explicit `--root`、`init`、per-root daemon/dynamic endpoint、platform npm native Runtime package、Go CLI parity迁移与清理；本地/fresh-source/final review与 macOS arm64/x64 + Linux glibc arm64/x64 CI matrix均完成 | [Client](../design/client.md)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md)、[D75](../design/decisions.md#d75-typescript-client)、[D76](../design/decisions.md#d76-npm-distribution)、[D77](../design/decisions.md#d77-explicit-instance-root) |
-| [09 MVP Release Closure](phases/09-mvp-release-closure.md) | `blocked` | `v0.1.0` 六包、四平台 registry npx、GitHub Release与六包 Trusted Publisher/credential cleanup均完成；等待最终 OIDC closure commit/push + CI | [Client版本关系](../design/client.md#版本关系)、[发布与验证边界](../design/client.md#发布与验证边界)、[Phase 08](phases/08-typescript-client-npm-runtime.md) |
+| [09 MVP Release Closure](phases/09-mvp-release-closure.md) | `done` | `v0.1.0` 六包、四平台 registry npx、GitHub Release、六包 Trusted Publisher/credential cleanup与长期 OIDC closure均完成 | [Client版本关系](../design/client.md#版本关系)、[发布与验证边界](../design/client.md#发布与验证边界)、[Phase 08](phases/08-typescript-client-npm-runtime.md) |
 
 当前实现依赖顺序：
 
@@ -114,7 +114,7 @@ Go Engineering Foundation
   -> later Web / Skill phases
 ```
 
-Phase 02–08 均已完成。Phase 09 的公开 Release acceptance 也已真实完成：`v0.1.0` tag、六包 `0.1.0` / `latest`、四平台 public-registry smoke、GitHub Release、六包 Trusted Publisher 与 bootstrap credential cleanup均有实际证据；当前保持 `blocked` 只因为长期 OIDC publish workflow 的去 token closure 与状态文档尚未提交/推送并通过远端 CI。Web / Skill 不属于 Phase 09。
+Phase 02–09 均已完成。Phase 09 的 `v0.1.0` tag、六包 `0.1.0` / `latest`、四平台 public-registry smoke、GitHub Release、六包 Trusted Publisher、bootstrap credential cleanup与长期 OIDC publish workflow closure均有实际证据；closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 对应 CI Run `36226930183` 全绿。Web / Skill 不属于 Phase 09。
 
 ## 6. Phase 通用完成标准
 
