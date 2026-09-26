@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -850,7 +852,7 @@ func TestSemanticHiddenConfigClosedProfile(t *testing.T) {
 				"encoding_format": "float",
 				"cache": map[string]any{
 					"enabled":   false,
-					"path":      "/tmp/kgos-semantic-cache.db",
+					"path":      filepath.Join(os.TempDir(), "kgos-semantic-cache.db"),
 					"max_bytes": float64(1024),
 				},
 			},

@@ -2,6 +2,8 @@ package kernel
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
@@ -99,7 +101,7 @@ func validSemanticOptionsForTest() map[string]any {
 				"encoding_format": "float",
 				"cache": map[string]any{
 					"enabled":   false,
-					"path":      "/tmp/kgos-phase02-cache.db",
+					"path":      filepath.Join(os.TempDir(), "kgos-phase02-cache.db"),
 					"max_bytes": float64(10),
 				},
 			},

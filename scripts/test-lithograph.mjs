@@ -38,6 +38,7 @@ await run(
     "-count=1",
     "./internal/lithograph",
     "./internal/runtime",
+    "./internal/runtimeprofile",
     "./internal/lithographtest",
     "./internal/kernel",
     "./internal/daemon",

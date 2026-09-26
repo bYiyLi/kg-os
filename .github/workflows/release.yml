@@ -156,6 +156,28 @@ jobs:
           rustup default 1.97.1
           test "$(rustc --version | cut -d' ' -f2)" = "1.97.1"
 
+      - name: Install Windows arm64 CGO toolchain
+        if: matrix.target == 'win32-arm64'
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          release: false
+          update: true
+          install: mingw-w64-clang-aarch64-clang
+
+      - name: Select Windows arm64 CGO compiler
+        if: matrix.target == 'win32-arm64'
+        shell: pwsh
+        env:
+          MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
+        run: |
+          $compiler = Join-Path $env:MSYS2_ROOT 'clangarm64\bin\clang.exe'
+          if (!(Test-Path $compiler)) { throw "Windows arm64 compiler is missing" }
+          $target = & $compiler -dumpmachine
+          if ($LASTEXITCODE -ne 0 -or $target -ne 'aarch64-w64-windows-gnu') { throw "Windows arm64 compiler target is $target" }
+          "CC=$compiler" >> $env:GITHUB_ENV
+
       - name: Install Linux CGO toolchain
         if: startsWith(matrix.target, 'linux-')
         run: |
@@ -166,7 +188,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Verify native runner target
-        run: test "$(node -p 'process.platform + "-" + process.arch')" = "${{ matrix.target }}"
+        run: |
+          test "$(node -p 'process.platform + "-" + process.arch')" = "${{ matrix.target }}"
+          if [[ "${{ matrix.target }}" == win32-arm64 ]]; then test "$("$CC" -dumpmachine)" = "aarch64-w64-windows-gnu"; fi
 
       - name: Build Runtime candidate
         run: pnpm build

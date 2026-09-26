@@ -2,6 +2,8 @@ package kernel
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -288,7 +290,7 @@ func TestSnapshotSchemaHelperCoverage(t *testing.T) {
 		"providerConfig": map[string]any{
 			"base_url": "https://example.invalid/v1", "model": "m",
 			"send_dimensions": false, "encoding_format": "float",
-			"cache": map[string]any{"enabled": true, "path": "/tmp/cache.db", "max_bytes": float64(10)},
+			"cache": map[string]any{"enabled": true, "path": filepath.Join(os.TempDir(), "cache.db"), "max_bytes": float64(10)},
 		},
 		"dimensions": float64(3), "similarity": "euclidean",
 	}

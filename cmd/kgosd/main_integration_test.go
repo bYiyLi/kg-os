@@ -51,8 +51,16 @@ func prepareKGOSDTestRuntimePackage(t *testing.T) {
 	suffix := ".so"
 	if runtime.GOOS == "darwin" {
 		suffix = ".dylib"
+	} else if runtime.GOOS == "windows" {
+		suffix = ".dll"
 	}
-	daemon := filepath.Join(packageRoot, "kgosd")
+	daemonName := "kgosd"
+	platform := runtime.GOOS
+	if platform == "windows" {
+		platform = "win32"
+		daemonName += ".exe"
+	}
+	daemon := filepath.Join(packageRoot, daemonName)
 	extensions := filepath.Join(packageRoot, "extensions")
 	licenses := filepath.Join(packageRoot, "licenses")
 	manifestPath := filepath.Join(packageRoot, "manifest.json")
@@ -134,7 +142,7 @@ func prepareKGOSDTestRuntimePackage(t *testing.T) {
 		})
 	}
 	manifest := map[string]any{
-		"arch": arch, "files": manifestFiles, "platform": runtime.GOOS, "version": buildinfo.Version,
+		"arch": arch, "files": manifestFiles, "platform": platform, "version": buildinfo.Version,
 	}
 	body, err := json.Marshal(manifest)
 	if err != nil {

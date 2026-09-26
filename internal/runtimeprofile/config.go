@@ -249,6 +249,9 @@ func validateAndClassifyExtensionConfig(
 }
 
 func classifySource(source string) (remote bool, sourcePath string, err error) {
+	if filepath.IsAbs(source) {
+		return false, source, nil
+	}
 	parsed, parseErr := url.Parse(source)
 	if parseErr == nil && parsed.IsAbs() {
 		if parsed.Scheme != "https" || parsed.Host == "" {
@@ -256,10 +259,7 @@ func classifySource(source string) (remote bool, sourcePath string, err error) {
 		}
 		return true, parsed.Path, nil
 	}
-	if !filepath.IsAbs(source) {
-		return false, "", fmt.Errorf("source must be an absolute local file path or absolute https URL")
-	}
-	return false, source, nil
+	return false, "", fmt.Errorf("source must be an absolute local file path or absolute https URL")
 }
 
 func isArchivePath(path string) bool {

@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 const credentialEntropyBytes = 32
@@ -44,8 +45,8 @@ func loadCredential(path string) (Credential, error) {
 	if err != nil {
 		return Credential{}, fmt.Errorf("stat auth.json: %w", err)
 	}
-	if info.Mode().Perm() != 0o600 {
-		return Credential{}, fmt.Errorf("auth.json permissions must be 0600")
+	if err := ensureCredentialPrivate(path, info); err != nil {
+		return Credential{}, err
 	}
 
 	decoder := json.NewDecoder(file)
@@ -92,6 +93,9 @@ func createCredential(path string, random io.Reader) (Credential, error) {
 	if err := temporary.Chmod(0o600); err != nil {
 		return Credential{}, fmt.Errorf("secure auth.json temporary file: %w", err)
 	}
+	if err := ensureCredentialPrivate(temporaryPath, nil); err != nil {
+		return Credential{}, err
+	}
 	if _, err := io.Copy(temporary, bytes.NewReader(body)); err != nil {
 		return Credential{}, fmt.Errorf("write auth.json temporary file: %w", err)
 	}
@@ -122,6 +126,9 @@ func syncDirectory(path string) error {
 		return fmt.Errorf("open runtime directory for sync: %w", err)
 	}
 	defer directory.Close()
+	if runtime.GOOS == "windows" {
+		return nil
+	}
 	if err := directory.Sync(); err != nil {
 		return fmt.Errorf("sync runtime directory: %w", err)
 	}

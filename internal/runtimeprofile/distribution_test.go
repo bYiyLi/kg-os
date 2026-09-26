@@ -15,7 +15,11 @@ func TestDiscoverRuntimePackageFromExecutableVerifiesPackage(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	daemon := filepath.Join(root, "kgosd")
+	daemonName := "kgosd"
+	if runtime.GOOS == "windows" {
+		daemonName += ".exe"
+	}
+	daemon := filepath.Join(root, daemonName)
 	extensions := filepath.Join(root, "extensions")
 	if err := os.MkdirAll(extensions, 0o700); err != nil {
 		t.Fatal(err)
@@ -45,7 +49,7 @@ func TestDiscoverRuntimePackageFromExecutableVerifiesPackage(t *testing.T) {
 	}
 	manifest := runtimeManifest{
 		Arch:     runtimePackageArch(runtime.GOARCH),
-		Platform: runtime.GOOS,
+		Platform: runtimePackagePlatform(runtime.GOOS),
 		Version:  "fixture",
 		Go:       "go fixture",
 	}
@@ -133,7 +137,7 @@ func TestDiscoverRuntimePackageRejectsTargetAndManifestErrors(t *testing.T) {
 
 	manifest := runtimeManifest{
 		Arch:     "wrong",
-		Platform: runtime.GOOS,
+		Platform: runtimePackagePlatform(runtime.GOOS),
 		Version:  "fixture",
 		Go:       "go fixture",
 	}

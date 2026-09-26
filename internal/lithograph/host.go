@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -160,9 +161,13 @@ func openPool(driverName, databasePath string, readOnly bool, maxOpen int) (*sql
 	if readOnly {
 		mode = "ro"
 	}
+	uriPath := databasePath
+	if runtime.GOOS == "windows" {
+		uriPath = "/" + filepath.ToSlash(databasePath)
+	}
 	dsnURL := &url.URL{
 		Scheme: "file",
-		Path:   databasePath,
+		Path:   uriPath,
 	}
 	query := dsnURL.Query()
 	query.Set("mode", mode)

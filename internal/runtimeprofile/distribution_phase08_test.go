@@ -120,7 +120,11 @@ func phase08RuntimePackageFixture(t *testing.T) (string, string, runtimeManifest
 	if err != nil {
 		t.Skip(err)
 	}
-	daemon := filepath.Join(root, "kgosd")
+	daemonName := "kgosd"
+	if runtime.GOOS == "windows" {
+		daemonName += ".exe"
+	}
+	daemon := filepath.Join(root, daemonName)
 	extensions := filepath.Join(root, "extensions")
 	if err := os.MkdirAll(extensions, 0o700); err != nil {
 		t.Fatal(err)
@@ -144,7 +148,7 @@ func phase08RuntimePackageFixture(t *testing.T) (string, string, runtimeManifest
 	}
 	manifest := runtimeManifest{
 		Arch:     runtimePackageArch(runtime.GOARCH),
-		Platform: runtime.GOOS,
+		Platform: runtimePackagePlatform(runtime.GOOS),
 		Version:  "fixture",
 	}
 	for _, path := range paths {
