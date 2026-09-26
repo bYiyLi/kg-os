@@ -107,7 +107,11 @@ describe("kg doctor", () => {
     await runDoctor(root, ["--json"]);
     expect(String(write.mock.calls.at(-1)?.[0])).toContain('"ready":true');
     write.mockClear();
+    await runDoctor(root, ["--json", "--pretty"]);
+    expect(String(write.mock.calls.at(-1)?.[0])).toContain('\n  "ready"');
+    write.mockClear();
     await runDoctor(root, []);
     expect(write.mock.calls.map((call) => String(call[0])).join("")).toContain("ready");
+    await expect(runDoctor(root, ["--pretty"])).rejects.toMatchObject({ exitCode: 2 });
   });
 });

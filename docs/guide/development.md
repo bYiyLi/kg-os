@@ -39,6 +39,7 @@ Instance 只由显式 `--root <path>` 定位。不存在默认 `KG_HOME`、`KG_T
 | C compiler | CGO 必需；macOS 使用 Apple Clang，Linux runner 使用 GCC |
 | Node.js | `24.15.0`，由 [`.node-version`](../../.node-version) 固定 |
 | pnpm | `10.34.5`，由根 `packageManager` / `engines` 固定 |
+| Rust | `1.97.1`，用于构建 `native/jieba/` 的official FTS5 tokenizer |
 | SQLite driver | `github.com/mattn/go-sqlite3 v1.14.52`，bundled SQLite + CGO + `sqlite_fts5` |
 | Lithograph | `v0.3.0` release artifacts，覆盖 macOS / Linux arm64/x64 |
 
@@ -47,6 +48,7 @@ Instance 只由显式 `--root <path>` 定位。不存在默认 `KG_HOME`、`KG_T
 ```sh
 node --version
 pnpm --version
+rustc --version
 cc --version
 ```
 
@@ -58,7 +60,7 @@ pnpm run setup
 
 必须写成 `pnpm run setup`；裸 `pnpm setup` 是 pnpm 自己的命令。
 
-setup 会安装 frozen-lockfile workspace、校验 Go/C toolchain、安装仓库 Go quality tools和 Playwright，并下载/校验当前平台的 Lithograph v0.3.0 fixture。Linux 缺 Chromium system libraries 时可额外运行：
+setup 会安装 frozen-lockfile workspace、校验 Go/C/Rust toolchain、安装仓库 Go quality tools和 Playwright，并下载/校验当前平台的 Lithograph v0.3.0 fixture。Linux 缺 Chromium system libraries 时可额外运行：
 
 ```sh
 pnpm exec playwright install --with-deps --only-shell chromium
@@ -125,7 +127,6 @@ npm exec --yes -- kg --root "$ROOT" doctor --json
 npm exec --yes -- kg --root "$ROOT" init \
   --cache-path cache/openai-compatible.db \
   --cache-max-size-mb 4096 \
-  --fulltext-analyzer unicode61 \
   --embedding-base-url https://example.invalid/v1 \
   --embedding-model local-fixture \
   --embedding-dimensions 3 \
@@ -137,6 +138,8 @@ npm exec --yes -- kg --root "$ROOT" init \
 npm exec --yes -- kg --root "$ROOT" evolution overview
 npm exec --yes -- kg --root "$ROOT" ontology --at branch/main
 ```
+
+省略 `--fulltext-analyzer` 时，新 Instance 的 `config.toml` 显式写入 `jieba`；如需英文或其它已安装FTS5 tokenizer，可在 `init` 时显式传 `--fulltext-analyzer unicode61` 等值。已有 Instance 不会被自动改写。
 
 如果 `embedding.api_key_env` 配置为非空变量名，应在需要 Semantic Provider 的 daemon startup 前提供同名环境变量。KG OS 只持久化环境变量名称，不持久化 secret。
 
@@ -158,12 +161,17 @@ artifacts/npm/runtime-<platform>-<arch>/
 ├── LICENSE
 ├── kgosd
 ├── manifest.json
+├── JIEBA-NOTICE.md
+├── licenses/
+│   ├── sqlite-simple-tokenizer-MIT.txt
+│   └── jieba-rs-MIT.txt
 └── extensions/
     ├── lithograph.<dylib|so>
-    └── lithograph-openai-compatible.<dylib|so>
+    ├── lithograph-openai-compatible.<dylib|so>
+    └── kgos-jieba.<dylib|so>
 ```
 
-manifest 固定 package version/platform/arch 和三个 native file 的 SHA-256。Runtime package不包含 native `kg`，也没有 preinstall/install/postinstall 下载脚本。
+manifest 固定 package version/platform/arch 和七个受校验文件的 SHA-256。Runtime package不包含 native `kg`，也没有 preinstall/install/postinstall 下载脚本。
 
 source workspace 下的四个 `packages/runtime-*` 只维护 npm metadata；native binary 是 build artifact，不提交 Git。
 
@@ -190,7 +198,7 @@ Go daemon 的生产启动依赖与 binary 同目录的 Runtime manifest/native a
 | `pnpm test` | SDK/CLI/Web Vitest |
 | `pnpm test:coverage` | 现有 SDK/Web V8 coverage gate |
 | `pnpm test:e2e` | build 后用 Playwright 验证内置 Web |
-| `pnpm test:native` | 真实 Lithograph + Provider、Runtime/Kernel/Daemon 集成 |
+| `pnpm test:native` | 真实 Lithograph + Provider + Jieba、Runtime/Kernel/Daemon 集成 |
 | `pnpm check:package` | workspace 外临时 npm tarball install + Runtime/CLI smoke |
 | `pnpm check:quick` | Go quick gate + TS typecheck/lint/test；pre-commit入口 |
 | `pnpm validate` | race、coverage、安全、build、E2E、native/package/license/audit/diff等完整门禁 |

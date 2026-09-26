@@ -40,7 +40,7 @@ export const INIT_FIELDS = [
 export const RECOMMENDED_CONFIG = {
   "--cache-path": "cache/openai-compatible.db",
   "--cache-max-size-mb": "4096",
-  "--fulltext-analyzer": "unicode61",
+  "--fulltext-analyzer": "jieba",
   "--embedding-base-url": "https://api.openai.com/v1",
   "--embedding-model": "text-embedding-3-small",
   "--embedding-dimensions": "1536",
@@ -50,7 +50,8 @@ export const RECOMMENDED_CONFIG = {
 
 const OFFICIAL_ENTRYPOINTS = new Set([
   "sqlite3_lithograph_init",
-  "sqlite3_lithographopenaicompatible_init"
+  "sqlite3_lithographopenaicompatible_init",
+  "sqlite3_kgosjieba_init"
 ]);
 
 export function configPath(root: string): string {

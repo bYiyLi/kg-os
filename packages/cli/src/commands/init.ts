@@ -15,23 +15,30 @@ import { CLIError, localIOError, usageError } from "../errors.js";
 import { outputJSON } from "../io.js";
 
 export async function runInit(root: string, args: readonly string[]): Promise<void> {
-  const parsed = parseOptions(args, { value: INIT_FIELDS });
+  const parsed = parseOptions(args, { boolean: ["--pretty"], value: INIT_FIELDS });
   if (parsed.positionals.length !== 0) {
     throw usageError("init does not accept positional arguments");
   }
   const existing = await readExistingConfig(root);
+  const pretty = parsed.booleans.has("--pretty");
   if (existing !== undefined) {
     parseConfig(root, existing);
     if (parsed.values.size !== 0) {
       throw usageError("configuration options cannot be provided for an initialized Instance");
     }
-    writeInitSuccess(root, "already_initialized");
+    writeInitSuccess(root, "already_initialized", pretty);
     return;
   }
 
   const values = new Map(parsed.values);
+  if (!values.has("--fulltext-analyzer")) {
+    values.set("--fulltext-analyzer", RECOMMENDED_CONFIG["--fulltext-analyzer"]);
+  }
   const missing = INIT_FIELDS.filter((field) => !values.has(field));
   const interactive = process.stdin.isTTY && process.stdout.isTTY;
+  if (interactive && missing.length !== 0 && pretty) {
+    throw usageError("--pretty is not valid with interactive init prompts");
+  }
   if (missing.length !== 0 && !interactive) {
     throw new CLIError(
       "INIT_CONFIGURATION_INCOMPLETE",
@@ -51,7 +58,7 @@ export async function runInit(root: string, args: readonly string[]): Promise<vo
     process.stdout.write(successMessage(root));
     return;
   }
-  writeInitSuccess(root, "initialized");
+  writeInitSuccess(root, "initialized", pretty);
 }
 
 async function readExistingConfig(root: string): Promise<string | undefined> {
@@ -164,8 +171,12 @@ function required(values: Map<string, string>, name: string): string {
   return value;
 }
 
-function writeInitSuccess(root: string, status: "initialized" | "already_initialized"): void {
-  outputJSON({ status, root }, false);
+function writeInitSuccess(
+  root: string,
+  status: "initialized" | "already_initialized",
+  pretty: boolean
+): void {
+  outputJSON({ status, root }, pretty);
 }
 
 function detectLocale(): "en" | "zh" {

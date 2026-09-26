@@ -103,6 +103,8 @@ kg
 
 `--help`、任意 namespace / command 的 `--help` 以及 `--version` 属于标准 CLI discovery，不需要连接 daemon或Instance。Help 必须使用本文和 logical contract 的真实名词，并明确标出全局 `--root`、required argument、StateRef grammar、分页、stdin/file input 和 write behavior；help 示例不能引入隐藏默认 Branch 或另一套快捷写语义。
 
+Help discovery 必须逐层完整：namespace 的 `--help` 列出它的**直接子命令**及一句话职责，leaf command 的 `--help` 列出完整 canonical usage、required/optional flags、互斥输入来源和适用输出模式。例如 `kg evolution branch --help` 必须直接列出 `list/create/delete`，`kg evolution merge --help` 必须直接列出 `start/list/get/conflicts/resolve/finalize/abort`，`kg evolution merge start --help` 必须展示 `--branch/--source`。父 namespace help 不能用 `branch ...`、`merge ...` 之类占位符替代这一层已经存在的子命令发现。
+
 ## 国际化
 
 v1 人类可见 CLI 文案支持 English 与中文，默认 English。locale 解析按 `LC_ALL` → `LC_MESSAGES` → `LANG` 取首个非空值；识别为中文 locale 时使用中文，其它值、缺失或无法识别时使用英文。v1 不增加独立语言配置文件或 profile setting。
@@ -121,6 +123,8 @@ default        → compact JSON + trailing LF
 ```
 
 `--pretty` 只改变空白，不改变 field、value、排序或类型，因此不是第二种数据格式。v1 不提供 `--table`、template、`--jq` 或字段选择 DSL；调用方需要进一步转换时使用标准 shell / JSON 工具。
+
+凡成功 stdout 是**一个 JSON document** 的 command mode，CLI parser 都必须接受 `--pretty`，包括 read 与 mutation；不能因为某个 mutation 的默认输出本来已经较短就拒绝这个 flag。明确不适用的只有非单一 JSON document 模式：Ontology Markdown、Ontology `--edit` YAML stream、Object `--body --format yaml` 与 Graph `--stream` NDJSON。Object `--body --format json` 仍属于单一 JSON document（batch 为一个 JSON array）并支持 `--pretty`。`--stream` 与 `--pretty` 继续互斥。
 
 结果为空仍返回 exit `0`；JSON 命令返回如 `items: []`，Ontology 返回带明确空范围说明的 Markdown。不能用非零 exit code 表示“没有匹配结果”。
 
@@ -210,9 +214,16 @@ kg init
   [--embedding-api-key-env <name-or-empty>]
 ```
 
-`init` 只建立当前显式 root 的 KG OS Instance 与完整 `config.toml`；native `kgosd`、Lithograph 与 OpenAI-compatible Provider 由当前 npm Runtime package 拥有，不写入 Instance config。它不启动 daemon、不生成 `auth.json`、不创建 `kgos.db`、不执行 Lithograph init 或 KG OS bootstrap。
+`init` 只建立当前显式 root 的 KG OS Instance 与完整 `config.toml`；native `kgosd`、Lithograph、OpenAI-compatible Provider 与 official Jieba tokenizer 由当前 npm Runtime package 拥有，不写入 Instance config。它不启动 daemon、不生成 `auth.json`、不创建 `kgos.db`、不执行 Lithograph init 或 KG OS bootstrap。
 
-初始化配置解析对每个用户可配置字段使用同一规则：
+初始化配置解析先应用 KG OS 明确冻结的产品默认，再处理其余用户可配置字段。v1 唯一无需询问即可自动解析的初始化字段是 `fulltext.analyzer`：
+
+```text
+--fulltext-analyzer 已提供 → 使用显式值
+未提供                    → 直接使用 jieba，不询问
+```
+
+其它字段继续使用同一规则：
 
 ```text
 CLI flag 已提供 → 直接采用，不询问
@@ -224,22 +235,22 @@ CLI flag 已提供 → 直接采用，不询问
 所有字段显式 resolved → validate → 原子写完整 config.toml
 ```
 
-交互提示可以展示推荐值；用户直接 Enter 表示明确采用该推荐值，不能靠输出文件省略字段表达默认。全部参数已提供时即使存在 TTY 也必须零 prompt，直接 validate + init，适合 AI / automation。非交互缺失错误使用 CLI-local 稳定 code `INIT_CONFIGURATION_INCOMPLETE`，exit `2`，`details.missing` 是按 config key 排序的字符串数组。
+交互提示可以展示推荐值；用户直接 Enter 表示明确采用该推荐值，不能靠输出文件省略字段表达默认。省略 `--fulltext-analyzer` 不属于“缺少配置”，因此不会触发 prompt，也不会出现在 `INIT_CONFIGURATION_INCOMPLETE.details.missing`；最终文件仍必须显式写出 `analyzer = "jieba"`。其余参数全部 resolved 时即使存在 TTY 也必须零 prompt，适合 AI / automation。非交互仍缺其它字段时使用 CLI-local 稳定 code `INIT_CONFIGURATION_INCOMPLETE`，exit `2`，`details.missing` 是按 config key 排序的字符串数组。
 
-v1 init 的推荐值冻结为：
+v1 init 的产品默认与交互推荐值冻结为：
 
-| Config key | Recommended value |
+| Config key | Resolution |
 | --- | --- |
+| `fulltext.analyzer` | **默认 `jieba`，缺失时直接采用，不 prompt** |
 | `cache.path` | `cache/openai-compatible.db` |
 | `cache.max_size_mb` | `4096` |
-| `fulltext.analyzer` | `unicode61` |
 | `embedding.base_url` | `https://api.openai.com/v1` |
 | `embedding.model` | `text-embedding-3-small` |
 | `embedding.dimensions` | `1536` |
 | `embedding.similarity` | `cosine` |
 | `embedding.api_key_env` | `OPENAI_API_KEY` |
 
-这些值只用于交互 prompt；它们不是 runtime 缺失字段默认值。用户可以输入其它合法值，也可以按 Enter 明确接受推荐值。`embedding.api_key_env` 的空字符串是一个合法值，因此交互 prompt 使用 `""` 表示调用方显式选择 no-auth；直接 Enter 仍表示采用推荐的 `OPENAI_API_KEY`。
+`fulltext.analyzer=jieba` 是产品默认；表中其它值只用于交互 prompt，不是 runtime 缺失字段默认值。用户可以为 Full-text 显式覆盖其它合法 FTS5 specification；其它字段可以在交互中输入其它合法值或按 Enter 明确接受推荐值。`embedding.api_key_env` 的空字符串是一个合法值，因此交互 prompt 使用 `""` 表示调用方显式选择 no-auth；直接 Enter 仍表示采用推荐的 `OPENAI_API_KEY`。
 
 `[fulltext]` 与 `[embedding]` 是初始化配置。交互 init 进入这组字段前只显示一次当前语言对应的简短提示：
 
@@ -459,7 +470,7 @@ CLI 必须保持 Graph logical contract：`execute` **没有 `--base-state`**。
 
 `--stream` 用于可能很大的 Graph result，并与 `--pretty` 互斥。stdout 是 UTF-8 NDJSON，每行一个 event：
 
-```json
+```jsonl
 {"type":"columns","columns":["p"]}
 {"type":"row","row":["Alice"]}
 {"type":"summary","state":"commit/..."}
@@ -650,11 +661,11 @@ KG OS CLI 不单独维护 human-only 命令树。人类与 AI 使用相同 comma
 compatible active daemon → use current kgosd
 stopped                  → spawn current npm Runtime kgosd --root → wait ready
 starting                 → wait ready
-unavailable              → fail explicitly
+unreachable locator      → spawn contender → OS-lock arbitration → wait winner / unavailable
 version mismatch         → fail explicitly
 ```
 
-如果没有usable active owner，业务命令从当前platform native npm package自动后台启动 `kgosd --root <absolute-root>`；spawn / startup validation / ready wait失败属于本地Runtime failure，原始业务request不得在未ready的endpoint上提前dispatch。多个并发caller只能由single-instance lock产生一个winner。运行中的daemon启动后即使磁盘 `config.toml`被修改，当前进程仍继续使用startup时的effective config；CLI不比较配置文件、不自动hot-reload/restart。
+如果没有usable active owner，或locator endpoint不可连接而ownership尚未确定，业务命令从当前platform native npm package自动后台启动 `kgosd --root <absolute-root>` contender；只有daemon持有的OS exclusive lock决定它是stale-recovery winner还是因已有live owner而退出。多个并发caller最终只能有一个winner，其余caller等待winner locator；已有owner仍持lock但endpoint持续不可用时最终明确返回Runtime unavailable，不force-kill也不启动第二daemon。spawn / startup validation / ready wait失败属于本地Runtime failure，原始业务request不得在未ready的endpoint上提前dispatch。运行中的daemon启动后即使磁盘 `config.toml`被修改，当前进程仍继续使用startup时的effective config；CLI不比较配置文件、不自动hot-reload/restart。
 
 daemon ready 后，CLI 只读取同一 root 的 `auth.json`取得credential，并把它与同一root locator中的endpoint交给 `@kgos/sdk`。连接失败或认证失败时不尝试其它root/token，不直接打开SQLite，也不静默重启版本不兼容的active daemon。
 

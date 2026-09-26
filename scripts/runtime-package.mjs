@@ -52,15 +52,53 @@ export async function buildCurrentRuntimePackage({ root, daemon, output: explici
 
   const librarySource = resolve(artifact.cacheDirectory, artifact.library);
   const providerSource = resolve(artifact.cacheDirectory, artifact.providerLibrary);
+  const jiebaSource = resolve(
+    root,
+    "artifacts",
+    "jieba",
+    "release",
+    platform === "darwin" ? "libkgos_jieba.dylib" : "libkgos_jieba.so"
+  );
   const libraryTarget = resolve(output, "extensions", artifact.library);
   const providerTarget = resolve(output, "extensions", artifact.providerLibrary);
+  const jiebaTarget = resolve(
+    output,
+    "extensions",
+    "kgos-jieba" + (platform === "darwin" ? ".dylib" : ".so")
+  );
+  const noticeTarget = resolve(output, "JIEBA-NOTICE.md");
   await cp(librarySource, libraryTarget);
   await cp(providerSource, providerTarget);
+  await cp(jiebaSource, jiebaTarget);
+  await cp(resolve(root, "native", "jieba", "NOTICE.md"), noticeTarget);
+  await mkdir(resolve(output, "licenses"), { recursive: true });
+  const tokenizerLicense = resolve(output, "licenses", "sqlite-simple-tokenizer-MIT.txt");
+  const jiebaLicense = resolve(output, "licenses", "jieba-rs-MIT.txt");
+  await cp(
+    resolve(root, "native", "jieba", "licenses", "sqlite-simple-tokenizer-MIT.txt"),
+    tokenizerLicense
+  );
+  await cp(resolve(root, "native", "jieba", "licenses", "jieba-rs-MIT.txt"), jiebaLicense);
 
   const files = [];
-  for (const path of [daemonTarget, libraryTarget, providerTarget]) {
+  for (const path of [
+    daemonTarget,
+    libraryTarget,
+    providerTarget,
+    jiebaTarget,
+    noticeTarget,
+    tokenizerLicense,
+    jiebaLicense
+  ]) {
     const bytes = await readFile(path);
-    const file = path === daemonTarget ? "kgosd" : "extensions/" + basename(path);
+    const file =
+      path === daemonTarget
+        ? "kgosd"
+        : path === noticeTarget
+          ? "JIEBA-NOTICE.md"
+          : path === tokenizerLicense || path === jiebaLicense
+            ? "licenses/" + basename(path)
+            : "extensions/" + basename(path);
     files.push({ file, sha256: sha256(bytes) });
   }
   const manifest = {

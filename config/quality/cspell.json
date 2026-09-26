@@ -115,6 +115,11 @@
     "klauspost",
     "runtimeprofile",
     "webui",
-    "zeebo"
+    "zeebo",
+    "cdylib",
+    "kgosjieba",
+    "rustc",
+    "stopword",
+    "unreviewed"
   ]
 }

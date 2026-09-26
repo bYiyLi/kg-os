@@ -1,14 +1,15 @@
 import type { KGOSClient, OntologyReadResult, ObjectTextReadResult } from "@kgos/sdk";
 
-import { optionalInteger, parseOptions, requiredValue } from "../args.js";
+import { extractPretty, optionalInteger, parseOptions, requiredValue } from "../args.js";
 import { usageError } from "../errors.js";
 import { outputJSON } from "../io.js";
 import { isResolvedState, parsePatchRequest } from "./patch.js";
 
 export async function runOntology(client: KGOSClient, args: readonly string[]): Promise<void> {
   if (args[0] === "patch") {
-    const request = await parsePatchRequest(args.slice(1), "ontology patch");
-    outputJSON(await client.ontology.patch(request), false);
+    const { args: patchArgs, pretty } = extractPretty(args.slice(1));
+    const request = await parsePatchRequest(patchArgs, "ontology patch");
+    outputJSON(await client.ontology.patch(request), pretty);
     return;
   }
 

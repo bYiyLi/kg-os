@@ -16,11 +16,19 @@ const nativeTags = "sqlite_fts5,lithograph_smoke";
 
 async function nativeEnvironment() {
   await run("node", ["scripts/prepare-lithograph.mjs"], { cwd: root, env: goEnv });
+  await run("node", ["scripts/prepare-jieba.mjs"], { cwd: root, env: goEnv });
   const artifact = currentLithographArtifact(root);
   return {
     ...goEnv,
     KGOS_LITHOGRAPH_LIBRARY: resolve(artifact.cacheDirectory, artifact.library),
-    KGOS_LITHOGRAPH_PROVIDER_LIBRARY: resolve(artifact.cacheDirectory, artifact.providerLibrary)
+    KGOS_LITHOGRAPH_PROVIDER_LIBRARY: resolve(artifact.cacheDirectory, artifact.providerLibrary),
+    KGOS_JIEBA_LIBRARY: resolve(
+      root,
+      "artifacts",
+      "jieba",
+      "release",
+      process.platform === "darwin" ? "libkgos_jieba.dylib" : "libkgos_jieba.so"
+    )
   };
 }
 

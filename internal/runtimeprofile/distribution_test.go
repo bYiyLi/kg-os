@@ -22,10 +22,22 @@ func TestDiscoverRuntimePackageFromExecutableVerifiesPackage(t *testing.T) {
 	}
 	lithograph := filepath.Join(extensions, "lithograph"+librarySuffix)
 	provider := filepath.Join(extensions, "lithograph-openai-compatible"+librarySuffix)
+	jieba := filepath.Join(extensions, "kgos-jieba"+librarySuffix)
+	licenses := filepath.Join(root, "licenses")
+	if err := os.MkdirAll(licenses, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	notice := filepath.Join(root, "JIEBA-NOTICE.md")
+	tokenizerLicense := filepath.Join(licenses, "sqlite-simple-tokenizer-MIT.txt")
+	jiebaLicense := filepath.Join(licenses, "jieba-rs-MIT.txt")
 	for path, body := range map[string]string{
-		daemon:     "kgosd",
-		lithograph: "lithograph",
-		provider:   "provider",
+		daemon:           "kgosd",
+		lithograph:       "lithograph",
+		provider:         "provider",
+		jieba:            "jieba",
+		notice:           "notice",
+		tokenizerLicense: "tokenizer license",
+		jiebaLicense:     "jieba license",
 	} {
 		if err := os.WriteFile(path, []byte(body), 0o700); err != nil {
 			t.Fatal(err)
@@ -37,7 +49,7 @@ func TestDiscoverRuntimePackageFromExecutableVerifiesPackage(t *testing.T) {
 		Version:  "fixture",
 		Go:       "go fixture",
 	}
-	for _, path := range []string{daemon, lithograph, provider} {
+	for _, path := range []string{daemon, lithograph, provider, jieba, notice, tokenizerLicense, jiebaLicense} {
 		hash, err := LocalFileSHA256(path)
 		if err != nil {
 			t.Fatal(err)
@@ -67,16 +79,36 @@ func TestDiscoverRuntimePackageFromExecutableVerifiesPackage(t *testing.T) {
 		pkg.Daemon != filepath.Join(canonicalRoot, filepath.Base(daemon)) ||
 		pkg.Lithograph != filepath.Join(canonicalRoot, "extensions", filepath.Base(lithograph)) ||
 		pkg.Provider != filepath.Join(canonicalRoot, "extensions", filepath.Base(provider)) ||
+		pkg.Jieba != filepath.Join(canonicalRoot, "extensions", filepath.Base(jieba)) ||
 		pkg.LithographSHA256 == "" ||
 		pkg.ProviderSHA256 == "" ||
+		pkg.JiebaSHA256 == "" ||
 		pkg.Version != "fixture" {
 		t.Fatalf("runtime package = %#v", pkg)
 	}
 	official := pkg.OfficialExtensions()
-	if len(official) != 2 ||
+	if len(official) != 3 ||
 		official[0].Entrypoint != LithographEntrypoint ||
-		official[1].Entrypoint != ProviderEntrypoint {
+		official[1].Entrypoint != ProviderEntrypoint ||
+		official[2].Entrypoint != JiebaEntrypoint {
 		t.Fatalf("official extensions = %#v", official)
+	}
+	if err := os.Remove(jieba); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DiscoverRuntimePackageFromExecutable(daemon); err == nil ||
+		!strings.Contains(err.Error(), "kgos-jieba") {
+		t.Fatalf("missing official Jieba error = %v", err)
+	}
+	if err := os.WriteFile(jieba, []byte("tampered"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DiscoverRuntimePackageFromExecutable(daemon); err == nil ||
+		!strings.Contains(err.Error(), "SHA-256") {
+		t.Fatalf("tampered official Jieba error = %v", err)
+	}
+	if err := os.WriteFile(jieba, []byte("jieba"), 0o700); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := os.WriteFile(provider, []byte("tampered"), 0o700); err != nil {

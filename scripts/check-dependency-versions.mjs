@@ -30,6 +30,12 @@ if (rootPackage.engines?.node !== "24.15.0" || rootPackage.engines?.pnpm !== "10
 if ((await readFile(resolve(root, ".node-version"), "utf8")).trim() !== "24.15.0") {
   throw new Error(".node-version must remain pinned to 24.15.0");
 }
+if (packages[2].engines?.node !== ">=24.15.0") {
+  throw new Error("@kgos/cli must declare Node.js >=24.15.0");
+}
+if (packages[1].engines?.node !== undefined) {
+  throw new Error("@kgos/sdk must keep its browser-compatible engine contract");
+}
 
 for (const [index, packageJson] of packages.entries()) {
   if (packageJson.version !== rootPackage.version) {

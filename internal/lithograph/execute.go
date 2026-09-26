@@ -115,21 +115,17 @@ func (host *Host) Execute(ctx context.Context, request ExecuteRequest) (Result, 
 func (host *Host) withWriteConnection(
 	ctx context.Context,
 	execute func(context.Context, *sql.Conn) (Result, error),
-) (Result, error) {
+) (result Result, returnErr error) {
 	operationCtx, done, err := host.operationContext(ctx)
 	if err != nil {
 		return Result{}, err
 	}
 	defer done()
-	connection, err := host.acquire(operationCtx, host.writeDB)
+	connection, err := host.acquireWriteConnection(operationCtx)
 	if err != nil {
 		return Result{}, err
 	}
-	defer connection.Close()
-	if err := requireAutoCommit(connection); err != nil {
-		discardConnection(connection)
-		return Result{}, err
-	}
+	defer joinWriteCleanup(&returnErr, connection)
 	return execute(operationCtx, connection)
 }
 
@@ -175,7 +171,7 @@ func (host *Host) StreamExecute(
 	ctx context.Context,
 	request ExecuteRequest,
 	consume func(Event) error,
-) error {
+) (returnErr error) {
 	if request.Branch == "" || request.Cypher == "" {
 		return fmt.Errorf("execute branch and Cypher are required")
 	}
@@ -184,15 +180,11 @@ func (host *Host) StreamExecute(
 		return err
 	}
 	defer done()
-	connection, err := host.acquire(operationCtx, host.writeDB)
+	connection, err := host.acquireWriteConnection(operationCtx)
 	if err != nil {
 		return err
 	}
-	defer connection.Close()
-	if err := requireAutoCommit(connection); err != nil {
-		discardConnection(connection)
-		return err
-	}
+	defer joinWriteCleanup(&returnErr, connection)
 	if _, err := executeRaw(
 		operationCtx,
 		connection,

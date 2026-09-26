@@ -9,6 +9,7 @@ import type {
 
 import {
   assertPositionals,
+  extractPretty,
   optionalInteger,
   parseOptions,
   requiredValue,
@@ -347,22 +348,6 @@ async function optionalJSONSource(
     throw usageError(label + " is required");
   }
   return { present: true, value: parseJSON(await readStdin(label + " stdin"), label) };
-}
-
-function extractPretty(args: readonly string[]): { args: string[]; pretty: boolean } {
-  const result: string[] = [];
-  let pretty = false;
-  for (const arg of args) {
-    if (arg !== "--pretty") {
-      result.push(arg);
-      continue;
-    }
-    if (pretty) {
-      throw usageError("--pretty may be provided only once");
-    }
-    pretty = true;
-  }
-  return { args: result, pretty };
 }
 
 function requireCount(args: readonly string[], count: number, message: string): void {

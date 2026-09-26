@@ -127,4 +127,24 @@ describe("ontology CLI", () => {
       runOntology(client, ["node:A", "--at", "branch/main", "--edit"])
     ).rejects.toBeInstanceOf(CLIError);
   });
+
+  it("accepts pretty for JSON patch but rejects it for Markdown read", async () => {
+    const state = "commit/" + "b".repeat(64);
+    const client = clientFor(() => ({ state, created: [], transitions: [] }));
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    await runOntology(client, [
+      "patch",
+      "--base-state",
+      state,
+      "--branch",
+      "main",
+      "--patch",
+      "diff",
+      "--pretty"
+    ]);
+    expect(String(write.mock.calls.at(-1)?.[0])).toContain('\n  "state"');
+    await expect(runOntology(client, ["--at", "branch/main", "--pretty"])).rejects.toBeInstanceOf(
+      CLIError
+    );
+  });
 });

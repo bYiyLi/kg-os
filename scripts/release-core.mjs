@@ -87,7 +87,11 @@ export function validateCandidateDocument(candidate) {
   const expectedRuntimeFiles = new Set([
     "kgosd",
     "extensions/lithograph" + librarySuffix,
-    "extensions/lithograph-openai-compatible" + librarySuffix
+    "extensions/lithograph-openai-compatible" + librarySuffix,
+    "extensions/kgos-jieba" + librarySuffix,
+    "JIEBA-NOTICE.md",
+    "licenses/sqlite-simple-tokenizer-MIT.txt",
+    "licenses/jieba-rs-MIT.txt"
   ]);
   if (
     candidate.runtimeManifest?.version !== candidate.version ||

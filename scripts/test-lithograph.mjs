@@ -5,6 +5,7 @@ import { run } from "./process.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 await run("node", ["scripts/prepare-lithograph.mjs"], { cwd: root });
+await run("node", ["scripts/prepare-jieba.mjs"], { cwd: root });
 
 const artifact = currentLithographArtifact(root);
 const baseEnv = {
@@ -15,7 +16,14 @@ const baseEnv = {
 const env = {
   ...baseEnv,
   KGOS_LITHOGRAPH_LIBRARY: resolve(artifact.cacheDirectory, artifact.library),
-  KGOS_LITHOGRAPH_PROVIDER_LIBRARY: resolve(artifact.cacheDirectory, artifact.providerLibrary)
+  KGOS_LITHOGRAPH_PROVIDER_LIBRARY: resolve(artifact.cacheDirectory, artifact.providerLibrary),
+  KGOS_JIEBA_LIBRARY: resolve(
+    root,
+    "artifacts",
+    "jieba",
+    "release",
+    process.platform === "darwin" ? "libkgos_jieba.dylib" : "libkgos_jieba.so"
+  )
 };
 
 await run(

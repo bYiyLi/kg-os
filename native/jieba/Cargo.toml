@@ -1,0 +1,14 @@
+[package]
+name = "kgos-jieba"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rusqlite = { version = "=0.39.0", default-features = false, features = ["loadable_extension"] }
+sqlite-jieba-tokenizer = { git = "https://github.com/miyayaLora/sqlite-simple-tokenizer.git", rev = "720b3fa794b3fe8163fba9088bb964b4c629aa33" }
+rusqlite-ext = { git = "https://github.com/miyayaLora/sqlite-simple-tokenizer.git", rev = "720b3fa794b3fe8163fba9088bb964b4c629aa33" }

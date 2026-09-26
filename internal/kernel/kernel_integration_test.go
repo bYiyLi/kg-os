@@ -2177,8 +2177,10 @@ func openKernelIntegrationRuntime(ctx context.Context, root string) (*runtimehos
 func kernelIntegrationOfficialExtensions() []runtimeprofile.ExtensionConfig {
 	mainLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_LIBRARY"))
 	providerLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY"))
+	jiebaLibrary, _ := filepath.Abs(os.Getenv("KGOS_JIEBA_LIBRARY"))
 	return []runtimeprofile.ExtensionConfig{
 		{Source: mainLibrary, Entrypoint: runtimeprofile.LithographEntrypoint},
 		{Source: providerLibrary, Entrypoint: runtimeprofile.ProviderEntrypoint},
+		{Source: jiebaLibrary, Entrypoint: runtimeprofile.JiebaEntrypoint},
 	}
 }

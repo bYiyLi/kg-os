@@ -40,6 +40,7 @@ func TestOpenRejectsInstanceRootThatIsAFile(t *testing.T) {
 		[]runtimeprofile.ExtensionConfig{
 			{Source: "/missing/lithograph", Entrypoint: runtimeprofile.LithographEntrypoint},
 			{Source: "/missing/provider", Entrypoint: runtimeprofile.ProviderEntrypoint},
+			{Source: "/missing/jieba", Entrypoint: runtimeprofile.JiebaEntrypoint},
 		},
 		nil,
 	)

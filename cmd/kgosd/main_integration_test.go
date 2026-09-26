@@ -29,7 +29,7 @@ func TestRunStartsPackagedRuntimeAndStopsOnContextCancellation(t *testing.T) {
 		done <- run(ctx, []string{"--root", root}, nil, &stderr)
 	}()
 
-	waitForKGOSDLocator(t, root)
+	waitForKGOSDLocator(t, root, done, &stderr)
 	cancel()
 	select {
 	case code := <-done:
@@ -54,14 +54,20 @@ func prepareKGOSDTestRuntimePackage(t *testing.T) {
 	}
 	daemon := filepath.Join(packageRoot, "kgosd")
 	extensions := filepath.Join(packageRoot, "extensions")
+	licenses := filepath.Join(packageRoot, "licenses")
 	manifestPath := filepath.Join(packageRoot, "manifest.json")
 	if err := os.MkdirAll(extensions, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(licenses, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
 		_ = os.Remove(daemon)
 		_ = os.Remove(manifestPath)
+		_ = os.Remove(filepath.Join(packageRoot, "JIEBA-NOTICE.md"))
 		_ = os.RemoveAll(extensions)
+		_ = os.RemoveAll(licenses)
 	})
 	if err := os.WriteFile(daemon, []byte("kgosd test runtime"), 0o700); err != nil {
 		t.Fatal(err)
@@ -78,6 +84,22 @@ func prepareKGOSDTestRuntimePackage(t *testing.T) {
 			source: os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY"),
 			target: filepath.Join(extensions, "lithograph-openai-compatible"+suffix),
 		},
+		{
+			source: os.Getenv("KGOS_JIEBA_LIBRARY"),
+			target: filepath.Join(extensions, "kgos-jieba"+suffix),
+		},
+		{
+			source: filepath.Join("..", "..", "native", "jieba", "NOTICE.md"),
+			target: filepath.Join(packageRoot, "JIEBA-NOTICE.md"),
+		},
+		{
+			source: filepath.Join("..", "..", "native", "jieba", "licenses", "sqlite-simple-tokenizer-MIT.txt"),
+			target: filepath.Join(licenses, "sqlite-simple-tokenizer-MIT.txt"),
+		},
+		{
+			source: filepath.Join("..", "..", "native", "jieba", "licenses", "jieba-rs-MIT.txt"),
+			target: filepath.Join(licenses, "jieba-rs-MIT.txt"),
+		},
 	}
 	for _, file := range files {
 		body, err := os.ReadFile(file.source)
@@ -92,8 +114,12 @@ func prepareKGOSDTestRuntimePackage(t *testing.T) {
 	if arch == "amd64" {
 		arch = "x64"
 	}
-	manifestFiles := make([]map[string]string, 0, 3)
-	for _, path := range []string{daemon, files[0].target, files[1].target} {
+	manifestFiles := make([]map[string]string, 0, len(files)+1)
+	paths := []string{daemon}
+	for _, file := range files {
+		paths = append(paths, file.target)
+	}
+	for _, path := range paths {
 		body, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
@@ -130,10 +156,15 @@ func writeKGOSDIntegrationConfig(t *testing.T, root string) {
 	}
 }
 
-func waitForKGOSDLocator(t *testing.T, root string) {
+func waitForKGOSDLocator(t *testing.T, root string, done <-chan int, stderr *bytes.Buffer) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
+		select {
+		case code := <-done:
+			t.Fatalf("kgosd exited before publishing a locator: code=%d stderr=%q", code, stderr.String())
+		default:
+		}
 		body, err := os.ReadFile(filepath.Join(root, "kgosd.lock"))
 		if err == nil {
 			var locator map[string]any

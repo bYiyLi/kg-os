@@ -129,7 +129,7 @@ func (host *Host) CreateCommit(
 	expectedParent string,
 	data *json.RawMessage,
 	author, message *string,
-) (string, error) {
+) (createdCommit string, returnErr error) {
 	if branch == "" {
 		return "", fmt.Errorf("commit branch is required")
 	}
@@ -141,23 +141,27 @@ func (host *Host) CreateCommit(
 		return "", err
 	}
 	defer done()
-	connection, err := host.acquire(operationCtx, host.writeDB)
+	connection, err := host.acquireWriteConnection(operationCtx)
 	if err != nil {
 		return "", err
 	}
-	defer connection.Close()
-	if err := requireAutoCommit(connection); err != nil {
-		discardConnection(connection)
-		return "", err
-	}
+	defer func() {
+		if connection != nil {
+			joinWriteCleanup(&returnErr, connection)
+		}
+	}()
 	if _, err := connection.ExecContext(operationCtx, "BEGIN IMMEDIATE"); err != nil {
 		return "", fmt.Errorf("begin State create writer boundary: %w", err)
 	}
 	active := true
 	defer func() {
 		if active {
-			if _, rollbackErr := connection.ExecContext(context.WithoutCancel(operationCtx), "ROLLBACK"); rollbackErr != nil {
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), writeCleanupTimeout)
+			defer cancel()
+			if _, rollbackErr := connection.ExecContext(cleanupCtx, "ROLLBACK"); rollbackErr != nil {
 				discardConnection(connection)
+				connection = nil
+				returnErr = errors.Join(returnErr, fmt.Errorf("rollback State create writer boundary: %w", rollbackErr))
 			}
 		}
 	}()

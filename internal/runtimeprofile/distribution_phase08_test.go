@@ -129,6 +129,13 @@ func phase08RuntimePackageFixture(t *testing.T) (string, string, runtimeManifest
 		daemon,
 		filepath.Join(extensions, "lithograph"+librarySuffix),
 		filepath.Join(extensions, "lithograph-openai-compatible"+librarySuffix),
+		filepath.Join(extensions, "kgos-jieba"+librarySuffix),
+		filepath.Join(root, "JIEBA-NOTICE.md"),
+		filepath.Join(root, "licenses", "sqlite-simple-tokenizer-MIT.txt"),
+		filepath.Join(root, "licenses", "jieba-rs-MIT.txt"),
+	}
+	if err := os.MkdirAll(filepath.Join(root, "licenses"), 0o700); err != nil {
+		t.Fatal(err)
 	}
 	for index, path := range paths {
 		if err := os.WriteFile(path, []byte{byte(index + 1)}, 0o700); err != nil {

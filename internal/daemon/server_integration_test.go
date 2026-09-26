@@ -137,12 +137,14 @@ func openDaemonRuntime(t *testing.T) *runtimehost.Runtime {
 	writeDaemonConfig(t, root)
 	mainLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_LIBRARY"))
 	providerLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY"))
+	jiebaLibrary, _ := filepath.Abs(os.Getenv("KGOS_JIEBA_LIBRARY"))
 	runtime, err := runtimehost.OpenWithOfficialExtensions(
 		context.Background(),
 		root,
 		[]runtimeprofile.ExtensionConfig{
 			{Source: mainLibrary, Entrypoint: runtimeprofile.LithographEntrypoint},
 			{Source: providerLibrary, Entrypoint: runtimeprofile.ProviderEntrypoint},
+			{Source: jiebaLibrary, Entrypoint: runtimeprofile.JiebaEntrypoint},
 		},
 		nil,
 	)

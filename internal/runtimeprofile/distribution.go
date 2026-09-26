@@ -16,6 +16,7 @@ import (
 const (
 	LithographEntrypoint = "sqlite3_lithograph_init"
 	ProviderEntrypoint   = "sqlite3_lithographopenaicompatible_init"
+	JiebaEntrypoint      = "sqlite3_kgosjieba_init"
 )
 
 type RuntimePackage struct {
@@ -25,6 +26,11 @@ type RuntimePackage struct {
 	LithographSHA256 string
 	Provider         string
 	ProviderSHA256   string
+	Jieba            string
+	JiebaSHA256      string
+	JiebaNotice      string
+	TokenizerLicense string
+	JiebaLicense     string
 	Manifest         string
 	Version          string
 }
@@ -77,7 +83,11 @@ func DiscoverRuntimePackageFromExecutable(executable string) (RuntimePackage, er
 			"extensions",
 			"lithograph-openai-compatible"+librarySuffix,
 		),
-		Manifest: filepath.Join(root, "manifest.json"),
+		Jieba:            filepath.Join(root, "extensions", "kgos-jieba"+librarySuffix),
+		JiebaNotice:      filepath.Join(root, "JIEBA-NOTICE.md"),
+		TokenizerLicense: filepath.Join(root, "licenses", "sqlite-simple-tokenizer-MIT.txt"),
+		JiebaLicense:     filepath.Join(root, "licenses", "jieba-rs-MIT.txt"),
+		Manifest:         filepath.Join(root, "manifest.json"),
 	}
 	if err := pkg.verify(); err != nil {
 		return RuntimePackage{}, err
@@ -96,6 +106,11 @@ func (pkg RuntimePackage) OfficialExtensions() []ExtensionConfig {
 			Source:     pkg.Provider,
 			Entrypoint: ProviderEntrypoint,
 			SHA256:     pkg.ProviderSHA256,
+		},
+		{
+			Source:     pkg.Jieba,
+			Entrypoint: JiebaEntrypoint,
+			SHA256:     pkg.JiebaSHA256,
 		},
 	}
 }
@@ -130,9 +145,13 @@ func (pkg *RuntimePackage) verify() error {
 	pkg.Version = parsed.Version
 
 	expected := map[string]*string{
-		relativeSlash(pkg.Root, pkg.Daemon):     nil,
-		relativeSlash(pkg.Root, pkg.Lithograph): &pkg.LithographSHA256,
-		relativeSlash(pkg.Root, pkg.Provider):   &pkg.ProviderSHA256,
+		relativeSlash(pkg.Root, pkg.Daemon):           nil,
+		relativeSlash(pkg.Root, pkg.Lithograph):       &pkg.LithographSHA256,
+		relativeSlash(pkg.Root, pkg.Provider):         &pkg.ProviderSHA256,
+		relativeSlash(pkg.Root, pkg.Jieba):            &pkg.JiebaSHA256,
+		relativeSlash(pkg.Root, pkg.JiebaNotice):      nil,
+		relativeSlash(pkg.Root, pkg.TokenizerLicense): nil,
+		relativeSlash(pkg.Root, pkg.JiebaLicense):     nil,
 	}
 	manifestHashes := make(map[string]string, len(parsed.Files))
 	for _, file := range parsed.Files {

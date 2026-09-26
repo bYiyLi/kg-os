@@ -43,6 +43,21 @@ export interface ParsedOptions {
   values: Map<string, string>;
 }
 
+export function extractPretty(args: readonly string[]): { args: string[]; pretty: boolean } {
+  const remaining: string[] = [];
+  let pretty = false;
+  for (const arg of args) {
+    if (arg !== "--pretty") {
+      remaining.push(arg);
+    } else if (pretty) {
+      throw usageError("--pretty may be provided only once");
+    } else {
+      pretty = true;
+    }
+  }
+  return { args: remaining, pretty };
+}
+
 export function parseOptions(args: readonly string[], spec: OptionSpec): ParsedOptions {
   const booleanNames = new Set(spec.boolean ?? []);
   const valueNames = new Set(spec.value ?? []);

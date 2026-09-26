@@ -1,6 +1,6 @@
 import type { KGOSClient, ObjectReadResult, ObjectTextReadResult } from "@kgos/sdk";
 
-import { parseOptions, requiredValue } from "../args.js";
+import { extractPretty, parseOptions, requiredValue } from "../args.js";
 import { parseError, usageError } from "../errors.js";
 import { outputJSON, readStdin, readTextFile } from "../io.js";
 import { parsePatchRequest } from "./patch.js";
@@ -12,8 +12,9 @@ export async function runObject(client: KGOSClient, args: readonly string[]): Pr
     return;
   }
   if (command === "patch") {
-    const request = await parsePatchRequest(args.slice(1), "object patch");
-    outputJSON(await client.object.patch(request), false);
+    const { args: patchArgs, pretty } = extractPretty(args.slice(1));
+    const request = await parsePatchRequest(patchArgs, "object patch");
+    outputJSON(await client.object.patch(request), pretty);
     return;
   }
   throw usageError(

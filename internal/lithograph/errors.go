@@ -89,7 +89,15 @@ func normalizeDatabaseError(err error) error {
 	if !errors.As(err, &sqliteErr) {
 		return err
 	}
-	category, message, ok := parseDatabaseErrorMessage(err.Error())
+	// go-sqlite3 appends sqlite3_system_errno to Error(), including when an
+	// extension returns SQLITE_IOERR for a remote Provider failure. The OS
+	// errno can belong to an earlier host operation, so keep only the SQLite
+	// diagnostic when the driver's structured errno identifies its suffix.
+	diagnostic := err.Error()
+	if sqliteErr.SystemErrno != 0 {
+		diagnostic = strings.TrimSuffix(diagnostic, ": "+sqliteErr.SystemErrno.Error())
+	}
+	category, message, ok := parseDatabaseErrorMessage(diagnostic)
 	if !ok {
 		return err
 	}

@@ -144,7 +144,7 @@ func (config *Config) normalizeAndValidate(paths Paths) error {
 
 	for index := range config.SQLite.Extensions {
 		entrypoint := config.SQLite.Extensions[index].Entrypoint
-		if entrypoint == LithographEntrypoint || entrypoint == ProviderEntrypoint {
+		if entrypoint == LithographEntrypoint || entrypoint == ProviderEntrypoint || entrypoint == JiebaEntrypoint {
 			return fmt.Errorf(
 				"sqlite.extensions[%d]: official Runtime extensions cannot be configured as caller extensions",
 				index,

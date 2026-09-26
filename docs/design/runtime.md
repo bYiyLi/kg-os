@@ -111,13 +111,14 @@ Authorization: Bearer <token>
 ├── kgosd
 ├── extensions/
 │   ├── lithograph.<platform-library-suffix>
-│   └── lithograph-openai-compatible.<platform-library-suffix>
+│   ├── lithograph-openai-compatible.<platform-library-suffix>
+│   └── kgos-jieba.<platform-library-suffix>
 └── manifest.json
 ```
 
 `@kgos/cli` 从当前 npm dependency graph解析对应 `@kgos/runtime-<platform>-<arch>`，验证 package version、target与manifest hash后按绝对路径启动其中的 `kgosd`；不依赖系统PATH、全局daemon或用户手工提供official library path。当前支持目标为 macOS / Linux x64/arm64，具体package topology由 [Client](client.md#npm-package-topology)拥有。
 
-official Lithograph / Provider path **不写入** Instance `config.toml`。daemon从自身Runtime package发现并验证这些 files，再使用现有 resolver语义把它们固定为 `<root>/extensions/<sha256>/` 的 immutable runtime artifact；这样运行中的connection不依赖npm cache源文件继续存在。额外第三方extension继续由通用 `[[sqlite.extensions]]` config表达并使用同一content-addressed cache。
+official Lithograph / Provider / Jieba path **不写入** Instance `config.toml`。daemon从自身Runtime package发现并验证这些 files，再使用现有 resolver语义把它们固定为 `<root>/extensions/<sha256>/` 的 immutable runtime artifact；这样运行中的connection不依赖npm cache源文件继续存在。official Jieba artifact必须把运行所需 tokenizer code 与词典/数据固定在当前 Runtime package / manifest identity 中，不依赖宿主预装词典、运行时网络下载或可变外部文件。额外第三方extension继续由通用 `[[sqlite.extensions]]` config表达并使用同一content-addressed cache。
 
 ## Instance Root
 
@@ -149,21 +150,21 @@ one --root
 
 ### `config.toml`
 
-`config.toml` 是持久的 **Instance startup configuration**。v1 使用 Embedding cache policy、caller additional SQLite Extension、Full-text 与 Embedding 四组配置。正式 Runtime不依赖缺失字段的隐式默认值：`init`必须写出完整显式配置，手工配置也必须满足同一完整性校验。official Lithograph / Provider由native Runtime package拥有，不写入config：
+`config.toml` 是持久的 **Instance startup configuration**。v1 使用 Embedding cache policy、caller additional SQLite Extension、Full-text 与 Embedding 四组配置。最终文件始终写出完整显式配置；`init` 可以按 [CLI Init](cli.md#init) 为 KG OS-owned 字段解析产品默认值，手工配置仍必须满足同一完整性校验。official Lithograph / Provider / Jieba由native Runtime package拥有，不写入config：
 
 ```toml
 [cache]
 path = "cache/openai-compatible.db"
 max_size_mb = 4096
 
-# 仅用于调用方额外 SQLite extension；official Lithograph / Provider 不在这里声明。
+# 仅用于调用方额外 SQLite extension；official Lithograph / Provider / Jieba 不在这里声明。
 [[sqlite.extensions]]
 source = "/absolute/path/custom-tokenizer.dylib"
 entrypoint = "sqlite3_custom_tokenizer_init"
 sha256 = "<optional-local-or-required-remote-sha256>"
 
 [fulltext]
-analyzer = "unicode61"
+analyzer = "jieba"
 
 [embedding]
 base_url = "https://api.openai.com/v1"
@@ -193,7 +194,9 @@ The following settings must not be changed after initialization.
 
 Graph `execute` 使用本次 operation 独占的读写 connection。进入用户 Cypher 前必须确认 connection 处于 SQLite autocommit / 无 active Lithograph explicit transaction 状态，并先完整执行 `CALL lithograph.branch.checkout($branch)` 建立调用方要求的 connection-local default Branch；随后执行原始 Cypher时**不附加 `options.branch`**。`author/message` 只有调用方显式提供时才作为普通 execution options传入；若目标 procedure不接受这些 options，按 Lithograph公开错误失败。这样 `branch.*` / `tag.*` / Merge Session等自行携带 target的 procedure不需要 KG OS特例表，也不会被无条件 branch option破坏。
 
-用户 Cypher本身可以合法改变 connection checkout。KG OS 不尝试在语句后猜测或恢复原 checkout；任何 connection在下一次 operation使用前都必须按该 operation重新建立或明确覆盖所需 context，绝不能把 pool中残留的 active Branch当作默认值。写语句进入 `query` 时由物理只读 / `at` boundary拒绝，不自动换成读写 connection重试。两类 connection都加载同一批配置的 extensions。Graph 的语句范围见 [Graph](graph.md#graph)。
+用户 Cypher本身可以合法改变 connection checkout，但这个 checkout **只属于当前 operation**，不能成为 pooled connection 的跨请求状态。任何读写 connection 归还 pool 前都必须处于可安全复用的 canonical baseline：SQLite autocommit、没有 active Lithograph explicit transaction，并 checkout 到 `main`。该规则覆盖成功、普通执行错误、stream terminal error、caller cancellation 与 streaming early-close；清理可以使用独立的有界内部 cleanup context，不得因为原 request context 已取消就跳过。只要实现无法证明这三个条件全部成立，就必须 discard 该物理 connection，让 pool 后续新建 connection，而不是把未知 checkout / transaction 状态重新放回池。
+
+因此并发 operation 即使分别 checkout `branch/a`、`branch/b`、`branch/c`，后续 Version/ref operation 也不能观察到随机 pooled connection 上的历史 active Branch。Evolution 的 branch/tag/merge/state 等 public operation继续只使用自己显式的 target参数；它们取得的 write connection必须已经满足上述 reusable baseline。`main` 是 KG OS Instance bootstrap 后始终存在的内部 neutral checkout，但这不建立 public “current Branch”。写语句进入 `query` 时由物理只读 / `at` boundary拒绝，不自动换成读写 connection重试。两类 connection都加载同一批配置的 extensions。Graph 的语句范围见 [Graph](graph.md#graph)。
 
 Bearer token 仍是实例的统一认证。通过认证的调用方可使用 Lithograph 支持的 Cypher；KG OS 不额外禁止 `LOAD CSV` 等文件 / 网络能力。实际文件路径位于运行 `kgosd` 的主机，访问权限由宿主进程和 Lithograph 决定；只读是数据库执行边界，不是无外部 I/O 模式。这里没有开放 raw SQL 或改变 extension 的 startup-only 加载合同。
 
@@ -223,7 +226,7 @@ Provider cache database 是 runtime/derived data，不属于 State、Commit、Br
 
 ### SQLite Extension source resolver
 
-`[[sqlite.extensions]]` 只表达 **caller additional SQLite loadable extensions**。Official Lithograph 与 OpenAI-compatible Provider 由当前 platform native Runtime package提供，不要求用户在 `config.toml` 重复声明 source/path。Jieba tokenizer、其它 tokenizer、SQL function、virtual table或未来额外SQLite extension继续使用这套通用配置；配置了就表示required，v1不增加 `kind/name/enabled/optional/capabilities` 等插件注册层。
+`[[sqlite.extensions]]` 只表达 **caller additional SQLite loadable extensions**。Official Lithograph、OpenAI-compatible Provider 与 KG OS Jieba tokenizer 由当前 platform native Runtime package提供，不要求用户在 `config.toml` 重复声明 source/path。其它 tokenizer、SQL function、virtual table或未来额外SQLite extension继续使用这套通用配置；配置了就表示required，v1不增加 `kind/name/enabled/optional/capabilities` 等插件注册层。SQLite FTS5 对同名 tokenizer 使用后注册覆盖前注册的语义，因此 caller additional extensions 必须先于 official Jieba 加载，official Jieba 最后注册，确保最终 `jieba` 始终由 KG OS Runtime 拥有。
 
 每个 SQLite connection 的完整 extension load order 固定为：
 
@@ -231,15 +234,16 @@ Provider cache database 是 runtime/derived data，不属于 State、Commit、Br
 1. official Lithograph
 2. official lithograph-openai-compatible Provider
 3. caller [[sqlite.extensions]]，保持 config array order
+4. official KG OS Jieba tokenizer（最后注册，固定最终 `jieba` identity）
 ```
 
-调用方不能用 additional entry替换 official artifact，也不能把自定义extension插入两个official extension之间。
+调用方不能用 additional entry替换 official artifact，也不能把自定义extension插入 Lithograph / Provider official slot。caller extension 即使注册同名 `jieba`，随后 official Jieba 的最终注册也必须覆盖它；其它 caller tokenizer/function/virtual table registration继续保留。
 
 每个 entry 的合同固定为：
 
 - `source` **必填**，只能是本机 absolute file path 或 absolute `https://` URL；不接受 relative path、`http://`、其它 scheme、目录或自动按插件名发现/下载。KG OS 不维护插件 registry/package manager。
 - `source` 可以直接指向当前平台可加载的 `.so` / `.dylib` / `.dll`，也可以指向 `.tar.gz` / `.zip` archive。archive 必须额外提供 `library`，它是解包根目录内要交给 SQLite 加载的精确 relative regular-file path；direct library 不提供 `library`。v1 不做 glob、basename 猜测或平台自动选包。
-- `entrypoint` **必填**，必须是非空、无 NUL 的 SQLite extension init symbol。KG OS 把该 symbol 原样交给 driver 的 extension-loading API，不做 filename-derived symbol 猜测。caller additional extension 必须由 operator 填写自身真实 init symbol；official Lithograph / Provider 的 entrypoint由Runtime package合同固定。
+- `entrypoint` **必填**，必须是非空、无 NUL 的 SQLite extension init symbol。KG OS 把该 symbol 原样交给 driver 的 extension-loading API，不做 filename-derived symbol 猜测。caller additional extension 必须由 operator 填写自身真实 init symbol；official Lithograph / Provider / Jieba 的 entrypoint由Runtime package合同固定。
 - `sha256` 对 **远程 source 必填**，必须是 64 位 lowercase hex，校验的是下载得到的原始 artifact bytes；本地 source 可省略，提供时同样必须匹配。无论配置是否显式给出，resolver 都会计算实际 artifact SHA-256，并以内容 hash 固定本次 daemon 使用的 artifact identity。
 
 远程 URL 只作为 artifact location，不是可执行 identity。resolver 可以跟随有界的 **HTTPS → HTTPS** redirect，以支持 GitHub Releases 这类下载；不得降级到 HTTP。`releases/latest/download/...` 可以配置，但仍由 `sha256` 固定本次允许的 bytes：若远端 `latest` 已变化且本地没有旧 hash cache，校验失败而不是自动升级。因此正式可复现部署优先使用带版本号 URL + SHA-256。
@@ -264,7 +268,7 @@ https source -- bounded redirect ┘
 
 archive extraction 必须 fail-closed：拒绝 absolute path、`..` traversal、symlink/hardlink、device/special entry 与越界 `library`；download / decompression / extracted-size 受实现资源上限约束。先写临时文件/目录，hash 与 extraction 全部成功后再原子发布 content-addressed cache。缓存命中时重新确认目标 artifact 与 hash 一致；缓存可删除并从 source 重建，不属于 Knowledge Base history 或 correctness source。远程 cache 已存在且有效时，daemon restart 不要求网络可用。
 
-`kgosd` 对每个新 SQLite connection 使用**同一批已解析的本地 artifacts**：仅在宿主 SQLite 驱动的 connection 初始化阶段临时允许 extension loading，按“official Lithograph → official Provider → caller additional config order”逐项调用可接受显式 `(library, entrypoint)` 的 driver API，随后立即关闭该能力；业务 Cypher/SQL 不获得任意 `load_extension()` 权限。任一 official 或 configured additional extension 在任一 connection 加载失败，该 connection 不进入可用池。Go host通过 process-private registered driver / connection hook把这一步绑定到每个物理 connection 的创建，不能只在 `*sql.DB` 初始 connection加载一次后假设 pool后续 connection自动继承。
+`kgosd` 对每个新 SQLite connection 使用**同一批已解析的本地 artifacts**：仅在宿主 SQLite 驱动的 connection 初始化阶段临时允许 extension loading，按“official Lithograph → official Provider → caller additional config order → official Jieba”逐项调用可接受显式 `(library, entrypoint)` 的 driver API，随后立即关闭该能力；业务 Cypher/SQL 不获得任意 `load_extension()` 权限。official Jieba 最后注册后再验证当前 Full-text analyzer。任一 official 或 configured additional extension 在任一 connection 加载失败，该 connection 不进入可用池。Go host通过 process-private registered driver / connection hook把这一步绑定到每个物理 connection 的创建，不能只在 `*sql.DB` 初始 connection加载一次后假设 pool后续 connection自动继承。
 
 Go SQLite runtime固定使用 `go-sqlite3` bundled amalgamation，并以 `sqlite_fts5` build tag构建；不得使用 `libsqlite3` 把 SQLite版本漂移到宿主系统，也不得使用 `sqlite_omit_load_extension` 移除 KG OS 所需的 extension capability。startup仍必须实际 probe `sqlite_version() >= 3.45.0`、FTS5 与完整 resolved extension set加载成功，build tag本身不作为运行证据。
 
@@ -303,7 +307,11 @@ KG OS v1 的 Full-text 只暴露一个 daemon-global 运行时分词配置：
 analyzer = "jieba"
 ```
 
-`[fulltext].analyzer` 是必填显式值，是非空、无 NUL 的**完整 FTS5 tokenizer specification STRING**，例如 `unicode61`、`porter unicode61`、`jieba`；KG OS 不解析第三方 tokenizer 的业务参数含义。`init` 可以把 `unicode61` 作为推荐值，但最终文件必须显式写出选择。它决定 KG OS **新建或因业务定义变化重建** managed Full-text Index 时写入的 `fulltext.analyzer`；若 specification 需要第三方 tokenizer，对应实现必须由前述 `[[sqlite.extensions]]` 在每个 connection 上注册。
+`[fulltext].analyzer` 在最终 `config.toml` 中仍是必填显式值，是非空、无 NUL 的**完整 FTS5 tokenizer specification STRING**，例如 `jieba`、`unicode61`、`porter unicode61`；KG OS 不解析第三方 tokenizer 的业务参数含义。新 Instance 的 `init` 在调用方没有提供 `--fulltext-analyzer` 时**直接解析为 `jieba`，不询问、不要求 AI/CI 显式传 flag**，并把 `analyzer = "jieba"` 写进配置。调用方仍可通过 `--fulltext-analyzer <fts5-spec>` 显式覆盖，例如选择 `unicode61`；手工配置缺少 `analyzer` 仍是配置错误。
+
+`jieba` 是 KG OS Runtime 的 official FTS5 tokenizer 名称，不再要求 caller 通过 `[[sqlite.extensions]]` 自行安装。产品合同冻结的是**最终注册名、默认行为与可复现性要求**；测试candidate可先pin具体 tokenizer implementation / dictionary source并构建package，以取得 [Jieba tokenizer research](../research/jieba-tokenizer.md) 要求的四平台 build/load/query证据。四平台、license与artifact identity选择门全部通过后，才能接受该实现为正式可分发的official Jieba。首次official实现冻结后，四个受支持 Runtime target必须使用同一逻辑 tokenizer 与词典版本；同一 v1 analyzer 名称不能在普通升级中静默换成不同分词语义。未来若必须升级到会改变 tokenization 的实现/词典，需要新的 analyzer identity或显式迁移设计，不能在 `jieba` 名称下无声替换。已有 Instance 的 `config.toml` 与历史 Full-text IndexDefinition 不自动改写；例如 v0.1.0 已显式保存 `unicode61` 的 Instance 继续使用自身配置。
+
+`[fulltext].analyzer` 决定 KG OS **新建或因业务定义变化重建** managed Full-text Index 时写入的 `fulltext.analyzer`；若调用方显式覆盖为其它第三方 specification，对应 tokenizer 仍必须由前述 `[[sqlite.extensions]]` 在每个 connection 上注册。
 
 KG OS v1 不公开 per-Index analyzer、`fulltext.eventually_consistent`、tokenizer path/arguments registry 或其它 FTS5 建表 options。Ontology 只声明“哪些字段需要 Full-text”。KG OS **创建或因业务定义变化重建** Full-text IndexDefinition 时写入当前 `[fulltext].analyzer`，并保持 `fulltext.eventually_consistent = false`；已经存在且本次不需要重建的 IndexDefinition 保留自己的 versioned analyzer。KG OS 不把 analyzer 配置、fingerprint 或 generation 额外写入 Knowledge Base。
 
@@ -311,7 +319,7 @@ KG OS v1 不公开 per-Index analyzer、`fulltext.eventually_consistent`、token
 
 打开已有 Knowledge Base 时，KG OS **不比较**当前 `[fulltext].analyzer` 与库中已有 IndexDefinition，也不迁移或批量重建历史索引。历史 Full-text query 继续使用目标 State 的 versioned IndexDefinition 实际保存的 analyzer；如果那个 tokenizer 当前没有通过 `sqlite.extensions` 注册，则只让该次 Lithograph Full-text 操作按底层公开 category 失败，不能退化为空结果或改用当前 analyzer。KG OS raw Graph 不解析 Cypher 或错误文案来把这类底层执行失败重新分类为 `FULLTEXT_ANALYZER_UNAVAILABLE`；该 KG OS code 只属于前述当前 `[fulltext].analyzer` capability probe。虽然初始化合同要求该配置初始化后禁止修改，Runtime 不实现历史值检测。
 
-KG OS 不承诺检测第三方 extension 在同一 analyzer name 下偷偷替换算法/词典；远程 artifact SHA-256 pin 能固定 binary bytes，但插件外部资源仍由 operator 负责版本化。这与 Lithograph 的 tokenizer 可复现性边界一致。对同一 Knowledge Base 长期保持 analyzer 语义稳定是 operator responsibility，v1 不建立配置兼容检查或迁移机制。
+official `jieba` 的算法/词典可复现性由 KG OS Runtime artifact/version 负责；调用方显式覆盖为其它第三方 analyzer 时，KG OS 不承诺检测第三方 extension 在同一 analyzer name 下偷偷替换算法/词典，远程 artifact SHA-256 只能固定配置 source bytes，插件外部资源仍由 operator 负责版本化。这与 Lithograph 的 tokenizer 可复现性边界一致。Runtime 不为已有 Instance 建立配置迁移系统。
 
 ### Embedding 配置与索引映射
 
@@ -434,7 +442,7 @@ require and resolve --root <absolute-instance-root>
 → validate cache + caller sqlite.extensions + fulltext + embedding config
 → resolve official Runtime extensions + caller configured extensions to <root>/extensions/<sha256>
 → open one exclusive read-write bootstrap connection to <root>/kgos.db
-→ connection hook loads official Lithograph → official Provider → caller additional extensions and verifies host SQLite >=3.45 + FTS5
+→ connection hook loads official Lithograph → official Provider → caller additional extensions → official Jieba and verifies host SQLite >=3.45 + FTS5
 → call lithograph_version(); if databaseId/storageFormat.current are null, run lithograph_init(); otherwise verify compatible existing database
 → verify Root/main and freeze this startup databaseId/storage-format/Instance baseline
 → validate effective Full-text analyzer on the bootstrap connection
@@ -463,10 +471,26 @@ require and resolve --root <absolute-instance-root>
 无有效 locator                                      → stopped / start candidate
 locator 只有 pid/version、尚无 endpoint                → starting hint
 endpoint可连接且version兼容                            → running candidate
-endpoint不可连接或version不兼容                        → unavailable / mismatch
+endpoint不可连接                                      → recovery candidate
+endpoint可连接但version不兼容                          → mismatch
 ```
 
-locator只是发现信息，不能替代daemon持有的OS lock。stale `kgosd.lock` 内容不能单独证明daemon仍在运行；错误endpoint如果指向另一个KG OS Instance，原始业务请求必须因为per-root token不匹配而在进入Kernel前认证失败，CLI不得因此fallback到其它root/token。若已有进程仍持有lock但endpoint不可用，新spawn contender会因拿不到lock退出，CLI最终报告Runtime unavailable而不是force-kill owner。
+locator只是发现信息，不能替代daemon持有的OS lock。stale `kgosd.lock` 内容不能单独证明daemon仍在运行，PID是否存在也不是 ownership 真源，避免 PID reuse 造成误判。endpoint 不可连接时，CLI Runtime ensure允许启动一个当前版本的 **contender**；contender能否取得 `kgosd.lock` 的 OS exclusive lock才是 stale recovery 的权威仲裁：
+
+```text
+unreachable locator
+→ spawn contender
+→ contender acquires OS lock
+   → old owner 已不存在 / stale locator confirmed
+   → contender覆盖旧 locator并按正常startup成为唯一daemon
+→ contender cannot acquire OS lock
+   → live owner仍存在
+   → caller在有界等待后仍无ready endpoint则报告Runtime unavailable
+```
+
+多个 CLI 并发发现同一 stale locator时仍只能有一个 contender取得lock，其余caller等待winner发布新endpoint；不得先删除lock文件、根据PID force-kill、或绕过single-instance lock启动第二个daemon。locator错误endpoint如果指向另一个KG OS Instance，endpoint本身可连接时仍进入正常认证边界，原始业务请求必须因为per-root token不匹配而在进入Kernel前认证失败，CLI不得把认证失败当成stale locator再fallback其它root/token。reachable但版本不兼容的active daemon继续fail closed，不静默替换。
+
+`doctor` 仍保持 side-effect-free：它看到 unreachable locator 时可以报告 `unavailable`，但不得为了判定 stale 而 spawn contender、删除 locator 或获取第二套 CLI-side lock。上述 recovery candidate 只属于**业务命令的 Runtime ensure**；因此“doctor 报 unavailable”与“下一条业务命令可以通过 daemon-held OS lock 仲裁自动恢复”并不冲突。
 
 ### 停止边界
 
@@ -495,9 +519,9 @@ v1 不定义 launchd/systemd registration、开机启动、service installation�
 - v1只有单token全权限认证，不提供user / role / scope / OAuth / TLS；CLI-managed daemon只监听loopback；
 - `kgosd` / Kernel / Database Host使用Go；`@kgos/sdk` / `@kgos/cli` / Web使用TypeScript；内置Web随daemon native package交付，与API共用进程、endpoint和lifecycle；
 - `config.toml` 不 hot reload，也不做修改检测；当前文件只在下一次 daemon startup 读取；
-- official Lithograph / Provider来自当前native Runtime package；`[[sqlite.extensions]]`只表达caller additional SQLite extensions；两类artifact最终都走同一startup resolver/load lifecycle，不由业务请求动态加载；
+- official Lithograph / Provider / Jieba来自当前native Runtime package；`[[sqlite.extensions]]`只表达caller additional SQLite extensions；两类artifact最终都走同一startup resolver/load lifecycle，不由业务请求动态加载；
 - remote extension 必须 SHA-256 pin，最终总是从 daemon-local immutable artifact 加载；每个 SQLite connection 都加载同一解析结果；
-- `[fulltext].analyzer` 是必填初始化配置；`[embedding]` 的全部字段也是必填初始化配置；`init`时明确提示初始化后禁止修改，但Runtime不保存历史值进行检查；
+- `[fulltext].analyzer` 在最终配置中必填，`init` 未显式覆盖时写入 official `jieba`；`[embedding]` 的全部字段也是必填初始化配置；`init`时明确提示初始化后禁止修改，但Runtime不保存历史值进行检查；
 - `[cache].path/max_size_mb` 必填且 cache 始终启用，映射到 OpenAI-compatible Provider 的独立 SQLite cache，不写 Lithograph `main`；
 - Full-text analyzer 与 Semantic provider/config 正常保存在各自 versioned IndexDefinition；KG OS 不保存第二份 fingerprint/generation，不在 restart 时自动迁移或批量重建；
 - `kgosd.lock` 承担single-instance + active `pid/endpoint/version`定位，但不保存token或业务状态；

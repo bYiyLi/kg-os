@@ -9,7 +9,7 @@
   ],
   "workspaces": {
     ".": {
-      "entry": ["scripts/prepare-lithograph.mjs"],
+      "entry": ["scripts/prepare-lithograph.mjs", "scripts/prepare-jieba.mjs"],
       "project": ["config/test/*.ts", "scripts/*.mjs", "tests/**/*.ts"]
     },
     "packages/sdk": {

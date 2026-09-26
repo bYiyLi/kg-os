@@ -63,7 +63,14 @@ function candidate(target, overrides = {}) {
           file:
             "extensions/lithograph-openai-compatible" + (platform === "darwin" ? ".dylib" : ".so"),
           sha256: "d".repeat(64)
-        }
+        },
+        {
+          file: "extensions/kgos-jieba" + (platform === "darwin" ? ".dylib" : ".so"),
+          sha256: "e".repeat(64)
+        },
+        { file: "JIEBA-NOTICE.md", sha256: "f".repeat(64) },
+        { file: "licenses/sqlite-simple-tokenizer-MIT.txt", sha256: "a".repeat(64) },
+        { file: "licenses/jieba-rs-MIT.txt", sha256: "1".repeat(64) }
       ]
     },
     ...overrides

@@ -29,7 +29,7 @@ Node / Relationship Definition 一起表达字段、约束和索引。单字段�
 
 KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Host 使用 Go；`@kgos/sdk`、`@kgos/cli` 与浏览器 Web 使用 TypeScript。**`kgosd` 自带 Web**：页面与 API 由每个 Instance 自己的 daemon 同 endpoint 提供，不需要单独部署 Web 服务；具体边界见 [运行架构](docs/design/architecture.md#v1-运行时与技术分层)、[Client](docs/design/client.md) 和 [Web hosting](docs/design/runtime.md#web-hosting)。
 
-正式 AI / CI Client 分发形态为 `npx --yes @kgos/cli@<version> --root <instance-root> ...`；`--yes` 属于 npm 自身的首次 package acquisition 确认，普通人类交互可省略。一个显式 root 对应一个 `config.toml`、`auth.json`、`kgos.db` 与最多一个 active `kgosd`；不同 root 使用独立 daemon、dynamic loopback endpoint 与随机 token。不存在默认 `KG_HOME` / `KG_TOKEN`。Instance 首次建立使用 `init`，业务命令自动确保对应 root 的 Runtime 可用。首个 `0.1.0` 六包已真实进入 public npm registry，四平台 public-registry `npx` smoke 与 GitHub Release 均已成功，六包 Trusted Publisher / OIDC 与 bootstrap credential 清理也已完成。
+正式 AI / CI Client 分发形态为 `npx --yes @kgos/cli@<version> --root <instance-root> ...`；`@kgos/cli` 的正式运行前置是 **Node.js >= 24.15.0**，`--yes` 属于 npm 自身的首次 package acquisition 确认，普通人类交互可省略。一个显式 root 对应一个 `config.toml`、`auth.json`、`kgos.db` 与最多一个 active `kgosd`；不同 root 使用独立 daemon、dynamic loopback endpoint 与随机 token。不存在默认 `KG_HOME` / `KG_TOKEN`。Instance 首次建立使用 `init`，业务命令自动确保对应 root 的 Runtime 可用。首个 `0.1.0` 六包已真实进入 public npm registry，四平台 public-registry `npx` smoke 与 GitHub Release 均已成功，六包 Trusted Publisher / OIDC 与 bootstrap credential 清理也已完成。
 
 配置、模型与调用示例，以及设计职责索引，统一从 [设计入口](docs/design.md)进入。本文只维护产品定义，具体配置、数据和接口规则由各 owner 文档维护。
 
@@ -57,9 +57,11 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 **Phase 09 MVP Release Closure 当前为 `done`。** Release Run `36219384704` 已成功完成六包 registry verification、macOS arm64/x64 + Linux arm64/x64 public-registry `npx` smoke 与 GitHub Release finalization；六个 package 均为 `0.1.0` 且 `latest=0.1.0`，`v0.1.0` 仍指向原 release revision `d35e254`。六包已配置 `bYiyLi/kg-os` / `release.yml` Trusted Publisher，并收紧为必须 2FA、禁止 bypass token；GitHub `NPM_TOKEN` secret 与 npm bootstrap token均已删除。长期 OIDC publish workflow closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 已推送到 `main`，GitHub Actions CI Run `36226930183` 的 Validate 与四个平台 Native Runtime jobs 全部成功。完整状态与 Acceptance 见[Phase 09](docs/development/phases/09-mvp-release-closure.md)。
 
+**Phase 10 Runtime & CLI Hardening 当前为 `in_progress`。** 工作树已有 pooled write connection 清理、official `jieba` Runtime artifact与默认值、CLI help / JSON `--pretty`、Provider 诊断修正及真实用户回归；macOS arm64 主工作树 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、仓库外 packed Ontology→中文 Full-text→真实外部 Semantic 查询均已通过。macOS x64与Linux glibc arm64/x64的目标runner CI仍未取得本次candidate证据，因此不把Phase标记为`done`。公开版本仍为 v0.1.0，本阶段不包含新的 npm publish / Git tag / GitHub Release。完整状态与 Acceptance 见[Phase 10](docs/development/phases/10-runtime-cli-hardening.md)。
+
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、Client迁移、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
-相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go Runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、D67–D74，以及 [D75 TypeScript Client](docs/design/decisions.md#d75-typescript-client)、[D76 npm distribution](docs/design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](docs/design/decisions.md#d77-explicit-instance-root)。D75–D77 替换 D65/D72 中与 Go CLI、传统安装、`KG_HOME/KG_TOKEN` 和 fixed endpoint 相关的部分；Go Runtime / Kernel、single-token Bearer、Runtime auto-start与数据库边界继续有效。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
+相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go Runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、D67–D74，以及 [D75 TypeScript Client](docs/design/decisions.md#d75-typescript-client)、[D76 npm distribution](docs/design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](docs/design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](docs/design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](docs/design/decisions.md#d79-stale-daemon-recovery) 与 [D80 official Jieba](docs/design/decisions.md#d80-official-jieba)。D75–D77 替换 D65/D72 中与 Go CLI、传统安装、`KG_HOME/KG_TOKEN` 和 fixed endpoint 相关的部分；D78–D80进一步 harden connection lifecycle、daemon recovery 与默认 Full-text Runtime。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
 ## License
 
@@ -88,5 +90,6 @@ KG OS 采用双许可模式：
 - [Phase 07 计划](docs/development/phases/07-evolution-merge.md)：Evolution Merge Session 的冲突投影、渐进 resolution、candidate validation、finalize/abort、HTTP 与 CLI 范围和验收。
 - [Phase 08 计划](docs/development/phases/08-typescript-client-npm-runtime.md)：TypeScript SDK/CLI、npm native Runtime distribution、explicit Instance Root 与 Go CLI迁移范围和验收。
 - [Phase 09 计划](docs/development/phases/09-mvp-release-closure.md)：首个公开 MVP Release 的 version closure、npm publish/recovery、registry npx matrix、Git tag / GitHub Release与发布状态闭环。
+- [Phase 10 计划](docs/development/phases/10-runtime-cli-hardening.md)：Runtime connection state isolation、stale daemon recovery、official Jieba default、CLI help/pretty、Provider diagnostics、Node baseline与真实用户回归。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

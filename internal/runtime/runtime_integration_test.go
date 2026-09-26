@@ -28,8 +28,8 @@ func TestRuntimeOpenLockResolverCredentialAndReopen(t *testing.T) {
 	if token == "" {
 		t.Fatal("runtime credential token is empty")
 	}
-	if len(first.Extensions) != 2 {
-		t.Fatalf("resolved extensions = %d, want 2", len(first.Extensions))
+	if len(first.Extensions) != 3 {
+		t.Fatalf("resolved extensions = %d, want 3", len(first.Extensions))
 	}
 	for _, extension := range first.Extensions {
 		if !strings.HasPrefix(extension.Library, first.Paths.ExtensionsDir+string(filepath.Separator)) {
@@ -227,12 +227,14 @@ func writeIntegrationConfig(t *testing.T, home string, cachePath string) {
 func openIntegrationRuntime(ctx context.Context, root string) (*Runtime, error) {
 	mainLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_LIBRARY"))
 	providerLibrary, _ := filepath.Abs(os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY"))
+	jiebaLibrary, _ := filepath.Abs(os.Getenv("KGOS_JIEBA_LIBRARY"))
 	return OpenWithOfficialExtensions(
 		ctx,
 		root,
 		[]runtimeprofile.ExtensionConfig{
 			{Source: mainLibrary, Entrypoint: runtimeprofile.LithographEntrypoint},
 			{Source: providerLibrary, Entrypoint: runtimeprofile.ProviderEntrypoint},
+			{Source: jiebaLibrary, Entrypoint: runtimeprofile.JiebaEntrypoint},
 		},
 		nil,
 	)

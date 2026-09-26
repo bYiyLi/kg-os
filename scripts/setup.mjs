@@ -23,6 +23,10 @@ const goVersion = (await runCapture("go", ["version"], { cwd: root, env: goEnv }
 if (!goVersion.includes("go1.27.1")) {
   throw new Error("KG OS setup requires Go 1.27.1; got " + goVersion.trim());
 }
+const rustVersion = (await runCapture("rustc", ["--version"], { cwd: root })).stdout.trim();
+if (!rustVersion.startsWith("rustc 1.97.1 ")) {
+  throw new Error("KG OS setup requires Rust 1.97.1 for official Jieba; got " + rustVersion);
+}
 await runCapture("cc", ["--version"], { cwd: root });
 
 await run("pnpm", ["install", "--frozen-lockfile"], { cwd: root });

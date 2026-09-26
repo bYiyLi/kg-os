@@ -44,13 +44,17 @@ interface CheckInput {
 }
 
 export async function runDoctor(root: string, args: readonly string[]): Promise<void> {
-  const parsed = parseOptions(args, { boolean: ["--json"] });
+  const parsed = parseOptions(args, { boolean: ["--json", "--pretty"] });
   if (parsed.positionals.length !== 0) {
     throw usageError("doctor does not accept positional arguments");
   }
+  const pretty = parsed.booleans.has("--pretty");
+  if (pretty && !parsed.booleans.has("--json")) {
+    throw usageError("--pretty requires --json for doctor");
+  }
   const result = await diagnose(root);
   if (parsed.booleans.has("--json")) {
-    outputJSON(result, false);
+    outputJSON(result, pretty);
     return;
   }
   for (const check of result.checks) {

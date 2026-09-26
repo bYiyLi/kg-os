@@ -55,6 +55,8 @@ CLI 的 stdout/stderr/exit 映射仍由 [CLI](cli.md#error-与-exit-code)拥有�
 
 `@kgos/cli` 是 KG OS v1 面向 AI / shell 的正式分发与执行入口，并且 package 只暴露一个 npm `bin` entry：`kg`。单一 bin 使 npm/npx 对 scoped package 的 executable 推断保持确定，不建立第二个 CLI executable 名。
 
+`@kgos/cli` 的正式 Node.js runtime baseline 为 **Node >= 24.15.0**；package `engines.node`、仓库 pinned Node toolchain、CI 与发布 smoke 必须保持一致。版本不满足时属于 Client 前置条件不满足，不为兼容旧 Node 隐式切换另一套 CLI 实现。README / 使用指南必须在 canonical npx 路径附近明确这一要求，避免只依赖 npm 的 engine-version incompatibility warning 作为用户说明。`@kgos/sdk` 的浏览器 / Web Platform 边界不因为 CLI 的 Node baseline 自动变成 Node-only。
+
 AI / CI 的 canonical invocation 为：
 
 ```text
@@ -96,11 +98,12 @@ CLI 的业务命令通过 `@kgos/sdk` 调用 daemon。只有 `doctor`、`init`�
 ├── kgosd
 ├── extensions/
 │   ├── lithograph.<platform-suffix>
-│   └── lithograph-openai-compatible.<platform-suffix>
+│   ├── lithograph-openai-compatible.<platform-suffix>
+│   └── kgos-jieba.<platform-suffix>
 └── manifest.json
 ```
 
-package 不再包含 native `kg` binary。`kgosd` 与两个 required official extension 使用同一 KG OS package version；manifest 记录 target、version 与 native artifact SHA-256，缺失、target/version 不匹配或 hash 不匹配必须 fail closed。
+package 不再包含 native `kg` binary。`kgosd` 与三个 required official extension 使用同一 KG OS package version；manifest 记录 target、version 与每个 native artifact 的 SHA-256，缺失、target/version 不匹配或 hash 不匹配必须 fail closed。official Jieba 的 tokenizer code / dictionary data必须随当前 platform package形成可复现 artifact，不依赖宿主预装资源或运行时下载。
 
 当前 v1 package target 冻结为 macOS arm64/x64 与 Linux **glibc** arm64/x64。Linux native package除 `os/cpu` 外还必须声明与实际构建一致的 npm `libc` metadata；Phase 08 当前不宣称 musl / Alpine 兼容。没有对应 native package 的平台返回明确 unsupported-platform local error，不从源码即时编译、不回退任意远端 binary。
 
@@ -137,7 +140,7 @@ KG OS 不建立第二个长期 runtime installation directory 或自制 package 
 
 npm 是正式分发入口；GitHub artifacts 可以继续作为 CI / provenance / 调试证据，但不要求用户手工下载后才能使用 KG OS。
 
-发布候选至少验证 SDK exports/types、packed `@kgos/cli` 的 `npm exec` 与 `npx --yes`、platform selection、native manifest/hash、repo 外 `doctor -> init -> 首次业务命令`、daemon auto-start/auth/streaming，以及 macOS arm64/x64 与 Linux glibc arm64/x64 对应 runner 的真实 native load。
+发布候选至少验证 SDK exports/types、Node >=24.15.0 baseline、packed `@kgos/cli` 的 `npm exec` 与 `npx --yes`、platform selection、native manifest/hash、repo 外 `doctor -> init -> 首次业务命令`、daemon auto-start/auth/streaming，以及 macOS arm64/x64 与 Linux glibc arm64/x64 对应 runner 的真实 native load。四个平台都必须实际加载 official Jieba tokenizer并证明新 Instance 省略 `--fulltext-analyzer` 后写出/使用 `jieba`，不能只检查 package里存在一个文件。
 
 `@kgos/*` 使用 npm organization scope。实际发布前必须由有权限的 npm account / organization确认可以发布 `@kgos` scope；若该 namespace不可用，属于 release naming blocker，需要在发布前单独裁决，不能静默换名后仍宣称符合本设计。
 

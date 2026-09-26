@@ -20,7 +20,9 @@
   "files": [
     "kgosd",
     "extensions",
-    "manifest.json"
+    "manifest.json",
+    "JIEBA-NOTICE.md",
+    "licenses"
   ],
   "exports": {
     "./package.json": "./package.json"

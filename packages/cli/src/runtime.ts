@@ -170,7 +170,11 @@ function validateRuntimeMetadata(
   const expected = new Set([
     "kgosd",
     "extensions/lithograph" + suffix,
-    "extensions/lithograph-openai-compatible" + suffix
+    "extensions/lithograph-openai-compatible" + suffix,
+    "extensions/kgos-jieba" + suffix,
+    "JIEBA-NOTICE.md",
+    "licenses/sqlite-simple-tokenizer-MIT.txt",
+    "licenses/jieba-rs-MIT.txt"
   ]);
   const actual = new Set(manifest.files.map((item) => item.file));
   if (actual.size !== expected.size || [...expected].some((file) => !actual.has(file))) {

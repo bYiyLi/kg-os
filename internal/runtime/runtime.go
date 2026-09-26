@@ -47,10 +47,11 @@ func OpenWithOfficialExtensions(
 	official []runtimeprofile.ExtensionConfig,
 	client *http.Client,
 ) (_ *Runtime, returnErr error) {
-	if len(official) != 2 ||
+	if len(official) != 3 ||
 		official[0].Entrypoint != runtimeprofile.LithographEntrypoint ||
-		official[1].Entrypoint != runtimeprofile.ProviderEntrypoint {
-		return nil, fmt.Errorf("official runtime extensions must be Lithograph then Provider")
+		official[1].Entrypoint != runtimeprofile.ProviderEntrypoint ||
+		official[2].Entrypoint != runtimeprofile.JiebaEntrypoint {
+		return nil, fmt.Errorf("official runtime extensions must be Lithograph, Provider, then Jieba")
 	}
 	paths, err := runtimeprofile.ResolvePaths(root)
 	if err != nil {
@@ -86,8 +87,9 @@ func OpenWithOfficialExtensions(
 		return nil, fmt.Errorf("create Provider cache parent directory: %w", err)
 	}
 	configs := make([]runtimeprofile.ExtensionConfig, 0, len(official)+len(config.SQLite.Extensions))
-	configs = append(configs, official...)
+	configs = append(configs, official[:2]...)
 	configs = append(configs, config.SQLite.Extensions...)
+	configs = append(configs, official[2])
 	extensions, err := runtimeprofile.ResolveExtensions(ctx, paths, configs, client)
 	if err != nil {
 		return nil, err

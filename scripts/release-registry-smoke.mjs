@@ -47,8 +47,6 @@ try {
         "cache/openai-compatible.db",
         "--cache-max-size-mb",
         "4096",
-        "--fulltext-analyzer",
-        "unicode61",
         "--embedding-base-url",
         "https://example.invalid/v1",
         "--embedding-model",
@@ -64,6 +62,10 @@ try {
   );
   if (initialized.status !== "initialized" || initialized.root !== instanceRoot) {
     throw new Error("Registry CLI init returned an unexpected result");
+  }
+  const config = await readFile(resolve(instanceRoot, "config.toml"), "utf8");
+  if (!config.includes('analyzer = "jieba"')) {
+    throw new Error("Registry CLI init did not use the official Jieba default");
   }
 
   const overview = await runJson(["--root", instanceRoot, "evolution", "overview"]);
@@ -114,6 +116,42 @@ try {
   ]);
   if (queried.rows?.[0]?.[0] !== "phase09") {
     throw new Error("Registry Graph query did not return the written Knowledge value");
+  }
+
+  await runJson([
+    "--root",
+    instanceRoot,
+    "graph",
+    "execute",
+    "--branch",
+    "main",
+    "--cypher",
+    "CREATE (:Phase10RegistryChinese {body: '这是知识图。'})"
+  ]);
+  await runJson([
+    "--root",
+    instanceRoot,
+    "graph",
+    "execute",
+    "--branch",
+    "main",
+    "--cypher",
+    "CREATE FULLTEXT INDEX phase10_registry_chinese FOR (d:Phase10RegistryChinese) " +
+      "ON EACH [d.body] OPTIONS {indexConfig:{`fulltext.analyzer`: 'jieba'}}"
+  ]);
+  const chinese = await runJson([
+    "--root",
+    instanceRoot,
+    "graph",
+    "query",
+    "--at",
+    "branch/main",
+    "--cypher",
+    "CALL db.index.fulltext.queryNodes('phase10_registry_chinese', '知识图', {limit:10}) " +
+      "YIELD node, score RETURN node.body AS body"
+  ]);
+  if (chinese.rows?.[0]?.[0] !== "这是知识图。") {
+    throw new Error("Registry Runtime did not query Chinese Knowledge with official Jieba");
   }
 } catch (error) {
   smokeFailure = error;

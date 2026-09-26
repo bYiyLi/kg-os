@@ -9,6 +9,7 @@ playwright-report/
 test-results/
 .cache/
 artifacts/
+native/jieba/target/
 *.tsbuildinfo
 .env
 .env.*

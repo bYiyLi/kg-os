@@ -21,6 +21,7 @@ await run("pnpm", ["exec", "tsc", "-p", "packages/web/tsconfig.json", "--pretty"
 });
 await run("pnpm", ["--filter", "@kgos/web", "build"], { cwd: root });
 await run("node", ["scripts/prepare-lithograph.mjs"], { cwd: root });
+await run("node", ["scripts/prepare-jieba.mjs"], { cwd: root });
 
 await mkdir(embeddedWeb, { recursive: true });
 for (const entry of await readdir(embeddedWeb)) {

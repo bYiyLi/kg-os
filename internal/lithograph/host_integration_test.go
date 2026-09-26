@@ -759,6 +759,75 @@ func TestSemanticQueryUsesProviderOwnedCacheAcrossReadOnlyConnectionsAndReopen(t
 	}
 }
 
+func TestSemanticProviderHTTPDiagnostics(t *testing.T) {
+	const secret = "phase10-fixture-secret"
+	t.Setenv("KGOS_PHASE10_PROVIDER_KEY", secret)
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests, http.StatusInternalServerError} {
+		t.Run(fmt.Sprintf("HTTP_%d", status), func(t *testing.T) {
+			provider := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+				response.WriteHeader(status)
+				_, _ = response.Write([]byte(`{"error":"rejected"}`))
+			}))
+			defer provider.Close()
+			assertProviderFailure(t, provider.URL+"/v1", 1000, fmt.Sprintf("OpenAI-compatible embeddings endpoint returned HTTP %d", status), secret)
+		})
+	}
+	t.Run("network", func(t *testing.T) {
+		assertProviderFailure(t, "http://127.0.0.1:9/v1", 100, "OpenAI-compatible embeddings request failed before receiving a response", secret)
+	})
+	t.Run("timeout", func(t *testing.T) {
+		provider := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+			time.Sleep(200 * time.Millisecond)
+			response.WriteHeader(http.StatusOK)
+		}))
+		defer provider.Close()
+		assertProviderFailure(t, provider.URL+"/v1", 50, "OpenAI-compatible embeddings request failed before receiving a response", secret)
+	})
+}
+
+func assertProviderFailure(t *testing.T, baseURL string, timeoutMS int, want string, secret string) {
+	t.Helper()
+	paths := integrationPaths(t)
+	semantic := integrationSemantic(paths, false)
+	semantic.BaseURL = baseURL
+	host, err := Open(context.Background(), paths.Database, integrationExtensions(t), "unicode61", semantic)
+	if err != nil {
+		t.Fatalf("open Provider host: %v", err)
+	}
+	defer host.Close()
+	options := map[string]any{
+		"provider": "openai-compatible",
+		"providerConfig": map[string]any{
+			"base_url": baseURL, "model": semantic.Model,
+			"api_key_env": "KGOS_PHASE10_PROVIDER_KEY",
+			"timeout_ms":  timeoutMS, "max_retries": 0,
+		},
+		"dimensions": semantic.Dimensions, "similarity": semantic.Similarity,
+	}
+	if _, err := host.Execute(context.Background(), ExecuteRequest{
+		Branch: "main",
+		Cypher: "CALL db.index.semantic.createNodeIndex($name, [$label], $property, $options)",
+		Params: map[string]any{"name": "provider_error", "label": "ProviderError", "property": "content", "options": options},
+	}); err != nil {
+		t.Fatalf("create Semantic index: %v", err)
+	}
+	if _, err := host.Execute(context.Background(), ExecuteRequest{
+		Branch: "main", Cypher: "CREATE (:ProviderError {content: 'fixture'})",
+	}); err != nil {
+		t.Fatalf("create Semantic source: %v", err)
+	}
+	_, err = host.Query(context.Background(), QueryRequest{
+		At: "branch/main", Cypher: "CALL db.index.semantic.queryNodes('provider_error', 'fixture', {limit: 10}) YIELD node RETURN node",
+	})
+	if err == nil {
+		t.Fatal("Provider failure unexpectedly succeeded")
+	}
+	category, message, _, ok := ErrorDetails(err)
+	if !ok || category != CategoryIO || message != want || strings.Contains(message, secret) || strings.Contains(err.Error(), secret) {
+		t.Fatalf("Provider failure diagnostics = (%q, %q, %v)", category, message, err)
+	}
+}
+
 func TestHostRejectsUnavailableFullTextAnalyzer(t *testing.T) {
 	paths := integrationPaths(t)
 	host, err := Open(
@@ -1052,14 +1121,17 @@ func integrationExtensions(t *testing.T) []runtimeprofile.ResolvedExtension {
 	t.Helper()
 	mainLibrary := os.Getenv("KGOS_LITHOGRAPH_LIBRARY")
 	providerLibrary := os.Getenv("KGOS_LITHOGRAPH_PROVIDER_LIBRARY")
-	if mainLibrary == "" || providerLibrary == "" {
-		t.Fatal("KGOS_LITHOGRAPH_LIBRARY and KGOS_LITHOGRAPH_PROVIDER_LIBRARY are required")
+	jiebaLibrary := os.Getenv("KGOS_JIEBA_LIBRARY")
+	if mainLibrary == "" || providerLibrary == "" || jiebaLibrary == "" {
+		t.Fatal("KGOS_LITHOGRAPH_LIBRARY, KGOS_LITHOGRAPH_PROVIDER_LIBRARY, and KGOS_JIEBA_LIBRARY are required")
 	}
 	mainLibrary, _ = filepath.Abs(mainLibrary)
 	providerLibrary, _ = filepath.Abs(providerLibrary)
+	jiebaLibrary, _ = filepath.Abs(jiebaLibrary)
 	return []runtimeprofile.ResolvedExtension{
 		{Library: mainLibrary, Entrypoint: "sqlite3_lithograph_init"},
 		{Library: providerLibrary, Entrypoint: "sqlite3_lithographopenaicompatible_init"},
+		{Library: jiebaLibrary, Entrypoint: "sqlite3_kgosjieba_init"},
 	}
 }
 

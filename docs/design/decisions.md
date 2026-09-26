@@ -2,7 +2,7 @@
 
 本文件记录 KG OS 架构决策的**决定、依据、备选、取舍与被替换基线**。具体运行行为仍由对应职责设计文件拥有；本文件不建立第二份操作合同。
 
-当前运行架构由 [D65 Go runtime](#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](#d66-lithograph-v030-sql-only) 与 2026-09-24 新增的 [D75 TypeScript Client](#d75-typescript-client)、[D76 npm distribution](#d76-npm-distribution)、[D77 explicit Instance Root](#d77-explicit-instance-root) 共同定义：Go 保留 daemon / Kernel / Database Host，Client 统一 TypeScript，npm/npx 负责分发，Instance 由显式 root 定位。早期 D44/D45/D51/D54/D55/D63/D72 等被后续决定替换的部分只保留历史依据。
+当前运行架构由 [D65 Go runtime](#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](#d66-lithograph-v030-sql-only)、[D75 TypeScript Client](#d75-typescript-client)、[D76 npm distribution](#d76-npm-distribution)、[D77 explicit Instance Root](#d77-explicit-instance-root)，以及 2026-09-26 新增的 [D78 operation-scoped Branch](#d78-operation-scoped-branch)、[D79 stale daemon recovery](#d79-stale-daemon-recovery)、[D80 official Jieba](#d80-official-jieba) 共同定义：Go 保留 daemon / Kernel / Database Host，Client 统一 TypeScript，npm/npx 负责分发，Instance 由显式 root 定位；pooled connection不能泄漏 Branch状态，stale daemon由OS lock仲裁恢复，新Instance默认使用KG OS official Jieba全文分词。早期 D44/D45/D51/D54/D55/D63/D72 等被后续决定替换的部分只保留历史依据。
 
 ## 底层架构替换背景
 
@@ -418,7 +418,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D51 SQLite Extension 统一由 startup source resolver 装配（2026-09-17）
 
-> 后续调整：[D63](#d63-typescript-integrated-web) 曾将宿主改为 TypeScript / Node.js；[D65](#d65-go-runtime) 曾将服务端 / CLI 改为 Go；[D75](#d75-typescript-client) 随后只把 Client CLI 迁回 TypeScript而保留Go Runtime；[D66](#d66-lithograph-v030-sql-only) 进一步删除 application-facing Native query ABI / `sqlite3*` 要求；[D76](#d76-npm-distribution) 又把 official Lithograph / Provider source 从 Instance config 移到 platform native Runtime package。source resolver、content-addressed cache、每 connection加载同一批immutable artifacts与startup-only trust boundary继续有效；当前config中的 `[[sqlite.extensions]]` 只表示caller additional extensions，official artifacts先按固定顺序加载。下文“Lithograph也必须由config声明”、optional entrypoint与Native ABI描述只保留历史依据。
+> 后续调整：[D63](#d63-typescript-integrated-web) 曾将宿主改为 TypeScript / Node.js；[D65](#d65-go-runtime) 曾将服务端 / CLI 改为 Go；[D75](#d75-typescript-client) 随后只把 Client CLI 迁回 TypeScript而保留Go Runtime；[D66](#d66-lithograph-v030-sql-only) 进一步删除 application-facing Native query ABI / `sqlite3*` 要求；[D76](#d76-npm-distribution) 又把 official Lithograph / Provider source 从 Instance config 移到 platform native Runtime package；[D80](#d80-official-jieba) 再增加Runtime-owned official Jieba，并因FTS5同名registration覆盖语义要求caller additional extensions先加载、official Jieba最终注册。source resolver、content-addressed cache、每 connection加载同一批immutable artifacts与startup-only trust boundary继续有效。下文“Lithograph也必须由config声明”、optional entrypoint与Native ABI描述只保留历史依据。
 
 - 决定：`~/.kgosd/config.toml` 使用 ordered `[[sqlite.extensions]]` 作为 **唯一 SQLite loadable-extension 配置入口**。Lithograph 自身、第三方 FTS5 tokenizer 与其它 SQLite extension 都使用同一机制；KG OS 不再把 Lithograph shared library 内嵌进 binary、写死安装路径，也不为“全文插件 / 向量插件 / Lithograph 插件”建立多套 loader。每个 entry 只表达 artifact source 与 SQLite load 参数，不声明业务 `kind/capability`；全部加载完成后由 `kgosd` 单独验证 KG OS 必需的 Lithograph public capability。
 - Source contract：`source` 是 absolute local file path 或 absolute HTTPS URL。Remote source 必须配置 artifact SHA-256；local source 可选配置 expected SHA-256，但 resolver 总会计算实际 content hash。Direct `.so/.dylib/.dll` 直接形成 load artifact；`.tar.gz/.zip` 必须用精确 relative `library` 指出 archive 内要加载的 shared library。`entrypoint` optional，省略时使用 SQLite 标准 resolution。数组顺序就是每个 connection 的加载顺序，所有 entry 都是 required；v1 不增加自动发现、plugin registry、可选插件、任意 download headers 或 package dependency solver。
@@ -430,7 +430,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D52 Full-text analyzer 是 kgosd 全局运行配置，Ontology 不暴露分词实现（2026-09-17）
 
-> 后续调整：[D72](#d72-local-install-runtime-onboarding) 保留 Ontology 不暴露 analyzer 与现有 versioned IndexDefinition 语义，并把 `[fulltext].analyzer` 改为初始化时必须显式给出；[D77](#d77-explicit-instance-root) 只把该初始化动作从 `install` 改名为 Instance `init`。下文缺失配置默认值等早期描述只保留历史依据。
+> 后续调整：[D72](#d72-local-install-runtime-onboarding) 保留 Ontology 不暴露 analyzer 与现有 versioned IndexDefinition 语义，并把 `[fulltext].analyzer` 改为初始化时必须显式给出；[D77](#d77-explicit-instance-root) 只把该初始化动作从 `install` 改名为 Instance `init`；[D80](#d80-official-jieba) 又把**新 Instance** 的 `init` 缺省解析改为Runtime-owned `jieba`并仍显式写入最终config。下文“省略整段默认 `unicode61`”、Jieba只能由caller extension提供等内容只保留历史依据。
 
 - 决定：KG OS v1 的 Ontology Full-text Index 只声明真实 `name/targets/properties` 与 `type: fulltext`；不提供 per-index `analyzer/options/eventually_consistent/tokenizer plugin` 字段。Daemon startup config 的 `[fulltext].analyzer` 决定 KG OS **新建或因业务定义变化重建** Full-text IndexDefinition 时写入的 `fulltext.analyzer`，省略整段默认 `unicode61`；`fulltext.eventually_consistent` 固定为 false。Analyzer 是完整 FTS5 tokenizer specification string，但第三方 tokenizer implementation 由 D51 的 `sqlite.extensions` 在每个 SQLite connection 上提供，KG OS 不根据 analyzer 名称查找/安装插件，也不因配置变化覆盖已有 IndexDefinition。
 - State contract：analyzer 不进入公共 Ontology，也不另存 fulltext-space fingerprint/generation。Lithograph Full-text IndexDefinition 自己正常保存创建时的 analyzer，这是数据库执行所需的 versioned Schema 内容，不是 KG OS runtime config 的第二份副本。已有 Index 不因 restart/config change 自动改写；KG OS 新建或因业务 targets/properties 变化重建 Index 时使用当前 `[fulltext].analyzer`。因此同一 Knowledge Base 的不同历史 State，甚至同一 State 的不同 Full-text Index，都可能来自不同 runtime analyzer；这种差异本身不是 KG OS consistency violation。
@@ -734,6 +734,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D76 npm / npx 是正式 Client 分发入口，kgosd 作为平台 native package 交付（2026-09-24）
 
+> 后续调整：[D80](#d80-official-jieba) 在同一四个平台Runtime package中新增KG OS official Jieba artifact；下文“只携带 kgosd、Lithograph、OpenAI-compatible Provider”的描述保留为v0.1.0 / Phase 08历史基线，当前package topology以 [Client](client.md#npm-package-topology) 与 [Runtime](runtime.md#native-runtime-package) 为准。
+
 - 决定：用户不再先下载 native distribution、配置 PATH 或安装 `kg` binary；AI / CI 正式入口固定为 `npx --yes @kgos/cli@<version> ...`，其中 `--yes` 属于 npm 首次 package acquisition 的非交互确认，人类交互可省略。发布单元包括 `@kgos/sdk`、`@kgos/cli` 与 macOS arm64/x64、Linux glibc arm64/x64 四个 `@kgos/runtime-<os>-<arch>` native package。
 - Native package：平台 package 只携带同版本 `kgosd`、Lithograph、OpenAI-compatible Provider 与 manifest，不再携带 native `kg`。CLI 用 exact-version `optionalDependencies` + npm `os/cpu` metadata选择当前平台；Linux package还必须用 `libc` metadata与真实构建目标一致，v1只承诺glibc而不把musl/Alpine自动算作“Linux已支持”。所有package都是预构建artifact，不通过preinstall/install/postinstall下载或选择binary；CLI继续验证 target/version/hash；不支持或optional package缺失的平台fail closed，不即时源码编译或下载任意远端binary。
 - Runtime path：npm / `node_modules` / cache path 只是本次软件分发位置，不进入 Instance `config.toml`、State 或 State Data。daemon 从自身 package取得 official extension并在 startup 固定到 Instance content-addressed extension cache；caller extra extension仍走通用 resolver。
@@ -755,3 +757,39 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 备选：保留 `KGOS_HOME` 默认实例；把 `kgosd` binary复制到root；固定每库port。前者继续引入隐藏上下文，第二项混合软件/数据 lifecycle，第三项造成多Instance端口冲突，均不采用。
 - 取舍：每条本地命令更显式，用户/Agent需要提供root；不同Runtime版本同时面对同一active daemon时必须做版本检查并fail closed，v1不静默kill/upgrade正在运行的daemon。换取Instance identity、credential与runtime discovery完全确定。
 - 当前合同：[Runtime Instance Root](runtime.md#instance-root)、[CLI global root](cli.md#global-root)、[Client](client.md)、[Phase 08](../development/phases/08-typescript-client-npm-runtime.md)。
+
+<a id="d78-operation-scoped-branch"></a>
+
+### D78 Graph Branch context 只属于单次 operation，pooled write connection 必须清理或丢弃（2026-09-26）
+
+- 决定：KG OS 公共 Graph / Evolution 不存在 connection-local current Branch。`graph execute --branch X` 可以通过 Lithograph checkout建立本次调用的默认 Branch，但该 checkout不能随 `database/sql` connection回到pool后影响任何后续请求。读写 connection归还pool前必须证明处于 autocommit、无 active Lithograph explicit transaction、checkout `main` 的 reusable baseline；成功、错误、取消、stream terminal error与early-close均适用。无法证明时直接 discard物理connection。
+- 并发：多个请求可以同时在不同write connection上使用不同Branch；任一后续branch/tag/state/merge或Graph操作的结果不得依赖pool随机分配到哪条历史connection。清理失败不能以“下一次请求会重新checkout”作为正确性兜底。
+- 依据：真实 public CLI验收复现了在 `feature` 上执行Graph后，已merge的 `feature` 因某条pooled connection仍将其视为active Branch而无法删除；切到 `main` 后才恢复。write pool存在多connection时同一问题会进一步变成并发非确定性。
+- 备选：只在下一次Graph execute开始时重新checkout；每次Graph execute后best-effort checkout main但清理失败仍回池。前者不能保护Version/ref operation，后者把未知connection继续复用，均不能满足公共无隐藏current Branch语义。
+- 取舍：每次write operation增加一次有界cleanup，清理失败可能丢弃并重建connection；换取跨请求和并发确定性。
+- 当前合同：[Runtime Cypher执行连接](runtime.md#cypher-执行连接)、[Graph公共调用合同](graph.md#graph-公共调用合同)。
+
+<a id="d79-stale-daemon-recovery"></a>
+
+### D79 stale daemon locator 由 daemon-held OS lock 仲裁并自动恢复（2026-09-26）
+
+- 决定：`kgosd.lock` 文件内容和PID都只是locator hint，不是daemon ownership真源；OS exclusive file lock继续是唯一single-instance仲裁。业务命令Runtime ensure遇到unreachable locator时允许spawn当前Runtime contender：contender取得lock即确认旧owner不存在并覆盖stale locator正常启动；取不到lock表示仍有live owner，caller有界等待后仍无ready endpoint则返回Runtime unavailable，不force-kill、不启动第二个daemon。
+- 并发：多个CLI同时发现stale locator时只能一个contender成为lock winner，其余caller等待winner locator；不先删lock文件，不依赖PID existence判断，避免PID reuse。
+- 边界：`doctor`保持side-effect-free，可以把unreachable locator报告为 `unavailable`，但不执行recovery；reachable但版本不兼容继续fail closed；reachable错误endpoint指向另一Instance时依靠同root Bearer认证失败，不把auth failure当stale fallback。
+- 依据：真实v0.1.0使用验收中，SIGTERM后的daemon进程已退出，但旧locator仍使CLI观察到unavailable而非可auto-start状态。现有daemon startup本身已经持有权威OS lock，因此不需要增加第二套CLI-side lock协议。
+- 备选：根据PID不存在直接删除locator；CLI自己读取/获取lock；遇到unavailable直接kill旧PID。它们分别受PID reuse、重复lock owner和误杀风险影响，不采用。
+- 取舍：unreachable但仍持锁的真实live owner会保持fail closed，自动恢复只发生在新contender实际取得权威lock时。
+- 当前合同：[Runtime daemon lifecycle](runtime.md#daemon-lifecycle)、[Runtime lock](runtime.md#kgosdlock)。
+
+<a id="d80-official-jieba"></a>
+
+### D80 KG OS Runtime 官方携带 Jieba，new Instance 默认 analyzer=jieba（2026-09-26）
+
+- 决定：KG OS四个platform native Runtime package在Lithograph与OpenAI-compatible Provider之外，再携带一个official FTS5 Jieba tokenizer artifact；Lithograph仍只拥有通用FTS5 tokenizer contract，不因此内置Jieba。每个SQLite connection先加载caller additional extensions、再**最后注册 official Jieba**，因为SQLite FTS5同名tokenizer后注册会覆盖前注册；这样caller不能通过普通extension顺序无意间改变KG OS-owned `jieba` identity。用户不需要为默认中文全文能力配置 `[[sqlite.extensions]]`。
+- Init默认：新Instance省略 `--fulltext-analyzer` 时，CLI直接解析为 `jieba`、不prompt，并在完整 `config.toml` 中显式写 `[fulltext].analyzer = "jieba"`。高级调用方仍可显式覆盖其它合法FTS5 specification，例如 `unicode61`。
+- Reproducibility：产品先冻结final name / default / reproducibility contract。Phase 10可以先构建pin住源码与词典输入的测试candidate，以取得四平台build/load/query证据；只有 [Jieba tokenizer research](../research/jieba-tokenizer.md) 的四平台、license与artifact identity选择门全部通过后，才能将该实现接受为正式可分发的official Jieba。首次official实现冻结后，tokenizer code与运行所需词典/数据必须进入Runtime artifact/manifest identity，四个支持平台使用同一逻辑语义，不依赖宿主预装资源或运行时下载。同一v1 `jieba` identity不得在普通升级中静默替换成会改变tokenization的算法/词典；发生这种变化需要新的analyzer identity或显式迁移设计。
+- Existing Instance：不迁移已有 `config.toml` 或历史IndexDefinition；v0.1.0已经显式配置 `unicode61` 的Instance继续使用自身配置/历史定义。
+- 依据：真实用户验收中 `unicode61` 的英文Full-text工作正常，但中文短语“知识图”无法按预期命中；KG OS实际面向中英文AI知识场景，默认依赖caller手工安装Jieba又破坏开箱即用目标。
+- 备选：继续默认 `unicode61`，只文档推荐Jieba；默认Jieba但仍要求用户手工第三方extension；把Jieba写入Lithograph。前两项不能提供默认中文开箱体验，后一项污染通用数据库边界，均不采用。
+- 取舍：KG OS需要承担official Jieba实现选择、许可证、四平台构建/manifest/release与语义可复现性；exact implementation 属于Phase 10的工程选择，必须先取得真实证据再进入Runtime artifact，但不因为候选尚未选定把已完整定义的Phase退回未设计。不能只凭第三方README把候选当成已可分发artifact。换取新Instance无需额外tokenizer配置即可获得中文全文分词。
+- 当前合同：[Runtime native package / Full-text](runtime.md#native-runtime-package)、[CLI Init](cli.md#init)、[Client npm package topology](client.md#npm-package-topology)。

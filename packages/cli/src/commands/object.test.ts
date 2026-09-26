@@ -96,6 +96,23 @@ describe("object CLI", () => {
     expect(String(write.mock.calls.at(-1)?.[0])).toContain('"created":[]');
   });
 
+  it("pretty prints a single JSON patch result without changing its value", async () => {
+    const state = "commit/" + "a".repeat(64);
+    const result = { state, created: [], transitions: [] };
+    const client = clientFor(() => result);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const args = ["patch", "--base-state", state, "--branch", "main", "--patch", "diff"];
+    await runObject(client, args);
+    const compact = String(write.mock.calls.at(-1)?.[0]);
+    await runObject(client, [...args, "--pretty"]);
+    const pretty = String(write.mock.calls.at(-1)?.[0]);
+    expect(pretty).toContain('\n  "state"');
+    expect(JSON.parse(pretty)).toEqual(JSON.parse(compact));
+    await expect(runObject(client, [...args, "--pretty", "--pretty"])).rejects.toBeInstanceOf(
+      CLIError
+    );
+  });
+
   it("rejects duplicate refs, invalid CRLF lists, and invalid format combinations", async () => {
     const client = clientFor(() => ({}));
     await expect(

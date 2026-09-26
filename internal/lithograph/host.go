@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -101,6 +102,12 @@ func Open(
 func registerDriver(extensions []runtimeprofile.ResolvedExtension) string {
 	driverName := fmt.Sprintf("kgos-lithograph-%d", driverSequence.Add(1))
 	resolved := append([]runtimeprofile.ResolvedExtension(nil), extensions...)
+	officialJieba := false
+	for _, extension := range resolved {
+		if extension.Entrypoint == runtimeprofile.JiebaEntrypoint {
+			officialJieba = true
+		}
+	}
 	sql.Register(driverName, &sqlite3.SQLiteDriver{
 		ConnectHook: func(connection *sqlite3.SQLiteConn) error {
 			for _, extension := range resolved {
@@ -113,10 +120,39 @@ func registerDriver(extensions []runtimeprofile.ResolvedExtension) string {
 					)
 				}
 			}
+			if officialJieba {
+				if err := probeOfficialJieba(connection); err != nil {
+					return err
+				}
+			}
 			return nil
 		},
 	})
 	return driverName
+}
+
+func probeOfficialJieba(connection *sqlite3.SQLiteConn) error {
+	const table = "kgos_official_jieba_probe"
+	if _, err := connection.Exec("CREATE VIRTUAL TABLE temp."+table+" USING fts5(body, tokenize='jieba')", nil); err != nil {
+		return fmt.Errorf("probe official Jieba registration: %w", err)
+	}
+	if _, err := connection.Exec("INSERT INTO temp."+table+"(body) VALUES ('这是知识图。')", nil); err != nil {
+		return fmt.Errorf("probe official Jieba indexing: %w", err)
+	}
+	rows, err := connection.Query("SELECT count(*) FROM temp."+table+" WHERE "+table+" MATCH '知识图'", nil)
+	if err != nil {
+		return fmt.Errorf("probe official Jieba query: %w", err)
+	}
+	value := make([]driver.Value, 1)
+	nextErr := rows.Next(value)
+	closeErr := rows.Close()
+	if nextErr != nil || closeErr != nil || len(value) != 1 || value[0] != int64(1) {
+		return fmt.Errorf("official Jieba query did not match the Chinese probe corpus: row=%v close=%v", nextErr, closeErr)
+	}
+	if _, err := connection.Exec("DROP TABLE temp."+table, nil); err != nil {
+		return fmt.Errorf("clean official Jieba probe: %w", err)
+	}
+	return nil
 }
 
 func openPool(driverName, databasePath string, readOnly bool, maxOpen int) (*sql.DB, error) {
