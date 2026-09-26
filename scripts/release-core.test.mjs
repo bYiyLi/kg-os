@@ -132,6 +132,30 @@ describe("release core", () => {
         { directory: "/divergent-client", document: divergentClient }
       ])
     ).toThrow(/client package differs/);
+    const windowsCliMode = candidate("win32-x64");
+    windowsCliMode.packages.find((entry) => entry.name === "@kgos/cli").integrity =
+      integrity("windows-cli-mode");
+    const windowsCandidates = [
+      ...clean.filter((entry) => entry.document.target !== "win32-x64"),
+      { directory: "/windows-mode", document: windowsCliMode }
+    ];
+    expect(() => aggregateCandidateDocuments(windowsCandidates)).toThrow(/client package differs/);
+    expect(
+      aggregateCandidateDocuments(windowsCandidates, new Set(["win32-x64"])).packages.at(-1)
+        ?.sourceDirectory
+    ).toBe("/candidates/linux-x64");
+    const macCliChange = candidate("darwin-arm64");
+    macCliChange.packages.find((entry) => entry.name === "@kgos/cli").integrity =
+      integrity("mac-cli-change");
+    expect(() =>
+      aggregateCandidateDocuments(
+        [
+          ...clean.filter((entry) => entry.document.target !== "darwin-arm64"),
+          { directory: "/mac-change", document: macCliChange }
+        ],
+        new Set(["darwin-arm64"])
+      )
+    ).toThrow(/client package differs/);
     const invalidRuntime = candidate("linux-x64");
     invalidRuntime.runtimeManifest.files[0].sha256 = "invalid";
     expect(() =>

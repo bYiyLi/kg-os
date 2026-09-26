@@ -126,7 +126,7 @@ export function validateCandidateDocument(candidate) {
   return candidate;
 }
 
-export function aggregateCandidateDocuments(entries) {
+export function aggregateCandidateDocuments(entries, verifiedWindowsCliTargets = new Set()) {
   if (!Array.isArray(entries)) {
     throw new TypeError("Candidate entries must be an array");
   }
@@ -169,7 +169,15 @@ export function aggregateCandidateDocuments(entries) {
     const packageEntry = clientEntry.document.packages.find((item) => item.name === name);
     for (const target of RUNTIME_TARGETS) {
       const peer = byTarget.get(target).document.packages.find((item) => item.name === name);
-      if (peer.integrity !== packageEntry.integrity || peer.filename !== packageEntry.filename) {
+      if (
+        peer.filename !== packageEntry.filename ||
+        (peer.integrity !== packageEntry.integrity &&
+          !(
+            name === "@kgos/cli" &&
+            target.startsWith("win32-") &&
+            verifiedWindowsCliTargets.has(target)
+          ))
+      ) {
         throw new Error("Release client package differs across target candidates: " + name);
       }
     }

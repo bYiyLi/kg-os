@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -129,7 +129,26 @@ async function aggregate() {
     entries.push({ directory, document });
   }
 
-  const aggregateManifest = aggregateCandidateDocuments(entries);
+  const canonical = entries.find((entry) => entry.document.target === "linux-x64");
+  const canonicalCli = canonical?.document.packages.find((entry) => entry.name === "@kgos/cli");
+  if (canonical === undefined || canonicalCli === undefined) {
+    throw new Error("Linux x64 CLI release candidate is missing");
+  }
+  const verifiedWindowsCliTargets = new Set();
+  for (const entry of entries) {
+    if (!entry.document.target.startsWith("win32-")) {
+      continue;
+    }
+    const cli = entry.document.packages.find((item) => item.name === "@kgos/cli");
+    if (cli.integrity !== canonicalCli.integrity) {
+      await verifyWindowsCliModeDifference(
+        resolve(canonical.directory, canonicalCli.filename),
+        resolve(entry.directory, cli.filename)
+      );
+      verifiedWindowsCliTargets.add(entry.document.target);
+    }
+  }
+  const aggregateManifest = aggregateCandidateDocuments(entries, verifiedWindowsCliTargets);
   if (
     aggregateManifest.revision !== expectedRevision ||
     aggregateManifest.version !== expectedVersion
@@ -408,6 +427,60 @@ async function findFiles(directory, filename) {
     }
   }
   return matches;
+}
+
+async function verifyWindowsCliModeDifference(canonicalTarball, windowsTarball) {
+  const extraction = await mkdtemp(join(tmpdir(), "kgos-release-cli-"));
+  const canonicalRoot = resolve(extraction, "canonical");
+  const windowsRoot = resolve(extraction, "windows");
+  try {
+    await mkdir(canonicalRoot);
+    await mkdir(windowsRoot);
+    await run("tar", ["-xzf", canonicalTarball, "-C", canonicalRoot], { cwd: root });
+    await run("tar", ["-xzf", windowsTarball, "-C", windowsRoot], { cwd: root });
+    const canonicalFiles = await packedFileTree(resolve(canonicalRoot, "package"));
+    const windowsFiles = await packedFileTree(resolve(windowsRoot, "package"));
+    if (
+      canonicalFiles.size !== windowsFiles.size ||
+      canonicalFiles.get("dist/bin.js")?.mode !== 0o755 ||
+      windowsFiles.get("dist/bin.js")?.mode !== 0o644
+    ) {
+      throw new Error("Windows CLI tarball differs beyond the npm executable mode");
+    }
+    for (const [path, file] of canonicalFiles) {
+      const peer = windowsFiles.get(path);
+      if (
+        peer === undefined ||
+        peer.integrity !== file.integrity ||
+        (path !== "dist/bin.js" && peer.mode !== file.mode)
+      ) {
+        throw new Error("Windows CLI tarball differs beyond the npm executable mode: " + path);
+      }
+    }
+  } finally {
+    await rm(extraction, { force: true, recursive: true });
+  }
+}
+
+async function packedFileTree(directory, prefix = "") {
+  const files = new Map();
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = resolve(directory, entry.name);
+    const name = prefix === "" ? entry.name : prefix + "/" + entry.name;
+    if (entry.isDirectory()) {
+      for (const [nestedName, file] of await packedFileTree(path, name)) {
+        files.set(nestedName, file);
+      }
+    } else if (entry.isFile()) {
+      files.set(name, {
+        integrity: await fileIntegrity(path),
+        mode: (await stat(path)).mode & 0o777
+      });
+    } else {
+      throw new Error("CLI tarball contains a non-regular file: " + name);
+    }
+  }
+  return files;
 }
 
 async function verifyRuntimeCandidate(directory, candidate) {

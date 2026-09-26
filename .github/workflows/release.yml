@@ -224,7 +224,7 @@ jobs:
       - name: Check out release tooling
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.preflight.outputs.revision }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || needs.preflight.outputs.revision }}
 
       - name: Install Node.js
         uses: actions/setup-node@v7
