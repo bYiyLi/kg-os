@@ -4,5 +4,5 @@ const (
 	ProductName = "KG OS"
 	CLIName     = "kg"
 	DaemonName  = "kgosd"
-	Version     = "0.1.0"
+	Version     = "0.1.1"
 )

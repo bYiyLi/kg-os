@@ -8,6 +8,7 @@ const root = resolve(import.meta.dirname, "..");
 const webOutput = resolve(root, "packages/web/dist");
 const embeddedWeb = resolve(root, "internal/webui/dist");
 const buildOutput = resolve(root, "artifacts/build");
+const daemonName = process.platform === "win32" ? "kgosd.exe" : "kgosd";
 const goEnv = {
   ...process.env,
   CGO_ENABLED: "1",
@@ -34,10 +35,10 @@ await cp(webOutput, embeddedWeb, { recursive: true });
 await mkdir(buildOutput, { recursive: true });
 await run(
   "go",
-  ["build", "-tags=sqlite_fts5", "-o", resolve(buildOutput, "kgosd"), "./cmd/kgosd"],
+  ["build", "-tags=sqlite_fts5", "-o", resolve(buildOutput, daemonName), "./cmd/kgosd"],
   { cwd: root, env: goEnv }
 );
 await buildCurrentRuntimePackage({
   root,
-  daemon: resolve(buildOutput, "kgosd")
+  daemon: resolve(buildOutput, daemonName)
 });

@@ -148,6 +148,9 @@ func TestDiscoverRuntimePackageRejectsTargetAndManifestErrors(t *testing.T) {
 }
 
 func TestRuntimePackagePlatformMappings(t *testing.T) {
+	if got := runtimePackagePlatform("windows"); got != "win32" {
+		t.Fatalf("windows runtime platform = %q", got)
+	}
 	if got := runtimePackageArch("amd64"); got != "x64" {
 		t.Fatalf("amd64 runtime arch = %q", got)
 	}
@@ -160,13 +163,14 @@ func TestRuntimePackagePlatformMappings(t *testing.T) {
 	}{
 		{goos: "darwin", want: ".dylib"},
 		{goos: "linux", want: ".so"},
+		{goos: "windows", want: ".dll"},
 	} {
 		got, err := nativeLibrarySuffix(test.goos)
 		if err != nil || got != test.want {
 			t.Fatalf("nativeLibrarySuffix(%q) = %q, %v", test.goos, got, err)
 		}
 	}
-	for _, unsupported := range []string{"windows", "plan9"} {
+	for _, unsupported := range []string{"plan9"} {
 		if _, err := nativeLibrarySuffix(unsupported); err == nil {
 			t.Fatalf("unsupported platform %q did not fail", unsupported)
 		}

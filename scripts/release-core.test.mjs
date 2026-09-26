@@ -23,6 +23,7 @@ function integrity(value) {
 
 function candidate(target, overrides = {}) {
   const [platform, arch] = target.split("-");
+  const suffix = platform === "darwin" ? ".dylib" : platform === "win32" ? ".dll" : ".so";
   return {
     schemaVersion: 1,
     revision,
@@ -54,18 +55,17 @@ function candidate(target, overrides = {}) {
       arch,
       version: "0.1.0",
       files: [
-        { file: "kgosd", sha256: "b".repeat(64) },
+        { file: platform === "win32" ? "kgosd.exe" : "kgosd", sha256: "b".repeat(64) },
         {
-          file: "extensions/lithograph" + (platform === "darwin" ? ".dylib" : ".so"),
+          file: "extensions/lithograph" + suffix,
           sha256: "c".repeat(64)
         },
         {
-          file:
-            "extensions/lithograph-openai-compatible" + (platform === "darwin" ? ".dylib" : ".so"),
+          file: "extensions/lithograph-openai-compatible" + suffix,
           sha256: "d".repeat(64)
         },
         {
-          file: "extensions/kgos-jieba" + (platform === "darwin" ? ".dylib" : ".so"),
+          file: "extensions/kgos-jieba" + suffix,
           sha256: "e".repeat(64)
         },
         { file: "JIEBA-NOTICE.md", sha256: "f".repeat(64) },
@@ -108,27 +108,27 @@ describe("release core", () => {
     }));
     expect(() =>
       aggregateCandidateDocuments([
-        ...clean.slice(0, 3),
+        ...clean.filter((entry) => entry.document.target !== "linux-x64"),
         { directory: "/dirty", document: candidate("linux-x64", { dirty: true }) }
       ])
     ).toThrow(/dirty worktree/);
     expect(() =>
       aggregateCandidateDocuments([
-        ...clean.slice(0, 3),
+        ...clean.filter((entry) => entry.document.target !== "linux-x64"),
         {
           directory: "/stale",
           document: candidate("linux-x64", { revision: "c".repeat(40) })
         }
       ])
     ).toThrow(/one revision and version/);
-    expect(() => aggregateCandidateDocuments(clean.slice(0, 3))).toThrow(/Missing/);
+    expect(() => aggregateCandidateDocuments(clean.slice(0, -1))).toThrow(/Missing/);
     expect(() => aggregateCandidateDocuments([...clean, clean[0]])).toThrow(/Duplicate/);
     const divergentClient = candidate("linux-x64");
     divergentClient.packages.find((entry) => entry.name === "@kgos/sdk").integrity =
       integrity("different-sdk");
     expect(() =>
       aggregateCandidateDocuments([
-        ...clean.slice(0, 3),
+        ...clean.filter((entry) => entry.document.target !== "linux-x64"),
         { directory: "/divergent-client", document: divergentClient }
       ])
     ).toThrow(/client package differs/);
@@ -136,7 +136,7 @@ describe("release core", () => {
     invalidRuntime.runtimeManifest.files[0].sha256 = "invalid";
     expect(() =>
       aggregateCandidateDocuments([
-        ...clean.slice(0, 3),
+        ...clean.filter((entry) => entry.document.target !== "linux-x64"),
         { directory: "/invalid-runtime", document: invalidRuntime }
       ])
     ).toThrow(/Runtime manifest file/);
@@ -152,7 +152,7 @@ describe("release core", () => {
     );
   });
 
-  it("requires exact CLI dependencies and a complete six-package manifest", () => {
+  it("requires exact CLI dependencies and a complete target manifest", () => {
     const dependencies = { "@kgos/sdk": "0.1.0" };
     const optionalDependencies = Object.fromEntries(
       RUNTIME_TARGETS.map((target) => ["@kgos/runtime-" + target, "0.1.0"])
@@ -208,8 +208,12 @@ describe("release core", () => {
     expect(workflow).toContain('--release-tag "$RELEASE_TAG"');
     expect(workflow).toContain("REVISION=$(git rev-parse HEAD)");
     expect(workflow).toContain("id-token: write");
-    expect(workflow).not.toContain("NPM_TOKEN");
+    expect(workflow).toContain("NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_TOKEN }}");
     expect(workflow).not.toContain("NODE_AUTH_TOKEN");
+    expect(RELEASE_PACKAGE_ORDER.slice(0, 2)).toEqual([
+      "@kgos/runtime-win32-arm64",
+      "@kgos/runtime-win32-x64"
+    ]);
     expect(workflow).toContain("github.event_name == 'workflow_dispatch' && github.sha");
     expect(workflow).toContain("Remove non-package build metadata");
     expect(workflow).toContain("packages/cli/dist/.tsbuildinfo");

@@ -91,8 +91,15 @@ jobs:
             target: linux-arm64
           - runner: ubuntu-24.04
             target: linux-x64
+          - runner: windows-11-vs2026-arm
+            target: win32-arm64
+          - runner: windows-2025
+            target: win32-x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Check out repository
@@ -132,7 +139,7 @@ jobs:
       - name: Verify native target
         run: |
           go version
-          cc --version
+          if [[ "${{ matrix.target }}" == win32-* ]]; then gcc --version; else cc --version; fi
           test "$(go env GOVERSION)" = "go1.27.1"
           test "$(node -p "process.platform + '-' + process.arch")" = "${{ matrix.target }}"
 

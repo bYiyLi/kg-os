@@ -24,7 +24,9 @@ Native npm package metadata
 ├── packages/runtime-darwin-arm64
 ├── packages/runtime-darwin-x64
 ├── packages/runtime-linux-arm64
-└── packages/runtime-linux-x64
+├── packages/runtime-linux-x64
+├── packages/runtime-win32-arm64
+└── packages/runtime-win32-x64
 ```
 
 正式 Client 层使用 TypeScript：`@kgos/cli -> @kgos/sdk -> HTTP -> kgosd`。Go 只拥有 daemon、Kernel、SQLite / Lithograph Host 与服务端编译/投影逻辑；仓库不再包含 Go `kg` CLI。
@@ -36,12 +38,12 @@ Instance 只由显式 `--root <path>` 定位。不存在默认 `KG_HOME`、`KG_T
 | 工具 | 固定版本或要求 |
 | --- | --- |
 | Go | `1.27.1`；仓库任务通过 `GOTOOLCHAIN=go1.27.1` 执行 |
-| C compiler | CGO 必需；macOS 使用 Apple Clang，Linux runner 使用 GCC |
+| C compiler | CGO 必需；macOS 使用 Apple Clang，Linux / Windows runner 使用 GCC 或经 CI 验证的目标编译器 |
 | Node.js | `24.15.0`，由 [`.node-version`](../../.node-version) 固定 |
 | pnpm | `10.34.5`，由根 `packageManager` / `engines` 固定 |
 | Rust | `1.97.1`，用于构建 `native/jieba/` 的official FTS5 tokenizer |
 | SQLite driver | `github.com/mattn/go-sqlite3 v1.14.52`，bundled SQLite + CGO + `sqlite_fts5` |
-| Lithograph | `v0.3.0` release artifacts，覆盖 macOS / Linux arm64/x64 |
+| Lithograph | `v0.3.0` release artifacts，覆盖 macOS / Linux / Windows arm64/x64 |
 
 先确认基础工具：
 
@@ -159,21 +161,21 @@ npx --yes @kgos/cli@<version> --root <instance-root> <command>
 artifacts/npm/runtime-<platform>-<arch>/
 ├── package.json
 ├── LICENSE
-├── kgosd
+├── kgosd（Windows 为 kgosd.exe）
 ├── manifest.json
 ├── JIEBA-NOTICE.md
 ├── licenses/
 │   ├── sqlite-simple-tokenizer-MIT.txt
 │   └── jieba-rs-MIT.txt
 └── extensions/
-    ├── lithograph.<dylib|so>
-    ├── lithograph-openai-compatible.<dylib|so>
-    └── kgos-jieba.<dylib|so>
+    ├── lithograph.<dylib|so|dll>
+    ├── lithograph-openai-compatible.<dylib|so|dll>
+    └── kgos-jieba.<dylib|so|dll>
 ```
 
 manifest 固定 package version/platform/arch 和七个受校验文件的 SHA-256。Runtime package不包含 native `kg`，也没有 preinstall/install/postinstall 下载脚本。
 
-source workspace 下的四个 `packages/runtime-*` 只维护 npm metadata；native binary 是 build artifact，不提交 Git。
+source workspace 下的六个 `packages/runtime-*` 只维护 npm metadata；native binary 是 build artifact，不提交 Git。
 
 ## 调试
 
@@ -207,7 +209,7 @@ Go daemon 的生产启动依赖与 binary 同目录的 Runtime manifest/native a
 
 ## Lithograph v0.3.0 fixture
 
-[`scripts/lithograph-artifacts.mjs`](../../scripts/lithograph-artifacts.mjs) 固定 macOS/Linux arm64/x64 的 Lithograph v0.3.0 release artifact 与 SHA-256。[`scripts/prepare-lithograph.mjs`](../../scripts/prepare-lithograph.mjs) 校验 archive entry、`VERSION`、Lithograph 与 OpenAI-compatible Provider library，再缓存到 `.cache/lithograph/`。
+[`scripts/lithograph-artifacts.mjs`](../../scripts/lithograph-artifacts.mjs) 固定 macOS/Linux/Windows arm64/x64 的 Lithograph v0.3.0 release artifact 与 SHA-256。[`scripts/prepare-lithograph.mjs`](../../scripts/prepare-lithograph.mjs) 校验 archive entry、`VERSION`、Lithograph 与 OpenAI-compatible Provider library，再缓存到 `.cache/lithograph/`。
 
 `pnpm test:native` 使用 bundled SQLite，并由测试 Runtime显式加载 official Lithograph → official Provider；caller configured extensions仍走通用 resolver。native suite覆盖 bootstrap/reopen、Object/Ontology、Graph streaming/cancellation、Evolution/Merge、HTTP auth、dynamic daemon endpoint 与 shutdown。
 
@@ -235,7 +237,7 @@ SDK + CLI TypeScript
 packages/sdk/dist/
 packages/cli/dist/
 packages/web/dist/
-artifacts/build/kgosd
+artifacts/build/kgosd（Windows 为 kgosd.exe）
 artifacts/npm/runtime-<target>/
 ```
 
@@ -266,14 +268,16 @@ pnpm pack:release
 pnpm check:quick
 ```
 
-GitHub Actions 保留 Ubuntu 24.04 x64 的完整 `pnpm validate`，并增加四平台 native/package matrix：
+GitHub Actions 保留 Ubuntu 24.04 x64 的完整 `pnpm validate`，并运行六平台 native/package matrix：
 
 - macOS arm64：`macos-15`
 - macOS x64：`macos-15-intel`
 - Linux glibc arm64：`ubuntu-24.04-arm`
 - Linux glibc x64：`ubuntu-24.04`
+- Windows arm64：`windows-11-vs2026-arm`
+- Windows x64：`windows-2025`
 
-四平台 job 真实执行 current-target build、`pnpm test:native` 与 `pnpm pack:release`，并上传 npm candidate。Phase 只有在要求的 pushed revision 对应远端 matrix真实成功后才能记为 `done`。
+各平台 job 真实执行 current-target build、`pnpm test:native` 与 `pnpm pack:release`，并上传 npm candidate。Windows job 是否通过以对应 CI run 为准；Phase 只有在要求的 pushed revision 对应远端 matrix真实成功后才能记为 `done`。
 
 ## MVP Release Closure
 
@@ -291,22 +295,23 @@ pnpm release:authority
 正式 Release 由 Git tag 触发。版本已准备并且目标 commit 已在 `main` 后，创建并 push 与 package version 完全一致的 tag：
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+KGOS_VERSION="$(node -p 'require("./package.json").version')"
+git tag "v${KGOS_VERSION}"
+git push origin "v${KGOS_VERSION}"
 ```
 
-[`.github/workflows/release.yml`](../../.github/workflows/release.yml) 监听 `v*` tag push；普通 pull request 与 `main` push 不会 publish。`workflow_dispatch` 只接受一个**已经存在**的 release tag，用于恢复同一次 partial release，不产生新的 version。workflow preflight 要求 tag 名等于 `v<package-version>`、tag revision 属于 `origin/main` 历史且 source clean，然后按同一 revision 完成四平台 candidate、聚合与 native hash/integrity 校验、Runtime → SDK → CLI-last publish / partial recovery、六包 exact-version + `latest` registry verification、四平台 public-registry `npx` smoke，最后基于已有 tag 创建 GitHub Release。
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml) 监听 `v*` tag push；普通 pull request 与 `main` push 不会 publish。`workflow_dispatch` 只接受一个**已经存在**的 release tag，用于恢复同一次 partial release，不产生新的 version。workflow preflight 要求 tag 名等于 `v<package-version>`、tag revision 属于 `origin/main` 历史且 source clean。当前源码的后续 Release workflow 要求六平台 candidate、聚合与 native hash/integrity 校验、Runtime → SDK → CLI-last publish / partial recovery、八包 exact-version + `latest` registry verification、六平台 public-registry `npx` smoke，最后基于已有 tag 创建 GitHub Release；这不改变已发布 v0.1.0 的六包/四平台事实。Windows 两个新 package 正式首次发布前还需建立对应 npm 发布认证。
 
-publish job 具备 GitHub Actions OIDC `id-token: write`，长期认证使用 npm Trusted Publishing。六个 package 的 `repository.url` 都绑定当前 `bYiyLi/kg-os` GitHub repository。首次 `0.1.0` 发布时 package 尚不存在，无法先在 package settings 建立 Trusted Publisher，因此允许临时使用一个短期 granular token 作为 GitHub Actions secret `NPM_TOKEN`；token 只用于 bootstrap，不写入仓库、candidate、release notes 或 Instance。六包首次存在后，应逐包配置 GitHub Actions Trusted Publisher：
+publish job 具备 GitHub Actions OIDC `id-token: write`，长期认证使用 npm Trusted Publishing。当前八个 package 的 `repository.url` 都绑定 `bYiyLi/kg-os` GitHub repository。首次 `0.1.0` 发布时原六包尚不存在，无法先在 package settings 建立 Trusted Publisher，因此曾使用短期 granular token 完成 bootstrap。`0.1.1` 的两个 Windows 包也需要首发：GitHub Actions secret `NPM_TOKEN` 只在它们尚未存在时注入对应 publish 子进程；缺少该 secret 时，dry-run 在发布任何包之前失败。token 不写入仓库、candidate、release notes 或 Instance。每个 Windows package 存在后，应配置对应的 GitHub Actions Trusted Publisher：
 
 - GitHub owner：`bYiyLi`
 - Repository：`kg-os`
 - Workflow filename：`release.yml`
 - Allowed action：允许 `npm publish`
 
-配置完成后删除 repository secret `NPM_TOKEN`；后续 `v*` Release 使用 OIDC，无需长期 npm publish token。
+全部配置完成后删除 repository secret `NPM_TOKEN`；后续 `v*` Release 使用 OIDC，无需长期 npm publish token。
 
-只完成本地 candidate、workflow 配置、部分 npm publish 或单独 Git tag 都不等于公开 Release 完成；真实状态以 [Phase 09](../development/phases/09-mvp-release-closure.md) 的 registry/tag/Release 证据为准。
+只完成本地 candidate、workflow 配置、部分 npm publish 或单独 Git tag 都不等于公开 Release 完成；`0.1.0` 真实状态以 [Phase 09](../development/phases/09-mvp-release-closure.md)、`0.1.1` 以 [Phase 11](../development/phases/11-windows-runtime-acceptance.md) 的 registry/tag/Release 证据为准。
 
 ## 常见问题
 

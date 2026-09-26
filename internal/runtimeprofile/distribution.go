@@ -133,7 +133,7 @@ func (pkg *RuntimePackage) verify() error {
 	if parsed.Version == "" {
 		return fmt.Errorf("runtime manifest version must be non-empty")
 	}
-	if parsed.Platform != runtime.GOOS || parsed.Arch != runtimePackageArch(runtime.GOARCH) {
+	if parsed.Platform != runtimePackagePlatform(runtime.GOOS) || parsed.Arch != runtimePackageArch(runtime.GOARCH) {
 		return fmt.Errorf(
 			"runtime target %s/%s does not match process %s/%s",
 			parsed.Platform,
@@ -189,6 +189,13 @@ func (pkg *RuntimePackage) verify() error {
 	return nil
 }
 
+func runtimePackagePlatform(goos string) string {
+	if goos == "windows" {
+		return "win32"
+	}
+	return goos
+}
+
 func runtimePackageArch(goarch string) string {
 	if goarch == "amd64" {
 		return "x64"
@@ -223,6 +230,8 @@ func nativeLibrarySuffix(goos string) (string, error) {
 		return ".dylib", nil
 	case "linux":
 		return ".so", nil
+	case "windows":
+		return ".dll", nil
 	default:
 		return "", fmt.Errorf("unsupported runtime platform %q", goos)
 	}

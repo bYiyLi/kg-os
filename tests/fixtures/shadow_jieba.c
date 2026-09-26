@@ -2,6 +2,9 @@
 
 SQLITE_EXTENSION_INIT1
 
+#if defined(_WIN32)
+__declspec(dllexport)
+#endif
 int sqlite3_shadowjieba_init(sqlite3 *db, char **error_message,
                              const sqlite3_api_routines *api_routines) {
   fts5_api *fts = 0;

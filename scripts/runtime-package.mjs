@@ -5,7 +5,14 @@ import { fileURLToPath } from "node:url";
 
 import { currentLithographArtifact } from "./lithograph-artifacts.mjs";
 
-const supportedTargets = new Set(["darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64"]);
+const supportedTargets = new Set([
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-arm64",
+  "linux-x64",
+  "win32-arm64",
+  "win32-x64"
+]);
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -46,9 +53,11 @@ export async function buildCurrentRuntimePackage({ root, daemon, output: explici
   await mkdir(resolve(output, "extensions"), { recursive: true });
   await cp(resolve(source, "package.json"), resolve(output, "package.json"));
   await cp(resolve(root, "LICENSE"), resolve(output, "LICENSE"));
-  const daemonTarget = resolve(output, "kgosd");
+  const daemonName = platform === "win32" ? "kgosd.exe" : "kgosd";
+  const suffix = platform === "darwin" ? ".dylib" : platform === "win32" ? ".dll" : ".so";
+  const daemonTarget = resolve(output, daemonName);
   await cp(daemon, daemonTarget);
-  await chmod(daemonTarget, 0o755);
+  if (platform !== "win32") await chmod(daemonTarget, 0o755);
 
   const librarySource = resolve(artifact.cacheDirectory, artifact.library);
   const providerSource = resolve(artifact.cacheDirectory, artifact.providerLibrary);
@@ -57,15 +66,15 @@ export async function buildCurrentRuntimePackage({ root, daemon, output: explici
     "artifacts",
     "jieba",
     "release",
-    platform === "darwin" ? "libkgos_jieba.dylib" : "libkgos_jieba.so"
+    platform === "darwin"
+      ? "libkgos_jieba.dylib"
+      : platform === "win32"
+        ? "kgos_jieba.dll"
+        : "libkgos_jieba.so"
   );
   const libraryTarget = resolve(output, "extensions", artifact.library);
   const providerTarget = resolve(output, "extensions", artifact.providerLibrary);
-  const jiebaTarget = resolve(
-    output,
-    "extensions",
-    "kgos-jieba" + (platform === "darwin" ? ".dylib" : ".so")
-  );
+  const jiebaTarget = resolve(output, "extensions", "kgos-jieba" + suffix);
   const noticeTarget = resolve(output, "JIEBA-NOTICE.md");
   await cp(librarySource, libraryTarget);
   await cp(providerSource, providerTarget);
@@ -93,7 +102,7 @@ export async function buildCurrentRuntimePackage({ root, daemon, output: explici
     const bytes = await readFile(path);
     const file =
       path === daemonTarget
-        ? "kgosd"
+        ? daemonName
         : path === noticeTarget
           ? "JIEBA-NOTICE.md"
           : path === tokenizerLicense || path === jiebaLicense
@@ -113,7 +122,12 @@ export async function buildCurrentRuntimePackage({ root, daemon, output: explici
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = resolve(import.meta.dirname, "..");
-  const daemon = resolve(root, "artifacts", "build", "kgosd");
+  const daemon = resolve(
+    root,
+    "artifacts",
+    "build",
+    process.platform === "win32" ? "kgosd.exe" : "kgosd"
+  );
   const built = await buildCurrentRuntimePackage({ root, daemon });
   process.stdout.write("Built " + built.target + " Runtime package: " + built.output + "\n");
 }

@@ -52,7 +52,7 @@ async function preflight() {
     throw new Error("Release tag must exactly match package version: v" + version);
   }
 
-  await run("pnpm", ["check:dependencies"], { cwd: root });
+  await run("node", ["scripts/check-dependency-versions.mjs"], { cwd: root });
   const revision = (await runCapture("git", ["rev-parse", "HEAD"], { cwd: root })).stdout.trim();
   const originMain = (
     await runCapture("git", ["rev-parse", "--verify", "origin/main"], { cwd: root })
@@ -193,6 +193,14 @@ async function publish() {
     }
   }
 
+  const bootstrapToken = process.env.NPM_BOOTSTRAP_TOKEN;
+  const bootstrapNames = RELEASE_PACKAGE_ORDER.filter(
+    (name) => name.startsWith("@kgos/runtime-win32-") && !states.get(name).packageExists
+  );
+  if (bootstrapNames.length > 0 && !bootstrapToken) {
+    throw new Error("First Windows Runtime publish requires NPM_BOOTSTRAP_TOKEN");
+  }
+
   if (dryRun) {
     process.stdout.write(
       JSON.stringify({
@@ -237,7 +245,12 @@ async function publish() {
           "--registry",
           RELEASE_REGISTRY
         ],
-        { cwd: root }
+        {
+          cwd: root,
+          env: bootstrapNames.includes(name)
+            ? { ...process.env, NODE_AUTH_TOKEN: bootstrapToken }
+            : process.env
+        }
       );
     } catch (error) {
       publishError = error;
@@ -296,10 +309,12 @@ async function loadRelease(directory) {
 async function readRegistryStates(release) {
   const states = new Map();
   for (const entry of release.packages) {
-    const metadata = await registryVersion(entry.name, release.version);
+    const packageMetadata = await registryPackage(entry.name);
+    const metadata = packageMetadata?.versions?.[release.version] ?? null;
     states.set(entry.name, {
       metadata,
-      state: classifyRegistryVersion(entry.integrity, metadata)
+      state: classifyRegistryVersion(entry.integrity, metadata),
+      packageExists: packageMetadata !== null
     });
   }
   return states;

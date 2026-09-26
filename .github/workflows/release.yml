@@ -115,8 +115,15 @@ jobs:
             target: linux-arm64
           - runner: ubuntu-24.04
             target: linux-x64
+          - runner: windows-11-vs2026-arm
+            target: win32-arm64
+          - runner: windows-2025
+            target: win32-x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Check out release revision
@@ -252,6 +259,8 @@ jobs:
           path: artifacts/final
 
       - name: Dry-run registry release state
+        env:
+          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node scripts/release.mjs publish \
             --directory artifacts/final \
@@ -259,6 +268,8 @@ jobs:
             --dry-run
 
       - name: Publish or recover matching partial release
+        env:
+          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node scripts/release.mjs publish \
             --directory artifacts/final \
@@ -287,8 +298,15 @@ jobs:
             target: linux-arm64
           - runner: ubuntu-24.04
             target: linux-x64
+          - runner: windows-11-vs2026-arm
+            target: win32-arm64
+          - runner: windows-2025
+            target: win32-x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Check out registry smoke tooling
@@ -365,8 +383,10 @@ jobs:
           - @kgos/runtime-darwin-x64@$VERSION
           - @kgos/runtime-linux-arm64@$VERSION
           - @kgos/runtime-linux-x64@$VERSION
+          - @kgos/runtime-win32-arm64@$VERSION
+          - @kgos/runtime-win32-x64@$VERSION
 
-          Supported native targets: macOS arm64/x64 and Linux glibc arm64/x64.
+          Supported native targets: macOS, Linux glibc, and Windows arm64/x64.
           EOF
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" \

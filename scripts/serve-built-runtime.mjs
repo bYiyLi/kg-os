@@ -19,11 +19,15 @@ const instanceRoot = await mkdtemp(join(tmpdir(), "kgos-e2e-"));
 await prepareRuntimeProfile({ instanceRoot });
 
 const runtimeRoot = resolve(root, "artifacts", "npm", "runtime-" + currentRuntimeTarget());
-const child = spawn(resolve(runtimeRoot, "kgosd"), ["--root", instanceRoot], {
-  cwd: root,
-  env: process.env,
-  stdio: ["ignore", "inherit", "inherit"]
-});
+const child = spawn(
+  resolve(runtimeRoot, process.platform === "win32" ? "kgosd.exe" : "kgosd"),
+  ["--root", instanceRoot],
+  {
+    cwd: root,
+    env: process.env,
+    stdio: ["ignore", "inherit", "inherit"]
+  }
+);
 const endpoint = await waitForRuntimeEndpoint(instanceRoot, child);
 const proxy = createServer((incoming, outgoing) => {
   const target = new URL(incoming.url ?? "/", endpoint);

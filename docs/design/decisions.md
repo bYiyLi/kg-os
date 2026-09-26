@@ -734,7 +734,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D76 npm / npx 是正式 Client 分发入口，kgosd 作为平台 native package 交付（2026-09-24）
 
-> 后续调整：[D80](#d80-official-jieba) 在同一四个平台Runtime package中新增KG OS official Jieba artifact；下文“只携带 kgosd、Lithograph、OpenAI-compatible Provider”的描述保留为v0.1.0 / Phase 08历史基线，当前package topology以 [Client](client.md#npm-package-topology) 与 [Runtime](runtime.md#native-runtime-package) 为准。
+> 后续调整：[D80](#d80-official-jieba) 在四个平台 Runtime package 中新增 KG OS official Jieba artifact；Phase 11 将当前源码候选扩至 Windows x64/arm64。下文的四平台发布单元及“只携带 kgosd、Lithograph、OpenAI-compatible Provider”描述保留为 v0.1.0 / Phase 08 历史基线，当前 package topology 以 [Client](client.md#npm-package-topology) 与 [Runtime](runtime.md#native-runtime-package) 为准。
 
 - 决定：用户不再先下载 native distribution、配置 PATH 或安装 `kg` binary；AI / CI 正式入口固定为 `npx --yes @kgos/cli@<version> ...`，其中 `--yes` 属于 npm 首次 package acquisition 的非交互确认，人类交互可省略。发布单元包括 `@kgos/sdk`、`@kgos/cli` 与 macOS arm64/x64、Linux glibc arm64/x64 四个 `@kgos/runtime-<os>-<arch>` native package。
 - Native package：平台 package 只携带同版本 `kgosd`、Lithograph、OpenAI-compatible Provider 与 manifest，不再携带 native `kg`。CLI 用 exact-version `optionalDependencies` + npm `os/cpu` metadata选择当前平台；Linux package还必须用 `libc` metadata与真实构建目标一致，v1只承诺glibc而不把musl/Alpine自动算作“Linux已支持”。所有package都是预构建artifact，不通过preinstall/install/postinstall下载或选择binary；CLI继续验证 target/version/hash；不支持或optional package缺失的平台fail closed，不即时源码编译或下载任意远端binary。

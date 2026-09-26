@@ -3,7 +3,14 @@ import { readFile } from "node:fs/promises";
 
 export const RELEASE_DIST_TAG = "latest";
 export const RELEASE_REGISTRY = "https://registry.npmjs.org";
-export const RUNTIME_TARGETS = ["darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64"];
+export const RUNTIME_TARGETS = [
+  "win32-arm64",
+  "win32-x64",
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-arm64",
+  "linux-x64"
+];
 export const RELEASE_PACKAGE_ORDER = [
   ...RUNTIME_TARGETS.map((target) => "@kgos/runtime-" + target),
   "@kgos/sdk",
@@ -83,9 +90,10 @@ export function validateCandidateDocument(candidate) {
   }
 
   const [platform, arch] = candidate.target.split("-");
-  const librarySuffix = platform === "darwin" ? ".dylib" : ".so";
+  const librarySuffix = platform === "darwin" ? ".dylib" : platform === "win32" ? ".dll" : ".so";
+  const daemonName = platform === "win32" ? "kgosd.exe" : "kgosd";
   const expectedRuntimeFiles = new Set([
-    "kgosd",
+    daemonName,
     "extensions/lithograph" + librarySuffix,
     "extensions/lithograph-openai-compatible" + librarySuffix,
     "extensions/kgos-jieba" + librarySuffix,

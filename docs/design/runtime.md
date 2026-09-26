@@ -116,7 +116,7 @@ Authorization: Bearer <token>
 └── manifest.json
 ```
 
-`@kgos/cli` 从当前 npm dependency graph解析对应 `@kgos/runtime-<platform>-<arch>`，验证 package version、target与manifest hash后按绝对路径启动其中的 `kgosd`；不依赖系统PATH、全局daemon或用户手工提供official library path。当前支持目标为 macOS / Linux x64/arm64，具体package topology由 [Client](client.md#npm-package-topology)拥有。
+`@kgos/cli` 从当前 npm dependency graph解析对应 `@kgos/runtime-<platform>-<arch>`，验证 package version、target与manifest hash后按绝对路径启动其中的 `kgosd`（Windows 为 `kgosd.exe`）；不依赖系统PATH、全局daemon或用户手工提供official library path。当前源码目标为 macOS / Linux glibc / Windows x64/arm64，具体package topology与已发布版本边界由 [Client](client.md#npm-package-topology)拥有。
 
 official Lithograph / Provider / Jieba path **不写入** Instance `config.toml`。daemon从自身Runtime package发现并验证这些 files，再使用现有 resolver语义把它们固定为 `<root>/extensions/<sha256>/` 的 immutable runtime artifact；这样运行中的connection不依赖npm cache源文件继续存在。official Jieba artifact必须把运行所需 tokenizer code 与词典/数据固定在当前 Runtime package / manifest identity 中，不依赖宿主预装词典、运行时网络下载或可变外部文件。额外第三方extension继续由通用 `[[sqlite.extensions]]` config表达并使用同一content-addressed cache。
 
@@ -309,7 +309,7 @@ analyzer = "jieba"
 
 `[fulltext].analyzer` 在最终 `config.toml` 中仍是必填显式值，是非空、无 NUL 的**完整 FTS5 tokenizer specification STRING**，例如 `jieba`、`unicode61`、`porter unicode61`；KG OS 不解析第三方 tokenizer 的业务参数含义。新 Instance 的 `init` 在调用方没有提供 `--fulltext-analyzer` 时**直接解析为 `jieba`，不询问、不要求 AI/CI 显式传 flag**，并把 `analyzer = "jieba"` 写进配置。调用方仍可通过 `--fulltext-analyzer <fts5-spec>` 显式覆盖，例如选择 `unicode61`；手工配置缺少 `analyzer` 仍是配置错误。
 
-`jieba` 是 KG OS Runtime 的 official FTS5 tokenizer 名称，不再要求 caller 通过 `[[sqlite.extensions]]` 自行安装。产品合同冻结的是**最终注册名、默认行为与可复现性要求**；测试candidate可先pin具体 tokenizer implementation / dictionary source并构建package，以取得 [Jieba tokenizer research](../research/jieba-tokenizer.md) 要求的四平台 build/load/query证据。四平台、license与artifact identity选择门全部通过后，才能接受该实现为正式可分发的official Jieba。首次official实现冻结后，四个受支持 Runtime target必须使用同一逻辑 tokenizer 与词典版本；同一 v1 analyzer 名称不能在普通升级中静默换成不同分词语义。未来若必须升级到会改变 tokenization 的实现/词典，需要新的 analyzer identity或显式迁移设计，不能在 `jieba` 名称下无声替换。已有 Instance 的 `config.toml` 与历史 Full-text IndexDefinition 不自动改写；例如 v0.1.0 已显式保存 `unicode61` 的 Instance 继续使用自身配置。
+`jieba` 是 KG OS Runtime 的 official FTS5 tokenizer 名称，不再要求 caller 通过 `[[sqlite.extensions]]` 自行安装。产品合同冻结的是**最终注册名、默认行为与可复现性要求**；测试candidate需pin具体 tokenizer implementation / dictionary source并构建package，以取得 [Jieba tokenizer research](../research/jieba-tokenizer.md) 要求的每个受支持平台 build/load/query证据。license与artifact identity选择门全部通过后，才能接受该实现为正式可分发的official Jieba。受支持 Runtime target必须使用同一逻辑 tokenizer 与词典版本；同一 v1 analyzer 名称不能在普通升级中静默换成不同分词语义。未来若必须升级到会改变 tokenization 的实现/词典，需要新的 analyzer identity或显式迁移设计，不能在 `jieba` 名称下无声替换。已有 Instance 的 `config.toml` 与历史 Full-text IndexDefinition 不自动改写；例如 v0.1.0 已显式保存 `unicode61` 的 Instance 继续使用自身配置。
 
 `[fulltext].analyzer` 决定 KG OS **新建或因业务定义变化重建** managed Full-text Index 时写入的 `fulltext.analyzer`；若调用方显式覆盖为其它第三方 specification，对应 tokenizer 仍必须由前述 `[[sqlite.extensions]]` 在每个 connection 上注册。
 

@@ -34,6 +34,7 @@ if (outputIndex !== -1 && process.argv[outputIndex + 1] === undefined) {
 const rootPackage = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
 const version = rootPackage.version;
 const target = currentRuntimeTarget();
+const daemonName = process.platform === "win32" ? "kgosd.exe" : "kgosd";
 const workRoot = await mkdtemp(join(tmpdir(), "kgos-npm-pack-"));
 const packDirectory =
   outputIndex === -1 ? join(workRoot, "release") : resolve(root, process.argv[outputIndex + 1]);
@@ -66,7 +67,7 @@ await verifyTarballContents(
 await verifyTarballContents(
   runtimePackage.tarball,
   [
-    "package/kgosd",
+    "package/" + daemonName,
     "package/manifest.json",
     "package/extensions/lithograph",
     "package/extensions/lithograph-openai-compatible",
@@ -650,10 +651,19 @@ async function cleanupPackedDaemons(roots) {
       continue;
     }
     try {
-      const processInfo = await runCapture("ps", ["-p", String(locator.pid), "-o", "command="], {
-        cwd: smokeRoot
-      });
-      if (processInfo.stdout.includes("kgosd") && processInfo.stdout.includes(instanceRoot)) {
+      const processInfo =
+        process.platform === "win32"
+          ? await runCapture("tasklist", ["/FI", `PID eq ${locator.pid}`, "/FO", "CSV", "/NH"], {
+              cwd: smokeRoot
+            })
+          : await runCapture("ps", ["-p", String(locator.pid), "-o", "command="], {
+              cwd: smokeRoot
+            });
+      const ownedDaemon =
+        process.platform === "win32"
+          ? processInfo.stdout.toLowerCase().includes('"kgosd.exe"')
+          : processInfo.stdout.includes("kgosd") && processInfo.stdout.includes(instanceRoot);
+      if (locator.pid !== process.pid && ownedDaemon) {
         killPackedDaemon(locator.pid);
         await waitForProcessExit(locator.pid, "packed kgosd did not exit during smoke cleanup");
       }

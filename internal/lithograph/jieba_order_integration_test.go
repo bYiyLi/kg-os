@@ -83,6 +83,9 @@ func buildShadowJieba(t *testing.T) string {
 	if runtime.GOOS == "darwin" {
 		suffix = ".dylib"
 		args = []string{"-fPIC", "-dynamiclib", "-undefined", "dynamic_lookup"}
+	} else if runtime.GOOS == "windows" {
+		suffix = ".dll"
+		args = []string{"-shared"}
 	}
 	library := filepath.Join(t.TempDir(), "shadow-jieba"+suffix)
 	args = append(args, "-I", strings.TrimSpace(string(headerDirectory)), "-o", library, filepath.Join("..", "..", "tests", "fixtures", "shadow_jieba.c"))

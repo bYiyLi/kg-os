@@ -77,6 +77,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 10 Runtime & CLI Hardening 当前为 `done`。** pooled write connection清理、official Jieba与默认值、CLI help/pretty、Provider错误诊断和packed回归已完成。实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`；macOS arm64主工作树完整`pnpm validate`、独立fresh-source`pnpm run setup && pnpm validate`、repo外packed真实外部Provider验收及 GitHub Actions CI run `36256273631` 的 Validate与四平台native/package jobs均通过。本阶段未发布新的public版本。逐项证据见[Phase 10](phases/10-runtime-cli-hardening.md)。
 
+**Phase 11 Windows Runtime CI 验收与六平台发布当前为 `in_progress`。** 目标是 Windows x64/arm64 的 native DLL、npm Runtime package、CLI 启动与 packed smoke 在真实 Windows runner 上通过，再将 `0.1.1` 八包经 Release workflow 发布并完成六平台 public-registry 验收。当前本地候选已通过 macOS arm64 完整验证，尚无 Windows CI 或新版本发布证据。公开 v0.1.0 的六包/四平台发布事实不变。详见[Phase 11](phases/11-windows-runtime-acceptance.md)。
+
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |
@@ -92,6 +94,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [08 TypeScript Client & npm Runtime Distribution](phases/08-typescript-client-npm-runtime.md) | `done` | 真实 `@kgos/sdk`、TypeScript `@kgos/cli`、explicit `--root`、`init`、per-root daemon/dynamic endpoint、platform npm native Runtime package、Go CLI parity迁移与清理；本地/fresh-source/final review与 macOS arm64/x64 + Linux glibc arm64/x64 CI matrix均完成 | [Client](../design/client.md)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md)、[D75](../design/decisions.md#d75-typescript-client)、[D76](../design/decisions.md#d76-npm-distribution)、[D77](../design/decisions.md#d77-explicit-instance-root) |
 | [09 MVP Release Closure](phases/09-mvp-release-closure.md) | `done` | `v0.1.0` 六包、四平台 registry npx、GitHub Release、六包 Trusted Publisher/credential cleanup与长期 OIDC closure均完成 | [Client版本关系](../design/client.md#版本关系)、[发布与验证边界](../design/client.md#发布与验证边界)、[Phase 08](phases/08-typescript-client-npm-runtime.md) |
 | [10 Runtime & CLI Hardening](phases/10-runtime-cli-hardening.md) | `done` | 本地与fresh-source完整验证、repo外packed真实Provider、macOS arm64/x64 + Linux glibc arm64/x64 CI native/package matrix全部通过 | [D78](../design/decisions.md#d78-operation-scoped-branch)、[D79](../design/decisions.md#d79-stale-daemon-recovery)、[D80](../design/decisions.md#d80-official-jieba)、[Runtime](../design/runtime.md)、[CLI](../design/cli.md) |
+| [11 Windows Runtime CI 验收与六平台发布](phases/11-windows-runtime-acceptance.md) | `in_progress` | 六平台 native/package CI、`0.1.1` 八包发布与 public-registry smoke | [Client](../design/client.md#npm-package-topology)、[Runtime](../design/runtime.md#native-runtime-package) |
 
 当前实现依赖顺序：
 
@@ -116,10 +119,12 @@ Go Engineering Foundation
        (release version / npm publish / registry npx matrix / Git tag / GitHub Release)
   -> Phase 10: Runtime & CLI Hardening
        (connection state isolation / stale daemon recovery / official Jieba / CLI UX / diagnostics)
+  -> Phase 11: Windows Runtime CI acceptance and six-platform release
+       (win32 x64/arm64 native packages / real runner load / packed smoke / registry)
   -> later Web / Skill phases
 ```
 
-Phase 02–10 均已完成。Phase 09 的 `v0.1.0` tag、六包 `0.1.0` / `latest`、四平台 public-registry smoke、GitHub Release、六包 Trusted Publisher、bootstrap credential cleanup与长期 OIDC publish workflow closure均有实际证据；closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 对应 CI Run `36226930183` 全绿。Phase 10提交 `f138d41c15ba16578e76829af452458a2321be7e` 对应 CI Run `36256273631` 的 Validate与四平台native/package matrix全绿；该代码验收不等于新的public release。Web / Skill继续留在其后独立阶段。
+Phase 02–10 均已完成；Phase 11 正在实施，Windows CI 尚未通过。Phase 09 的 `v0.1.0` tag、六包 `0.1.0` / `latest`、四平台 public-registry smoke、GitHub Release、六包 Trusted Publisher、bootstrap credential cleanup与长期 OIDC publish workflow closure均有实际证据；closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 对应 CI Run `36226930183` 全绿。Phase 10提交 `f138d41c15ba16578e76829af452458a2321be7e` 对应 CI Run `36256273631` 的 Validate与四平台native/package matrix全绿；该代码验收不等于新的public release。Web / Skill继续留在其后独立阶段。
 
 ## 6. Phase 通用完成标准
 
@@ -148,5 +153,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 08：TypeScript Client & npm Runtime Distribution](phases/08-typescript-client-npm-runtime.md)
 - [Phase 09：MVP Release Closure](phases/09-mvp-release-closure.md)
 - [Phase 10：Runtime & CLI Hardening](phases/10-runtime-cli-hardening.md)
+- [Phase 11：Windows Runtime CI 验收与六平台发布](phases/11-windows-runtime-acceptance.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

@@ -1,0 +1,33 @@
+# Phase 11：Windows Runtime CI 验收与六平台发布
+
+## 目标与状态
+
+`in_progress`。把现有 CLI + native Runtime package 路径扩展到 Windows x64 / arm64，并在对应 GitHub Actions runner 上取得真实 build、native load、packed npm 使用链与回归证据。六平台候选验收后，按既定 Release workflow 发布 `0.1.1` 的八个 npm package，并完成六平台 public-registry `npx` smoke 与 GitHub Release。Phase 10 的四平台完成结论保持原适用范围；公开 `0.1.0` 仍只有 macOS / Linux Runtime package。
+
+本阶段不增加 Windows Service 或系统级安装方式。Git tag、npm publish 和 GitHub Release 必须在同一经过六平台 CI 验收的 source revision 上进行；仅有本地候选或 CI 配置不构成发布完成。
+
+## 设计输入
+
+- [Client npm package topology](../../design/client.md#npm-package-topology)：平台包、版本关系、manifest 与目标选择。
+- [Runtime native package](../../design/runtime.md#native-runtime-package)：daemon、official extensions、Instance 隔离与自动启动。
+- [Runtime daemon lifecycle](../../design/runtime.md#daemon-lifecycle)：同 root 锁、stale recovery 和 ready 等待。
+- [Phase 10](10-runtime-cli-hardening.md)：现有 packed smoke 与 official Jieba 行为基线。
+
+## 工作与验收
+
+| 工作 | 可观察验收 |
+| --- | --- |
+| Windows 资产与包 | pinned Lithograph v0.3.0 ZIP 校验、DLL 解包；`kgosd.exe`、Provider/Jieba DLL、license 与 manifest hash 进入 `win32-x64` / `win32-arm64` npm 候选 |
+| Runtime 与 CLI | CLI 在 Windows 解析同版本 package，daemon 验证 manifest，`doctor -> init -> auto-start` 在 repo 外 packed install 成功 |
+| Native 行为 | Windows runner 真正加载三个 official DLL；Go native suite、中文 Full-text、loopback Semantic Provider、Graph/Object/Evolution 主链成功 |
+| 生命周期 | packed smoke 覆盖两个 Instance、并发启动、stale locator、正常与异常退出后的恢复，结束时没有遗留测试 daemon |
+| 跨平台回归 | macOS/Linux 既有 CI matrix 与 Ubuntu full Validate 仍成功；release candidate 集合、package metadata、文档与 lockfile 一致 |
+| 六平台发布 | `v0.1.1` tag 指向已通过完整 CI 的 main revision；Release workflow 六平台 immutable candidate、八包 exact-version registry verification、六平台 public-registry `npx` smoke 与 GitHub Release 全部成功 |
+| 首发认证 | 两个 Windows npm package 首次发布使用短期 bootstrap credential；其余已发布 package 继续使用 Trusted Publishing。首发后为 Windows 包配置 Trusted Publisher，移除 bootstrap credential，并验证后续 OIDC 路径 |
+
+CI matrix 使用 `windows-2025` x64 与 `windows-11-vs2026-arm` arm64，并继续现有四个平台。Windows arm64 所需 CGO toolchain 必须在实际 runner 上证实，不能由 runner 标签或交叉编译推断成功。失败后按日志修复并复验受影响 job；最终 Review 检查 Windows 目标、secret、manifest、进程清理及历史发布边界。只有 Validate 与六个平台的 native/package jobs 在同一最终 revision 成功，且同 revision 的 Release workflow 完成 registry 与六平台 smoke、范围内 finding 关闭并同步状态后，才能改为 `done`。
+
+## 当前证据
+
+- 上游 Lithograph v0.3.0 的 Windows x64 / arm64 ZIP 已下载并核对固定 SHA-256，均含 `lithograph.dll`、`lithograph-openai-compatible.dll` 和 `VERSION`。
+- Windows 代码候选的 macOS arm64 `pnpm validate` 已通过；`0.1.1` 版本与首发认证接线正在复验，Windows CI、`v0.1.1` 发布和 registry smoke 尚未运行，故本阶段尚未完成。

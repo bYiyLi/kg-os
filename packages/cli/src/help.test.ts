@@ -6,7 +6,7 @@ describe("CLI help", () => {
   it("exposes the explicit-root command tree", () => {
     expect(rootHelp()).toContain("--root <instance-root>");
     expect(rootHelp()).toContain("ontology");
-    expect(versionText()).toBe("0.1.0\n");
+    expect(versionText()).toBe("0.1.1\n");
   });
 
   it.each(["doctor", "init", "ontology", "object", "graph", "evolution"])(

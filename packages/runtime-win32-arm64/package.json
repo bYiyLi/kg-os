@@ -1,24 +1,24 @@
 {
-  "name": "@kgos/runtime-darwin-arm64",
+  "name": "@kgos/runtime-win32-arm64",
   "version": "0.1.1",
-  "description": "KG OS native runtime for macOS arm64",
+  "description": "KG OS native runtime for Windows arm64",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bYiyLi/kg-os.git",
-    "directory": "packages/runtime-darwin-arm64"
+    "directory": "packages/runtime-win32-arm64"
   },
   "publishConfig": {
     "access": "public"
   },
   "os": [
-    "darwin"
+    "win32"
   ],
   "cpu": [
     "arm64"
   ],
   "files": [
-    "kgosd",
+    "kgosd.exe",
     "extensions",
     "manifest.json",
     "JIEBA-NOTICE.md",

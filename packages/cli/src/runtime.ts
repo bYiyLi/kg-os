@@ -46,12 +46,16 @@ interface PackageMetadata {
 
 export interface RuntimeTarget {
   packageName: string;
-  platform: "darwin" | "linux";
+  platform: "darwin" | "linux" | "win32";
   arch: "arm64" | "x64";
 }
 
 export function currentRuntimeTarget(): RuntimeTarget {
-  if (process.platform !== "darwin" && process.platform !== "linux") {
+  if (
+    process.platform !== "darwin" &&
+    process.platform !== "linux" &&
+    process.platform !== "win32"
+  ) {
     throw localIOError("unsupported KG OS Runtime platform", { platform: process.platform });
   }
   if (process.arch !== "arm64" && process.arch !== "x64") {
@@ -166,9 +170,12 @@ function validateRuntimeMetadata(
       runtimeVersion: manifest.version
     });
   }
-  const suffix = target.platform === "darwin" ? ".dylib" : ".so";
+  let suffix = ".so";
+  if (target.platform === "darwin") suffix = ".dylib";
+  if (target.platform === "win32") suffix = ".dll";
+  const daemonName = target.platform === "win32" ? "kgosd.exe" : "kgosd";
   const expected = new Set([
-    "kgosd",
+    daemonName,
     "extensions/lithograph" + suffix,
     "extensions/lithograph-openai-compatible" + suffix,
     "extensions/kgos-jieba" + suffix,
@@ -193,9 +200,9 @@ async function verifyRuntimeFiles(root: string, manifest: RuntimeManifest): Prom
       throw localIOError("native Runtime file failed SHA-256 verification", { file: file.file });
     }
   }
-  const daemon = join(root, "kgosd");
+  const daemon = join(root, process.platform === "win32" ? "kgosd.exe" : "kgosd");
   const info = await stat(daemon);
-  if ((info.mode & 0o111) === 0) {
+  if (process.platform !== "win32" && (info.mode & 0o111) === 0) {
     throw localIOError("native Runtime kgosd is not executable");
   }
 }

@@ -17,7 +17,11 @@ await run("cargo", ["build", "--manifest-path", manifest, "--release", "--locked
 export const JIEBA_LIBRARY = resolve(
   targetDirectory,
   "release",
-  process.platform === "darwin" ? "libkgos_jieba.dylib" : "libkgos_jieba.so"
+  process.platform === "darwin"
+    ? "libkgos_jieba.dylib"
+    : process.platform === "win32"
+      ? "kgos_jieba.dll"
+      : "libkgos_jieba.so"
 );
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {

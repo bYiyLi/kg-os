@@ -85,17 +85,19 @@ CLI 的业务命令通过 `@kgos/sdk` 调用 daemon。只有 `doctor`、`init`�
 @kgos/runtime-darwin-x64
 @kgos/runtime-linux-arm64
 @kgos/runtime-linux-x64
+@kgos/runtime-win32-arm64
+@kgos/runtime-win32-x64
 ```
 
 `@kgos/cli` 以 exact-version normal dependency 关联同版本 `@kgos/sdk`，再以 exact-version `optionalDependencies` 关联同版本的平台 Runtime package。每个 native package 使用 npm `os` / `cpu` metadata 声明目标；npm 可以跳过当前平台不适用的 optional package，也允许调用方整体 omit optional dependencies，因此 CLI 仍必须验证当前 platform/arch 对应 package 确实存在、metadata 匹配且 manifest 有效。SDK version mismatch或native package缺失/unsupported target统一 fail closed，不在运行时临时下载第二份 binary。
 
-这些 package 都是普通预构建 npm artifacts：`@kgos/cli` 与 native Runtime packages 不使用 `preinstall/install/postinstall` lifecycle script 下载、选择或改写 binary。平台选择只依赖 npm package metadata + CLI runtime resolution；native package中的 `kgosd` 必须在 packed artifact中保留可执行权限。四个 `@kgos/*` Runtime package与 `@kgos/cli` / `@kgos/sdk` 均按 public scoped package准备（manifest不得保留 `private: true`；发布时使用public access metadata），实际registry publish仍由release动作单独授权。
+这些 package 都是普通预构建 npm artifacts：`@kgos/cli` 与 native Runtime packages 不使用 `preinstall/install/postinstall` lifecycle script 下载、选择或改写 binary。平台选择只依赖 npm package metadata + CLI runtime resolution；Unix native package中的 `kgosd` 必须在 packed artifact中保留可执行权限，Windows package提供 `kgosd.exe`。六个 `@kgos/*` Runtime package与 `@kgos/cli` / `@kgos/sdk` 均按 public scoped package准备（manifest不得保留 `private: true`；发布时使用public access metadata），实际registry publish仍由release动作单独授权。
 
 平台 package 的 logical layout 为：
 
 ```text
 <runtime-package>/
-├── kgosd
+├── kgosd（Windows 为 kgosd.exe）
 ├── extensions/
 │   ├── lithograph.<platform-suffix>
 │   ├── lithograph-openai-compatible.<platform-suffix>
@@ -105,7 +107,7 @@ CLI 的业务命令通过 `@kgos/sdk` 调用 daemon。只有 `doctor`、`init`�
 
 package 不再包含 native `kg` binary。`kgosd` 与三个 required official extension 使用同一 KG OS package version；manifest 记录 target、version 与每个 native artifact 的 SHA-256，缺失、target/version 不匹配或 hash 不匹配必须 fail closed。official Jieba 的 tokenizer code / dictionary data必须随当前 platform package形成可复现 artifact，不依赖宿主预装资源或运行时下载。
 
-当前 v1 package target 冻结为 macOS arm64/x64 与 Linux **glibc** arm64/x64。Linux native package除 `os/cpu` 外还必须声明与实际构建一致的 npm `libc` metadata；Phase 08 当前不宣称 musl / Alpine 兼容。没有对应 native package 的平台返回明确 unsupported-platform local error，不从源码即时编译、不回退任意远端 binary。
+当前源码的 native package target 为 macOS arm64/x64、Linux **glibc** arm64/x64 与 Windows arm64/x64。Windows 使用 Node/npm 的 `win32` target 名、`.dll` 扩展和 `kgosd.exe`；Linux native package除 `os/cpu` 外还必须声明与实际构建一致的 npm `libc` metadata。公开 v0.1.0 仍只有已发布的四个 macOS/Linux Runtime package，Windows 需后续新版本发布；Phase 08 的历史四平台结论不被追溯扩张。没有对应 native package 的平台返回明确 unsupported-platform local error，不从源码即时编译、不回退任意远端 binary。
 
 ## Runtime package 与 Instance 分离
 
@@ -140,15 +142,15 @@ KG OS 不建立第二个长期 runtime installation directory 或自制 package 
 
 npm 是正式分发入口；GitHub artifacts 可以继续作为 CI / provenance / 调试证据，但不要求用户手工下载后才能使用 KG OS。
 
-发布候选至少验证 SDK exports/types、Node >=24.15.0 baseline、packed `@kgos/cli` 的 `npm exec` 与 `npx --yes`、platform selection、native manifest/hash、repo 外 `doctor -> init -> 首次业务命令`、daemon auto-start/auth/streaming，以及 macOS arm64/x64 与 Linux glibc arm64/x64 对应 runner 的真实 native load。四个平台都必须实际加载 official Jieba tokenizer并证明新 Instance 省略 `--fulltext-analyzer` 后写出/使用 `jieba`，不能只检查 package里存在一个文件。
+发布候选至少验证 SDK exports/types、Node >=24.15.0 baseline、packed `@kgos/cli` 的 `npm exec` 与 `npx --yes`、platform selection、native manifest/hash、repo 外 `doctor -> init -> 首次业务命令`、daemon auto-start/auth/streaming，以及 macOS arm64/x64、Linux glibc arm64/x64、Windows arm64/x64 对应 runner 的真实 native load。六个平台都必须实际加载 official Jieba tokenizer并证明新 Instance 省略 `--fulltext-analyzer` 后写出/使用 `jieba`，不能只检查 package里存在一个文件。
 
 `@kgos/*` 使用 npm organization scope。实际发布前必须由有权限的 npm account / organization确认可以发布 `@kgos` scope；若该 namespace不可用，属于 release naming blocker，需要在发布前单独裁决，不能静默换名后仍宣称符合本设计。
 
 正式 Release 由已经存在的 `v<version>` Git tag 触发 GitHub Actions。tag 名必须与 root/package version 完全一致，并指向 `main` 历史中的同一 source revision；普通 PR / `main` push 不触发 publish。手工 `workflow_dispatch` 只用于对一个已经存在的 release tag 恢复或重跑，不产生第二套 release version/source。
 
-发布顺序固定为四个 Runtime package、SDK、CLI 最后。四平台 immutable candidate、native load 与 packed smoke 全部通过后，六个 package 直接使用本次正式 dist-tag 发布；CLI 只有在其 exact SDK / Runtime dependency 已经能从 registry 解析到同版本 artifact 后才允许发布。这样在 CLI 切换前，用户正式入口不会提前指向一个依赖不完整的新版本，也不需要发布完成后再执行单独的 npm `dist-tag add`。
+发布顺序固定为六个 Runtime package、SDK、CLI 最后。六平台 immutable candidate、native load 与 packed smoke 全部通过后，八个 package 直接使用本次正式 dist-tag 发布；CLI 只有在其 exact SDK / Runtime dependency 已经能从 registry 解析到同版本 artifact 后才允许发布。这样在 CLI 切换前，用户正式入口不会提前指向一个依赖不完整的新版本，也不需要发布完成后再执行单独的 npm `dist-tag add`。
 
-GitHub Actions 的长期 npm 发布认证使用 npm Trusted Publishing / OIDC；published package 的 `repository.url` 必须绑定当前 GitHub repository，Release publish job 必须拥有 `id-token: write`，正式 publish step 不注入长期 `NODE_AUTH_TOKEN`。首个 package 尚未存在、无法在 package settings 建立 trusted publisher 时，允许使用一次短期 bootstrap credential完成首次 publish；bootstrap credential 只能保存在 GitHub Actions secret，不进入 repository、artifact 或 log，并在六个 package 都配置 trusted publisher 后删除。
+GitHub Actions 的长期 npm 发布认证使用 npm Trusted Publishing / OIDC；published package 的 `repository.url` 必须绑定当前 GitHub repository，Release publish job 必须拥有 `id-token: write`，正式 publish step 不注入长期 `NODE_AUTH_TOKEN`。首个 package 尚未存在、无法在 package settings 建立 trusted publisher 时，允许使用一次短期 bootstrap credential完成首次 publish；bootstrap credential 只能保存在 GitHub Actions secret，不进入 repository、artifact 或 log，并在本次首发 package 都配置 trusted publisher 后删除。
 
 实际 npm registry publish、public-registry smoke 与 GitHub Release 是发布动作；只有真实执行并取得 registry evidence 后才能声称已发布。Git tag 是发布指令与 source identity，不再表示“发布完成后才补建的结果”。
 

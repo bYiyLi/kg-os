@@ -26,6 +26,18 @@ const artifacts = {
     library: "lithograph.so",
     providerLibrary: "lithograph-openai-compatible.so",
     sha256: "0a14828ae87e1643d693fdb60306342bb45ad0eb2a79d5f98956c9bfd9b1450b"
+  },
+  "win32-arm64": {
+    archive: "lithograph-windows-arm64.zip",
+    library: "lithograph.dll",
+    providerLibrary: "lithograph-openai-compatible.dll",
+    sha256: "17fd8dd7367390e2e642b0cfb3952ced4b61b54d53f2a05a3c702aaf70b7cd78"
+  },
+  "win32-x64": {
+    archive: "lithograph-windows-x64.zip",
+    library: "lithograph.dll",
+    providerLibrary: "lithograph-openai-compatible.dll",
+    sha256: "b9aa1013ebbd0063d769d5a96437d149456d3ae9c95cf46361a7ea064585e4ca"
   }
 };
 
@@ -34,7 +46,7 @@ export function currentLithographArtifact(root) {
   const artifact = artifacts[key];
   if (artifact === undefined) {
     throw new Error(
-      `No KG OS Lithograph artifact for ${key}; supported targets are macOS/Linux x64/arm64`
+      `No KG OS Lithograph artifact for ${key}; supported targets are macOS/Linux/Windows x64/arm64`
     );
   }
 

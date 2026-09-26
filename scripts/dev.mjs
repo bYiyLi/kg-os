@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 
-import { run } from "./process.mjs";
+import { run, spawnCommand } from "./process.mjs";
 import { waitForRuntimeEndpoint } from "./runtime-locator.mjs";
 import { prepareRuntimeProfile } from "./runtime-profile.mjs";
 import { currentRuntimeTarget } from "./runtime-package.mjs";
@@ -13,18 +13,22 @@ await run("pnpm", ["build"], { cwd: root });
 await prepareRuntimeProfile({ instanceRoot });
 
 const runtimeRoot = resolve(root, "artifacts", "npm", "runtime-" + currentRuntimeTarget());
-const daemon = spawn(resolve(runtimeRoot, "kgosd"), ["--root", instanceRoot], {
-  cwd: root,
-  detached: process.platform !== "win32",
-  env: process.env,
-  stdio: "inherit"
-});
+const daemon = spawn(
+  resolve(runtimeRoot, process.platform === "win32" ? "kgosd.exe" : "kgosd"),
+  ["--root", instanceRoot],
+  {
+    cwd: root,
+    detached: process.platform !== "win32",
+    env: process.env,
+    stdio: "inherit"
+  }
+);
 daemon.once("error", (error) => {
   process.stderr.write("Go daemon: " + error.message + "\n");
 });
 
 const endpoint = await waitForRuntimeEndpoint(instanceRoot, daemon);
-const vite = spawn(
+const vite = spawnCommand(
   "pnpm",
   [
     "--filter",

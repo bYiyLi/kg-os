@@ -35,7 +35,7 @@ describe("CLI Runtime discovery", () => {
   it("selects the current supported npm Runtime package", () => {
     const target = currentRuntimeTarget();
     expect(target.packageName).toBe(`@kgos/runtime-${target.platform}-${target.arch}`);
-    expect(["darwin", "linux"]).toContain(target.platform);
+    expect(["darwin", "linux", "win32"]).toContain(target.platform);
     expect(["arm64", "x64"]).toContain(target.arch);
   });
 
