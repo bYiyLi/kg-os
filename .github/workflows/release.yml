@@ -10,6 +10,10 @@ on:
         description: Existing v* release tag to recover
         required: true
         type: string
+      reuse_release_run:
+        description: Completed Release run ID whose verified release-set artifact must be reused
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -103,6 +107,7 @@ jobs:
   candidate:
     name: Release candidate / ${{ matrix.target }}
     needs: preflight
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.reuse_release_run == '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -217,8 +222,12 @@ jobs:
     needs:
       - preflight
       - candidate
+    if: ${{ always() && needs.preflight.result == 'success' && (needs.candidate.result == 'success' || inputs.reuse_release_run != '') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
 
     steps:
       - name: Check out release tooling
@@ -232,16 +241,42 @@ jobs:
           node-version-file: .node-version
 
       - name: Download platform candidates
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.reuse_release_run == '' }}
         uses: actions/download-artifact@v7
         with:
           pattern: release-candidate-*
           path: artifacts/candidates
 
       - name: Aggregate exact release set
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.reuse_release_run == '' }}
         run: |
           node scripts/release.mjs aggregate \
             --input artifacts/candidates \
             --output artifacts/final \
+            --revision "${{ needs.preflight.outputs.revision }}" \
+            --version "${{ needs.preflight.outputs.version }}"
+
+      - name: Download verified release set for partial recovery
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.reuse_release_run != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REUSE_RUN: ${{ inputs.reuse_release_run }}
+        run: |
+          [[ "$REUSE_RUN" =~ ^[1-9][0-9]*$ ]] || { echo "Recovery run ID must be numeric" >&2; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REUSE_RUN" \
+            --jq '[.name == "Release", .path == ".github/workflows/release.yml", .status == "completed"] | all' \
+            | grep -Fx true
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REUSE_RUN" \
+            --jq '.head_repository.full_name' | grep -Fx "$GITHUB_REPOSITORY"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REUSE_RUN/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.name == "Aggregate release candidates" and .conclusion == "success")] | length' \
+            | grep -Fx 1
+          gh run download "$REUSE_RUN" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name release-set \
+            --dir artifacts/final
+          node scripts/release.mjs verify-release-set \
+            --directory artifacts/final \
             --revision "${{ needs.preflight.outputs.revision }}" \
             --version "${{ needs.preflight.outputs.version }}"
 
@@ -363,7 +398,7 @@ jobs:
       - name: Check out release revision
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.preflight.outputs.revision }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || needs.preflight.outputs.revision }}
           fetch-depth: 0
 
       - name: Install Node.js

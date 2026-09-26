@@ -31,6 +31,9 @@ switch (command) {
   case "aggregate":
     await aggregate();
     break;
+  case "verify-release-set":
+    await verifyReleaseSet();
+    break;
   case "publish":
     await publish();
     break;
@@ -39,7 +42,7 @@ switch (command) {
     break;
   default:
     throw new Error(
-      "Usage: node scripts/release.mjs <preflight|authority|aggregate|publish|verify-registry>"
+      "Usage: node scripts/release.mjs <preflight|authority|aggregate|verify-release-set|publish|verify-registry>"
     );
 }
 
@@ -180,6 +183,19 @@ async function aggregate() {
   });
   await writeFile(resolve(output, "release.json"), JSON.stringify(release, null, 2) + "\n");
   process.stdout.write(JSON.stringify({ output, ...release }) + "\n");
+}
+
+async function verifyReleaseSet() {
+  const release = await loadRelease(resolve(requiredOption("--directory")));
+  if (
+    release.revision !== requiredOption("--revision") ||
+    release.version !== assertReleaseVersion(requiredOption("--version"))
+  ) {
+    throw new Error("Reused release set does not match the preflight revision and version");
+  }
+  process.stdout.write(
+    JSON.stringify({ revision: release.revision, version: release.version }) + "\n"
+  );
 }
 
 async function publish() {
@@ -402,9 +418,8 @@ async function registryVersion(name, version) {
 }
 
 async function registryPackage(name) {
-  const response = await fetch(RELEASE_REGISTRY + "/" + encodeURIComponent(name), {
-    headers: { Accept: "application/vnd.npm.install-v1+json" }
-  });
+  const url = RELEASE_REGISTRY + "/" + encodeURIComponent(name);
+  const response = await fetch(url);
   if (response.status === 404) {
     return null;
   }
