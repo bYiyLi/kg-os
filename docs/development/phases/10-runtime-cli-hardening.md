@@ -28,11 +28,11 @@ discoverable help + consistent JSON presentation
 
 ## 2. 状态
 
-`in_progress`
+`done`
 
-Phase 00–09 已为 `done`，v0.1.0 已公开发布。Phase 10 工作树candidate已实现，official Jieba 使用pinned upstream revision加最小 `cdylib` adapter；macOS arm64主工作树与独立fresh-source完整验证、repo外packed Ontology / Full-text / Semantic主链和真实外部Provider均已通过。macOS x64与Linux glibc arm64/x64目标runner尚未验证本次candidate，因此完整Phase acceptance未闭合。
+Phase 00–09 已为 `done`，v0.1.0 已公开发布。Phase 10 实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`；official Jieba 使用pinned upstream revision加最小 `cdylib` adapter。macOS arm64主工作树与独立fresh-source完整验证、repo外packed Ontology / Full-text / Semantic主链和真实外部Provider，以及 GitHub Actions CI run `36256273631` 的 Validate与四平台native/package matrix均通过。Phase 10代码验收已闭合，未执行新的public release。
 
-公开发布新的 npm version、Git tag / GitHub Release与registry release closure **不属于本 Phase**；Phase 10 只产生经过完整本地 / fresh-source / packed / 四平台验证的 hardening candidate。后续正式 Release 继续作为独立发布动作和阶段关闭。
+公开发布新的 npm version、Git tag / GitHub Release与registry release closure **不属于本 Phase**；Phase 10 只产生经过完整本地 / fresh-source / packed / 四平台验证的 hardening candidate。后续正式 Release 作为独立发布动作处理。
 
 ## 3. Design Inputs
 
@@ -124,7 +124,7 @@ Phase 计划只安排上述已确认合同的实现与验收，不复制成第�
 - 不要求运行时联网下载或宿主预装可变资源。
 - caller additional extension加载后，official artifact能够最后注册exact `jieba`并成为最终identity。
 
-`sqlite-jieba-tokenizer 0.6.0` 的上游命令没有直接产出 `.dylib`；当前实现用 pinned Git revision `720b3fa794b3fe8163fba9088bb964b4c629aa33`、`jieba-rs 0.9.0` 和 `native/jieba/` adapter 产出可加载的official artifact。词典/停词输入hash、license、macOS arm64真实load/query及四平台待验证边界见[研究记录](../../research/jieba-tokenizer.md)。不以本地单平台通过替代本节四平台选择门。
+`sqlite-jieba-tokenizer 0.6.0` 的上游命令没有直接产出 `.dylib`；当前实现用 pinned Git revision `720b3fa794b3fe8163fba9088bb964b4c629aa33`、`jieba-rs 0.9.0` 和 `native/jieba/` adapter 产出可加载的official artifact。词典/停词输入hash、license、macOS arm64真实load/query及四平台目标runner证据见[研究记录](../../research/jieba-tokenizer.md)。
 
 ## 7. Feature 顺序
 
@@ -391,11 +391,12 @@ Commit、push和public release不是本 Phase自动包含的动作。只有实�
 
 ## 14. 当前状态
 
-2026-09-27：`in_progress`，工作树candidate，尚未提交/推送/发布。
+2026-09-27：`done`，实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`；未发布新的npm版本或GitHub Release。
 
 - macOS arm64 targeted native：Graph/Evolution pooled-connection顺序与并发、错误/取消/stream early-close、unsafe connection discard；official Jieba真实load/query与caller同名覆盖回归；Provider 401/403/429/500、network/timeout fixture均通过。
 - repo外 packed candidate：Node 24安装tarball、未初始化doctor、init默认Jieba与显式unicode61 override、并发auto-start、wrong-Instance Bearer拒绝、Graph/Object/Evolution、merge后直接delete Branch、层级help、pretty、SIGTERM stale恢复与四caller竞争、通过Ontology Patch建立Full-text + Semantic Index、中文Full-text、loopback OpenAI-compatible Semantic query和secret scan通过。
 - Provider诊断根因是KG OS使用go-sqlite3 `Error()`时，该驱动把`sqlite3_system_errno`追加到Lithograph已返回的干净HTTP message后。KG OS adapter现在只根据驱动的结构化`SystemErrno`剔除这个精确附加尾部，保留`IO_ERROR`和SQLite code；当前证据不指向Lithograph Provider实现缺陷，因此没有跨仓修改或更换pinned Lithograph artifact。
 - macOS arm64主工作树`pnpm validate`与独立fresh-source`pnpm run setup && pnpm validate`均通过：Go race、statement coverage 90.0%、govulncheck、TypeScript 16文件/89测试与覆盖率、Playwright、native、packed、Rust/npm/Go license、audit和diff门禁全绿。`pnpm check:quick`也已单独通过。
 - repo外packed candidate用真实外部OpenAI-compatible endpoint、环境变量凭据和Ontology Patch完成中文Full-text与Semantic query，各命中一条Knowledge；临时Instance文件未发现credential。该endpoint在KG OS当前请求形状下返回4096维，用户提供的2048维与实际响应不一致，因此测试Index按实测4096维配置；未把credential值写入仓库、fixture、日志或文档。
-- 仍待：macOS x64、Linux glibc arm64/x64三个目标runner对本次candidate的native/package build、load/probe、中文query与packed smoke。没有这些证据前不标记`done`，也不把本地candidate称为public release。
+- GitHub Actions CI run `36256273631` 对实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 为 `success`：Validate job `108443547019`，Linux x64 `108443547179`、macOS arm64 `108443547241`、macOS x64 `108443547243`、Linux arm64 `108443547267` 均成功。四个native job各自的Runtime package build、native Lithograph suite及repo外packed candidate smoke步骤均为`success`；其中Jieba最终注册/load/probe、中文Full-text query及manifest/hash由对应测试实际执行。
+- Final review核对D78–D80、Phase Acceptance A–R、四平台目标runner结果、仓库外真实Provider与secret hygiene，未发现剩余task-affecting finding。本阶段产物是代码hardening candidate，不是新public release。

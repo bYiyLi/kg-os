@@ -35,7 +35,7 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 ## 当前状态
 
-**Phase 00–08 均已完成。** Phase 08 已把正式 Client / local Runtime distribution 迁移到真实 `@kgos/sdk` + TypeScript `@kgos/cli` + platform npm Runtime packages，并冻结显式 `--root`、`init/doctor`、per-instance dynamic `kgosd` 与同 root endpoint/token；Go `kg` 已在 parity 证明后删除。实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`，主工作树完整 validation、独立 fresh-source、final review 与 GitHub Actions run `36103842748` 的 Validate + macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix 均成功。
+**Phase 00–10 均已完成。** Phase 08 已把正式 Client / local Runtime distribution 迁移到真实 `@kgos/sdk` + TypeScript `@kgos/cli` + platform npm Runtime packages，并冻结显式 `--root`、`init/doctor`、per-instance dynamic `kgosd` 与同 root endpoint/token；Go `kg` 已在 parity 证明后删除。实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`，主工作树完整 validation、独立 fresh-source、final review 与 GitHub Actions run `36103842748` 的 Validate + macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix 均成功。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
@@ -57,7 +57,7 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 **Phase 09 MVP Release Closure 当前为 `done`。** Release Run `36219384704` 已成功完成六包 registry verification、macOS arm64/x64 + Linux arm64/x64 public-registry `npx` smoke 与 GitHub Release finalization；六个 package 均为 `0.1.0` 且 `latest=0.1.0`，`v0.1.0` 仍指向原 release revision `d35e254`。六包已配置 `bYiyLi/kg-os` / `release.yml` Trusted Publisher，并收紧为必须 2FA、禁止 bypass token；GitHub `NPM_TOKEN` secret 与 npm bootstrap token均已删除。长期 OIDC publish workflow closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 已推送到 `main`，GitHub Actions CI Run `36226930183` 的 Validate 与四个平台 Native Runtime jobs 全部成功。完整状态与 Acceptance 见[Phase 09](docs/development/phases/09-mvp-release-closure.md)。
 
-**Phase 10 Runtime & CLI Hardening 当前为 `in_progress`。** 工作树已有 pooled write connection 清理、official `jieba` Runtime artifact与默认值、CLI help / JSON `--pretty`、Provider 诊断修正及真实用户回归；macOS arm64 主工作树 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、仓库外 packed Ontology→中文 Full-text→真实外部 Semantic 查询均已通过。macOS x64与Linux glibc arm64/x64的目标runner CI仍未取得本次candidate证据，因此不把Phase标记为`done`。公开版本仍为 v0.1.0，本阶段不包含新的 npm publish / Git tag / GitHub Release。完整状态与 Acceptance 见[Phase 10](docs/development/phases/10-runtime-cli-hardening.md)。
+**Phase 10 Runtime & CLI Hardening 当前为 `done`。** pooled write connection 清理、official `jieba` Runtime artifact与默认值、CLI help / JSON `--pretty`、Provider 诊断修正及真实用户回归已完成。实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`；macOS arm64 主工作树 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、仓库外 packed Ontology→中文 Full-text→真实外部 Semantic 查询及 GitHub Actions run `36256273631` 的 Validate + macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix 均通过。公开版本仍为 v0.1.0，本阶段没有执行新的 npm publish、Git tag 或 GitHub Release。完整状态与 Acceptance 见[Phase 10](docs/development/phases/10-runtime-cli-hardening.md)。
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、Client迁移、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 

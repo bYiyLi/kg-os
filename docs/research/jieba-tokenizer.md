@@ -2,7 +2,7 @@
 
 <!-- cspell:ignore sqlitejiebatokenizer rlib rustc cdylib -->
 
-本文件记录 KG OS Phase 10 为 official Jieba tokenizer 选择实现时取得的外部与本地工程证据。它是研究材料，不是产品设计真源；最终行为由 [Runtime](../design/runtime.md)、[CLI](../design/cli.md) 与 [D80](../design/decisions.md#d80-official-jieba) 定义。
+本文件记录 KG OS Phase 10 为 official Jieba tokenizer 选择实现时取得的外部、本地与目标runner工程证据。它是研究材料，不是产品设计真源；最终行为由 [Runtime](../design/runtime.md)、[CLI](../design/cli.md) 与 [D80](../design/decisions.md#d80-official-jieba) 定义。
 
 ## 研究目标
 
@@ -47,7 +47,9 @@ SQLite FTS5 custom tokenizer API 规定：同名 tokenizer 已存在时，新注
 | `jieba-rs 0.9.0/src/hmm.rs` | `610e1bb45f2913d7925afedf72e18083eec225e5740ec15a187d17b67729e39b` |
 | `sqlite-chinese-stopword/data/stopword.txt`，上述 Git revision | `12d0689a793153bb7edfa900451903bcc93f3cbbb76020c25598960e90b8f8a4` |
 
-KG OS 当前 macOS arm64 本地证据：`cargo build --locked --release` 产出 `.dylib`；Go bundled SQLite 真实 load 后 `tokenize='jieba'` 对“这是知识图。”与“知识图”命中；caller 先把 `unicode61` 注册为同名 `jieba` 时不能命中，official artifact 最后注册后可以命中；repo 外 packed Runtime package 通过 manifest/hash 校验、daemon load、中文索引和查询。`pnpm check:licenses:rust` 检查 Cargo metadata 的 pinned source/version 与所有依赖 license expression，随包分发的 NOTICE 和上游 MIT 文本在 `native/jieba/`。macOS x64、Linux glibc arm64/x64 的目标 runner 真实证据仍待 CI；本地 arm64 不能代替四平台验收。
+KG OS macOS arm64 本地证据：`cargo build --locked --release` 产出 `.dylib`；Go bundled SQLite 真实 load 后 `tokenize='jieba'` 对“这是知识图。”与“知识图”命中；caller 先把 `unicode61` 注册为同名 `jieba` 时不能命中，official artifact 最后注册后可以命中；repo 外 packed Runtime package 通过 manifest/hash 校验、daemon load、中文索引和查询。`pnpm check:licenses:rust` 检查 Cargo metadata 的 pinned source/version 与所有依赖 license expression，随包分发的 NOTICE 和上游 MIT 文本在 `native/jieba/`。
+
+GitHub Actions CI run `36256273631` 在实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 上为 `success`：macOS arm64/x64、Linux glibc arm64/x64 四个真实目标runner的Runtime package build、native suite与repo外packed smoke均成功。各runner的native suite验证official Jieba最后注册与中文probe，packed smoke使用同一“这是知识图。”/“知识图”语料完成真实建索引和查询；manifest/hash校验也在各runner执行。具体job ID见[Phase 10状态](../development/phases/10-runtime-cli-hardening.md#14-当前状态)。
 
 ## Phase 10 冻结实现前的选择门
 
@@ -61,4 +63,4 @@ official Jieba implementation 必须先证明：
 6. 不运行时下载词典，不依赖 manifest identity 外的宿主资源；
 7. official Jieba 最后注册后，caller extension 不能改变最终 `jieba` 行为。
 
-上述本地证据已使该 adapter 成为当前 implementation candidate；本节第 3、5 项的四平台部分仍需各自目标 runner 的真实 build/load/query 结果。Phase 10 在这些证据及其余 Acceptance 闭合前保持 `in_progress`。
+上述本地与四平台目标runner证据已满足本节选择门；该adapter成为Phase 10已验收的official Jieba实现。代码验收不等于新的public npm发布。

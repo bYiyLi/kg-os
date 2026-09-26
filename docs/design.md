@@ -2,7 +2,7 @@
 
 本文是 KG OS 设计文档集的**总入口与职责索引**。产品定义见 [README](../README.md)，协作与评审规则见 [AGENTS](../AGENTS.md)。
 
-开发阶段、状态与验收见[开发计划](development/README.md)，当前已实现版本的实际开发/验证命令见[开发指南](guide/development.md)。Phase 00–09 已完成并公开发布v0.1.0；Phase 10 Runtime & CLI Hardening 当前为 `in_progress`，工作树candidate已通过macOS arm64主工作树与独立fresh-source完整验证、repo外packed真实用户回归，未形成新公开发布；其余三个目标runner的本次candidate CI仍待运行。official Jieba exact artifact的本地工程选择与跨平台边界见[研究记录](research/jieba-tokenizer.md)。完成证据由开发计划与 Phase 文件维护。
+开发阶段、状态与验收见[开发计划](development/README.md)，当前已实现版本的实际开发/验证命令见[开发指南](guide/development.md)。Phase 00–10 已完成；公开版本仍为v0.1.0。Phase 10 Runtime & CLI Hardening 实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`，macOS arm64本地与独立fresh-source完整验证、repo外packed真实用户回归及四平台CI run `36256273631` 均通过；本阶段没有新的公开发布。official Jieba exact artifact选择与跨平台证据见[研究记录](research/jieba-tokenizer.md)。完成证据由开发计划与 Phase 文件维护。
 
 KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下的职责文件共同构成当前设计真源；**每个主题只有一个正文 owner**，本索引不复制详细设计。跨文档引用应链接到 owner 文件，不在其它文件重新维护同一规则。
 
@@ -39,10 +39,10 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 状态 | 范围与入口 |
 | --- | --- |
 | 已确认 | Ontology 渐进读取 / 聚合编辑、Object batch read / Patch、Knowledge / Graph、Evolution；Client 统一 TypeScript，Runtime / Kernel 保留 Go；npm/npx 分发；显式 Instance Root、单库、单 Token、每 root 最多一个 daemon；具体规则见上面的 owner 表 |
-| 当前实现基线 | Phase 00–09 已完成；当前公开版本为v0.1.0，包含真实 `@kgos/sdk` + TypeScript `@kgos/cli`、显式 `--root`、per-root dynamic `kgosd`、四平台native Runtime packages与npm/GitHub Release closure。Phase 10工作树代码当前为 `in_progress`，macOS arm64本地/fresh-source/packed及真实外部Provider已验证，但其它目标runner与完整Phase验收未闭合；official Jieba选择及证据见[研究记录](research/jieba-tokenizer.md)。状态与完整完成证据由[开发计划](development/README.md)及对应 Phase 文件维护 |
+| 当前实现基线 | Phase 00–10 已完成；当前公开版本为v0.1.0，包含真实 `@kgos/sdk` + TypeScript `@kgos/cli`、显式 `--root`、per-root dynamic `kgosd`、四平台native Runtime packages与npm/GitHub Release closure。Phase 10实现与macOS arm64本地/fresh-source/packed真实外部Provider、四平台CI已验证；official Jieba选择及证据见[研究记录](research/jieba-tokenizer.md)。状态与完整完成证据由[开发计划](development/README.md)及对应 Phase 文件维护 |
 | 已确认调整 | [D59 Cypher passthrough](design/decisions.md#d59-cypher-passthrough)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](design/decisions.md#d66-lithograph-v030-sql-only)、[D67–D74](design/decisions.md)、[D75 TypeScript Client](design/decisions.md#d75-typescript-client)、[D76 npm distribution](design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](design/decisions.md#d79-stale-daemon-recovery)、[D80 official Jieba](design/decisions.md#d80-official-jieba)。D78–D80在不增加新业务能力的前提下收紧Runtime connection/recovery与默认Full-text行为 |
 | 检索范围与限制 | [首版 Semantic 只支持单字段且不公开 filterProperties，Cypher 联合检索可组合；post-YIELD 过滤不等价于过滤范围内 top-k](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
-| 工程待办 | [Phase 09 MVP Release Closure](development/phases/09-mvp-release-closure.md) 已为 `done`；[Phase 10 Runtime & CLI Hardening](development/phases/10-runtime-cli-hardening.md) 状态 `in_progress`，继续完成macOS x64与Linux glibc arm64/x64目标runner的native/package验证及最终Phase closure。Web页面/Skill继续留在后续独立阶段。具体阶段顺序见[开发计划](development/README.md)，复用边界见[工程映射](design/implementation.md) |
+| 工程待办 | [Phase 09 MVP Release Closure](development/phases/09-mvp-release-closure.md) 与 [Phase 10 Runtime & CLI Hardening](development/phases/10-runtime-cli-hardening.md) 均为 `done`。Web页面/Skill继续留在后续独立阶段。具体阶段顺序见[开发计划](development/README.md)，复用边界见[工程映射](design/implementation.md) |
 | Web 待细化 | [kgosd 内置交付、同源服务与共享 Kernel 已定，具体页面布局和交互尚未展开](design/runtime.md#web-交互设计状态)；不阻塞 Kernel、daemon、CLI 或 SDK 的实现 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库、真实 loadable extension、SQL streaming 与 cancellation 集成测试。

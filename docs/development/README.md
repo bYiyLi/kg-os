@@ -75,7 +75,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 09 MVP Release Closure 当前为 `done`。** Release Run `36219384704` 为 `success`，六个 `0.1.0` package 与 `latest` 已重新验证，四平台 public-registry `npx` smoke全部成功，GitHub Release `KG OS v0.1.0` 已发布。六包 Trusted Publisher 均绑定 `bYiyLi/kg-os` / `release.yml` 并启用直接 `npm publish`，publishing access 已收紧为必须 2FA、禁止 bypass token；临时 GitHub `NPM_TOKEN` secret 与 npm `kgos-v0.1.0-bootstrap` token均已删除。长期 OIDC publish workflow closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 已推送到 `main`，GitHub Actions CI Run `36226930183` 的 Validate 与四个平台 Native Runtime jobs 全部成功。完整范围与 Acceptance 见[Phase 09](phases/09-mvp-release-closure.md)。
 
-**Phase 10 Runtime & CLI Hardening 当前为 `in_progress`。** pooled write connection清理、official Jieba与默认值、CLI help/pretty、Provider错误诊断和packed回归已形成工作树candidate。macOS arm64主工作树完整`pnpm validate`、独立fresh-source`pnpm run setup && pnpm validate`及repo外packed真实外部Provider验收均已通过；macOS x64与Linux glibc arm64/x64目标runner仍待本次candidate的真实build/load/package证据。不把本地candidate记为public release。逐项证据与剩余项见[Phase 10](phases/10-runtime-cli-hardening.md)。
+**Phase 10 Runtime & CLI Hardening 当前为 `done`。** pooled write connection清理、official Jieba与默认值、CLI help/pretty、Provider错误诊断和packed回归已完成。实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`；macOS arm64主工作树完整`pnpm validate`、独立fresh-source`pnpm run setup && pnpm validate`、repo外packed真实外部Provider验收及 GitHub Actions CI run `36256273631` 的 Validate与四平台native/package jobs均通过。本阶段未发布新的public版本。逐项证据见[Phase 10](phases/10-runtime-cli-hardening.md)。
 
 ## 5. 路线总览
 
@@ -91,7 +91,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [07 Evolution Merge Session](phases/07-evolution-merge.md) | `done` | Merge Session adapter、public conflict projection、渐进 resolution、exact-revision candidate consistency、finalize/abort、authenticated HTTP 与 `kg evolution merge` CLI；本地/fresh-source/Ubuntu CI 验收完成 | [Evolution Merge](../design/evolution.md#evolution-公共调用合同)、[Merge CLI](../design/cli.md#merge-session)、[D41](../design/decisions.md#d41-evolution-merge-使用-lithograph-merge-session-渐进解决冲突) |
 | [08 TypeScript Client & npm Runtime Distribution](phases/08-typescript-client-npm-runtime.md) | `done` | 真实 `@kgos/sdk`、TypeScript `@kgos/cli`、explicit `--root`、`init`、per-root daemon/dynamic endpoint、platform npm native Runtime package、Go CLI parity迁移与清理；本地/fresh-source/final review与 macOS arm64/x64 + Linux glibc arm64/x64 CI matrix均完成 | [Client](../design/client.md)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md)、[D75](../design/decisions.md#d75-typescript-client)、[D76](../design/decisions.md#d76-npm-distribution)、[D77](../design/decisions.md#d77-explicit-instance-root) |
 | [09 MVP Release Closure](phases/09-mvp-release-closure.md) | `done` | `v0.1.0` 六包、四平台 registry npx、GitHub Release、六包 Trusted Publisher/credential cleanup与长期 OIDC closure均完成 | [Client版本关系](../design/client.md#版本关系)、[发布与验证边界](../design/client.md#发布与验证边界)、[Phase 08](phases/08-typescript-client-npm-runtime.md) |
-| [10 Runtime & CLI Hardening](phases/10-runtime-cli-hardening.md) | `in_progress` | 本地candidate已通过主工作树与fresh-source完整验证、macOS arm64 native/packed、真实外部Provider；其余三个目标runner的本次candidate CI仍待运行 | [D78](../design/decisions.md#d78-operation-scoped-branch)、[D79](../design/decisions.md#d79-stale-daemon-recovery)、[D80](../design/decisions.md#d80-official-jieba)、[Runtime](../design/runtime.md)、[CLI](../design/cli.md) |
+| [10 Runtime & CLI Hardening](phases/10-runtime-cli-hardening.md) | `done` | 本地与fresh-source完整验证、repo外packed真实Provider、macOS arm64/x64 + Linux glibc arm64/x64 CI native/package matrix全部通过 | [D78](../design/decisions.md#d78-operation-scoped-branch)、[D79](../design/decisions.md#d79-stale-daemon-recovery)、[D80](../design/decisions.md#d80-official-jieba)、[Runtime](../design/runtime.md)、[CLI](../design/cli.md) |
 
 当前实现依赖顺序：
 
@@ -119,7 +119,7 @@ Go Engineering Foundation
   -> later Web / Skill phases
 ```
 
-Phase 02–09 均已完成。Phase 09 的 `v0.1.0` tag、六包 `0.1.0` / `latest`、四平台 public-registry smoke、GitHub Release、六包 Trusted Publisher、bootstrap credential cleanup与长期 OIDC publish workflow closure均有实际证据；closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 对应 CI Run `36226930183` 全绿。Phase 10当前为 `in_progress`，本地candidate不等于四平台或public release验收。Web / Skill继续留在其后独立阶段。
+Phase 02–10 均已完成。Phase 09 的 `v0.1.0` tag、六包 `0.1.0` / `latest`、四平台 public-registry smoke、GitHub Release、六包 Trusted Publisher、bootstrap credential cleanup与长期 OIDC publish workflow closure均有实际证据；closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 对应 CI Run `36226930183` 全绿。Phase 10提交 `f138d41c15ba16578e76829af452458a2321be7e` 对应 CI Run `36256273631` 的 Validate与四平台native/package matrix全绿；该代码验收不等于新的public release。Web / Skill继续留在其后独立阶段。
 
 ## 6. Phase 通用完成标准
 
