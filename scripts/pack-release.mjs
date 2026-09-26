@@ -12,7 +12,7 @@ import {
 } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { run, runCapture, waitForProcessExit } from "./process.mjs";
 import { currentRuntimeTarget } from "./runtime-package.mjs";
@@ -192,7 +192,9 @@ async function packPackage(directory) {
 }
 
 async function verifyTarballContents(tarball, requiredPrefixes, forbiddenPrefixes) {
-  const listing = (await runCapture("tar", ["-tzf", tarball], { cwd: root })).stdout
+  const listing = (
+    await runCapture("tar", ["-tzf", basename(tarball)], { cwd: dirname(tarball) })
+  ).stdout
     .split("\n")
     .filter(Boolean);
   for (const prefix of requiredPrefixes) {

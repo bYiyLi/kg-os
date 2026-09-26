@@ -77,7 +77,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 10 Runtime & CLI Hardening 当前为 `done`。** pooled write connection清理、official Jieba与默认值、CLI help/pretty、Provider错误诊断和packed回归已完成。实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`；macOS arm64主工作树完整`pnpm validate`、独立fresh-source`pnpm run setup && pnpm validate`、repo外packed真实外部Provider验收及 GitHub Actions CI run `36256273631` 的 Validate与四平台native/package jobs均通过。本阶段未发布新的public版本。逐项证据见[Phase 10](phases/10-runtime-cli-hardening.md)。
 
-**Phase 11 Windows Runtime CI 验收与六平台发布当前为 `in_progress`。** 目标是 Windows x64/arm64 的 native DLL、npm Runtime package、CLI 启动与 packed smoke 在真实 Windows runner 上通过，再将 `0.1.1` 八包经 Release workflow 发布并完成六平台 public-registry 验收。当前本地候选已通过 macOS arm64 完整验证，尚无 Windows CI 或新版本发布证据。公开 v0.1.0 的六包/四平台发布事实不变。详见[Phase 11](phases/11-windows-runtime-acceptance.md)。
+**Phase 11 Windows Runtime CI 验收与六平台发布当前为 `in_progress`。** 目标是 Windows x64/arm64 的 native DLL、npm Runtime package、CLI 启动与 packed smoke 在真实 Windows runner 上通过，再将 `0.1.1` 八包经 Release workflow 发布并完成六平台 public-registry 验收。当前本地候选已通过 macOS arm64 完整验证，Windows CI 尚未通过，新版本尚未发布。公开 v0.1.0 的六包/四平台发布事实不变。详见[Phase 11](phases/11-windows-runtime-acceptance.md)。
 
 ## 5. 路线总览
 

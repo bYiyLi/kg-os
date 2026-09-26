@@ -2,7 +2,7 @@
 
 本文是 KG OS 设计文档集的**总入口与职责索引**。产品定义见 [README](../README.md)，协作与评审规则见 [AGENTS](../AGENTS.md)。
 
-开发阶段、状态与验收见[开发计划](development/README.md)，当前已实现版本的实际开发/验证命令见[开发指南](guide/development.md)。Phase 00–10 已完成；公开版本仍为v0.1.0。Phase 10 Runtime & CLI Hardening 实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`，macOS arm64本地与独立fresh-source完整验证、repo外packed真实用户回归及四平台CI run `36256273631` 均通过；本阶段没有新的公开发布。Phase 11 Windows Runtime CI 验收与六平台发布正在实施，当前源码目标扩展到 Windows x64/arm64，版本准备为 `0.1.1`，尚无 Windows CI 或新版本发布证据；范围见[Phase 11](development/phases/11-windows-runtime-acceptance.md)。official Jieba exact artifact选择与跨平台证据见[研究记录](research/jieba-tokenizer.md)。完成证据由开发计划与 Phase 文件维护。
+开发阶段、状态与验收见[开发计划](development/README.md)，当前已实现版本的实际开发/验证命令见[开发指南](guide/development.md)。Phase 00–10 已完成；公开版本仍为v0.1.0。Phase 10 Runtime & CLI Hardening 实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`，macOS arm64本地与独立fresh-source完整验证、repo外packed真实用户回归及四平台CI run `36256273631` 均通过；本阶段没有新的公开发布。Phase 11 Windows Runtime CI 验收与六平台发布正在实施，当前源码目标扩展到 Windows x64/arm64，版本准备为 `0.1.1`，Windows CI 尚未通过且新版本尚未发布；范围见[Phase 11](development/phases/11-windows-runtime-acceptance.md)。official Jieba exact artifact选择与跨平台证据见[研究记录](research/jieba-tokenizer.md)。完成证据由开发计划与 Phase 文件维护。
 
 KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下的职责文件共同构成当前设计真源；**每个主题只有一个正文 owner**，本索引不复制详细设计。跨文档引用应链接到 owner 文件，不在其它文件重新维护同一规则。
 

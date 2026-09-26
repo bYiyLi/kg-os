@@ -59,7 +59,7 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 **Phase 10 Runtime & CLI Hardening 当前为 `done`。** pooled write connection 清理、official `jieba` Runtime artifact与默认值、CLI help / JSON `--pretty`、Provider 诊断修正及真实用户回归已完成。实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`；macOS arm64 主工作树 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、仓库外 packed Ontology→中文 Full-text→真实外部 Semantic 查询及 GitHub Actions run `36256273631` 的 Validate + macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix 均通过。公开版本仍为 v0.1.0，本阶段没有执行新的 npm publish、Git tag 或 GitHub Release。完整状态与 Acceptance 见[Phase 10](docs/development/phases/10-runtime-cli-hardening.md)。
 
-**Phase 11 Windows Runtime CI 验收与六平台发布为 `in_progress`。** 已准备 Windows x64/arm64 native Runtime package、CLI 启动与 Windows runner packed 验收候选，并将源码版本升至 `0.1.1`；Windows CI 与新版本发布尚未完成，公开 v0.1.0 仍只提供原四个平台。范围与完成条件见[Phase 11](docs/development/phases/11-windows-runtime-acceptance.md)。
+**Phase 11 Windows Runtime CI 验收与六平台发布为 `in_progress`。** 已准备 Windows x64/arm64 native Runtime package、CLI 启动与 Windows runner packed 验收候选，并将源码版本升至 `0.1.1`；Windows CI 尚未通过，新版本尚未发布，公开 v0.1.0 仍只提供原四个平台。范围与完成条件见[Phase 11](docs/development/phases/11-windows-runtime-acceptance.md)。
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、Client迁移、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 

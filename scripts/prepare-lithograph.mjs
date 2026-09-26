@@ -73,9 +73,15 @@ async function prepare() {
     await writeFile(archivePath, archive, { flag: "wx" });
 
     const zip = artifact.archive.endsWith(".zip");
-    const listing = await runCapture("tar", [zip ? "-tf" : "-tzf", archivePath]);
+    const archiveTool =
+      process.platform === "win32" && zip
+        ? resolve(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe")
+        : "tar";
+    const listing = await runCapture(archiveTool, [zip ? "-tf" : "-tzf", artifact.archive], {
+      cwd: staging
+    });
     validateArchiveEntries(listing.stdout);
-    await run("tar", [zip ? "-xf" : "-xzf", archivePath, "-C", staging]);
+    await run(archiveTool, [zip ? "-xf" : "-xzf", artifact.archive], { cwd: staging });
     await access(join(staging, artifact.library));
     await access(join(staging, artifact.providerLibrary));
     const version = (await readFile(join(staging, "VERSION"), "utf8")).trim();

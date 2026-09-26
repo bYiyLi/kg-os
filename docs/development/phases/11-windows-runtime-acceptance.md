@@ -30,4 +30,4 @@ CI matrix 使用 `windows-2025` x64 与 `windows-11-vs2026-arm` arm64，并继�
 ## 当前证据
 
 - 上游 Lithograph v0.3.0 的 Windows x64 / arm64 ZIP 已下载并核对固定 SHA-256，均含 `lithograph.dll`、`lithograph-openai-compatible.dll` 和 `VERSION`。
-- Windows 代码候选的 macOS arm64 `pnpm validate` 已通过；`0.1.1` 版本与首发认证接线正在复验，Windows CI、`v0.1.1` 发布和 registry smoke 尚未运行，故本阶段尚未完成。
+- `0.1.1` 代码候选的 macOS arm64 `pnpm validate` 已通过，提交 `1ad53b2890324eec2628f865833d0fd17d2bce3a` 已推送。首次六平台 CI run `36262650545` 的 Windows x64/arm64 在 Lithograph ZIP 读取阶段失败：Git Bash `tar` 把 Windows 盘符当作远端设备；已改为 Windows 系统 `tar.exe` 与相对 archive path，待新提交复验。`v0.1.1` 发布与 registry smoke 尚未运行，本阶段尚未完成。
