@@ -228,14 +228,6 @@ async function publish() {
     }
   }
 
-  const bootstrapToken = process.env.NPM_BOOTSTRAP_TOKEN;
-  const bootstrapNames = RELEASE_PACKAGE_ORDER.filter(
-    (name) => name.startsWith("@kgos/runtime-win32-") && !states.get(name).packageExists
-  );
-  if (bootstrapNames.length > 0 && !bootstrapToken) {
-    throw new Error("First Windows Runtime publish requires NPM_BOOTSTRAP_TOKEN");
-  }
-
   if (dryRun) {
     process.stdout.write(
       JSON.stringify({
@@ -281,10 +273,7 @@ async function publish() {
           RELEASE_REGISTRY
         ],
         {
-          cwd: root,
-          env: bootstrapNames.includes(name)
-            ? { ...process.env, NODE_AUTH_TOKEN: bootstrapToken }
-            : process.env
+          cwd: root
         }
       );
     } catch (error) {

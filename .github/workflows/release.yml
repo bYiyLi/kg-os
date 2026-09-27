@@ -319,8 +319,6 @@ jobs:
           path: artifacts/final
 
       - name: Dry-run registry release state
-        env:
-          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node scripts/release.mjs publish \
             --directory artifacts/final \
@@ -328,8 +326,6 @@ jobs:
             --dry-run
 
       - name: Publish or recover matching partial release
-        env:
-          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node scripts/release.mjs publish \
             --directory artifacts/final \

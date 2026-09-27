@@ -232,7 +232,8 @@ describe("release core", () => {
     expect(workflow).toContain('--release-tag "$RELEASE_TAG"');
     expect(workflow).toContain("REVISION=$(git rev-parse HEAD)");
     expect(workflow).toContain("id-token: write");
-    expect(workflow).toContain("NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_TOKEN }}");
+    expect(workflow).not.toContain("NPM_BOOTSTRAP_TOKEN");
+    expect(workflow).not.toContain("secrets.NPM_TOKEN");
     expect(workflow).not.toContain("NODE_AUTH_TOKEN");
     expect(RELEASE_PACKAGE_ORDER.slice(0, 2)).toEqual([
       "@kgos/runtime-win32-arm64",
