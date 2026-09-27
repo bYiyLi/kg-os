@@ -308,14 +308,14 @@ git push origin "v${KGOS_VERSION}"
 gh workflow run release.yml --ref main -f tag="v${KGOS_VERSION}" -f reuse_release_run="<run-id>"
 ```
 
-publish job 具备 GitHub Actions OIDC `id-token: write`，长期认证使用 npm Trusted Publishing。当前八个 package 的 `repository.url` 都绑定 `bYiyLi/kg-os` GitHub repository。首次 `0.1.0` 的原六包与 `0.1.1` 的两个 Windows 包在 package settings 尚不可用时，都曾使用短期 granular token 完成首发。GitHub Actions secret `NPM_TOKEN` 只在 Windows package 尚不存在时注入对应 publish 子进程；token 不写入仓库、candidate、release notes 或 Instance。Windows package 首发后，需分别配置 GitHub Actions Trusted Publisher：
+publish job 具备 GitHub Actions OIDC `id-token: write`，长期认证使用 npm Trusted Publishing。当前八个 package 的 `repository.url` 都绑定 `bYiyLi/kg-os` GitHub repository。首次 `0.1.0` 的原六包与 `0.1.1` 的两个 Windows 包在 package settings 尚不可用时，都曾使用短期 granular token 完成首发；`0.1.1` 首发期间，GitHub Actions secret `NPM_TOKEN` 只向尚不存在的 Windows package 的 publish 子进程提供凭据。当前 workflow 与发布脚本已移除该路径，不再读取 bootstrap secret。新 package 首发后，应分别配置 GitHub Actions Trusted Publisher：
 
 - GitHub owner：`bYiyLi`
 - Repository：`kg-os`
 - Workflow filename：`release.yml`
 - Allowed action：允许 `npm publish`
 
-全部配置完成并核对后，删除 repository secret `NPM_TOKEN`，撤销 npm 上的短期 bootstrap token；后续 `v*` Release 使用 OIDC，无需长期 npm publish token。
+全部配置完成并核对后，删除 repository secret `NPM_TOKEN`，撤销 npm 上的短期 bootstrap token；后续 `v*` Release 使用 OIDC，无需长期 npm publish token。`0.1.1` 的两项清理已完成，证据见[Phase 11](../development/phases/11-windows-runtime-acceptance.md)。
 
 只完成本地 candidate、workflow 配置、部分 npm publish 或单独 Git tag 都不等于公开 Release 完成；`0.1.0` 真实状态以 [Phase 09](../development/phases/09-mvp-release-closure.md)、`0.1.1` 以 [Phase 11](../development/phases/11-windows-runtime-acceptance.md) 的 registry/tag/Release 证据为准。
 

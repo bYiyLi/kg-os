@@ -77,7 +77,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 10 Runtime & CLI Hardening 当前为 `done`。** pooled write connection清理、official Jieba与默认值、CLI help/pretty、Provider错误诊断和packed回归已完成。实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`；macOS arm64主工作树完整`pnpm validate`、独立fresh-source`pnpm run setup && pnpm validate`、repo外packed真实外部Provider验收及 GitHub Actions CI run `36256273631` 的 Validate与四平台native/package jobs均通过。本阶段未发布新的public版本。逐项证据见[Phase 10](phases/10-runtime-cli-hardening.md)。
 
-**Phase 11 Windows Runtime CI 验收与六平台发布当前为 `in_progress`。** Windows x64/arm64 native DLL、npm Runtime package、CLI 启动与 packed smoke 已在真实 runner 验收；发布源码 `1509eaf` 的 Validate 与六平台 native/package CI 全绿。`v0.1.1` 的八包、六平台 public-registry `npx` smoke 与 GitHub Release 已成功，剩余两个 Windows package 的 Trusted Publisher 和短期首发凭据清理。详见[Phase 11](phases/11-windows-runtime-acceptance.md)。
+**Phase 11 Windows Runtime CI 验收与六平台发布当前为 `done`。** Windows x64/arm64 native DLL、npm Runtime package、CLI 启动与 packed smoke 已在真实 runner 验收；发布源码 `1509eaf` 的 Validate 与六平台 native/package CI 全绿。`v0.1.1` 的八包、六平台 public-registry `npx` smoke 与 GitHub Release 已成功；两个 Windows package 的 Trusted Publisher、严格 publishing access 与短期首发凭据清理已完成，长期工作流已移除 bootstrap token 路径，收尾代码的六平台 CI Run `36289992799` 全绿。详见[Phase 11](phases/11-windows-runtime-acceptance.md)。
 
 ## 5. 路线总览
 
@@ -94,7 +94,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [08 TypeScript Client & npm Runtime Distribution](phases/08-typescript-client-npm-runtime.md) | `done` | 真实 `@kgos/sdk`、TypeScript `@kgos/cli`、explicit `--root`、`init`、per-root daemon/dynamic endpoint、platform npm native Runtime package、Go CLI parity迁移与清理；本地/fresh-source/final review与 macOS arm64/x64 + Linux glibc arm64/x64 CI matrix均完成 | [Client](../design/client.md)、[CLI](../design/cli.md)、[Runtime](../design/runtime.md)、[D75](../design/decisions.md#d75-typescript-client)、[D76](../design/decisions.md#d76-npm-distribution)、[D77](../design/decisions.md#d77-explicit-instance-root) |
 | [09 MVP Release Closure](phases/09-mvp-release-closure.md) | `done` | `v0.1.0` 六包、四平台 registry npx、GitHub Release、六包 Trusted Publisher/credential cleanup与长期 OIDC closure均完成 | [Client版本关系](../design/client.md#版本关系)、[发布与验证边界](../design/client.md#发布与验证边界)、[Phase 08](phases/08-typescript-client-npm-runtime.md) |
 | [10 Runtime & CLI Hardening](phases/10-runtime-cli-hardening.md) | `done` | 本地与fresh-source完整验证、repo外packed真实Provider、macOS arm64/x64 + Linux glibc arm64/x64 CI native/package matrix全部通过 | [D78](../design/decisions.md#d78-operation-scoped-branch)、[D79](../design/decisions.md#d79-stale-daemon-recovery)、[D80](../design/decisions.md#d80-official-jieba)、[Runtime](../design/runtime.md)、[CLI](../design/cli.md) |
-| [11 Windows Runtime CI 验收与六平台发布](phases/11-windows-runtime-acceptance.md) | `in_progress` | 六平台 CI、`0.1.1` 八包、六平台 registry smoke 与 GitHub Release 已完成；Windows Trusted Publisher / bootstrap credential 清理待完成 | [Client](../design/client.md#npm-package-topology)、[Runtime](../design/runtime.md#native-runtime-package) |
+| [11 Windows Runtime CI 验收与六平台发布](phases/11-windows-runtime-acceptance.md) | `done` | 六平台 CI、`0.1.1` 八包、六平台 registry smoke、GitHub Release、Windows Trusted Publisher 与 credential cleanup 均完成 | [Client](../design/client.md#npm-package-topology)、[Runtime](../design/runtime.md#native-runtime-package) |
 
 当前实现依赖顺序：
 
@@ -124,7 +124,7 @@ Go Engineering Foundation
   -> later Web / Skill phases
 ```
 
-Phase 02–10 均已完成；Phase 11 的六平台 CI 与 `v0.1.1` 公开发布已通过，首发认证收尾仍在进行。Phase 09 的 `v0.1.0` 六包/四平台发布与 OIDC closure 仍是其原有完成基线；Phase 10 提交 `f138d41c15ba16578e76829af452458a2321be7e` 对应 CI Run `36256273631` 的四平台代码验收，也不被后续六平台发布追溯扩张。Phase 11 的 tag 提交 `1509eaf` 对应 CI Run `36266146250` 六平台全绿，Release Run `36271452963` 的第二次尝试完成八包、六平台 public-registry smoke 和 GitHub Release。Web / Skill 继续留在其后独立阶段。
+Phase 02–11 均已完成。Phase 09 的 `v0.1.0` 六包/四平台发布与 OIDC closure 仍是其原有完成基线；Phase 10 提交 `f138d41c15ba16578e76829af452458a2321be7e` 对应 CI Run `36256273631` 的四平台代码验收，也不被后续六平台发布追溯扩张。Phase 11 的 tag 提交 `1509eaf` 对应 CI Run `36266146250` 六平台全绿，Release Run `36271452963` 的第二次尝试完成八包、六平台 public-registry smoke 和 GitHub Release。Windows 首发认证收尾与后续 OIDC 边界见[Phase 11](phases/11-windows-runtime-acceptance.md)。Web / Skill 继续留在其后独立阶段。
 
 ## 6. Phase 通用完成标准
 
