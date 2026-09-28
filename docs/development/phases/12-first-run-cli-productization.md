@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-`in_progress`。本阶段把 Phase 00–11 已实现的 Kernel、Runtime、SDK 与 CLI 能力收敛成一个可完整初始化、可自发现、可恢复的 first-run 产品路径，不增加新的 Knowledge / Graph / Evolution 业务语义。当前工作树的本地实现、主工作树完整 validation、独立 fresh-source validation、packed / PTY / dev fresh-user 验收与 final local review 已闭环；远端六平台 CI 尚未执行，因此不能标记 `done`。
+`done`。本阶段把 Phase 00–11 已实现的 Kernel、Runtime、SDK 与 CLI 能力收敛成一个可完整初始化、可自发现、可恢复的 first-run 产品路径，不增加新的 Knowledge / Graph / Evolution 业务语义。主工作树完整 validation、独立 fresh-source validation、packed / PTY / dev fresh-user 验收、final review 与六平台远端 CI 已全部闭环。
 
 完成后的可观察结果：
 
@@ -16,7 +16,7 @@ Workspace Root
   → existing Ontology / Object / Graph / Evolution commands usable
 ```
 
-本阶段实现 [D81 Workspace Root](../../design/decisions.md#d81-workspace-root)、[D82 Init readiness](../../design/decisions.md#d82-init-readiness) 与 [D83 CLI progressive disclosure](../../design/decisions.md#d83-cli-progressive-disclosure)。公开 v0.1.1 仍是旧 root-is-Instance / lazy-bootstrap 实现；当前未提交工作树中的 Phase 12 candidate 不等于已发布版本。
+本阶段实现 [D81 Workspace Root](../../design/decisions.md#d81-workspace-root)、[D82 Init readiness](../../design/decisions.md#d82-init-readiness) 与 [D83 CLI progressive disclosure](../../design/decisions.md#d83-cli-progressive-disclosure)。公开 v0.1.1 仍是旧 root-is-Instance / lazy-bootstrap 实现；Phase 12 的 `main` 实现不等于已发布版本，本阶段没有执行新的 npm publish、Git tag 或 GitHub Release。
 
 ## 设计输入
 
@@ -210,4 +210,4 @@ Path primitive必须先统一，避免init/doctor/runtime各自拼接两套目�
 
 只有 P12-01–P12-08 全部实现、全部 Acceptance 取得真实证据、设计/计划/README/开发指南按各自职责同步、final diff/review无剩余本阶段finding，并且要求的远端六平台CI实际成功后，Phase 12 才能从 `in_progress` 更新为 `done`。
 
-当前实现已完成 Workspace→`.kgos` 路径统一、`KGOS_ROOT`、shared init schema、TTY wizard、additional extension input、complete init/readiness receipt、resume/idempotency、业务命令 first-init gate、doctor 与分层 help；macOS arm64 主工作树完整 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、repo 外 packed fresh-user smoke、中文 PTY wizard 与真实 `pnpm dev` 回归均成功，final local diff/review 无剩余 task-affecting finding。当前只需在提交/推送获得授权后取得 Phase 要求的六平台 CI；未执行提交、推送或发布。
+P12-01–P12-08 已全部实现并取得真实证据。macOS arm64 主工作树完整 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、repo 外 packed fresh-user smoke、中文 PTY wizard 与真实 `pnpm dev` 回归均成功，final diff/review 无剩余 task-affecting finding。实现提交 `61ae9244a81364d209971d9be00c440f0b394cb1` 首次触发 Run `36398385921`，其中 win32-x64 packed smoke 暴露 Windows `process.kill()` 强制终止不会执行 graceful cleanup 的测试假设；按 D79 修正 Windows stale-locator 验收后，修复提交 `9c83ba1cbee0d832e7a2205de3cfc3a3ab90e7f1` 的 GitHub Actions Run `36399393826` 全绿：Validate `108853391763`、darwin-arm64 `108853391870`、win32-arm64 `108853391949`、linux-arm64 `108853391989`、linux-x64 `108853391999`、win32-x64 `108853392014`、darwin-x64 `108853392054` 均为 `success`。Phase 12 因此满足完成条件并更新为 `done`；未执行新版本发布。
