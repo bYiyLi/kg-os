@@ -29,13 +29,13 @@ Node / Relationship Definition 一起表达字段、约束和索引。单字段�
 
 KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Host 使用 Go；`@kgos/sdk`、`@kgos/cli` 与浏览器 Web 使用 TypeScript。**`kgosd` 自带 Web**：页面与 API 由每个 Instance 自己的 daemon 同 endpoint 提供，不需要单独部署 Web 服务；具体边界见 [运行架构](docs/design/architecture.md#v1-运行时与技术分层)、[Client](docs/design/client.md) 和 [Web hosting](docs/design/runtime.md#web-hosting)。
 
-正式 AI / CI Client 分发形态为 `npx --yes @kgos/cli@<version> --root <instance-root> ...`；`@kgos/cli` 的正式运行前置是 **Node.js >= 24.15.0**，`--yes` 属于 npm 自身的首次 package acquisition 确认，普通人类交互可省略。一个显式 root 对应一个 `config.toml`、`auth.json`、`kgos.db` 与最多一个 active `kgosd`；不同 root 使用独立 daemon、dynamic loopback endpoint 与随机 token。不存在默认 `KG_HOME` / `KG_TOKEN`。Instance 首次建立使用 `init`，业务命令自动确保对应 root 的 Runtime 可用。公开 `0.1.1` 已提供八个 npm package、macOS / Linux glibc / Windows 各 arm64/x64 Runtime，并通过六平台 public-registry `npx` smoke 与 GitHub Release 验收；首发认证收尾证据见[Phase 11](docs/development/phases/11-windows-runtime-acceptance.md)。
+正式 AI / CI Client 分发形态为 `npx --yes @kgos/cli@<version> --root <workspace-root> ...`；`@kgos/cli` 的正式运行前置是 **Node.js >= 24.15.0**，`--yes` 属于 npm 自身的首次 package acquisition 确认，普通人类交互可省略。当前已确认的下一实现基线把 `--root` / `KGOS_ROOT` 解析为 Workspace Root，并把唯一 Instance 固定在 `<root>/.kgos`；`init` 成功必须表示配置、extensions、credential、Knowledge Base、bootstrap 与 daemon readiness 全部完成。公开 `0.1.1` 仍是 Phase 11 已验收的旧 root-is-Instance / lazy-bootstrap 实现，八个 npm package与六平台 public-registry `npx` smoke / GitHub Release 均已完成；D81–D83 的新 first-run 合同由 Phase 12 实现，不能把设计确认写成 v0.1.1 已交付。
 
 配置、模型与调用示例，以及设计职责索引，统一从 [设计入口](docs/design.md)进入。本文只维护产品定义，具体配置、数据和接口规则由各 owner 文档维护。
 
 ## 当前状态
 
-**Phase 00–11 均已完成。** Phase 08 已把正式 Client / local Runtime distribution 迁移到真实 `@kgos/sdk` + TypeScript `@kgos/cli` + platform npm Runtime packages，并冻结显式 `--root`、`init/doctor`、per-instance dynamic `kgosd` 与同 root endpoint/token；Go `kg` 已在 parity 证明后删除。实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`，主工作树完整 validation、独立 fresh-source、final review 与 GitHub Actions run `36103842748` 的 Validate + macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix 均成功。
+**Phase 00–11 均已完成；Phase 12 已进入实现前设计/计划基线。** Phase 08 已把正式 Client / local Runtime distribution 迁移到真实 `@kgos/sdk` + TypeScript `@kgos/cli` + platform npm Runtime packages，并冻结显式 `--root`、`init/doctor`、per-instance dynamic `kgosd` 与同 root endpoint/token；Go `kg` 已在 parity 证明后删除。实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`，主工作树完整 validation、独立 fresh-source、final review 与 GitHub Actions run `36103842748` 的 Validate + macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix 均成功。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
@@ -63,7 +63,7 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、Client迁移、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
-相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go Runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、D67–D74，以及 [D75 TypeScript Client](docs/design/decisions.md#d75-typescript-client)、[D76 npm distribution](docs/design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](docs/design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](docs/design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](docs/design/decisions.md#d79-stale-daemon-recovery) 与 [D80 official Jieba](docs/design/decisions.md#d80-official-jieba)。D75–D77 替换 D65/D72 中与 Go CLI、传统安装、`KG_HOME/KG_TOKEN` 和 fixed endpoint 相关的部分；D78–D80进一步 harden connection lifecycle、daemon recovery 与默认 Full-text Runtime。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
+相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go Runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、D67–D74，以及 [D75 TypeScript Client](docs/design/decisions.md#d75-typescript-client)、[D76 npm distribution](docs/design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](docs/design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](docs/design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](docs/design/decisions.md#d79-stale-daemon-recovery) 与 [D80 official Jieba](docs/design/decisions.md#d80-official-jieba)、[D81 Workspace Root](docs/design/decisions.md#d81-workspace-root)、[D82 Init readiness](docs/design/decisions.md#d82-init-readiness)、[D83 CLI progressive disclosure](docs/design/decisions.md#d83-cli-progressive-disclosure)。D81–D83 supersede D77 的 root-is-Instance / lazy init 行为，但不追溯改写 v0.1.1 的已发布事实。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
 ## License
 
@@ -94,5 +94,6 @@ KG OS 采用双许可模式：
 - [Phase 09 计划](docs/development/phases/09-mvp-release-closure.md)：首个公开 MVP Release 的 version closure、npm publish/recovery、registry npx matrix、Git tag / GitHub Release与发布状态闭环。
 - [Phase 10 计划](docs/development/phases/10-runtime-cli-hardening.md)：Runtime connection state isolation、stale daemon recovery、official Jieba default、CLI help/pretty、Provider diagnostics、Node baseline与真实用户回归。
 - [Phase 11 计划](docs/development/phases/11-windows-runtime-acceptance.md)：Windows x64/arm64 native package、六平台 CI、`0.1.1` 发布与 registry smoke。
+- [Phase 12 计划](docs/development/phases/12-first-run-cli-productization.md)：Workspace Root / `.kgos`、`KGOS_ROOT`、完整 init readiness、extension setup、分层高信息密度 help 与 fresh-user 验收。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

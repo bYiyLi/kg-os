@@ -1,6 +1,6 @@
 # CLI
 
-本文件是 KG OS v1 **AI-facing CLI 命令、参数、输入输出、错误与非交互行为**的设计真源。CLI 只适配已经确认的 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。TypeScript SDK / npm 分发由 [Client](client.md) 负责；Instance Root、`kgosd` endpoint、认证与 lifecycle 由 [Runtime](runtime.md) 负责。
+本文件是 KG OS v1 **AI-facing CLI 命令、参数、输入输出、错误与非交互行为**的设计真源。CLI 只适配已经确认的 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。TypeScript SDK / npm 分发由 [Client](client.md) 负责；Workspace Root / `.kgos` Instance、`kgosd` endpoint、认证与 lifecycle 由 [Runtime](runtime.md) 负责。
 
 ## 目标与边界
 
@@ -12,42 +12,59 @@ CLI      → @kgos/cli
 Daemon   → kgosd
 ```
 
-v1 CLI 以 npm package `@kgos/cli` 分发，canonical invocation 为：
+v1 CLI 以 npm package `@kgos/cli` 分发，AI / CI 的 canonical invocation 为：
 
 ```text
-npx --yes @kgos/cli@<version> --root <instance-root> <command>
+npx --yes @kgos/cli@<version> --root <workspace-root> <command>
 ```
 
-`@kgos/cli` package 只暴露一个 npm bin `kg`，用于 npx/npm exec 的确定 executable 映射；这不表示用户需要全局安装它。本文后续示例中的 `kg ...` 仅作为**命令语法简写**，等价于上述 npx invocation 已经提供当前版本与 required `--root` 后的 command 部分。AI / CI 使用 `npx --yes`；`--yes` 属于 npm 而非 KG OS。
+`@kgos/cli` package 只暴露一个 npm bin `kg`，用于 npx/npm exec 的确定 executable 映射；这不表示用户需要全局安装它。本文后续示例中的 `kg ...` 仅作为**命令语法简写**。AI / CI 使用 `npx --yes`；`--yes` 属于 npm 而非 KG OS。Instance 命令的 Workspace Root 可以由 `--root` 或 `KGOS_ROOT` 明确提供；自动化推荐固定版本并显式传 `--root`，避免继承宿主环境导致目标漂移。
 
 CLI 遵守以下边界：
 
 - 命令树提供 Ontology 渐进读取，并映射共享 Object / Graph / Evolution；不按底层 REST route、Lithograph procedure 或数据库内部资源组织；
 - 除 Ontology 文本读取、`doctor` 人类诊断与 `init` 交互向导等下述显式例外外，默认输出稳定 JSON，适合 AI、脚本和 shell pipeline；人类需要可读缩进时使用 `--pretty`，不维护第二套 table 输出合同；
 - 不存在 connection-local current Branch、current State 或 checkout；需要 StateRef / Branch 的命令必须显式提供；
-- 业务命令不弹交互确认、不自动启动 editor、不进入 REPL、不自动打开 pager；只有 `init` 在配置缺失且 stdin/stdout 都可交互时逐项询问缺失配置；
+- 业务命令不弹交互确认、不自动启动 editor、不进入 REPL、不自动打开 pager；只有 `init` 可以在 stdin/stdout 都可交互时进入分阶段 setup wizard；
 - 不自动遍历所有 pagination page；AI / 调用方显式读取 cursor 并决定是否继续，避免一次命令无界扩大上下文；
 - 不提供 `kg request`、raw SQL 或 SQLite 内部表 pass-through；Graph `query` / `execute` 原样执行 Lithograph Cypher / procedure，分别选择只读 / 读写连接；
 - CLI 只通过 `kgosd` 的 HTTP endpoint 使用 Kernel，不直接打开 SQLite database 或加载 Lithograph extension；
-- 所有 Instance 命令必须显式给出全局 `--root <instance-root>`；CLI 不读取 `KG_HOME`、`KGOS_HOME`、默认 home profile 或 current directory 作为隐式 Instance selector；
-- active daemon endpoint 只从同一 root 的 `kgosd.lock` 定位，Bearer credential 只从同一 root 的 `auth.json` 取得；不存在 `KG_TOKEN` override、`--token` 或跨 root fallback；
+- 所有 Instance 命令都必须解析出唯一 Workspace Root：`--root <workspace-root>` 优先，其次使用非空 `KGOS_ROOT`；两者都缺失时失败。CLI 不读取 `KG_HOME`、`KGOS_HOME`、默认 home profile，不根据 current directory、父目录或 `.kgos` 存在性自动发现 Instance；
+- Workspace Root 下的 `.kgos/` 是唯一 Instance Directory。active daemon endpoint 只从该目录的 `kgosd.lock` 定位，Bearer credential 只从同目录的 `auth.json` 取得；不存在 `KG_TOKEN` override、`--token` 或跨 root fallback；
 - CLI 的业务 HTTP transport 通过 `@kgos/sdk`，本机 CLI 自己只拥有 Instance/Runtime discovery 与 presentation，不复制第二套 HTTP client。
 
 v1 不定义命令别名、缩写 namespace 或另一组 flattened commands。`kg branch ...`、`kg query ...` 等都不是 `kg evolution branch ...`、`kg graph query ...` 的第二种 canonical 拼写。
 
 ### Global root
 
-`--root <path>` 是 Instance 命令的必填全局参数：
+Instance 命令的 Workspace Root 按固定优先级解析：
 
 ```text
-npx --yes @kgos/cli@0.1.0 --root ./.kgos doctor
-npx --yes @kgos/cli@0.1.0 --root ./.kgos init
-npx --yes @kgos/cli@0.1.0 --root ./.kgos ontology --at branch/main
+--root <path>
+    ↓ 未提供
+KGOS_ROOT
+    ↓ 未提供或为空
+INVALID_ARGUMENT / exit 2
 ```
 
-CLI 在任何 Instance I/O 前把 `path` 解析为 absolute Instance Root；同一次 invocation 的 `config.toml`、`auth.json`、`kgosd.lock`、`kgos.db` 与 cache 全部基于这一 root。root 本身就是 Instance 目录，不把项目目录自动补成 `.kgos`，也不向父目录搜索。
+`--root` 与 `KGOS_ROOT` 都表示 **Workspace Root**，不是 `.kgos` Instance Directory。显式 flag 永远覆盖环境变量；相对路径按当前进程工作目录解析为 absolute Workspace Root。CLI 不向上搜索、不根据 cwd 自动选库，也不提供默认 home Instance。
 
-`--help`、`--version` 与只展示 namespace help 的调用不访问 Instance，因此不要求 `--root`。除此之外缺少 root 返回 local `INVALID_ARGUMENT` / exit `2`。
+```text
+npx --yes @kgos/cli@<version> --root ./my-project doctor
+npx --yes @kgos/cli@<version> --root ./my-project init
+
+KGOS_ROOT=./my-project npx --yes @kgos/cli@<version> ontology --at branch/main
+```
+
+CLI 在任何 Instance I/O 前先得到 absolute Workspace Root，再固定派生：
+
+```text
+<workspace-root>/.kgos
+```
+
+同一次 invocation 的 `config.toml`、`auth.json`、`kgosd.lock`、`kgos.db`、cache、extensions 与 logs 全部基于这个 Instance Directory。一个 Workspace Root 只对应这一处 `.kgos`，不支持自定义内部目录名。
+
+`--help`、`--version` 与只展示 namespace help 的调用不访问 Instance，因此不要求 root。其它命令无法从 `--root` / `KGOS_ROOT` 得到 root 时返回 local `INVALID_ARGUMENT` / exit `2`。
 
 ## 命令树
 
@@ -101,9 +118,26 @@ kg
         └── abort
 ```
 
-`--help`、任意 namespace / command 的 `--help` 以及 `--version` 属于标准 CLI discovery，不需要连接 daemon或Instance。Help 必须使用本文和 logical contract 的真实名词，并明确标出全局 `--root`、required argument、StateRef grammar、分页、stdin/file input 和 write behavior；help 示例不能引入隐藏默认 Branch 或另一套快捷写语义。
+`--help`、任意 namespace / command 的 `--help` 以及 `--version` 属于标准 CLI discovery，不需要连接 daemon或Instance。Help 的目标不是复制完整手册，而是在**当前层级职责内，以高信息密度提供正确完成下一步所需的信息**。每一段内容都必须帮助命令发现、避免错误调用或解释当前命令的必要输入；纯设计背景、内部实现、低频历史兼容细节和在上层已经充分说明的内容不重复灌入 leaf help。
 
-Help discovery 必须逐层完整：namespace 的 `--help` 列出它的**直接子命令**及一句话职责，leaf command 的 `--help` 列出完整 canonical usage、required/optional flags、互斥输入来源和适用输出模式。例如 `kg evolution branch --help` 必须直接列出 `list/create/delete`，`kg evolution merge --help` 必须直接列出 `start/list/get/conflicts/resolve/finalize/abort`，`kg evolution merge start --help` 必须展示 `--branch/--source`。父 namespace help 不能用 `branch ...`、`merge ...` 之类占位符替代这一层已经存在的子命令发现。
+Help 按职责分层：
+
+- **root help**：说明 CLI 作用、一级命令、全局 root 解析（`--root > KGOS_ROOT > error`）、全局 help/version 与少量入口示例；不展开 StateRef、Patch、Merge 或 streaming 的命令级细节；
+- **namespace help**：说明该能力解决什么问题、列出**直接子命令**与各自一句话职责，并只展示该 namespace 共享且会影响正确调用的概念/示例；不提前复制 leaf 的全部 flags；
+- **leaf help**：给出完整 canonical usage、当前命令的 required/optional arguments/options、必要的输入互斥/范围/默认值/输出模式/写入约束，以及 1..3 个能覆盖主路径的可复制示例。只有确实存在特殊 stdin/file、pagination、StateRef、streaming 等边界时才出现对应说明，不机械生成固定章节。
+
+因此 `kg evolution branch --help` 必须直接列出 `list/create/delete`，`kg evolution merge --help` 必须直接列出 `start/list/get/conflicts/resolve/finalize/abort`，`kg evolution merge start --help` 必须解释 `--branch/--source` 及典型调用。父 namespace help 不能用 `branch ...`、`merge ...` 之类占位符替代已存在的子命令发现；leaf help 也不能为了“全面”复制整个 Evolution 模型。
+
+Help 示例不能引入隐藏默认 Branch、current State、cwd Instance discovery 或另一套快捷写语义。全局 Workspace Root 只需以短全局说明重复，不在每个 leaf 重新解释 Instance 文件布局。
+
+### CLI 交互信息质量
+
+Help、`init` wizard、`doctor` 人类输出和本地状态信息共同遵守四项原则：
+
+1. **有效**：删除一行会导致用户更容易误操作、漏掉必要决策或无法判断下一步时，这行才有存在价值；
+2. **高信息密度**：优先给出值、约束、默认、状态和下一步，不用重复解释或低价值礼貌文案占屏；
+3. **职责明确**：每一层只解释自己拥有的决定；CLI 不讲数据库内部实现，namespace 不代替 leaf，wizard 不把自动可确定的 Runtime 事实变成用户问题；
+4. **渐进披露**：常用路径先出现；高级配置只有在用户选择或显式 flag/file 触发后展开，默认路径不被低频选项淹没。
 
 ## 国际化
 
@@ -186,7 +220,7 @@ v1 exit code 只表达粗粒度执行层级，稳定业务分类始终读取 err
 
 进程被 shell signal 中断使用平台惯例，不建立 KG OS 业务 exit code。结构化 stdout/stderr 不输出 ANSI escape sequence。
 
-需要 active daemon 的业务命令在 Runtime ensure 完成后只读取当前 root 的 `auth.json`；不可用时返回本地 `AUTHENTICATION_FAILED`（exit `2`）且不发送业务 request。token 存在但 endpoint daemon 拒绝时属于 daemon public error（exit `1`）。CLI 不尝试其它 root/token。`--help`、`--version`、`doctor`、`init` 与本地 daemon spawn 本身不要求预先存在 Bearer credential。
+需要 active daemon 的业务命令在 Runtime ensure 完成后只读取当前 Workspace 的 `.kgos/auth.json`；不可用时返回本地 `AUTHENTICATION_FAILED`（exit `2`）且不发送业务 request。token 存在但 endpoint daemon 拒绝时属于 daemon public error（exit `1`）。CLI 不尝试其它 root/token。`--help`、`--version`、`doctor`、`init` 与本地 daemon spawn 本身不要求预先存在 Bearer credential。
 
 ## Doctor
 
@@ -194,9 +228,9 @@ v1 exit code 只表达粗粒度执行层级，稳定业务分类始终读取 err
 kg doctor [--json]
 ```
 
-`doctor` 是 side-effect-free 本地诊断入口。它检查显式 root 是否已初始化、`config.toml` 完整性与静态合法性、当前 npm native Runtime package 完整性、caller extension source 的可确定状态、必需环境变量、`auth.json/kgos.db` 存在状态以及 daemon locator / version / authentication 状态；不得创建目录或文件、下载 artifact、启动 daemon、生成 credential、打开/初始化 `kgos.db` 或执行 Knowledge Base bootstrap。
+`doctor` 是 side-effect-free 本地诊断入口。它检查 Workspace Root、`.kgos` Instance Directory、`config.toml` 完整性与静态合法性、当前 npm native Runtime package 完整性、official/additional extension materialization 的可确定状态、必需环境变量、`auth.json/kgos.db` 存在状态以及 daemon locator / version / authentication 状态；不得创建目录或文件、下载 artifact、启动 daemon、生成 credential、打开/初始化 `kgos.db` 或执行 Knowledge Base bootstrap。
 
-daemon `stopped` 是正常非阻塞诊断结果，因为后续业务命令会自动启动 Runtime；`starting/running/unavailable/version_mismatch` 必须如实报告。默认 TTY 输出使用当前 locale 的简洁诊断文本；`--json` 输出稳定 machine result，至少包含 overall readiness、每个 check 的稳定 `id/status/blocking` 与适用的缺失配置 key，不翻译这些 identifier。
+成功完成过 `init` 的 Instance 即使 daemon 当前 `stopped` 仍可以是 ready，因为后续业务命令会自动启动 Runtime；未完成首次 init 的 Instance 不能靠业务命令隐式完成 bootstrap。`starting/running/unavailable/version_mismatch` 必须如实报告。默认 TTY 输出使用当前 locale 的高密度诊断文本，至少明确 Workspace / Instance 路径以及 blocking 项；`--json` 输出稳定 machine result，至少包含 overall readiness、每个 check 的稳定 `id/status/blocking` 与适用的缺失配置 key，不翻译这些 identifier。
 
 `doctor` 的 machine status 只使用 `ok | info | error`；daemon lifecycle state 放在对应 check 的 `details.state`。`stopped` 对应 `status=info, blocking=false`；`version_mismatch` 必须 blocking。只要诊断过程本身完成，`doctor` 即 exit `0`，环境是否 ready 由 `ready` 与 `blocking` 表达；CLI usage / 无法读取必需诊断输入等命令自身失败才使用通用非零 exit code。
 
@@ -206,6 +240,7 @@ daemon `stopped` 是正常非阻塞诊断结果，因为后续业务命令会自
 kg init
   [--cache-path <path>]
   [--cache-max-size-mb <n>]
+  [--extensions-file <path> | --no-additional-extensions]
   [--fulltext-analyzer <fts5-spec>]
   [--embedding-base-url <url>]
   [--embedding-model <id>]
@@ -214,7 +249,26 @@ kg init
   [--embedding-api-key-env <name-or-empty>]
 ```
 
-`init` 只建立当前显式 root 的 KG OS Instance 与完整 `config.toml`；native `kgosd`、Lithograph、OpenAI-compatible Provider 与 official Jieba tokenizer 由当前 npm Runtime package 拥有，不写入 Instance config。它不启动 daemon、不生成 `auth.json`、不创建 `kgos.db`、不执行 Lithograph init 或 KG OS bootstrap。
+`init` 是完整 Instance Setup，而不是单纯的 `config.toml` 生成器。成功返回表示当前 Workspace 的 `.kgos` 已经形成可用 Instance：配置已发布、Runtime package 已验证、official/additional extensions 已解析并固定、credential 与 Knowledge Base 已建立、Lithograph 与 KG OS bootstrap 已完成、compatible daemon 已达到 ready 并继续运行。任何这些步骤未完成都不能返回“initialized”成功。
+
+交互路径按职责分阶段，而不是把所有字段平铺成问卷：
+
+```text
+Workspace / Instance      → 展示解析结果，不询问内部路径
+Runtime                   → 自动验证 package / target / official artifacts
+Cache                     → 收集 path / max size
+Additional extensions     → 默认 none；用户选择添加后才展开 extension fields
+Full-text                 → 展示 built-in jieba 默认；显式 override 时使用调用方值
+Embedding                 → 收集 endpoint / model / dimensions / similarity / credential env name
+Review                    → 只汇总会影响用户决策的最终值
+Initialize                → materialize / credential / database / bootstrap / daemon / readiness
+```
+
+Runtime package、official Lithograph、official OpenAI-compatible Provider、official Jieba、`.kgos` 内部文件名、lock/log/cache目录等都由 KG OS 自己确定，wizard 只显示必要状态，不询问“是否安装”或要求用户输入官方 library path。交互过程只在第一次进入初始化后不可变的 Full-text / Embedding 配置范围时显示一次简短提示，不重复责任说明。
+
+Human-facing prompt 使用当前阶段的业务标签与单位，不直接把 CLI flag 名当作问题文案。例如 Cache 阶段显示 `Path` / `Maximum size (MB)`，Embedding 阶段显示 `Base URL` / `Model` / `Dimensions` / `Similarity` / `API key environment variable`；对应 `--cache-path` / `--embedding-model` 等 flag 只属于非交互 adapter 和 help。推荐值以内联默认形式展示，不为默认值增加第二次确认。
+
+Additional extension 的公共配置仍是 `source / entrypoint / optional library / conditional sha256`。交互模式先以一个高层问题决定是否进入高级 extension 配置；选择 none 后不再询问其字段。非交互模式使用 `--extensions-file <path>` 提供 UTF-8 JSON array，元素字段与 `[[sqlite.extensions]]` 一致；`--no-additional-extensions` 显式表示空集合，两者互斥。official Runtime extensions 不允许通过该文件重复声明或替换。
 
 初始化配置解析先应用 KG OS 明确冻结的产品默认，再处理其余用户可配置字段。v1 唯一无需询问即可自动解析的初始化字段是 `fulltext.analyzer`：
 
@@ -223,7 +277,7 @@ kg init
 未提供                    → 直接使用 jieba，不询问
 ```
 
-其它字段继续使用同一规则：
+其余 scalar 配置继续使用同一规则；additional extensions 按上面的独立分支解析：
 
 ```text
 CLI flag 已提供 → 直接采用，不询问
@@ -232,10 +286,10 @@ CLI flag 已提供 → 直接采用，不询问
         ↓
 字段缺失且不可交互 → INIT_CONFIGURATION_INCOMPLETE
         ↓
-所有字段显式 resolved → validate → 原子写完整 config.toml
+所有字段 resolved → validate（含required credential env）→ Review（仅实际进入过 wizard 时）→ 初始化 pipeline
 ```
 
-交互提示可以展示推荐值；用户直接 Enter 表示明确采用该推荐值，不能靠输出文件省略字段表达默认。省略 `--fulltext-analyzer` 不属于“缺少配置”，因此不会触发 prompt，也不会出现在 `INIT_CONFIGURATION_INCOMPLETE.details.missing`；最终文件仍必须显式写出 `analyzer = "jieba"`。其余参数全部 resolved 时即使存在 TTY 也必须零 prompt，适合 AI / automation。非交互仍缺其它字段时使用 CLI-local 稳定 code `INIT_CONFIGURATION_INCOMPLETE`，exit `2`，`details.missing` 是按 config key 排序的字符串数组。
+交互提示展示推荐值时，用户直接 Enter 表示明确采用该值；最终 `config.toml` 仍写出完整 scalar 字段。省略 `--fulltext-analyzer` 不属于“缺少配置”，最终文件必须显式写出 `analyzer = "jieba"`。完全参数化且没有进入 wizard 的调用必须零 prompt；非空 `embedding.api_key_env` 指向的环境变量在配置发布前必须存在且非空，init 不询问或持久化 secret；非交互仍缺必需 scalar 字段或既未提供 `--extensions-file` 也未显式 `--no-additional-extensions` 时使用 CLI-local 稳定 code `INIT_CONFIGURATION_INCOMPLETE`，exit `2`，`details.missing` 使用稳定 config key / `sqlite.extensions` identifier。
 
 v1 init 的产品默认与交互推荐值冻结为：
 
@@ -250,7 +304,7 @@ v1 init 的产品默认与交互推荐值冻结为：
 | `embedding.similarity` | `cosine` |
 | `embedding.api_key_env` | `OPENAI_API_KEY` |
 
-`fulltext.analyzer=jieba` 是产品默认；表中其它值只用于交互 prompt，不是 runtime 缺失字段默认值。用户可以为 Full-text 显式覆盖其它合法 FTS5 specification；其它字段可以在交互中输入其它合法值或按 Enter 明确接受推荐值。`embedding.api_key_env` 的空字符串是一个合法值，因此交互 prompt 使用 `""` 表示调用方显式选择 no-auth；直接 Enter 仍表示采用推荐的 `OPENAI_API_KEY`。
+`fulltext.analyzer=jieba` 是产品默认；表中其它值只用于交互 prompt，不是 runtime 缺失字段默认值。用户可以通过显式 flag 覆盖其它合法 FTS5 specification；其它字段可以在交互中输入其它合法值或按 Enter 明确接受推荐值。`embedding.api_key_env` 的空字符串是一个合法值，因此交互 prompt 使用 `""` 表示调用方显式选择 no-auth；直接 Enter 仍表示采用推荐的 `OPENAI_API_KEY`。
 
 `[fulltext]` 与 `[embedding]` 是初始化配置。交互 init 进入这组字段前只显示一次当前语言对应的简短提示：
 
@@ -262,11 +316,22 @@ The following settings must not be changed after initialization.
 
 不追加其它责任、迁移或兼容性说明。该提示不意味着 CLI 保存或比较历史配置。
 
-`cache` 没有 disable/skip 模式，init 必须取得并写出 `path/max_size_mb`；`fulltext` 与 `embedding` 同样不能通过缺失字段表示未启用。`embedding.api_key_env` 字段也必须显式提供；空字符串只表示调用方明确选择无需认证的 endpoint。official SQLite extension 不进入 config；caller additional extension 若存在仍必须显式满足通用 source / entrypoint / sha256 合同。
+`cache` 没有 disable/skip 模式，init 必须取得并写出 `path/max_size_mb`；`fulltext` 与 `embedding` 同样不能通过缺失字段表示未启用。`embedding.api_key_env` 字段也必须显式提供；空字符串只表示调用方明确选择无需认证的 endpoint。official SQLite extension 不进入 config；caller additional extension 集合必须在 init 中明确解析为空或完整 entries，每项仍满足通用 source / entrypoint / conditional library / sha256 合同。
 
-如果目标 `config.toml` 已经存在，`init` 不覆盖或重新引导配置：未提供任何 config-setting flag 且现有配置合法时返回 already-initialized 成功；现有配置非法时返回当前配置错误，由调用方直接修正文件；现有配置已经存在且调用方又提供任意 config-setting flag 时返回 `INVALID_ARGUMENT` / exit `2`，不能静默忽略，也不比较新旧值。v1 不增加 `setup`、`config set` 或另一套配置持久化接口。
+如果 `.kgos/config.toml` 已经存在，`init` 不把“配置存在”误判成“Instance ready”：
 
-交互向导实际询问过至少一个字段时，成功输出使用当前 locale 的简短 human text；完全参数化、零交互 init 成功时遵守 JSON-first 规则，stdout 返回稳定 JSON，例如 `{"status":"initialized","root":"<absolute-instance-root>"}`。already-initialized 的零交互成功使用 `status="already_initialized"`。这些状态值不翻译。
+- 配置合法且 Instance ready → 幂等返回 `already_initialized`；
+- 配置合法但 credential / extensions / database / bootstrap / daemon readiness 尚未完成 → 不重新询问配置，继续恢复缺失的初始化步骤直到 ready；
+- 配置非法 → fail closed，由调用方修正或明确重建，不自动猜测旧值；
+- 已存在配置时再次提供任意 config-setting / extensions-setting flag → `INVALID_ARGUMENT` / exit `2`，不把 `init` 变成隐式 config mutation。
+
+首次配置原子发布后，CLI 启动当前 native `kgosd --root <workspace-root>`；daemon 复用唯一 Runtime resolver 完成 official/additional extension materialization、auth、database、Lithograph init 与 KG OS bootstrap，避免在 TypeScript CLI 复制第二套 native resolver。CLI 等待 active endpoint、读取同一 Instance token 并做最小 authenticated readiness 验证；成功后 daemon 保持运行。失败时保留可安全重试的 durable 结果，再次 `init` 从实际状态恢复；业务命令不能代替 `init` 自动完成首次 bootstrap。
+
+对 legacy v0.1.x “root 本身就是 Instance 目录”的布局不做自动移动或隐式兼容。如果 Workspace Root 下没有 `.kgos/config.toml`，但 root 顶层出现可识别的旧 `config.toml/auth.json/kgos.db` Instance 组合，`init` / `doctor` 必须给出明确 legacy-layout 诊断并停止，不能在旧 Instance 里再静默创建嵌套新 Instance。
+
+交互向导实际询问过至少一个字段时，Review 只展示 Workspace/Instance、Cache、built-in/additional extensions、Full-text 与 Embedding 的有效摘要，并只在真正执行前确认一次；执行阶段用少量高密度状态行表示 Configuration / Extensions / Credential / Knowledge Base / Runtime 的结果，失败时才展开对应错误。完全参数化、零交互 init 成功时遵守 JSON-first 规则，stdout 返回稳定 JSON，例如 `{"status":"initialized","root":"<absolute-workspace-root>","instance":"<absolute-workspace-root>/.kgos"}`。already-initialized 的零交互成功使用 `status="already_initialized"`。这些状态值不翻译。
+
+v1 不增加 `setup`、`config set` 或另一套配置持久化接口；init resume 只补齐当前已确定配置下的初始化步骤，不提供修改已初始化配置的第二条路径。
 
 ## Ontology CLI
 
@@ -655,7 +720,7 @@ KG OS CLI 不单独维护 human-only 命令树。人类与 AI 使用相同 comma
 
 ## Runtime target 与非目标
 
-每次业务命令 dispatch 时，CLI 按 [本地运行时](runtime.md) 先解析显式 `--root` 为 absolute Instance Root，再针对该 root 执行 Runtime ensure。只有当前 root 的 active locator 已发布 endpoint、daemon version兼容且同root token认证成功时，才把该 endpoint 视为当前 daemon target。
+每次业务命令 dispatch 时，CLI 先按 `--root > KGOS_ROOT` 解析 absolute Workspace Root，再按 [本地运行时](runtime.md) 固定定位 `<root>/.kgos` 并执行 Runtime ensure。只有当前 Instance 的 active locator 已发布 endpoint、daemon version兼容且同Instance token认证成功时，才把该 endpoint 视为当前 daemon target。
 
 ```text
 compatible active daemon → use current kgosd
@@ -667,13 +732,13 @@ version mismatch         → fail explicitly
 
 如果没有usable active owner，或locator endpoint不可连接而ownership尚未确定，业务命令从当前platform native npm package自动后台启动 `kgosd --root <absolute-root>` contender；只有daemon持有的OS exclusive lock决定它是stale-recovery winner还是因已有live owner而退出。多个并发caller最终只能有一个winner，其余caller等待winner locator；已有owner仍持lock但endpoint持续不可用时最终明确返回Runtime unavailable，不force-kill也不启动第二daemon。spawn / startup validation / ready wait失败属于本地Runtime failure，原始业务request不得在未ready的endpoint上提前dispatch。运行中的daemon启动后即使磁盘 `config.toml`被修改，当前进程仍继续使用startup时的effective config；CLI不比较配置文件、不自动hot-reload/restart。
 
-daemon ready 后，CLI 只读取同一 root 的 `auth.json`取得credential，并把它与同一root locator中的endpoint交给 `@kgos/sdk`。连接失败或认证失败时不尝试其它root/token，不直接打开SQLite，也不静默重启版本不兼容的active daemon。
+daemon ready 后，CLI 只读取同一 Workspace 的 `.kgos/auth.json` 取得 credential，并把它与同一 Instance locator 中的 endpoint 交给 `@kgos/sdk`。连接失败或认证失败时不尝试其它 root/token，不直接打开 SQLite，也不静默重启版本不兼容的 active daemon。
 
-一个daemon固定只承载 `<root>/kgos.db` 这一个Knowledge Base。OpenAI-compatible Provider可以使用独立SQLite cache database，但它只是derived runtime data，不是第二个Knowledge Base或CLI target；init可以推荐 `cache/openai-compatible.db`，实际路径仍由完整 `[cache].path` 显式配置。v1不提供 `base list/use`、`--base` 或其它单-daemon多库选择surface；需要另一套知识世界时在下一条命令显式提供另一个 `--root`，该root拥有自己的daemon/token/endpoint/database。
+一个 daemon 固定只承载 `<workspace-root>/.kgos/kgos.db` 这一个 Knowledge Base。OpenAI-compatible Provider 可以使用独立 SQLite cache database，但它只是 derived runtime data，不是第二个 Knowledge Base 或 CLI target；init 可以推荐 `cache/openai-compatible.db`，实际路径仍由完整 `[cache].path` 显式配置并相对 `.kgos` 解析。v1 不提供 `base list/use`、`--base` 或其它单-daemon多库选择 surface；需要另一套知识世界时在下一条命令明确选择另一个 Workspace Root。
 
 ## 兼容性
 
-本文命令名、全局required `--root`、required flag、flag meaning、默认 JSON result shape、Ontology Markdown/--edit、raw body / streaming framing 与 exit-code category 构成 v1 CLI public adapter contract。实现可以增加新的可选命令 / flag，但不能让已有 canonical invocation 改变业务语义；删除 / 改名已有已发布 command 或 required flag、改变默认输出类型、引入隐藏 current Branch / Instance / auto-page / interactive confirmation，都属于 CLI breaking change，需要新的设计决定。D73 在通用 Object surface 发布前删除旧设计中的 `object list/search`，因此不产生已发布兼容层；D75–D77 在 KG OS 首个正式发布前替换 Go CLI / install / KG_HOME 基线，因此 Phase 08 不保留这些内部开发阶段 surface 的长期兼容层。
+本文命令名、Workspace Root resolution（`--root > KGOS_ROOT`）、required flag、flag meaning、默认 JSON result shape、Ontology Markdown/--edit、raw body / streaming framing 与 exit-code category 构成 v1 CLI public adapter contract。实现可以增加新的可选命令 / flag，但不能让已有 canonical invocation 改变业务语义；删除 / 改名已有已发布 command 或 required flag、改变默认输出类型、引入隐藏 current Branch / Instance / auto-page / interactive confirmation，都属于 CLI breaking change，需要新的设计决定。D73 在通用 Object surface 发布前删除旧设计中的 `object list/search`，因此不产生已发布兼容层；D75–D77 在 KG OS 首个正式发布前替换 Go CLI / install / KG_HOME 基线，因此 Phase 08 不保留这些内部开发阶段 surface 的长期兼容层。D81 则明确修改已经随 v0.1.1 公开的 root-is-Instance 本地布局：当前设计不静默迁移或双读旧布局，旧版本发布事实仍由 Phase 11 保留，新布局必须由后续 breaking release 单独验收与发布。
 
 CLI 的 JSON 内部 Object / Graph / Evolution field 继续由对应 logical contract 拥有；如果 logical contract 合法增加 optional field，CLI 可以原样增加该 field，不需要再复制一条 CLI-specific data-model decision。
 

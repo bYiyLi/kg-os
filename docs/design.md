@@ -17,9 +17,9 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
 | [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同 |
 | [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、npm/npx 分发、platform native Runtime package、Client version/package topology |
-| [cli.md](design/cli.md) | AI-first CLI command tree、全局 `--root`、`doctor/init`、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
-| [runtime.md](design/runtime.md) | Go `kgosd`、Instance Root、内置 Web / HTTP、dynamic loopback endpoint、`auth.json` / `kgosd.lock`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
-| [decisions.md](design/decisions.md) | D1–D80 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [cli.md](design/cli.md) | AI-first CLI command tree、`--root` / `KGOS_ROOT`、分层 help、`doctor/init` setup、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
+| [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、内置 Web / HTTP、dynamic loopback endpoint、`auth.json` / `kgosd.lock`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
+| [decisions.md](design/decisions.md) | D1–D83 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 ## 从配置到调用
@@ -27,7 +27,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 要解决的问题 | 正文位置 |
 | --- | --- |
 | npm / npx 怎么分发 CLI 与 native Runtime | [Client npm package topology](design/client.md#npm-package-topology)、[Native Runtime package](design/runtime.md#native-runtime-package) |
-| 第一次怎么定位并初始化 KG OS Instance | [CLI Global root](design/cli.md#global-root)、[Doctor](design/cli.md#doctor)、[Init](design/cli.md#init)、[Instance Root](design/runtime.md#instance-root) |
+| 第一次怎么定位并初始化 KG OS Instance | [CLI Global root](design/cli.md#global-root)、[Doctor](design/cli.md#doctor)、[Init](design/cli.md#init)、[Workspace Root / Instance](design/runtime.md#instance-root) |
 | kgosd 怎么配置扩展、模型和凭证 | [Runtime config](design/runtime.md#configtoml)、[Embedding 配置映射](design/runtime.md#embedding-配置与索引映射) |
 | 使用方怎么定义模型和索引 | [Ontology 公共格式](design/ontology.md#公共可编辑格式)、[完整编辑示例](design/ontology.md#编辑示例) |
 | 调用方怎么保存正文和查询 | [Graph 合同](design/graph.md#graph-公共调用合同)、[CLI query](design/cli.md#query)、[CLI execute](design/cli.md#execute) |
@@ -38,11 +38,11 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 
 | 状态 | 范围与入口 |
 | --- | --- |
-| 已确认 | Ontology 渐进读取 / 聚合编辑、Object batch read / Patch、Knowledge / Graph、Evolution；Client 统一 TypeScript，Runtime / Kernel 保留 Go；npm/npx 分发；显式 Instance Root、单库、单 Token、每 root 最多一个 daemon；具体规则见上面的 owner 表 |
+| 已确认 | Ontology 渐进读取 / 聚合编辑、Object batch read / Patch、Knowledge / Graph、Evolution；Client 统一 TypeScript，Runtime / Kernel 保留 Go；npm/npx 分发；Workspace Root→`.kgos` 单 Instance、`--root > KGOS_ROOT`、完整 ready 的 `init`、单库/单 Token/每 Instance 最多一个 daemon，以及职责分层的高信息密度 CLI；具体规则见上面的 owner 表 |
 | 当前实现基线 | Phase 00–11 已完成；当前公开版本为 v0.1.1，包含真实 `@kgos/sdk` + TypeScript `@kgos/cli`、显式 `--root`、per-root dynamic `kgosd`、六平台 native Runtime packages、八包 npm 与 GitHub Release。Phase 11 完成证据由[开发计划](development/README.md)及[Phase 11](development/phases/11-windows-runtime-acceptance.md)维护 |
-| 已确认调整 | [D59 Cypher passthrough](design/decisions.md#d59-cypher-passthrough)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](design/decisions.md#d66-lithograph-v030-sql-only)、[D67–D74](design/decisions.md)、[D75 TypeScript Client](design/decisions.md#d75-typescript-client)、[D76 npm distribution](design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](design/decisions.md#d79-stale-daemon-recovery)、[D80 official Jieba](design/decisions.md#d80-official-jieba)。D78–D80在不增加新业务能力的前提下收紧Runtime connection/recovery与默认Full-text行为 |
+| 已确认调整 | [D59 Cypher passthrough](design/decisions.md#d59-cypher-passthrough)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](design/decisions.md#d66-lithograph-v030-sql-only)、[D67–D74](design/decisions.md)、[D75 TypeScript Client](design/decisions.md#d75-typescript-client)、[D76 npm distribution](design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](design/decisions.md#d79-stale-daemon-recovery)、[D80 official Jieba](design/decisions.md#d80-official-jieba)。D78–D80在不增加新业务能力的前提下收紧 Runtime connection/recovery 与默认 Full-text 行为；[D81](design/decisions.md#d81-workspace-root)、[D82](design/decisions.md#d82-init-readiness)、[D83](design/decisions.md#d83-cli-progressive-disclosure)进一步重做 Workspace/Instance、first-run readiness 与 CLI 信息设计 |
 | 检索范围与限制 | [首版 Semantic 只支持单字段且不公开 filterProperties，Cypher 联合检索可组合；post-YIELD 过滤不等价于过滤范围内 top-k](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
-| 工程待办 | [Phase 09 MVP Release Closure](development/phases/09-mvp-release-closure.md) 与 [Phase 10 Runtime & CLI Hardening](development/phases/10-runtime-cli-hardening.md) 均为 `done`。Web页面/Skill继续留在后续独立阶段。具体阶段顺序见[开发计划](development/README.md)，复用边界见[工程映射](design/implementation.md) |
+| 工程待办 | Phase 00–11 保持已完成历史基线；[Phase 12 First-Run & CLI Productization](development/phases/12-first-run-cli-productization.md)负责实现 D81–D83，当前公开 v0.1.1 尚未具备新的 `.kgos` layout、完整 init readiness 与新 help。Web 页面 / Skill 继续留在后续独立阶段 |
 | Web 待细化 | [kgosd 内置交付、同源服务与共享 Kernel 已定，具体页面布局和交互尚未展开](design/runtime.md#web-交互设计状态)；不阻塞 Kernel、daemon、CLI 或 SDK 的实现 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库、真实 loadable extension、SQL streaming 与 cancellation 集成测试。

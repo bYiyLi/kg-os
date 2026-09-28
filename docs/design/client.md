@@ -35,7 +35,7 @@ new KGOSClient({
 })
 ```
 
-SDK 不读取 `--root`、`auth.json`、`kgosd.lock`、环境变量或 npm package location；本机 CLI 负责从 Instance Root 取得这些值后再创建 SDK client。
+SDK 不读取 `--root`、`KGOS_ROOT`、`auth.json`、`kgosd.lock`、环境变量或 npm package location；本机 CLI 负责解析 Workspace Root，并从 `<root>/.kgos` 取得 Instance locator/credential 后再创建 SDK client。
 
 SDK 使用标准 Web Platform 能力，同时服务 Node.js、`kgosd` 内置浏览器 Web 与第三方 TypeScript / JavaScript application；不得依赖 Node-only `fs`、`child_process`、process signal、native addon 或 KG OS platform package。
 
@@ -60,18 +60,18 @@ CLI 的 stdout/stderr/exit 映射仍由 [CLI](cli.md#error-与-exit-code)拥有�
 AI / CI 的 canonical invocation 为：
 
 ```text
-npx --yes @kgos/cli@<version> --root <instance-root> <command>
+npx --yes @kgos/cli@<version> --root <workspace-root> <command>
 ```
 
 例如：
 
 ```sh
-npx --yes @kgos/cli@0.1.1 --root ./.kgos ontology --at branch/main
+npx --yes @kgos/cli@<version> --root ./my-project ontology --at branch/main
 ```
 
 `--yes` 是 npm/npx 自身的非交互确认选项，必须位于 package specifier 之前；它不是 KG OS CLI flag。npm 在未安装 package 时可能先提示确认，因此 AI / CI 显式使用 `--yes`；非 TTY / CI 环境即使 npm 自动假定 yes，也保持这一 canonical spelling 以避免环境差异。人类交互使用可以省略 `--yes`。AI / CI 还应固定明确版本；`@latest` 可以用于人工试用，但不作为可复现自动化的推荐形式。
 
-CLI 的业务命令通过 `@kgos/sdk` 调用 daemon。只有 `doctor`、`init`、Instance discovery、credential 读取、Runtime ensure、native package resolution、stdin/file adapter、CLI presentation、i18n 与 exit code 属于 CLI 自己的本机职责。
+CLI 的业务命令通过 `@kgos/sdk` 调用 daemon。只有 Workspace Root 解析（`--root` / `KGOS_ROOT`）、`.kgos` Instance discovery、`doctor`、`init`、credential 读取、Runtime ensure、native package resolution、stdin/file adapter、CLI presentation、i18n 与 exit code 属于 CLI 自己的本机职责。
 
 ## npm package topology
 
@@ -119,30 +119,31 @@ npx --yes @kgos/cli@0.1.1
         └── @kgos/runtime-<os>-<arch>@0.1.1
                  └── kgosd + official extensions
 
---root /data/world/.kgos
-        └── config / auth / lock / kgos.db / caches
+--root /data/world
+        └── .kgos/
+              └── config / auth / lock / kgos.db / caches
 ```
 
 因此：
 
 - `config.toml` 不保存 npm cache / `node_modules` 中的 `kgosd` 或 official extension absolute path；
 - CLI 每次 invocation 从当前 npm dependency graph 解析 native package；
-- daemon 启动时从自身 Runtime package 校验并取得 required official extensions，再把本次进程需要的 native artifacts 固定到 Instance 的 content-addressed extension cache；后续 SQLite connection 不依赖 npm cache 文件继续存在；
+- `init` 启动当前 daemon 完成首次 setup；daemon 从自身 Runtime package 校验 required official extensions，并把 official 与 caller additional artifacts 固定到 `<root>/.kgos/extensions` 的 content-addressed cache。后续 restart/connection 复用同一 resolver 合同，不依赖 npm cache 文件继续存在；
 - 第三方 SQLite extension 仍由 Instance `config.toml` 的通用 extension 配置管理，不归 npm platform package 所有。
 
-KG OS 不建立第二个长期 runtime installation directory 或自制 package manager。npm/npx 负责软件 version acquisition，Instance Root 只负责数据与实例运行状态。
+KG OS 不建立第二个长期 runtime installation directory 或自制 package manager。npm/npx 负责软件 version acquisition；Workspace Root 只负责定位，`<root>/.kgos` 才保存 Instance 数据与运行状态。
 
 ## 版本关系
 
 一次 npx invocation 的 `@kgos/cli`、`@kgos/sdk` 与 resolved native Runtime package 使用同一个 KG OS package version。新启动的 daemon 必须报告与启动它的 Runtime package 一致的版本。
 
-如果目标 `--root` 已有 active daemon，CLI 必须验证 daemon identity / version。当前 v1 不静默替换正在运行的不同 Runtime；不兼容时 fail closed并由 `doctor` 报告实际/请求版本。未来如要自动 rolling restart，必须单独设计 lifecycle 与并发语义。
+如果目标 Workspace 的 `.kgos` 已有 active daemon，CLI 必须验证 daemon identity / version。当前 v1 不静默替换正在运行的不同 Runtime；不兼容时 fail closed并由 `doctor` 报告实际/请求版本。未来如要自动 rolling restart，必须单独设计 lifecycle 与并发语义。
 
 ## 发布与验证边界
 
 npm 是正式分发入口；GitHub artifacts 可以继续作为 CI / provenance / 调试证据，但不要求用户手工下载后才能使用 KG OS。
 
-发布候选至少验证 SDK exports/types、Node >=24.15.0 baseline、packed `@kgos/cli` 的 `npm exec` 与 `npx --yes`、platform selection、native manifest/hash、repo 外 `doctor -> init -> 首次业务命令`、daemon auto-start/auth/streaming，以及 macOS arm64/x64、Linux glibc arm64/x64、Windows arm64/x64 对应 runner 的真实 native load。六个平台都必须实际加载 official Jieba tokenizer并证明新 Instance 省略 `--fulltext-analyzer` 后写出/使用 `jieba`，不能只检查 package里存在一个文件。
+发布候选至少验证 SDK exports/types、Node >=24.15.0 baseline、packed `@kgos/cli` 的 `npm exec` 与 `npx --yes`、`--root` / `KGOS_ROOT` resolution、platform selection、native manifest/hash、repo 外 fresh Workspace 的 `init -> doctor ready -> 首次业务命令`、`.kgos` layout、official/additional extension materialization、daemon/auth/streaming，以及 macOS arm64/x64、Linux glibc arm64/x64、Windows arm64/x64 对应 runner 的真实 native load。六个平台都必须实际加载 official Jieba tokenizer并证明新 Instance 省略 `--fulltext-analyzer` 后写出/使用 `jieba`，不能只检查 package里存在一个文件。
 
 `@kgos/*` 使用 npm organization scope。实际发布前必须由有权限的 npm account / organization确认可以发布 `@kgos` scope；若该 namespace不可用，属于 release naming blocker，需要在发布前单独裁决，不能静默换名后仍宣称符合本设计。
 

@@ -21,7 +21,8 @@ Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能
 | 初始化 Full-text analyzer + 简化 Ontology | `type: fulltext` 只编译业务 targets/properties；Instance `init` 必须显式取得 `[fulltext].analyzer` 并提示初始化后禁止修改；新建/业务重建时写当前 analyzer + `eventually_consistent=false`，已有 versioned analyzer 保留；不做 config fingerprint / migration |
 | Lithograph Managed Semantic + 简化 Ontology | Phase 01 已完成 Provider extension 装配、startup readiness与连接基线；Instance `init` 必须显式取得完整 `[embedding]` 与始终启用的 `[cache].path/max_size_mb`，后续 Ontology compiler 生成 versioned IndexDefinition / providerConfig，Graph 公共 surface 直接使用 String query；不实现 embedding HTTP client、Provider cache内部逻辑、向量 Property或写入/合并刷新 |
 | Evolution 统一历史与 Merge Session | Definition 内字段级历史；shared resource 单次 conflict 投影；固定 revision 的 candidate 检查 |
-| CLI / SDK / Web 共享合同 | `@kgos/sdk` 作为唯一 TypeScript HTTP Client；CLI显式 `--root`、同root `kgosd.lock + auth.json`、`doctor/init`、npm native Runtime ensure、ontology batch Markdown、batch --edit YAML multi-document stream、ontology scoped patch、Object batch read / patch、Graph NDJSON、HTTP metadata 与错误映射 |
+| CLI / SDK / Web 共享合同 | `@kgos/sdk` 作为唯一 TypeScript HTTP Client；CLI 按 `--root > KGOS_ROOT` 解析 Workspace 并固定 `.kgos` Instance Directory，拥有 `doctor/init`、npm native Runtime ensure 与分层 help；ontology batch Markdown、batch --edit YAML multi-document stream、ontology scoped patch、Object batch read / patch、Graph NDJSON、HTTP metadata 与错误映射继续复用既有业务合同 |
+| First-run setup | `init` 统一收敛 config resolution、additional extension 输入、daemon startup、official/additional materialization、auth、database/bootstrap 与 readiness；配置存在不等于 ready，resume 与 already-initialized 按实际 Instance 状态判断；业务 Runtime ensure 不承担首次 bootstrap |
 
 ### Ontology compiler / decoder
 
@@ -66,7 +67,7 @@ POST /api/v1/object/patch
 
 共享 Object Patch 的实现可以先交付 Ontology-scoped adapter，再在后续能力中开放 Knowledge Object adapter；这不允许建立第二套 parser、logical delta、transaction 或 concurrency semantics。Ontology-scoped 实现仍必须支持模型变化必需的 derived Knowledge maintenance，例如 Definition / Property rename 对已有 Label / Property / Relationship Type 的安全 rewrite，以及新增 Constraint 前对已有数据的真实验证；但它不因此开放调用方任意 Knowledge CRUD。
 
-**`kgosd` runtime implementation**：`kgosd`、Kernel 与 SQLite / Lithograph Host 使用 Go；`@kgos/sdk`、`@kgos/cli` 与 Web 使用 TypeScript。Web 构建产物随 daemon native Runtime package交付，由同一进程与active endpoint提供页面和API。v1目标使用显式Instance Root、根目录 `kgos.db` 单库、persistent `auth.json`、dynamic loopback endpoint与Bearer authentication；普通用户不直接管理daemon，TypeScript CLI负责 `doctor/init`、npm native Runtime resolution与业务Runtime ensure。SQLite host继续使用 `database/sql` + `go-sqlite3`。
+**`kgosd` runtime implementation**：`kgosd`、Kernel 与 SQLite / Lithograph Host 使用 Go；`@kgos/sdk`、`@kgos/cli` 与 Web 使用 TypeScript。Web 构建产物随 daemon native Runtime package交付，由同一进程与active endpoint提供页面和API。当前目标使用 Workspace Root→`.kgos` 单 Instance、`.kgos/kgos.db` 单库、persistent `auth.json`、dynamic loopback endpoint 与 Bearer authentication；普通用户不直接管理 daemon，TypeScript CLI 负责 root resolution、`doctor/init`、npm native Runtime resolution 与业务 Runtime ensure。SQLite host继续使用 `database/sql` + `go-sqlite3`。
 
 SQLite Extension resolver 先把 official Runtime artifacts 与 caller configured source 全部固定为 Instance-local immutable artifacts：official files先验证Runtime manifest，caller local/HTTPS input继续执行remote mandatory SHA-256、HTTPS-only redirect、direct library/archive、`library` exact member、required explicit `entrypoint`、safe extraction 与 content-addressed cache。Go host注册process-private `go-sqlite3` driver / connection hook；每个物理connection固定按 **official Lithograph → official Provider → caller config order → official Jieba** 调用接受显式 `(library, entrypoint)` 的public extension loader，不能让caller覆盖Lithograph / Provider official slot，也不能使用driver filename-derived bulk list打乱顺序。SQLite FTS5同名tokenizer后注册会覆盖前注册，因此official Jieba必须最后注册并在之后执行Full-text probe，固定最终 `jieba` identity。official Jieba及其词典/数据与其它official artifact一样受Runtime manifest/hash约束；extension loading只在connection initialization window开启，任一load失败拒绝该connection。caller配置本身不标记`kind=lithograph`。按 [Runtime](runtime.md#sqlite-extension-source-resolver) 验证 Lithograph v0.3.0 public SQL、Provider registration 与当前Full-text analyzer capability。实现不能把下载放到connection checkout热路径、不能让不同connection因source更新加载不同binary、不能实例化第二套private SQLite，也不能通过业务SQL/Cypher暴露任意extension loading；不再绑定application-facing Native query ABI或要求driver暴露`sqlite3*`。
 
@@ -82,7 +83,7 @@ Embedding compiler校验当前 `[embedding]`，按 [Runtime 映射](runtime.md#e
 
 语言与交付边界已由 [Architecture](architecture.md#v1-运行时与技术分层)、[Client](client.md) 及 [Runtime](runtime.md#web-hosting)确定；以下是工程工作，不要求重新确认 Go Runtime / TypeScript Client 分工或 Web 是否独立部署：
 
-Phase 01–07 已完成并验收数据库/runtime foundation、业务HTTP surface与Go CLI行为基准。Phase 08负责在不改业务 logical contract 的前提下建立真实 `@kgos/sdk`、TypeScript CLI、显式Instance Root与npm Runtime package，并在parity证据后删除Go CLI。历史Phase证据继续证明当时实现，不作为Phase 08目标已经完成的证据。
+Phase 01–07 已完成并验收数据库/runtime foundation、业务HTTP surface与Go CLI行为基准。Phase 08负责在不改业务 logical contract 的前提下建立真实 `@kgos/sdk`、TypeScript CLI、当时的显式 root-is-Instance寻址与npm Runtime package，并在parity证据后删除Go CLI；D81–D83 当前目标在 Phase 12 进一步改为 Workspace Root→`.kgos` 与完整 first-run。历史Phase证据继续证明当时实现，不作为后续目标已经完成的证据。
 
 1. **Go SQLite driver / adapter**：使用 `database/sql` + `github.com/mattn/go-sqlite3` bundled SQLite；固定 CGO build启用 `sqlite_fts5`，不使用 `libsqlite3`，不启用 `sqlite_omit_load_extension`。运行时仍实际验证 SQLite >= 3.45、FTS5、ordered explicit-entrypoint extension loading、只读 / 读写 connection、参数 / 错误映射与连接清理。每个物理 connection按 startup-resolved artifact set加载同一批 extensions；不绑定 Native query ABI、不暴露 `sqlite3*`、不建立第二套 SQLite runtime。
 2. **SQL execution 与 explicit transaction**：普通完整结果使用 `lithograph()`，streaming 使用 `lithograph_rows()`；Object Patch 等多 execution 单 Commit 使用 `lithograph_tx_begin -> lithograph()/lithograph_rows()* -> commit/abort`。验证 expectedHead、staged visibility、single Commit、empty delta、失败自动 abort 与 connection exclusive ownership，不复制 Lithograph transaction state machine。
@@ -106,13 +107,13 @@ Go Runtime 与 TypeScript Client 不共享服务端源码。公共 request/resul
 
 Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；公共 Index 不暴露 `filterProperties`，post-YIELD 过滤与过滤范围内 top-k 的实际边界见 [owner 范围](ontology.md#语义索引的首版范围)。不增加底层不存在的过滤接口；缓存自动填充已经确认，不再列为需要用户设计的预热入口。
 
-显式Instance Root、单库、同root认证和通用 extension loader 的已确认边界保持；Object / Ontology / Evolution 的高层一致性校验保留，不能把它们重新挂到 Graph 透传路径。
+Workspace Root→`.kgos` 单Instance、单库、同Instance认证和通用 extension loader 的已确认边界保持；Object / Ontology / Evolution 的高层一致性校验保留，不能把它们重新挂到 Graph 透传路径。
 
 ## 实现范围映射
 
 实现前检查 Lithograph 实际文件与测试，不复制它的 Phase 状态为 KG OS 真源。当前可复用基线来自已完成的 Phase 00–07；实际阶段状态仍由[开发计划](../development/README.md)维护。以下内容只映射已确认设计产生的业务范围以及后续必须复用的基础 primitive，不在本文件维护阶段顺序或完成证据。
 
-- **Runtime / SQLite host**：Phase 01–07 的当前实现已证明Go host、`auth.json`、根目录 `kgos.db`、extension resolver / per-connection loading、SQL execution/transaction、streaming/cancellation、bootstrap、Bearer API、lock与auto-start可行；Phase 08把外层Instance寻址迁到 `--root`、dynamic endpoint与npm native Runtime package，同时保留这些Go primitive。阶段状态与远端门禁仍由开发计划维护。
+- **Runtime / SQLite host**：Phase 01–11 的当前实现已证明 Go host、`auth.json`、`kgos.db`、extension resolver / per-connection loading、SQL execution/transaction、streaming/cancellation、bootstrap、Bearer API、lock 与 auto-start primitive 可行；当前目标把外层寻址收敛为 Workspace Root→`.kgos` 并把首次 bootstrap 编排前移到 `init`，底层 Go primitive 继续复用。阶段状态与远端门禁仍由开发计划维护。
 - **Ontology storage mapping**：实现 semantic graph、Binding coverage、Schema Locator 与 Object / Ontology Graph View；高层 Object / Ontology 输入保留 reserved identifier 校验，公共 Graph 不复用该限制。
 - **Reserved Ontology Schema**：按 D68 建立最小 Graph Type profile；Graph Type 负责 internal Node marker、字段 type/required 与基础 endpoint legality，KG OS consistency validation 负责 kind 枚举、name uniqueness、Binding coverage 和 `includes` 的 Domain-or-Definition target，不增加第二套 Schema/constraint engine。
 - **Object representation**：实现五种公共 Object Ref、aggregate decoder 与 Knowledge 原生 Object value；canonical YAML / JSON 省略空的顶层 `indexes`，保留非空复合 / 共享索引。
@@ -121,7 +122,7 @@ Ontology 首版只实现单字段语义索引，联合检索沿用 Lithograph；
 - **Graph execution**：复用 Phase 01 已有 query / execute adapter，已完成公共 Graph HTTP contract、Bearer middleware、NDJSON framing、transport cancellation 及 client integration，并通过 public end-to-end 验收；继续原样传递 Cypher 与 Lithograph JSON 值，不设 procedure、Vector 或 reserved identifier 检查。
 - **Evolution Core**：Phase 06 实现 overview/get/ancestry、State / State Data、Branch / Tag、History / Diff；复用 Lithograph Version Procedure 与现有 Object/Snapshot decoder，把底层 graph/schema slot 投影成公共 aggregate Change，不建立第二套版本存储、History index 或 State identity。普通 Version/ref operation继续使用各自 autocommit lifecycle；`state.create` 按 [D74](decisions.md#d74-evolution-state-create-writer-boundary) 仅为一个 `commit.create([data])` 建立短 caller-owned SQLite writer boundary，在同一 write connection 上锁定并复核已校验 parent、执行唯一 Version Procedure、核对 parent并提交/失败回滚。它不组合多个 Commit、不承载 Object/Graph mutation，也不引入 hidden checkout。
 - **Merge**：Phase 07 已实现 Merge Session 的 public conflict projection、渐进 resolution、固定 candidate revision 一致性检查、finalize/abort、authenticated HTTP 与 `kg evolution merge`；继续复用 Phase 06 State/Object/Change 与同一个 Lithograph Host，没有第二套 Merge workspace 或版本模型，并已通过本地/fresh-source/Ubuntu CI 验收。阶段完成证据仍以 [Phase 07 Evolution Merge Session](../development/phases/07-evolution-merge.md) 为准。
-- **Client surfaces**：Phase 00–07 的 Go `kg` 已作为Phase 08 parity基准完成迁移；当前实现由真实 `@kgos/sdk` 统一HTTP transport，`@kgos/cli`复用SDK并拥有本地 Runtime职责，Go CLI已在parity证据后删除。Web继续复用SDK类型边界，页面构建产物由同一root的 `kgosd` 交付。
+- **Client surfaces**：Phase 00–07 的 Go `kg` 已作为 Phase 08 parity 基准完成迁移；当前实现由真实 `@kgos/sdk` 统一 HTTP transport，`@kgos/cli` 复用 SDK 并拥有本地 Runtime 职责，Go CLI 已在 parity 证据后删除。CLI 的 root/help/init presentation 必须从共享的 command/config metadata 与验证规则取得约束，避免再次出现 runtime config 已支持而 init/help 遗漏字段。Web 继续复用 SDK 类型边界，页面构建产物由同一 Workspace Instance 的 `kgosd` 交付。
 
 Web 还需细化页面布局、导航与具体操作交互，状态由 [Runtime](runtime.md#web-交互设计状态)记录。页面细化是同一产品的前端工作，不产生单独部署的 Web 服务，也不是上面 Kernel、daemon、CLI 或 SDK 开工的前置条件；当前文档不把尚未细化的页面标为已设计完成。
 
@@ -145,15 +146,16 @@ Web 还需细化页面布局、导航与具体操作交互，状态由 [Runtime]
 | ontology patch scope | 多 Definition/Domain Patch 与 object patch 得到相同 Ontology 结果；出现 Knowledge target 时在执行前整体拒绝；不建立第二 transaction/compiler |
 | Document 新建及全文/语义索引 | aggregate 只声明业务 source fields；不出现 caller-managed embedding Property/model/dimension，真实 fulltext/semantic Index name 均可查询 |
 | SQLite extension local source | absolute direct library 可解析到 content-addressed cache；启动期间 source 被替换后，本进程后续 connection 仍加载启动时固定的同一 artifact |
-| Explicit Instance Root | Instance命令缺 `--root` 时失败；两个不同absolute root的config/auth/lock/cache/extensions/log/kgos.db全部隔离，每个root只打开自己的根目录 `kgos.db`，没有default home profile或单-daemon多库 selector |
-| Embedding cache explicit config | `[cache].path/max_size_mb` 都必须显式存在，compiler固定写入enabled=true；relative path解析到当前Instance Root后进入versioned providerConfig，不存在disable/skip或缺失字段默认 |
+| Workspace Root / Instance layout | `--root` 覆盖 `KGOS_ROOT`，两者都缺失时 Instance 命令失败；两个不同 absolute Workspace 的 `.kgos/config/auth/lock/cache/extensions/log/kgos.db` 全部隔离，每个 daemon 只打开自己的 `.kgos/kgos.db`，没有 default home/cwd/parent discovery 或单-daemon多库 selector；legacy root-is-Instance 布局被诊断而非静默嵌套 |
+| Embedding cache explicit config | `[cache].path/max_size_mb` 都必须显式存在，compiler固定写入 enabled=true；relative path 解析到当前 `.kgos` Instance Directory 后进入 versioned providerConfig，不存在 disable/skip 或缺失字段默认 |
 | Embedding cache eviction/recovery | 使用 OpenAI-compatible Provider 自己的独立 SQLite cache/FIFO/recovery；普通 query/source miss 由 Provider透明命中/填充；KG OS/Lithograph main 不拥有 cache table，删除 cache只影响后续外部调用成本 |
 | 只读 query 与缓存 | 真实 Go adapter 使用物理只读 `kgos.db` 拒绝业务写入，同时 Semantic read 可由 Provider写独立 cache；验证跨 connection / restart复用且 Lithograph main graph/schema/history/ref不变 |
-| Auth first startup / restart | 新root缺 `auth.json` 时安全随机生成并原子写入；restart token保持不变；malformed/unreadable auth file fail closed，不静默rotate；secret不进入lock/日志/错误/State |
+| Init readiness / recovery | fresh Workspace 执行 init 后 `.kgos/config.toml/auth.json/kgos.db/extensions/cache/logs` 与 active locator 均符合合同，Lithograph/KG OS bootstrap 完成、authenticated request 成功且 daemon 保持运行；在 config 已发布后的可恢复失败再次 init 只补齐缺失步骤，不重复询问/改写 config；ready Instance 幂等 already-initialized |
+| Auth init / restart | init 启动 daemon 时新 Instance 缺 `auth.json` 则安全随机生成并原子写入；restart token 保持不变；malformed/unreadable auth file fail closed，不静默 rotate；secret 不进入 lock/日志/错误/State |
 | Daemon HTTP authentication | API 缺失、malformed、错误 Bearer token 都得到 `401 + AUTHENTICATION_FAILED`；正确 token 才能读取/修改业务数据；Web 不存在 credential-free data API |
-| CLI credential / endpoint boundary | endpoint只读同root `kgosd.lock`，token只读同root `auth.json`；不存在env/其它root fallback；wrong/stale endpoint指向其它Instance时认证失败且不误操作；缺本地credential时pre-dispatch exit 2，daemon拒绝时exit 1 |
+| CLI credential / endpoint boundary | Workspace 只由 `--root` 或 `KGOS_ROOT` 解析；endpoint 只读其 `.kgos/kgosd.lock`，token 只读其 `.kgos/auth.json`；不存在 credential env/其它 root fallback；wrong/stale endpoint 指向其它 Instance 时认证失败且不误操作；缺本地 credential 时 pre-dispatch exit 2，daemon 拒绝时 exit 1 |
 | stale daemon recovery | daemon已退出但locator残留时，业务Runtime ensure通过spawn contender + daemon-held OS lock确认stale并自动恢复；多个caller只有一个winner。仍持lock但endpoint不可用时不得启动第二daemon；doctor保持side-effect-free |
-| CLI hierarchical help | root/namespace help列直接子命令，leaf help列完整usage/required flags/输入来源；help/version路径不读取root、auth、lock或daemon |
+| CLI hierarchical help | root/namespace/leaf 分别覆盖自身职责；root 说明命令树与 `--root > KGOS_ROOT`，namespace 列直接子命令，leaf 给完整 usage、必要 flags/输入约束与 1..3 个主路径示例；只在适用命令出现 StateRef/pagination/stdin/file/streaming 说明，不复制设计手册；help/version 路径不读取 Workspace、auth、lock 或 daemon |
 | CLI JSON pretty matrix | 所有single-JSON-document command mode统一接受 `--pretty` 且只改变whitespace；Ontology Markdown/YAML、Object YAML body、Graph NDJSON stream保持非pretty边界 |
 | CLI Node baseline | `@kgos/cli.engines.node`、repo pinned Node、CI/package checks与公开README/guide均保持Node >=24.15.0；不建立Node 22 fallback，也不误收窄SDK浏览器边界 |
 | SQLite extension remote source | HTTPS artifact 必须 SHA-256 pin；GitHub redirect 可解析；cache 命中可离线 restart；download/hash mismatch/unsafe archive/missing library/entrypoint failure 都 fail closed |
@@ -162,7 +164,7 @@ Web 还需细化页面布局、导航与具体操作交互，状态由 [Runtime]
 | Lithograph 统一加载与 capability | 配置不声明 plugin kind；每个实际 connection 的 Lithograph v0.3.0 public SQL、Managed Semantic 与 Provider registration capability均验证通过；不要求 application Native query symbols或`sqlite3*` handle，缺失/不兼容时拒绝开放 Knowledge Base |
 | SQL explicit transaction | Go在同一 connection调用 `tx_begin -> lithograph()/lithograph_rows()* -> tx_commit/abort`；多次 mutation只生成一个最终 Commit，expectedHead/失败/abort/关闭未提交连接不残留变更，不存在`tx_execute`或外层 SQLite BEGIN/COMMIT |
 | Write connection reusable baseline | Graph execute及其它会改变connection checkout的写操作在success/error/cancel/stream failure/early-close后，归还pool前均证明autocommit、无active tx、checkout `main`；失败connection直接discard。并发不同Branch后branch/tag/state/merge结果不依赖随机pool connection |
-| Go runtime 与内置 Web | 每个root独立Go `kgosd --root` 启动完成后，同一active loopback endpoint可访问Web页面、资源和已认证API；两个root可并发使用不同动态endpoint；`context.Context`取消、streaming与graceful shutdown不破坏底层事务合同 |
+| Go runtime 与内置 Web | 每个 Workspace 独立 Go `kgosd --root` 启动完成后，同一 active loopback endpoint 可访问 Web 页面、资源和已认证 API；两个 Workspace 可并发使用不同动态 endpoint；`context.Context` 取消、streaming 与 graceful shutdown 不破坏底层事务合同 |
 | Full-text config 完整显式 | 新Instance不传 `--fulltext-analyzer` 时完整config显式写 `jieba`；显式override仍按完整FTS5 specification原样编译；Ontology 不出现 analyzer/plugin/options；已有unicode61 Instance不被迁移 |
 | Official Jieba 四平台 | exact source/dictionary/license先冻结；macOS arm64/x64、Linux glibc arm64/x64 packed Runtime都包含manifest-pinned official Jieba及所需运行数据，每个实际connection最终registration后可构造 `jieba`；caller先注册同名tokenizer不能改变最终identity；默认中文语料查询如“知识图”真实命中，不以文件存在代替tokenization验收 |
 | Full-text analyzer runtime probe | extension load 后每个 connection 验证当前 analyzer；未知 tokenizer/无效参数/缺运行资源返回 FULLTEXT_ANALYZER_UNAVAILABLE，不伪装为空结果 |

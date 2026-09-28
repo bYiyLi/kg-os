@@ -748,6 +748,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D77 Instance 只由显式 --root 定位，每个 root 独立 daemon / endpoint / token（2026-09-24）
 
+> 后续调整：[D81](#d81-workspace-root) 保留“一个明确 root 只对应一个 Instance、不同 Instance 隔离”的目标，但把 root 从 Instance 目录改为 Workspace Root，Instance 固定放入 `<root>/.kgos`，并允许 `KGOS_ROOT` 作为 CLI 显式 fallback；[D82](#d82-init-readiness)替换本条“init 只写配置、首次业务命令再 bootstrap”的 onboarding 语义。
+
 - 决定：删除 `KG_HOME`、默认 `~/.kgosd` 与本机 `KG_TOKEN` override。所有 Instance 命令必须显式传 `--root <instance-root>`；`--help` / `--version` 等不访问实例的 discovery 命令例外。root 是 KG OS Instance Root 本身，不是项目目录或软件安装目录。
 - Instance identity：one root = one `config.toml` = one `auth.json` = one `kgos.db` = at most one active `kgosd`。不同 root 可以同时运行不同 daemon process，数据、token、lock、endpoint 与 cache 全部隔离。
 - daemon：`kgosd` 要求显式 `--root`；CLI-managed Runtime 只绑定 `127.0.0.1:0`，由 OS 分配当前端口，Instance config不再保存 server host/port。daemon持有 root 下 `kgosd.lock` 的 OS exclusive lock，并在 ready 后发布当前 `pid/endpoint/version`；lock不保存 secret。
@@ -793,3 +795,39 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 备选：继续默认 `unicode61`，只文档推荐Jieba；默认Jieba但仍要求用户手工第三方extension；把Jieba写入Lithograph。前两项不能提供默认中文开箱体验，后一项污染通用数据库边界，均不采用。
 - 取舍：KG OS需要承担official Jieba实现选择、许可证、四平台构建/manifest/release与语义可复现性；exact implementation 属于Phase 10的工程选择，必须先取得真实证据再进入Runtime artifact，但不因为候选尚未选定把已完整定义的Phase退回未设计。不能只凭第三方README把候选当成已可分发artifact。换取新Instance无需额外tokenizer配置即可获得中文全文分词。
 - 当前合同：[Runtime native package / Full-text](runtime.md#native-runtime-package)、[CLI Init](cli.md#init)、[Client npm package topology](client.md#npm-package-topology)。
+
+<a id="d81-workspace-root"></a>
+
+### D81 --root / KGOS_ROOT 定位 Workspace，Instance 固定在 .kgos（2026-09-28）
+
+- 决定：CLI Instance 命令先按 `--root <workspace-root>` > 非空 `KGOS_ROOT` > error 解析唯一 Workspace Root；不使用默认 home、cwd、父目录搜索或 `.kgos` 自动发现。daemon 仍要求显式 `--root <workspace-root>`，环境变量只属于 CLI adapter。每个 Workspace 的唯一 Instance Directory 固定为 `<root>/.kgos`。
+- Instance identity：one Workspace Root = one `.kgos` = one `config.toml` = one `auth.json` = one `kgos.db` = at most one active `kgosd`。用户项目文件留在 Workspace 顶层，KG OS 内部状态不再散落其中；relative Instance paths（如 `cache/openai-compatible.db`）以 `.kgos` 为基准。
+- 兼容边界：不自动迁移或双读 v0.1.x root-is-Instance 布局。若新 CLI 在 Workspace 顶层检测到可识别的 legacy `config.toml/auth.json/kgos.db` 组合而 `.kgos` 尚不存在，`doctor/init` 明确诊断并停止，不能静默创建嵌套新 Instance 覆盖用户判断。
+- 依据：真实 Windows 首次使用把 `--root C:\...\kgos-demo` 直接变成配置、数据库、cache、extension、log 混合目录，Workspace 与 KG OS 内部状态职责不清；同时重复 `--root` 对日常 shell/CI 不友好。固定 `.kgos` 保持 one-root/one-instance 确定性，`KGOS_ROOT` 提供明确环境级选择而不引入 cwd 猜测。
+- 备选：继续 root-is-Instance；自动从 cwd/父目录寻找 `.kgos`；默认 `~/.kgos`。第一项污染 Workspace 语义，后两项重新引入隐藏 Instance context，均不采用。
+- 取舍：这是对已发布 v0.1.1 本地布局的 breaking change，需要新版本真实 fresh-user 验收；换取 Workspace 语义清晰、内部状态隔离以及 AI/CI/shell 可控的 root 选择。
+- 当前合同：[Runtime Workspace Root](runtime.md#instance-root)、[CLI global root](cli.md#global-root)、[Client](client.md)。
+
+<a id="d82-init-readiness"></a>
+
+### D82 init 成功即完整 ready，official/additional extensions 在 init 内落地（2026-09-28）
+
+- 决定：`init` 从“只写 config”的命令改为完整 Instance Setup。成功必须已经完成完整配置、native Runtime 验证、official 与 caller additional extension materialization、credential 建立、`kgos.db` 创建/打开、Lithograph init、KG OS bootstrap、daemon ready 与 authenticated readiness 验证；成功后 daemon 保持运行。业务命令只负责已初始化 Instance 的 Runtime ensure，不替代首次 init。
+- Runtime ownership：official Lithograph / OpenAI-compatible Provider / Jieba 仍由 native Runtime package 拥有，不写入 `config.toml`。CLI 在配置发布后启动同一个 `kgosd` startup path，由 daemon 唯一 resolver 把 official/additional artifacts 固定到 `.kgos/extensions/<sha256>`，不在 TypeScript 复制 native resolver。
+- Recovery：`config.toml` 存在不等于 ready。合法 config + incomplete runtime state 时再次 `init` 继续缺失步骤；ready 时幂等成功；非法 config fail closed；已有 config 时不接受新的配置 flags，避免把 resume 变成隐式 config mutation。初始化失败只保留可安全复用的 durable 结果，重跑按真实状态恢复。
+- Additional extensions：interactive wizard 先询问是否进入高级配置，再逐个收集 `source/entrypoint/optional library/conditional sha256`；非交互使用 `--extensions-file` 或 `--no-additional-extensions` 明确解析该集合。official artifacts 不得通过 additional surface 重复声明或替换。
+- 依据：真实首次体验中 init 结束后只有 `config.toml` 与空目录，用户无法从“initialized”判断 Knowledge Base、credential、plugins 或 daemon 是否真的可用；同时配置 parser 支持 `sqlite.extensions` 但 init surface 无法生成，首次 setup 不完整。
+- 备选：保留 lazy first-business-command bootstrap；CLI 自己复制一套 extension resolver；init 只 materialize plugins 但不建库。它们分别继续让“initialized”语义含糊、复制 native 安全逻辑或保留半初始化状态，均不采用。
+- 取舍：init 耗时和失败面增加，但把所有 first-run 副作用集中到一个可恢复入口；成功结果变成可测试的 ready 承诺，后续业务命令心智模型更简单。
+- 当前合同：[CLI Init](cli.md#init)、[Runtime lifecycle](runtime.md#daemon-lifecycle)、[Architecture bootstrap](architecture.md#knowledge-base-bootstrap)。
+
+<a id="d83-cli-progressive-disclosure"></a>
+
+### D83 CLI 信息设计采用高信息密度、职责分层与渐进披露（2026-09-28）
+
+- 决定：`--help`、`init` wizard 与 `doctor` 人类输出不以“越短”或“越全”为目标，而以**有效、高信息密度、职责明确、渐进披露**为共同质量约束。每条信息必须帮助当前层级的命令发现、必要决策、正确调用或状态判断；删除后不影响这些目标的背景/重复内容不应进入主路径。
+- Help 层级：root help 拥有产品入口、一级命令、全局 root 解析与少量入口示例；namespace help 拥有能力职责和直接子命令；leaf help 拥有当前命令完整 usage、必要 arguments/options/输入约束和少量主路径示例。stdin/file、pagination、StateRef、streaming 等说明只在当前命令确实需要时出现，不机械复制固定模板或设计文档。
+- Init 层级：自动可确定的 Workspace→`.kgos` 路径、Runtime target、official extensions 等只展示状态不询问；常用配置先展示/收集，additional extensions 等高级分支只有用户选择或显式输入时展开；初始化后不可变配置只提示一次；真正执行前最多一次 Review 确认。完全参数化/非交互路径保持 machine-first 和零多余 prompt。
+- 依据：真实用户运行 `ontology --help` 时现有输出只有 usage/一句话/子命令，无法高效完成下一步；反向把全部设计信息塞入 help 或让 wizard 逐字段确认内部事实同样会降低可用性。
+- 取舍：CLI presentation 需要按命令职责维护结构化 metadata 与 targeted tests，而不是一份极简字符串表；换取自发现性与人/AI 都可消费的稳定高信号入口。
+- 当前合同：[CLI](cli.md)、[Phase 12](../development/phases/12-first-run-cli-productization.md)。

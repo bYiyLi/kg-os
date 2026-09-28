@@ -79,6 +79,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 11 Windows Runtime CI 验收与六平台发布当前为 `done`。** Windows x64/arm64 native DLL、npm Runtime package、CLI 启动与 packed smoke 已在真实 runner 验收；发布源码 `1509eaf` 的 Validate 与六平台 native/package CI 全绿。`v0.1.1` 的八包、六平台 public-registry `npx` smoke 与 GitHub Release 已成功；两个 Windows package 的 Trusted Publisher、严格 publishing access 与短期首发凭据清理已完成，长期工作流已移除 bootstrap token 路径，收尾代码的六平台 CI Run `36289992799` 全绿。详见[Phase 11](phases/11-windows-runtime-acceptance.md)。
 
+**Phase 12 First-Run & CLI Productization 当前为 `ready`。** D81–D83 已确认 Workspace Root→`.kgos`、`--root > KGOS_ROOT`、完整 init readiness、additional extension setup，以及“有效、高信息密度、职责明确、渐进披露”的 CLI 信息设计。实现与验收尚未开始；当前公开 v0.1.1 仍保留旧 root-is-Instance / lazy-bootstrap 行为。完整工作与 Acceptance 见[Phase 12](phases/12-first-run-cli-productization.md)。
+
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |
@@ -95,6 +97,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [09 MVP Release Closure](phases/09-mvp-release-closure.md) | `done` | `v0.1.0` 六包、四平台 registry npx、GitHub Release、六包 Trusted Publisher/credential cleanup与长期 OIDC closure均完成 | [Client版本关系](../design/client.md#版本关系)、[发布与验证边界](../design/client.md#发布与验证边界)、[Phase 08](phases/08-typescript-client-npm-runtime.md) |
 | [10 Runtime & CLI Hardening](phases/10-runtime-cli-hardening.md) | `done` | 本地与fresh-source完整验证、repo外packed真实Provider、macOS arm64/x64 + Linux glibc arm64/x64 CI native/package matrix全部通过 | [D78](../design/decisions.md#d78-operation-scoped-branch)、[D79](../design/decisions.md#d79-stale-daemon-recovery)、[D80](../design/decisions.md#d80-official-jieba)、[Runtime](../design/runtime.md)、[CLI](../design/cli.md) |
 | [11 Windows Runtime CI 验收与六平台发布](phases/11-windows-runtime-acceptance.md) | `done` | 六平台 CI、`0.1.1` 八包、六平台 registry smoke、GitHub Release、Windows Trusted Publisher 与 credential cleanup 均完成 | [Client](../design/client.md#npm-package-topology)、[Runtime](../design/runtime.md#native-runtime-package) |
+| [12 First-Run & CLI Productization](phases/12-first-run-cli-productization.md) | `ready` | Workspace Root / `.kgos`、`KGOS_ROOT`、complete init/readiness/recovery、extension setup、responsibility-scoped high-density help、fresh-user acceptance | [D81](../design/decisions.md#d81-workspace-root)、[D82](../design/decisions.md#d82-init-readiness)、[D83](../design/decisions.md#d83-cli-progressive-disclosure) |
 
 当前实现依赖顺序：
 
@@ -121,10 +124,12 @@ Go Engineering Foundation
        (connection state isolation / stale daemon recovery / official Jieba / CLI UX / diagnostics)
   -> Phase 11: Windows Runtime CI acceptance and six-platform release
        (win32 x64/arm64 native packages / real runner load / packed smoke / registry)
+  -> Phase 12: First-Run & CLI Productization
+       (Workspace Root / .kgos / KGOS_ROOT / complete init / help / fresh-user acceptance)
   -> later Web / Skill phases
 ```
 
-Phase 02–11 均已完成。Phase 09 的 `v0.1.0` 六包/四平台发布与 OIDC closure 仍是其原有完成基线；Phase 10 提交 `f138d41c15ba16578e76829af452458a2321be7e` 对应 CI Run `36256273631` 的四平台代码验收，也不被后续六平台发布追溯扩张。Phase 11 的 tag 提交 `1509eaf` 对应 CI Run `36266146250` 六平台全绿，Release Run `36271452963` 的第二次尝试完成八包、六平台 public-registry smoke 和 GitHub Release。Windows 首发认证收尾与后续 OIDC 边界见[Phase 11](phases/11-windows-runtime-acceptance.md)。Web / Skill 继续留在其后独立阶段。
+Phase 02–11 均已完成；Phase 12 已具备设计输入、工作顺序与 Acceptance，当前为 `ready`。Phase 09 的 `v0.1.0` 六包/四平台发布与 OIDC closure 仍是其原有完成基线；Phase 10 提交 `f138d41c15ba16578e76829af452458a2321be7e` 对应 CI Run `36256273631` 的四平台代码验收，也不被后续六平台发布追溯扩张。Phase 11 的 tag 提交 `1509eaf` 对应 CI Run `36266146250` 六平台全绿，Release Run `36271452963` 的第二次尝试完成八包、六平台 public-registry smoke 和 GitHub Release。Windows 首发认证收尾与后续 OIDC 边界见[Phase 11](phases/11-windows-runtime-acceptance.md)。Web / Skill 继续留在其后独立阶段。
 
 ## 6. Phase 通用完成标准
 
@@ -154,5 +159,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 09：MVP Release Closure](phases/09-mvp-release-closure.md)
 - [Phase 10：Runtime & CLI Hardening](phases/10-runtime-cli-hardening.md)
 - [Phase 11：Windows Runtime CI 验收与六平台发布](phases/11-windows-runtime-acceptance.md)
+- [Phase 12：First-Run & CLI Productization](phases/12-first-run-cli-productization.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)
