@@ -16,7 +16,7 @@ Workspace Root
   → existing Ontology / Object / Graph / Evolution commands usable
 ```
 
-本阶段实现 [D81 Workspace Root](../../design/decisions.md#d81-workspace-root)、[D82 Init readiness](../../design/decisions.md#d82-init-readiness) 与 [D83 CLI progressive disclosure](../../design/decisions.md#d83-cli-progressive-disclosure)。公开 v0.1.1 仍是旧 root-is-Instance / lazy-bootstrap 实现；Phase 12 的 `main` 实现不等于已发布版本，本阶段没有执行新的 npm publish、Git tag 或 GitHub Release。
+本阶段实现 [D81 Workspace Root](../../design/decisions.md#d81-workspace-root)、[D82 Init readiness](../../design/decisions.md#d82-init-readiness) 与 [D83 CLI progressive disclosure](../../design/decisions.md#d83-cli-progressive-disclosure)。Phase 12 原开发 scope 不包含发布动作，因此阶段完成时 v0.1.1 仍是旧 root-is-Instance / lazy-bootstrap 公开版本；随后用户独立授权正式发布，当前 v0.2.0 已把本阶段行为交付到 public npm / GitHub Release。
 
 ## 设计输入
 
@@ -210,4 +210,6 @@ Path primitive必须先统一，避免init/doctor/runtime各自拼接两套目�
 
 只有 P12-01–P12-08 全部实现、全部 Acceptance 取得真实证据、设计/计划/README/开发指南按各自职责同步、final diff/review无剩余本阶段finding，并且要求的远端六平台CI实际成功后，Phase 12 才能从 `in_progress` 更新为 `done`。
 
-P12-01–P12-08 已全部实现并取得真实证据。macOS arm64 主工作树完整 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、repo 外 packed fresh-user smoke、中文 PTY wizard 与真实 `pnpm dev` 回归均成功，final diff/review 无剩余 task-affecting finding。实现提交 `61ae9244a81364d209971d9be00c440f0b394cb1` 首次触发 Run `36398385921`，其中 win32-x64 packed smoke 暴露 Windows `process.kill()` 强制终止不会执行 graceful cleanup 的测试假设；按 D79 修正 Windows stale-locator 验收后，修复提交 `9c83ba1cbee0d832e7a2205de3cfc3a3ab90e7f1` 的 GitHub Actions Run `36399393826` 全绿：Validate `108853391763`、darwin-arm64 `108853391870`、win32-arm64 `108853391949`、linux-arm64 `108853391989`、linux-x64 `108853391999`、win32-x64 `108853392014`、darwin-x64 `108853392054` 均为 `success`。Phase 12 因此满足完成条件并更新为 `done`；未执行新版本发布。
+P12-01–P12-08 已全部实现并取得真实证据。macOS arm64 主工作树完整 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、repo 外 packed fresh-user smoke、中文 PTY wizard 与真实 `pnpm dev` 回归均成功，final diff/review 无剩余 task-affecting finding。实现提交 `61ae9244a81364d209971d9be00c440f0b394cb1` 首次触发 Run `36398385921`，其中 win32-x64 packed smoke 暴露 Windows `process.kill()` 强制终止不会执行 graceful cleanup 的测试假设；按 D79 修正 Windows stale-locator 验收后，修复提交 `9c83ba1cbee0d832e7a2205de3cfc3a3ab90e7f1` 的 GitHub Actions Run `36399393826` 全绿。Phase 12 因此先满足阶段完成条件并更新为 `done`。
+
+后续独立 release 授权将版本提升到 `0.2.0`。版本 revision `5b15892d56de1a40dbb031570b61ab63918f3d5b` 的首轮 CI 在 win32-x64 packed smoke 两次复现 `0xC0000409`；review确认 Windows 早期连续强杀两个 Instance 与后半段已有 rootB abrupt-recovery 验收重复。最终 smoke 只在 Windows 早期强杀 rootA，并保留 rootB running isolation与后半段独立 abrupt recovery，Unix 仍验证两个 Instance graceful stop。修复后的发布 revision `ac5eda19cc6d7cc849f8036419143c80c1b6427d` 对应 CI Run `36407257662` 的 Validate 与六平台 native/package jobs 全部成功；`v0.2.0` tag 精确指向该 revision。Release Run `36410721397` 为 `success`：六平台 immutable candidate、八个 package 的 Trusted Publishing / OIDC publish、exact-version / `latest=0.2.0` verification、macOS/Linux/Windows arm64/x64 public-registry fresh-user smoke与非 draft/non-prerelease GitHub Release `KG OS v0.2.0` 全部完成。

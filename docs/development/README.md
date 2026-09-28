@@ -79,7 +79,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 11 Windows Runtime CI 验收与六平台发布当前为 `done`。** Windows x64/arm64 native DLL、npm Runtime package、CLI 启动与 packed smoke 已在真实 runner 验收；发布源码 `1509eaf` 的 Validate 与六平台 native/package CI 全绿。`v0.1.1` 的八包、六平台 public-registry `npx` smoke 与 GitHub Release 已成功；两个 Windows package 的 Trusted Publisher、严格 publishing access 与短期首发凭据清理已完成，长期工作流已移除 bootstrap token 路径，收尾代码的六平台 CI Run `36289992799` 全绿。详见[Phase 11](phases/11-windows-runtime-acceptance.md)。
 
-**Phase 12 First-Run & CLI Productization 当前为 `done`。** Workspace Root→`.kgos`、`--root > KGOS_ROOT`、完整 init/readiness/recovery、additional extension setup、doctor 与分层 help 已完成实现与多轮 review；macOS arm64 主工作树完整 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、repo 外增强 packed smoke、中文 PTY wizard 与 `pnpm dev` 回归全部通过。最终实现/CI 修复提交 `9c83ba1cbee0d832e7a2205de3cfc3a3ab90e7f1` 已推送到 `main`，GitHub Actions Run `36399393826` 的 Validate 与六平台 native/package jobs 全部成功。公开 v0.1.1 仍保留旧 root-is-Instance / lazy-bootstrap 行为；本阶段未发布新版本。完整工作与 Acceptance 见[Phase 12](phases/12-first-run-cli-productization.md)。
+**Phase 12 First-Run & CLI Productization 当前为 `done`，并已作为 v0.2.0 正式发布。** Workspace Root→`.kgos`、`--root > KGOS_ROOT`、完整 init/readiness/recovery、additional extension setup、doctor 与分层 help 已完成实现与多轮 review；本地/fresh-source/packed/PTY/dev 与阶段六平台 CI 均通过。后续独立发布授权将版本提升至 `0.2.0`；发布 revision `ac5eda19cc6d7cc849f8036419143c80c1b6427d` 的 CI Run `36407257662` 全绿，Release Run `36410721397` 成功完成六平台 candidates、八包纯 OIDC npm publish、exact-version/`latest` verification、六平台 public-registry `npx` smoke 与 GitHub Release。完整工作与 Acceptance 见[Phase 12](phases/12-first-run-cli-productization.md)。
 
 ## 5. 路线总览
 
@@ -97,7 +97,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [09 MVP Release Closure](phases/09-mvp-release-closure.md) | `done` | `v0.1.0` 六包、四平台 registry npx、GitHub Release、六包 Trusted Publisher/credential cleanup与长期 OIDC closure均完成 | [Client版本关系](../design/client.md#版本关系)、[发布与验证边界](../design/client.md#发布与验证边界)、[Phase 08](phases/08-typescript-client-npm-runtime.md) |
 | [10 Runtime & CLI Hardening](phases/10-runtime-cli-hardening.md) | `done` | 本地与fresh-source完整验证、repo外packed真实Provider、macOS arm64/x64 + Linux glibc arm64/x64 CI native/package matrix全部通过 | [D78](../design/decisions.md#d78-operation-scoped-branch)、[D79](../design/decisions.md#d79-stale-daemon-recovery)、[D80](../design/decisions.md#d80-official-jieba)、[Runtime](../design/runtime.md)、[CLI](../design/cli.md) |
 | [11 Windows Runtime CI 验收与六平台发布](phases/11-windows-runtime-acceptance.md) | `done` | 六平台 CI、`0.1.1` 八包、六平台 registry smoke、GitHub Release、Windows Trusted Publisher 与 credential cleanup 均完成 | [Client](../design/client.md#npm-package-topology)、[Runtime](../design/runtime.md#native-runtime-package) |
-| [12 First-Run & CLI Productization](phases/12-first-run-cli-productization.md) | `done` | Workspace Root / `.kgos`、`KGOS_ROOT`、complete init/readiness/recovery、extension setup、responsibility-scoped high-density help、fresh-user acceptance；本地/fresh-source/六平台 CI 验收完成 | [D81](../design/decisions.md#d81-workspace-root)、[D82](../design/decisions.md#d82-init-readiness)、[D83](../design/decisions.md#d83-cli-progressive-disclosure) |
+| [12 First-Run & CLI Productization](phases/12-first-run-cli-productization.md) | `done` | Workspace Root / `.kgos`、`KGOS_ROOT`、complete init/readiness/recovery、extension setup、responsibility-scoped high-density help、fresh-user acceptance；本地/fresh-source/六平台 CI 验收与 v0.2.0 八包/六平台正式发布完成 | [D81](../design/decisions.md#d81-workspace-root)、[D82](../design/decisions.md#d82-init-readiness)、[D83](../design/decisions.md#d83-cli-progressive-disclosure) |
 
 当前实现依赖顺序：
 
@@ -129,7 +129,7 @@ Go Engineering Foundation
   -> later Web / Skill phases
 ```
 
-Phase 02–12 均已完成。Phase 12 的本地实现、主工作树完整 validation、独立 fresh-source validation、packed/PTY/dev fresh-user 验收、final review 与 GitHub Actions Run `36399393826` 六平台远端 CI 已闭环；公开 v0.1.1 仍是 Phase 11 发布基线。Phase 09 的 `v0.1.0` 六包/四平台发布与 OIDC closure 仍是其原有完成基线；Phase 10 提交 `f138d41c15ba16578e76829af452458a2321be7e` 对应 CI Run `36256273631` 的四平台代码验收，也不被后续六平台发布追溯扩张。Phase 11 的 tag 提交 `1509eaf` 对应 CI Run `36266146250` 六平台全绿，Release Run `36271452963` 的第二次尝试完成八包、六平台 public-registry smoke 和 GitHub Release。Windows 首发认证收尾与后续 OIDC 边界见[Phase 11](phases/11-windows-runtime-acceptance.md)。Web / Skill 继续留在其后独立阶段。
+Phase 02–12 均已完成，当前公开版本为 **v0.2.0**。Phase 12 的本地/fresh-source/packed/PTY/dev验收、阶段六平台 CI 与后续正式发布均已闭环；`v0.2.0` tag 指向 `ac5eda19cc6d7cc849f8036419143c80c1b6427d`，Release Run `36410721397` 完成八包 OIDC publish、六平台 registry smoke 与 GitHub Release。Phase 09 的 `v0.1.0` 六包/四平台发布与 OIDC workflow closure、Phase 11 的 `v0.1.1` 八包/六平台首发及 Windows credential cleanup 继续保留为各自历史基线，不被 v0.2.0 追溯改写。Web / Skill 继续留在其后独立阶段。
 
 ## 6. Phase 通用完成标准
 

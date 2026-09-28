@@ -107,16 +107,16 @@ CLI 的业务命令通过 `@kgos/sdk` 调用 daemon。只有 Workspace Root 解�
 
 package 不再包含 native `kg` binary。`kgosd` 与三个 required official extension 使用同一 KG OS package version；manifest 记录 target、version 与每个 native artifact 的 SHA-256，缺失、target/version 不匹配或 hash 不匹配必须 fail closed。official Jieba 的 tokenizer code / dictionary data必须随当前 platform package形成可复现 artifact，不依赖宿主预装资源或运行时下载。
 
-当前源码的 native package target 为 macOS arm64/x64、Linux **glibc** arm64/x64 与 Windows arm64/x64。Windows 使用 Node/npm 的 `win32` target 名、`.dll` 扩展和 `kgosd.exe`；Linux native package除 `os/cpu` 外还必须声明与实际构建一致的 npm `libc` metadata。公开 v0.1.1 已发布六个平台的 Runtime package；v0.1.0 与 Phase 08 的历史四平台结论不被追溯扩张。没有对应 native package 的平台返回明确 unsupported-platform local error，不从源码即时编译、不回退任意远端 binary。
+当前源码的 native package target 为 macOS arm64/x64、Linux **glibc** arm64/x64 与 Windows arm64/x64。Windows 使用 Node/npm 的 `win32` target 名、`.dll` 扩展和 `kgosd.exe`；Linux native package除 `os/cpu` 外还必须声明与实际构建一致的 npm `libc` metadata。当前公开 v0.2.0 已发布六个平台的 Runtime package；v0.1.0 的四平台与 v0.1.1 的首次六平台结论保留为历史基线，不被追溯改写。没有对应 native package 的平台返回明确 unsupported-platform local error，不从源码即时编译、不回退任意远端 binary。
 
 ## Runtime package 与 Instance 分离
 
 npm package location 属于软件分发状态，不能进入 Instance 持久配置：
 
 ```text
-npx --yes @kgos/cli@0.1.1
+npx --yes @kgos/cli@0.2.0
         │
-        └── @kgos/runtime-<os>-<arch>@0.1.1
+        └── @kgos/runtime-<os>-<arch>@0.2.0
                  └── kgosd + official extensions
 
 --root /data/world

@@ -2,7 +2,7 @@
 
 本文是 KG OS 设计文档集的**总入口与职责索引**。产品定义见 [README](../README.md)，协作与评审规则见 [AGENTS](../AGENTS.md)。
 
-开发阶段、状态与验收见[开发计划](development/README.md)，当前已实现版本的实际开发/验证命令见[开发指南](guide/development.md)。Phase 00–11 已完成；公开版本为 v0.1.1，八包、六平台 public-registry smoke、GitHub Release 与 Windows 首发认证收尾均已完成，范围与证据见[Phase 11](development/phases/11-windows-runtime-acceptance.md)。official Jieba exact artifact选择与跨平台证据见[研究记录](research/jieba-tokenizer.md)。完成证据由开发计划与 Phase 文件维护。
+开发阶段、状态与验收见[开发计划](development/README.md)，当前已实现版本的实际开发/验证命令见[开发指南](guide/development.md)。Phase 00–12 已完成；当前公开版本为 **v0.2.0**，八包 OIDC npm publish、六平台 public-registry smoke 与 GitHub Release 均已完成，范围与证据见[Phase 12](development/phases/12-first-run-cli-productization.md)。v0.1.1 的 Windows 首发与认证收尾继续由[Phase 11](development/phases/11-windows-runtime-acceptance.md)维护为历史证据。official Jieba exact artifact选择与跨平台证据见[研究记录](research/jieba-tokenizer.md)。完成证据由开发计划与 Phase 文件维护。
 
 KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下的职责文件共同构成当前设计真源；**每个主题只有一个正文 owner**，本索引不复制详细设计。跨文档引用应链接到 owner 文件，不在其它文件重新维护同一规则。
 
@@ -39,10 +39,10 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 状态 | 范围与入口 |
 | --- | --- |
 | 已确认 | Ontology 渐进读取 / 聚合编辑、Object batch read / Patch、Knowledge / Graph、Evolution；Client 统一 TypeScript，Runtime / Kernel 保留 Go；npm/npx 分发；Workspace Root→`.kgos` 单 Instance、`--root > KGOS_ROOT`、完整 ready 的 `init`、单库/单 Token/每 Instance 最多一个 daemon，以及职责分层的高信息密度 CLI；具体规则见上面的 owner 表 |
-| 当前实现基线 | Phase 00–11 已完成；当前公开版本为 v0.1.1，包含真实 `@kgos/sdk` + TypeScript `@kgos/cli`、显式 `--root`、per-root dynamic `kgosd`、六平台 native Runtime packages、八包 npm 与 GitHub Release。Phase 11 完成证据由[开发计划](development/README.md)及[Phase 11](development/phases/11-windows-runtime-acceptance.md)维护 |
+| 当前实现基线 | Phase 00–12 已完成；当前公开版本为 v0.2.0，包含真实 `@kgos/sdk` + TypeScript `@kgos/cli`、Workspace Root→`.kgos`、`--root > KGOS_ROOT`、complete init/readiness/recovery、per-instance dynamic `kgosd`、六平台 native Runtime packages、八包 npm 与 GitHub Release。完成与发布证据由[开发计划](development/README.md)及[Phase 12](development/phases/12-first-run-cli-productization.md)维护 |
 | 已确认调整 | [D59 Cypher passthrough](design/decisions.md#d59-cypher-passthrough)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](design/decisions.md#d66-lithograph-v030-sql-only)、[D67–D74](design/decisions.md)、[D75 TypeScript Client](design/decisions.md#d75-typescript-client)、[D76 npm distribution](design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](design/decisions.md#d79-stale-daemon-recovery)、[D80 official Jieba](design/decisions.md#d80-official-jieba)。D78–D80在不增加新业务能力的前提下收紧 Runtime connection/recovery 与默认 Full-text 行为；[D81](design/decisions.md#d81-workspace-root)、[D82](design/decisions.md#d82-init-readiness)、[D83](design/decisions.md#d83-cli-progressive-disclosure)进一步重做 Workspace/Instance、first-run readiness 与 CLI 信息设计 |
 | 检索范围与限制 | [首版 Semantic 只支持单字段且不公开 filterProperties，Cypher 联合检索可组合；post-YIELD 过滤不等价于过滤范围内 top-k](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
-| 工程待办 | Phase 00–11 保持已完成历史基线；[Phase 12 First-Run & CLI Productization](development/phases/12-first-run-cli-productization.md)负责实现 D81–D83，当前公开 v0.1.1 尚未具备新的 `.kgos` layout、完整 init readiness 与新 help。Web 页面 / Skill 继续留在后续独立阶段 |
+| 工程待办 | Phase 00–12 均已完成，D81–D83 已随 v0.2.0 公开交付。Web 页面 / Skill 继续留在后续独立阶段 |
 | Web 待细化 | [kgosd 内置交付、同源服务与共享 Kernel 已定，具体页面布局和交互尚未展开](design/runtime.md#web-交互设计状态)；不阻塞 Kernel、daemon、CLI 或 SDK 的实现 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库、真实 loadable extension、SQL streaming 与 cancellation 集成测试。
