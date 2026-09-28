@@ -1,5 +1,7 @@
 import { KGOS_VERSION } from "@kgos/sdk";
 
+import { INIT_FIELD_SPECS } from "./init-schema.js";
+
 type HelpEntry = readonly [path: string, usage: string, english: string, chinese: string];
 
 // One list owns both locales and the command topology. Help runs before root,
@@ -11,12 +13,7 @@ const entries: readonly HelpEntry[] = [
     "Inspect an Instance without starting it",
     "只读检查 Instance，不启动服务"
   ],
-  [
-    "init",
-    "init [--pretty] [--cache-path <path>] [--cache-max-size-mb <n>] [--fulltext-analyzer <fts5-spec>] [--embedding-base-url <url>] [--embedding-model <id>] [--embedding-dimensions <1..4096>] [--embedding-similarity <cosine|euclidean>] [--embedding-api-key-env <name-or-empty>]",
-    "Initialize an Instance",
-    "初始化 Instance"
-  ],
+  ["init", initUsage(), "Initialize an Instance", "初始化 Instance"],
   [
     "ontology",
     "ontology [<OntologyRef> ...] --at <StateRef> [--limit <n>] [--cursor <token>] [--edit]",
@@ -201,15 +198,24 @@ export function rootHelp(): string {
   return `${zh ? "KG OS 命令行客户端" : "KG OS command-line client"}
 
 ${zh ? "用法" : "Usage"}:
-  kg --root <instance-root> <command> ...
+  kg --root <workspace-root> <command> ...
+  KGOS_ROOT=<workspace-root> kg <command> ...
   kg --help
   kg --version
 
 ${childrenHelp("", zh)}
 ${zh ? "全局选项" : "Global"}:
-  --root <path>   ${zh ? "显式 Instance Root" : "Explicit KG OS Instance Root"}
+  --root <path>   ${zh ? "Workspace Root；优先级高于 KGOS_ROOT" : "Workspace Root; overrides KGOS_ROOT"}
   -h, --help      ${zh ? "显示帮助，不访问 Instance" : "Show help without accessing an Instance"}
   -V, --version   ${zh ? "显示版本" : "Show version"}
+
+${zh ? "Root 解析" : "Root resolution"}:
+  ${zh ? "--root > KGOS_ROOT；不搜索 cwd、父目录或 home。" : "--root > KGOS_ROOT; cwd, parents, and home are never searched."}
+
+${zh ? "示例" : "Examples"}:
+  kg --root ./workspace init
+  KGOS_ROOT=./workspace kg doctor
+  kg ontology --help
 `;
 }
 
@@ -218,6 +224,18 @@ export function versionText(): string {
 }
 
 export function commandHelp(args: readonly string[]): string {
+  const resolved = resolveHelpEntry(args);
+  if (resolved === undefined) return rootHelp();
+  const zh = chineseHelp();
+  const children = childrenHelp(resolved.key, zh);
+  const header = renderCommandHeader(resolved.entry, zh);
+  if (children !== "") return header + "\n" + children;
+  return (
+    header + helpNotes(resolved.key, resolved.entry[1], zh) + renderLeafExamples(resolved.key, zh)
+  );
+}
+
+function resolveHelpEntry(args: readonly string[]): { key: string; entry: HelpEntry } | undefined {
   const path: string[] = [];
   for (const arg of args) {
     if (arg === "--help" || arg === "-h") continue;
@@ -228,14 +246,35 @@ export function commandHelp(args: readonly string[]): string {
   }
   const key = path.join(" ");
   const entry = byPath.get(key);
-  if (entry === undefined) return rootHelp();
-  const zh = chineseHelp();
-  const children = childrenHelp(key, zh);
-  const notes = helpNotes(key, entry[1], zh);
-  return `${zh ? "用法" : "Usage"}:\n  kg --root <instance-root> ${entry[1]}\n\n${zh ? entry[3] : entry[2]}\n${children === "" ? "" : `\n${children}`}${notes}`;
+  return entry === undefined ? undefined : { key, entry };
 }
 
 function helpNotes(key: string, usage: string, zh: boolean): string {
+  const notes = [requiredOptionalNote(zh), ...specializedHelpNotes(key, usage, zh)];
+  if (key === "init") notes.push(...initHelpNotes(zh));
+  return "\n" + (zh ? "约束" : "Constraints") + ":\n  " + notes.join("\n  ") + "\n";
+}
+
+function renderCommandHeader(entry: HelpEntry, zh: boolean): string {
+  const heading = zh ? "用法" : "Usage";
+  const description = zh ? entry[3] : entry[2];
+  return `${heading}:\n  kg --root <workspace-root> ${entry[1]}\n\n${description}\n`;
+}
+
+function renderLeafExamples(key: string, zh: boolean): string {
+  const examples = leafExamples[key] ?? [];
+  if (examples.length === 0) return "";
+  const heading = zh ? "示例" : "Examples";
+  return `\n${heading}:\n${examples.map((example) => `  ${example}\n`).join("")}`;
+}
+
+function requiredOptionalNote(zh: boolean): string {
+  return zh
+    ? "方括号参数可选；未放在方括号中的参数必填。"
+    : "Bracketed arguments are optional; unbracketed arguments are required.";
+}
+
+function specializedHelpNotes(key: string, usage: string, zh: boolean): string[] {
   const notes: string[] = [];
   if (usage.includes(" | ")) {
     notes.push(
@@ -252,8 +291,103 @@ function helpNotes(key: string, usage: string, zh: boolean): string {
       zh ? "YAML body 输出不支持 --pretty。" : "YAML body output does not support --pretty."
     );
   }
-  return notes.length === 0 ? "" : "\n" + notes.join("\n") + "\n";
+  if (usage.includes("--limit <n>")) {
+    notes.push(zh ? "--limit 必须为 1..1000。" : "--limit must be an integer from 1 to 1000.");
+  }
+  if (usage.includes("--expected-revision <n>")) {
+    notes.push(zh ? "--expected-revision 必须 >= 1。" : "--expected-revision must be >= 1.");
+  }
+  return notes;
 }
+
+function initHelpNotes(zh: boolean): string[] {
+  const extensionNote = zh
+    ? "--extensions-file 与 --no-additional-extensions 互斥；非交互初始化必须显式选择其中一个。"
+    : "--extensions-file and --no-additional-extensions are mutually exclusive; non-interactive init must choose one.";
+  return [extensionNote, ...INIT_FIELD_SPECS.map((spec) => initFieldNote(spec, zh))];
+}
+
+function initFieldNote(spec: (typeof INIT_FIELD_SPECS)[number], zh: boolean): string {
+  const help = zh ? spec.help.zh : spec.help.en;
+  let suffix: string;
+  if (spec.automaticDefault) {
+    suffix = zh
+      ? `；省略时默认 ${spec.recommended}`
+      : `; defaults to ${spec.recommended} when omitted`;
+  } else {
+    suffix = zh
+      ? `；交互推荐 ${spec.recommended}`
+      : `; interactive recommendation: ${spec.recommended}`;
+  }
+  return `${spec.flag}: ${help}${suffix}`;
+}
+
+function initUsage(): string {
+  const scalar = INIT_FIELD_SPECS.map((spec) => `[${spec.flag} <value>]`).join(" ");
+  return `init [--pretty] [--extensions-file <path> | --no-additional-extensions] ${scalar}`;
+}
+
+const leafExamples: Readonly<Record<string, readonly string[]>> = {
+  doctor: ["kg --root ./workspace doctor", "kg --root ./workspace doctor --json --pretty"],
+  init: [
+    "kg --root ./workspace init",
+    "kg --root ./workspace init --cache-path cache/openai-compatible.db --cache-max-size-mb 4096 --no-additional-extensions --embedding-base-url https://api.openai.com/v1 --embedding-model text-embedding-3-small --embedding-dimensions 1536 --embedding-similarity cosine --embedding-api-key-env OPENAI_API_KEY"
+  ],
+  ontology: ["kg --root ./workspace ontology node:Person --at branch/main"],
+  "ontology patch": [
+    "kg --root ./workspace ontology patch --base-state commit/<64-hex> --branch main --patch-file ontology.diff"
+  ],
+  "object read": ["kg --root ./workspace object read node:Person --at branch/main --body"],
+  "object patch": [
+    "kg --root ./workspace object patch --base-state commit/<64-hex> --branch main --patch-file objects.diff"
+  ],
+  "graph query": [
+    "kg --root ./workspace graph query --at branch/main --cypher 'MATCH (n) RETURN n LIMIT 10'"
+  ],
+  "graph execute": [
+    "kg --root ./workspace graph execute --branch main --cypher 'CREATE (:Example {name: $name})' --params '{\"name\":\"demo\"}'"
+  ],
+  "evolution overview": ["kg --root ./workspace evolution overview"],
+  "evolution get": ["kg --root ./workspace evolution get branch/main"],
+  "evolution ancestry": ["kg --root ./workspace evolution ancestry branch/main --limit 20"],
+  "evolution history": [
+    "kg --root ./workspace evolution history branch/main --scope all --limit 20"
+  ],
+  "evolution diff": [
+    "kg --root ./workspace evolution diff --before commit/<64-hex> --after branch/main --scope all"
+  ],
+  "evolution state create": ["kg --root ./workspace evolution state create --branch main"],
+  "evolution state set-data": [
+    'kg --root ./workspace evolution state set-data branch/main --data \'{"source":"example"}\''
+  ],
+  "evolution state clear-data": ["kg --root ./workspace evolution state clear-data branch/main"],
+  "evolution branch list": ["kg --root ./workspace evolution branch list"],
+  "evolution branch create": [
+    "kg --root ./workspace evolution branch create experiment --from branch/main"
+  ],
+  "evolution branch delete": ["kg --root ./workspace evolution branch delete experiment"],
+  "evolution tag list": ["kg --root ./workspace evolution tag list"],
+  "evolution tag create": ["kg --root ./workspace evolution tag create v1 --target branch/main"],
+  "evolution tag move": ["kg --root ./workspace evolution tag move v1 --target branch/main"],
+  "evolution tag delete": ["kg --root ./workspace evolution tag delete v1"],
+  "evolution merge start": [
+    "kg --root ./workspace evolution merge start --branch main --source branch/experiment"
+  ],
+  "evolution merge list": ["kg --root ./workspace evolution merge list --limit 20"],
+  "evolution merge get": ["kg --root ./workspace evolution merge get <session>"],
+  "evolution merge conflicts": [
+    "kg --root ./workspace evolution merge conflicts <session> --limit 20"
+  ],
+  "evolution merge resolve": [
+    "kg --root ./workspace evolution merge resolve <session> --expected-revision 1 --resolutions-file resolutions.json"
+  ],
+  "evolution merge finalize": [
+    "kg --root ./workspace evolution merge finalize <session> --expected-revision 1"
+  ],
+  "evolution merge abort": [
+    "kg --root ./workspace evolution merge abort <session> --expected-revision 1"
+  ]
+};
 
 function childrenHelp(parent: string, zh: boolean): string {
   const depth = parent === "" ? 1 : parent.split(" ").length + 1;

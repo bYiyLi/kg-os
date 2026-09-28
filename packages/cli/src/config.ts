@@ -5,6 +5,8 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { parse, stringify } from "smol-toml";
 
 import { localIOError, usageError } from "./errors.js";
+import { INIT_FIELD_SPECS, type InitField } from "./init-schema.js";
+import { resolveWorkspacePaths } from "./paths.js";
 
 export interface InstanceConfig {
   cache: { path: string; max_size_mb: number };
@@ -19,34 +21,12 @@ export interface InstanceConfig {
   };
 }
 
-interface ExtensionConfig {
+export interface ExtensionConfig {
   source: string;
   library?: string;
   entrypoint: string;
   sha256?: string;
 }
-
-export const INIT_FIELDS = [
-  "--cache-path",
-  "--cache-max-size-mb",
-  "--fulltext-analyzer",
-  "--embedding-base-url",
-  "--embedding-model",
-  "--embedding-dimensions",
-  "--embedding-similarity",
-  "--embedding-api-key-env"
-] as const;
-
-export const RECOMMENDED_CONFIG = {
-  "--cache-path": "cache/openai-compatible.db",
-  "--cache-max-size-mb": "4096",
-  "--fulltext-analyzer": "jieba",
-  "--embedding-base-url": "https://api.openai.com/v1",
-  "--embedding-model": "text-embedding-3-small",
-  "--embedding-dimensions": "1536",
-  "--embedding-similarity": "cosine",
-  "--embedding-api-key-env": "OPENAI_API_KEY"
-} as const satisfies Record<(typeof INIT_FIELDS)[number], string>;
 
 const OFFICIAL_ENTRYPOINTS = new Set([
   "sqlite3_lithograph_init",
@@ -55,7 +35,7 @@ const OFFICIAL_ENTRYPOINTS = new Set([
 ]);
 
 export function configPath(root: string): string {
-  return join(root, "config.toml");
+  return resolveWorkspacePaths(root).config;
 }
 
 export function encodeConfig(config: InstanceConfig): string {
@@ -76,25 +56,34 @@ export function parseConfig(root: string, body: string): InstanceConfig {
   const cache = requireRecord(raw["cache"], "cache");
   const fulltext = requireRecord(raw["fulltext"], "fulltext");
   const embedding = requireRecord(raw["embedding"], "embedding");
-  assertOnlyKeys(cache, ["path", "max_size_mb"], "cache");
-  assertOnlyKeys(fulltext, ["analyzer"], "fulltext");
-  assertOnlyKeys(
-    embedding,
-    ["base_url", "model", "dimensions", "similarity", "api_key_env"],
-    "embedding"
-  );
+  const sections = { cache, fulltext, embedding };
+  for (const name of ["cache", "fulltext", "embedding"] as const) {
+    assertOnlyKeys(
+      sections[name],
+      INIT_FIELD_SPECS.filter((spec) => spec.section === name).map((spec) => spec.key),
+      name
+    );
+  }
+  const values = new Map<InitField, string | number>();
+  for (const spec of INIT_FIELD_SPECS) {
+    const value = sections[spec.section][spec.key];
+    if (value === undefined) {
+      throw usageError(`config.toml missing required field ${spec.section}.${spec.key}`);
+    }
+    values.set(spec.flag, validateConfigScalar(spec, value));
+  }
   const config: InstanceConfig = {
     cache: {
-      path: normalizeCachePath(root, requireString(cache["path"], "cache.path")),
-      max_size_mb: requirePositiveInteger(cache["max_size_mb"], "cache.max_size_mb")
+      path: normalizeCachePath(root, scalarString(values, "--cache-path")),
+      max_size_mb: scalarNumber(values, "--cache-max-size-mb")
     },
-    fulltext: { analyzer: requireString(fulltext["analyzer"], "fulltext.analyzer") },
+    fulltext: { analyzer: scalarString(values, "--fulltext-analyzer") },
     embedding: {
-      base_url: validateBaseURL(requireString(embedding["base_url"], "embedding.base_url")),
-      model: requireString(embedding["model"], "embedding.model"),
-      dimensions: requireIntegerRange(embedding["dimensions"], "embedding.dimensions", 1, 4096),
-      similarity: requireSimilarity(embedding["similarity"]),
-      api_key_env: requirePresentString(embedding["api_key_env"], "embedding.api_key_env")
+      base_url: scalarString(values, "--embedding-base-url"),
+      model: scalarString(values, "--embedding-model"),
+      dimensions: scalarNumber(values, "--embedding-dimensions"),
+      similarity: scalarString(values, "--embedding-similarity") as "cosine" | "euclidean",
+      api_key_env: scalarString(values, "--embedding-api-key-env")
     }
   };
   const sqlite = parseSQLite(raw["sqlite"]);
@@ -102,6 +91,72 @@ export function parseConfig(root: string, body: string): InstanceConfig {
     config.sqlite = sqlite;
   }
   return config;
+}
+
+export function buildConfigFromInitValues(
+  root: string,
+  values: ReadonlyMap<string, string>,
+  extensions: readonly ExtensionConfig[]
+): { source: InstanceConfig; normalized: InstanceConfig; body: string } {
+  const parsed = new Map<InitField, string | number>();
+  for (const spec of INIT_FIELD_SPECS) {
+    const raw = values.get(spec.flag);
+    if (raw === undefined) {
+      throw usageError(spec.flag + " is required");
+    }
+    parsed.set(spec.flag, validateCLIValue(spec, raw));
+  }
+  const source: InstanceConfig = {
+    cache: {
+      path: scalarString(parsed, "--cache-path"),
+      max_size_mb: scalarNumber(parsed, "--cache-max-size-mb")
+    },
+    fulltext: { analyzer: scalarString(parsed, "--fulltext-analyzer") },
+    embedding: {
+      base_url: scalarString(parsed, "--embedding-base-url"),
+      model: scalarString(parsed, "--embedding-model"),
+      dimensions: scalarNumber(parsed, "--embedding-dimensions"),
+      similarity: scalarString(parsed, "--embedding-similarity") as "cosine" | "euclidean",
+      api_key_env: scalarString(parsed, "--embedding-api-key-env")
+    }
+  };
+  if (extensions.length !== 0) {
+    source.sqlite = { extensions: [...extensions] };
+  }
+  const body = encodeConfig(source);
+  return { source, normalized: parseConfig(root, body), body };
+}
+
+export function parseExtensionsJSON(body: string): ExtensionConfig[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(body) as unknown;
+  } catch {
+    throw usageError("--extensions-file must contain valid JSON");
+  }
+  if (!Array.isArray(value)) {
+    throw usageError("--extensions-file must contain a JSON array");
+  }
+  return value.map((entry, index) => parseExtension(entry, index, "extensions"));
+}
+
+export function classifyExtensionSource(source: string): {
+  remote: boolean;
+  archive: boolean;
+} {
+  if (isAbsolute(source)) {
+    return { remote: false, archive: isArchivePath(source) };
+  }
+  let url: URL;
+  try {
+    url = new URL(source);
+  } catch {
+    throw usageError("extension source must be an absolute local path or HTTPS URL");
+  }
+  if (url.protocol !== "https:" || url.host === "") {
+    throw usageError("extension source URL must use HTTPS");
+  }
+  return { remote: true, archive: isArchivePath(url.pathname) };
 }
 
 export async function loadConfig(root: string): Promise<InstanceConfig> {
@@ -127,7 +182,7 @@ export async function validateRootShape(root: string): Promise<"missing" | "dire
   try {
     const info = await lstat(root);
     if (!info.isDirectory()) {
-      throw usageError("--root must refer to a directory");
+      throw usageError("--root must refer to a Workspace directory");
     }
     return "directory";
   } catch (error) {
@@ -137,7 +192,7 @@ export async function validateRootShape(root: string): Promise<"missing" | "dire
     if (error instanceof Error && !isNodeError(error)) {
       throw error;
     }
-    throw localIOError("inspect instance root failed");
+    throw localIOError("inspect Workspace Root failed");
   }
 }
 
@@ -173,11 +228,13 @@ function parseSQLite(value: unknown): InstanceConfig["sqlite"] | undefined {
   if (!Array.isArray(extensions)) {
     throw usageError("sqlite.extensions must be an array of tables");
   }
-  return { extensions: extensions.map(parseExtension) };
+  return {
+    extensions: extensions.map((entry, index) => parseExtension(entry, index, "sqlite.extensions"))
+  };
 }
 
-function parseExtension(value: unknown, index: number): ExtensionConfig {
-  const label = `sqlite.extensions[${String(index)}]`;
+function parseExtension(value: unknown, index: number, collection: string): ExtensionConfig {
+  const label = `${collection}[${String(index)}]`;
   const extension = requireRecord(value, label);
   assertOnlyKeys(extension, ["source", "library", "entrypoint", "sha256"], label);
   const source = requireString(extension["source"], label + ".source");
@@ -185,7 +242,15 @@ function parseExtension(value: unknown, index: number): ExtensionConfig {
   if (OFFICIAL_ENTRYPOINTS.has(entrypoint)) {
     throw usageError(label + " cannot configure an official Runtime extension");
   }
-  validateExtensionSource(source, label);
+  let sourceClass: ReturnType<typeof classifyExtensionSource>;
+  try {
+    sourceClass = classifyExtensionSource(source);
+  } catch (error) {
+    if (error instanceof Error) {
+      throw usageError(label + "." + error.message);
+    }
+    throw error;
+  }
   const parsed: ExtensionConfig = { source, entrypoint };
   const library = extension["library"];
   if (library !== undefined) {
@@ -199,27 +264,93 @@ function parseExtension(value: unknown, index: number): ExtensionConfig {
     }
     parsed.sha256 = sha256;
   }
-  if (source.startsWith("https://") && parsed.sha256 === undefined) {
+  if (sourceClass.remote && parsed.sha256 === undefined) {
     throw usageError(label + ".sha256 is required for HTTPS sources");
   }
-  return parsed;
-}
-
-function validateExtensionSource(source: string, label: string): void {
-  if (!source.startsWith("https://") && !isAbsolute(source)) {
-    throw usageError(label + ".source must be an absolute local path or HTTPS URL");
+  if (sourceClass.archive && parsed.library === undefined) {
+    throw usageError(label + ".library is required for archive sources");
   }
+  if (!sourceClass.archive && parsed.library !== undefined) {
+    throw usageError(label + ".library is only valid for archive sources");
+  }
+  if (parsed.library !== undefined) {
+    validateLibraryPath(parsed.library, label);
+  }
+  return parsed;
 }
 
 function normalizeCachePath(root: string, path: string): string {
   if (path.includes("\0")) {
     throw usageError("cache.path must contain no NUL");
   }
-  const absolute = isAbsolute(path) ? resolve(path) : resolve(root, path);
-  if (absolute === join(root, "kgos.db")) {
+  const instanceRoot = resolveWorkspacePaths(root).instanceRoot;
+  const absolute = isAbsolute(path) ? resolve(path) : resolve(instanceRoot, path);
+  if (absolute === join(instanceRoot, "kgos.db")) {
     throw usageError("cache.path must not point at kgos.db");
   }
   return absolute;
+}
+
+function validateConfigScalar(
+  spec: (typeof INIT_FIELD_SPECS)[number],
+  value: unknown
+): string | number {
+  const label = `${spec.section}.${spec.key}`;
+  switch (spec.kind) {
+    case "cache-path":
+    case "string":
+      return requireString(value, label);
+    case "credential-env":
+      return requirePresentString(value, label);
+    case "positive-integer":
+      return requirePositiveInteger(value, label);
+    case "dimensions":
+      return requireIntegerRange(value, label, 1, 4096);
+    case "url":
+      return validateBaseURL(requireString(value, label));
+    case "similarity":
+      return requireSimilarity(value);
+  }
+}
+
+function validateCLIValue(spec: (typeof INIT_FIELD_SPECS)[number], value: string): string | number {
+  if (spec.kind === "positive-integer" || spec.kind === "dimensions") {
+    const parsed = Number(value);
+    return spec.kind === "positive-integer"
+      ? requirePositiveInteger(parsed, spec.flag)
+      : requireIntegerRange(parsed, spec.flag, 1, 4096);
+  }
+  return validateConfigScalar(spec, value);
+}
+
+function scalarString(values: ReadonlyMap<InitField, string | number>, flag: InitField): string {
+  const value = values.get(flag);
+  if (typeof value !== "string") {
+    throw usageError(flag + " must be a string");
+  }
+  return value;
+}
+
+function scalarNumber(values: ReadonlyMap<InitField, string | number>, flag: InitField): number {
+  const value = values.get(flag);
+  if (typeof value !== "number") {
+    throw usageError(flag + " must be an integer");
+  }
+  return value;
+}
+
+function isArchivePath(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith(".zip") || lower.endsWith(".tar.gz");
+}
+
+function validateLibraryPath(path: string, label: string): void {
+  if (path.length === 0 || path.includes("\0") || isAbsolute(path) || path.includes("\\")) {
+    throw usageError(label + ".library must be a safe relative archive path");
+  }
+  if (path.split("/").some((part) => part === "" || part === "." || part === "..")) {
+    throw usageError(label + ".library must be a safe relative archive path");
+  }
 }
 
 function validateBaseURL(value: string): string {

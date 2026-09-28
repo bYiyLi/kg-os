@@ -8,7 +8,8 @@ import { runCapture, waitForProcessExit } from "./process.mjs";
 const version = assertReleaseVersion(requiredOption("--version"));
 const workRoot = await mkdtemp(join(tmpdir(), "kgos-registry-smoke-"));
 const cacheRoot = resolve(workRoot, "npm-cache");
-const instanceRoot = resolve(workRoot, "instance");
+const workspaceRoot = resolve(workRoot, "workspace");
+const instanceRoot = resolve(workspaceRoot, ".kgos");
 const env = {
   ...process.env,
   npm_config_cache: cacheRoot,
@@ -24,13 +25,13 @@ try {
     throw new Error("Registry CLI returned the wrong version");
   }
 
-  const doctor = JSON.parse((await runNpx(["--root", instanceRoot, "doctor", "--json"])).stdout);
+  const doctor = JSON.parse((await runNpx(["--root", workspaceRoot, "doctor", "--json"])).stdout);
   if (doctor.ready !== false) {
     throw new Error("Uninitialized registry smoke root unexpectedly reported ready");
   }
   try {
-    await access(instanceRoot);
-    throw new Error("doctor created the uninitialized Instance root");
+    await access(workspaceRoot);
+    throw new Error("doctor created the uninitialized Workspace Root");
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) {
       throw error;
@@ -41,7 +42,7 @@ try {
     (
       await runNpx([
         "--root",
-        instanceRoot,
+        workspaceRoot,
         "init",
         "--cache-path",
         "cache/openai-compatible.db",
@@ -56,11 +57,16 @@ try {
         "--embedding-similarity",
         "cosine",
         "--embedding-api-key-env",
-        ""
+        "",
+        "--no-additional-extensions"
       ])
     ).stdout
   );
-  if (initialized.status !== "initialized" || initialized.root !== instanceRoot) {
+  if (
+    initialized.status !== "initialized" ||
+    initialized.root !== workspaceRoot ||
+    initialized.instance !== instanceRoot
+  ) {
     throw new Error("Registry CLI init returned an unexpected result");
   }
   const config = await readFile(resolve(instanceRoot, "config.toml"), "utf8");
@@ -68,7 +74,7 @@ try {
     throw new Error("Registry CLI init did not use the official Jieba default");
   }
 
-  const overview = await runJson(["--root", instanceRoot, "evolution", "overview"]);
+  const overview = await runJson(["--root", workspaceRoot, "evolution", "overview"]);
   if (overview.defaultBranch !== "main" || typeof overview.state !== "string") {
     throw new Error("Registry Runtime failed to bootstrap the main State");
   }
@@ -84,14 +90,14 @@ try {
     throw new Error("Registry Runtime published an invalid daemon locator");
   }
 
-  const ontology = await runNpx(["--root", instanceRoot, "ontology", "--at", "branch/main"]);
+  const ontology = await runNpx(["--root", workspaceRoot, "ontology", "--at", "branch/main"]);
   if (ontology.stdout.trim() === "") {
     throw new Error("Registry Ontology read returned empty output");
   }
 
   const created = await runJson([
     "--root",
-    instanceRoot,
+    workspaceRoot,
     "graph",
     "execute",
     "--branch",
@@ -106,7 +112,7 @@ try {
 
   const queried = await runJson([
     "--root",
-    instanceRoot,
+    workspaceRoot,
     "graph",
     "query",
     "--at",
@@ -120,7 +126,7 @@ try {
 
   await runJson([
     "--root",
-    instanceRoot,
+    workspaceRoot,
     "graph",
     "execute",
     "--branch",
@@ -130,7 +136,7 @@ try {
   ]);
   await runJson([
     "--root",
-    instanceRoot,
+    workspaceRoot,
     "graph",
     "execute",
     "--branch",
@@ -141,7 +147,7 @@ try {
   ]);
   const chinese = await runJson([
     "--root",
-    instanceRoot,
+    workspaceRoot,
     "graph",
     "query",
     "--at",

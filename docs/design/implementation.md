@@ -22,7 +22,7 @@ Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能
 | Lithograph Managed Semantic + 简化 Ontology | Phase 01 已完成 Provider extension 装配、startup readiness与连接基线；Instance `init` 必须显式取得完整 `[embedding]` 与始终启用的 `[cache].path/max_size_mb`，后续 Ontology compiler 生成 versioned IndexDefinition / providerConfig，Graph 公共 surface 直接使用 String query；不实现 embedding HTTP client、Provider cache内部逻辑、向量 Property或写入/合并刷新 |
 | Evolution 统一历史与 Merge Session | Definition 内字段级历史；shared resource 单次 conflict 投影；固定 revision 的 candidate 检查 |
 | CLI / SDK / Web 共享合同 | `@kgos/sdk` 作为唯一 TypeScript HTTP Client；CLI 按 `--root > KGOS_ROOT` 解析 Workspace 并固定 `.kgos` Instance Directory，拥有 `doctor/init`、npm native Runtime ensure 与分层 help；ontology batch Markdown、batch --edit YAML multi-document stream、ontology scoped patch、Object batch read / patch、Graph NDJSON、HTTP metadata 与错误映射继续复用既有业务合同 |
-| First-run setup | `init` 统一收敛 config resolution、additional extension 输入、daemon startup、official/additional materialization、auth、database/bootstrap 与 readiness；配置存在不等于 ready，resume 与 already-initialized 按实际 Instance 状态判断；业务 Runtime ensure 不承担首次 bootstrap |
+| First-run setup | `init` 统一收敛 config resolution、additional extension 输入、daemon startup、official/additional materialization、auth、database/bootstrap 与 readiness；配置存在不等于 ready，authenticated readiness 成功后才发布 `.kgos/initialized.json` completion receipt，resume 与 already-initialized 由 config + receipt + 实际 Runtime readiness共同决定；业务 Runtime ensure 不承担首次 bootstrap |
 
 ### Ontology compiler / decoder
 

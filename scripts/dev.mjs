@@ -3,19 +3,19 @@ import { resolve } from "node:path";
 
 import { run, spawnCommand } from "./process.mjs";
 import { waitForRuntimeEndpoint } from "./runtime-locator.mjs";
-import { prepareRuntimeProfile } from "./runtime-profile.mjs";
+import { markRuntimeProfileInitialized, prepareRuntimeProfile } from "./runtime-profile.mjs";
 import { currentRuntimeTarget } from "./runtime-package.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const instanceRoot = resolve(root, ".kgos-dev");
+const workspaceRoot = resolve(root, ".kgos-dev");
 
 await run("pnpm", ["build"], { cwd: root });
-await prepareRuntimeProfile({ instanceRoot });
+await prepareRuntimeProfile({ workspaceRoot });
 
 const runtimeRoot = resolve(root, "artifacts", "npm", "runtime-" + currentRuntimeTarget());
 const daemon = spawn(
   resolve(runtimeRoot, process.platform === "win32" ? "kgosd.exe" : "kgosd"),
-  ["--root", instanceRoot],
+  ["--root", workspaceRoot],
   {
     cwd: root,
     detached: process.platform !== "win32",
@@ -27,7 +27,8 @@ daemon.once("error", (error) => {
   process.stderr.write("Go daemon: " + error.message + "\n");
 });
 
-const endpoint = await waitForRuntimeEndpoint(instanceRoot, daemon);
+const endpoint = await waitForRuntimeEndpoint(workspaceRoot, daemon);
+await markRuntimeProfileInitialized({ workspaceRoot, endpoint });
 const vite = spawnCommand(
   "pnpm",
   [

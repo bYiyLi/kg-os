@@ -1,61 +1,182 @@
-import { link, mkdir, open, readFile, rm } from "node:fs/promises";
+import { access, link, mkdir, open, readFile, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { createInterface } from "node:readline/promises";
 
-import { parseOptions } from "../args.js";
+import { parseOptions, type ParsedOptions } from "../args.js";
 import {
-  INIT_FIELDS,
-  RECOMMENDED_CONFIG,
+  buildConfigFromInitValues,
   configPath,
-  encodeConfig,
+  parseExtensionsJSON,
   parseConfig,
+  validateRequiredEnvironment,
+  type ExtensionConfig,
   type InstanceConfig
 } from "../config.js";
 import { CLIError, localIOError, usageError } from "../errors.js";
 import { outputJSON } from "../io.js";
+import { initWizardSuccessMessage, runInitWizard } from "../init-wizard.js";
+import { INIT_FIELD_SPECS, INIT_FIELDS } from "../init-schema.js";
+import {
+  hasLegacyInstanceLayout,
+  isInitializationComplete,
+  markInitializationComplete,
+  resolveWorkspacePaths
+} from "../paths.js";
+import { initializeClient, resolveNativeRuntime, type NativeRuntime } from "../runtime.js";
 
 export async function runInit(root: string, args: readonly string[]): Promise<void> {
-  const parsed = parseOptions(args, { boolean: ["--pretty"], value: INIT_FIELDS });
-  if (parsed.positionals.length !== 0) {
-    throw usageError("init does not accept positional arguments");
-  }
+  const parsed = parseInitOptions(args);
+  await assertSupportedLayout(root);
   const existing = await readExistingConfig(root);
   const pretty = parsed.booleans.has("--pretty");
   if (existing !== undefined) {
-    parseConfig(root, existing);
-    if (parsed.values.size !== 0) {
-      throw usageError("configuration options cannot be provided for an initialized Instance");
-    }
+    await resumeInit(root, existing, parsed, pretty);
+    return;
+  }
+  await initializeFresh(root, parsed, pretty);
+}
+
+function parseInitOptions(args: readonly string[]): ParsedOptions {
+  const parsed = parseOptions(args, {
+    boolean: ["--pretty", "--no-additional-extensions"],
+    value: [...INIT_FIELDS, "--extensions-file"]
+  });
+  if (parsed.positionals.length !== 0) {
+    throw usageError("init does not accept positional arguments");
+  }
+  if (parsed.booleans.has("--no-additional-extensions") && parsed.values.has("--extensions-file")) {
+    throw usageError("--extensions-file and --no-additional-extensions are mutually exclusive");
+  }
+  return parsed;
+}
+
+async function assertSupportedLayout(root: string): Promise<void> {
+  if (!(await hasLegacyInstanceLayout(root))) return;
+  throw usageError(
+    "legacy v0.1.x Instance layout detected at the Workspace Root; move or rebuild it explicitly before init",
+    { root, instance: resolveWorkspacePaths(root).instanceRoot }
+  );
+}
+
+async function resumeInit(
+  root: string,
+  body: string,
+  parsed: ParsedOptions,
+  pretty: boolean
+): Promise<void> {
+  if (hasConfigurationOptions(parsed)) {
+    throw usageError("configuration options cannot be provided for an initialized Instance");
+  }
+  const config = parseConfig(root, body);
+  validateRequiredEnvironment(config);
+  const runtime = await resolveNativeRuntime();
+  if (await isInitializationComplete(root)) {
+    await assertCompletedArtifacts(root);
+    await initializeClient(root, runtime);
     writeInitSuccess(root, "already_initialized", pretty);
     return;
   }
+  await initializeClient(root, runtime);
+  await markInitializationComplete(root);
+  writeInitSuccess(root, "initialized", pretty);
+}
 
-  const values = new Map(parsed.values);
-  if (!values.has("--fulltext-analyzer")) {
-    values.set("--fulltext-analyzer", RECOMMENDED_CONFIG["--fulltext-analyzer"]);
+function hasConfigurationOptions(parsed: ParsedOptions): boolean {
+  return parsed.values.size !== 0 || parsed.booleans.has("--no-additional-extensions");
+}
+
+async function initializeFresh(
+  root: string,
+  parsed: ParsedOptions,
+  pretty: boolean
+): Promise<void> {
+  const values = collectInitValues(parsed);
+  const missing = missingInitSpecs(values);
+  const extensionsResolved = hasExtensionSelection(parsed);
+  const entersWizard = shouldEnterWizard(missing.length !== 0 || !extensionsResolved);
+  validatePromptMode(entersWizard, pretty, missing, extensionsResolved);
+
+  let runtime: NativeRuntime | undefined;
+  let extensions = await resolveFlagExtensions(parsed.values.get("--extensions-file"));
+  if (entersWizard) {
+    runtime = await resolveNativeRuntime();
+    extensions = await runInitWizard({
+      root,
+      values,
+      initialExtensions: extensions,
+      extensionsResolved,
+      runtime
+    });
   }
-  const missing = INIT_FIELDS.filter((field) => !values.has(field));
-  const interactive = process.stdin.isTTY && process.stdout.isTTY;
-  if (interactive && missing.length !== 0 && pretty) {
+  await completeFreshInitialization(root, values, extensions, runtime);
+  writeFreshSuccess(root, pretty, entersWizard);
+}
+
+function collectInitValues(parsed: ParsedOptions): Map<string, string> {
+  const values = new Map<string, string>();
+  for (const field of INIT_FIELDS) {
+    const value = parsed.values.get(field);
+    if (value !== undefined) values.set(field, value);
+  }
+  for (const spec of INIT_FIELD_SPECS) {
+    if (spec.automaticDefault && !values.has(spec.flag)) values.set(spec.flag, spec.recommended);
+  }
+  return values;
+}
+
+function missingInitSpecs(
+  values: ReadonlyMap<string, string>
+): (typeof INIT_FIELD_SPECS)[number][] {
+  return INIT_FIELD_SPECS.filter((spec) => !spec.automaticDefault && !values.has(spec.flag));
+}
+
+function hasExtensionSelection(parsed: ParsedOptions): boolean {
+  return (
+    parsed.values.has("--extensions-file") || parsed.booleans.has("--no-additional-extensions")
+  );
+}
+
+function shouldEnterWizard(hasMissingInput: boolean): boolean {
+  return process.stdin.isTTY && process.stdout.isTTY && hasMissingInput;
+}
+
+function validatePromptMode(
+  entersWizard: boolean,
+  pretty: boolean,
+  missingSpecs: readonly (typeof INIT_FIELD_SPECS)[number][],
+  extensionsResolved: boolean
+): void {
+  if (entersWizard && pretty) {
     throw usageError("--pretty is not valid with interactive init prompts");
   }
-  if (missing.length !== 0 && !interactive) {
-    throw new CLIError(
-      "INIT_CONFIGURATION_INCOMPLETE",
-      "all initialization settings must be provided in non-interactive mode",
-      2,
-      { missing: [...missing].sort() }
-    );
-  }
-  if (missing.length !== 0) {
-    await promptMissing(values, missing);
-  }
-  const sourceConfig = buildConfig(values);
-  const body = encodeConfig(sourceConfig);
-  const normalized = parseConfig(root, body);
-  await publishConfig(root, normalized, body);
-  if (interactive && missing.length !== 0) {
-    process.stdout.write(successMessage(root));
+  if (process.stdin.isTTY && process.stdout.isTTY) return;
+  if (missingSpecs.length === 0 && extensionsResolved) return;
+  const missing = missingSpecs.map((spec) => `${spec.section}.${spec.key}`);
+  if (!extensionsResolved) missing.push("sqlite.extensions");
+  throw new CLIError(
+    "INIT_CONFIGURATION_INCOMPLETE",
+    "all initialization settings must be provided in non-interactive mode",
+    2,
+    { missing: missing.sort() }
+  );
+}
+
+async function completeFreshInitialization(
+  root: string,
+  values: ReadonlyMap<string, string>,
+  extensions: readonly ExtensionConfig[],
+  runtime: NativeRuntime | undefined
+): Promise<void> {
+  const built = buildConfigFromInitValues(root, values, extensions);
+  validateRequiredEnvironment(built.normalized);
+  await publishConfig(root, built.normalized, built.body);
+  const resolvedRuntime = runtime ?? (await resolveNativeRuntime());
+  await initializeClient(root, resolvedRuntime);
+  await markInitializationComplete(root);
+}
+
+function writeFreshSuccess(root: string, pretty: boolean, enteredWizard: boolean): void {
+  if (enteredWizard) {
+    process.stdout.write(initWizardSuccessMessage(root));
     return;
   }
   writeInitSuccess(root, "initialized", pretty);
@@ -72,63 +193,38 @@ async function readExistingConfig(root: string): Promise<string | undefined> {
   }
 }
 
-async function promptMissing(
-  values: Map<string, string>,
-  missing: readonly (typeof INIT_FIELDS)[number][]
-): Promise<void> {
-  const locale = detectLocale();
-  const readline = createInterface({ input: process.stdin, output: process.stdout });
+async function resolveFlagExtensions(path: string | undefined): Promise<ExtensionConfig[]> {
+  if (path === undefined) {
+    return [];
+  }
+  let body: string;
   try {
-    let warned = false;
-    for (const field of missing) {
-      if (!warned && (field === "--fulltext-analyzer" || field.startsWith("--embedding-"))) {
-        process.stdout.write(immutabilityWarning(locale));
-        warned = true;
-      }
-      const recommended = RECOMMENDED_CONFIG[field];
-      const answer = await readline.question(promptText(locale, field, recommended));
-      values.set(field, answer === "" ? recommended : answer);
-    }
-  } finally {
-    readline.close();
+    body = await readFile(path, "utf8");
+  } catch {
+    throw localIOError("read --extensions-file failed", { path });
   }
-}
-
-function buildConfig(values: Map<string, string>): InstanceConfig {
-  const similarity = values.get("--embedding-similarity");
-  if (similarity !== "cosine" && similarity !== "euclidean") {
-    throw usageError("--embedding-similarity must be cosine or euclidean");
-  }
-  return {
-    cache: {
-      path: required(values, "--cache-path"),
-      max_size_mb: parseInteger(values, "--cache-max-size-mb", 1, Number.MAX_SAFE_INTEGER)
-    },
-    fulltext: { analyzer: required(values, "--fulltext-analyzer") },
-    embedding: {
-      base_url: required(values, "--embedding-base-url"),
-      model: required(values, "--embedding-model"),
-      dimensions: parseInteger(values, "--embedding-dimensions", 1, 4096),
-      similarity,
-      api_key_env: values.get("--embedding-api-key-env") ?? ""
-    }
-  };
+  return parseExtensionsJSON(body);
 }
 
 async function publishConfig(root: string, config: InstanceConfig, body: string): Promise<void> {
-  await mkdir(root, { recursive: true, mode: 0o700 }).catch(() => {
-    throw localIOError("create instance root failed");
+  const paths = resolveWorkspacePaths(root);
+  await mkdir(paths.workspaceRoot, { recursive: true, mode: 0o700 }).catch(() => {
+    throw localIOError("create Workspace Root failed");
   });
   await Promise.all([
-    mkdir(join(root, "cache"), { recursive: true, mode: 0o700 }),
-    mkdir(join(root, "extensions"), { recursive: true, mode: 0o700 }),
-    mkdir(join(root, "logs"), { recursive: true, mode: 0o700 }),
+    mkdir(paths.instanceRoot, { recursive: true, mode: 0o700 }),
+    mkdir(paths.cacheDir, { recursive: true, mode: 0o700 }),
+    mkdir(paths.extensionsDir, { recursive: true, mode: 0o700 }),
+    mkdir(paths.logsDir, { recursive: true, mode: 0o700 }),
     mkdir(dirname(config.cache.path), { recursive: true, mode: 0o700 })
   ]).catch(() => {
-    throw localIOError("create instance directories failed");
+    throw localIOError("create Instance directories failed");
   });
 
-  const temporary = join(root, `.config-${String(process.pid)}-${String(Date.now())}.tmp`);
+  const temporary = join(
+    paths.instanceRoot,
+    `.config-${String(process.pid)}-${String(Date.now())}.tmp`
+  );
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   try {
     handle = await open(temporary, "wx", 0o600);
@@ -148,27 +244,18 @@ async function publishConfig(root: string, config: InstanceConfig, body: string)
   }
 }
 
-function parseInteger(
-  values: Map<string, string>,
-  name: string,
-  minimum: number,
-  maximum: number
-): number {
-  const value = Number(values.get(name));
-  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
-    throw usageError(
-      `${name} must be an integer between ${String(minimum)} and ${String(maximum)}`
-    );
+async function assertCompletedArtifacts(root: string): Promise<void> {
+  const paths = resolveWorkspacePaths(root);
+  for (const [label, path] of [
+    ["auth.json", paths.auth],
+    ["kgos.db", paths.database]
+  ] as const) {
+    try {
+      await access(path);
+    } catch {
+      throw localIOError(`initialized Instance is missing ${label}`);
+    }
   }
-  return value;
-}
-
-function required(values: Map<string, string>, name: string): string {
-  const value = values.get(name);
-  if (value === undefined || value.length === 0) {
-    throw usageError(name + " is required");
-  }
-  return value;
 }
 
 function writeInitSuccess(
@@ -176,36 +263,7 @@ function writeInitSuccess(
   status: "initialized" | "already_initialized",
   pretty: boolean
 ): void {
-  outputJSON({ status, root }, pretty);
-}
-
-function detectLocale(): "en" | "zh" {
-  for (const name of ["LC_ALL", "LC_MESSAGES", "LANG"]) {
-    const value = process.env[name]?.trim();
-    if (value === undefined || value === "") {
-      continue;
-    }
-    return /^zh(?:_|-|\b)/iu.test(value) ? "zh" : "en";
-  }
-  return "en";
-}
-
-function immutabilityWarning(locale: "en" | "zh"): string {
-  return locale === "zh"
-    ? "以下配置初始化后禁止修改。\n"
-    : "The following settings must not be changed after initialization.\n";
-}
-
-function promptText(locale: "en" | "zh", field: string, recommended: string): string {
-  return locale === "zh"
-    ? field + "（推荐 " + recommended + "）: "
-    : field + " (recommended " + recommended + "): ";
-}
-
-function successMessage(root: string): string {
-  return detectLocale() === "zh"
-    ? "KG OS 已初始化到 " + root + "。\n"
-    : "KG OS initialized in " + root + ".\n";
+  outputJSON({ status, root, instance: resolveWorkspacePaths(root).instanceRoot }, pretty);
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

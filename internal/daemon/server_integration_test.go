@@ -156,11 +156,18 @@ func openDaemonRuntime(t *testing.T) *runtimehost.Runtime {
 
 func writeDaemonConfig(t *testing.T, root string) {
 	t.Helper()
+	paths, err := runtimeprofile.ResolvePaths(root)
+	if err != nil {
+		t.Fatalf("resolve daemon Runtime paths: %v", err)
+	}
+	if err := runtimeprofile.EnsureDirectories(paths); err != nil {
+		t.Fatalf("create daemon Runtime directories: %v", err)
+	}
 	body := "[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n" +
 		"[fulltext]\nanalyzer = \"unicode61\"\n\n" +
 		"[embedding]\nbase_url = \"https://example.invalid/v1\"\n" +
 		"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n"
-	if err := os.WriteFile(filepath.Join(root, "config.toml"), []byte(body), 0o600); err != nil {
+	if err := os.WriteFile(paths.Config, []byte(body), 0o600); err != nil {
 		t.Fatalf("write daemon config: %v", err)
 	}
 }

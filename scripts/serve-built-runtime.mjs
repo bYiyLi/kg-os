@@ -15,20 +15,20 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("--port must be an integer between 1 and 65535");
 }
 
-const instanceRoot = await mkdtemp(join(tmpdir(), "kgos-e2e-"));
-await prepareRuntimeProfile({ instanceRoot });
+const workspaceRoot = await mkdtemp(join(tmpdir(), "kgos-e2e-"));
+await prepareRuntimeProfile({ workspaceRoot });
 
 const runtimeRoot = resolve(root, "artifacts", "npm", "runtime-" + currentRuntimeTarget());
 const child = spawn(
   resolve(runtimeRoot, process.platform === "win32" ? "kgosd.exe" : "kgosd"),
-  ["--root", instanceRoot],
+  ["--root", workspaceRoot],
   {
     cwd: root,
     env: process.env,
     stdio: ["ignore", "inherit", "inherit"]
   }
 );
-const endpoint = await waitForRuntimeEndpoint(instanceRoot, child);
+const endpoint = await waitForRuntimeEndpoint(workspaceRoot, child);
 const proxy = createServer((incoming, outgoing) => {
   const target = new URL(incoming.url ?? "/", endpoint);
   const upstream = httpRequest(
@@ -75,7 +75,7 @@ const outcome = await new Promise((resolveExit, rejectExit) => {
 if (!stopping) {
   await new Promise((resolveClose) => proxy.close(resolveClose));
 }
-await rm(instanceRoot, { force: true, recursive: true });
+await rm(workspaceRoot, { force: true, recursive: true });
 
 if (outcome.code !== 0 && outcome.signal === null) {
   process.exitCode = outcome.code ?? 1;

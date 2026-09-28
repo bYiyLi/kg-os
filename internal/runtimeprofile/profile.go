@@ -7,6 +7,7 @@ import (
 )
 
 type Paths struct {
+	WorkspaceRoot string
 	Root          string
 	Config        string
 	Auth          string
@@ -19,22 +20,24 @@ type Paths struct {
 
 func ResolvePaths(root string) (Paths, error) {
 	if root == "" {
-		return Paths{}, fmt.Errorf("instance root is required")
+		return Paths{}, fmt.Errorf("workspace root is required")
 	}
 	if !filepath.IsAbs(root) {
-		return Paths{}, fmt.Errorf("instance root must be an absolute path")
+		return Paths{}, fmt.Errorf("workspace root must be an absolute path")
 	}
-	absolute := filepath.Clean(root)
+	workspaceRoot := filepath.Clean(root)
+	instanceRoot := filepath.Join(workspaceRoot, ".kgos")
 
 	return Paths{
-		Root:          absolute,
-		Config:        filepath.Join(absolute, "config.toml"),
-		Auth:          filepath.Join(absolute, "auth.json"),
-		Lock:          filepath.Join(absolute, "kgosd.lock"),
-		Database:      filepath.Join(absolute, "kgos.db"),
-		CacheDir:      filepath.Join(absolute, "cache"),
-		ExtensionsDir: filepath.Join(absolute, "extensions"),
-		LogsDir:       filepath.Join(absolute, "logs"),
+		WorkspaceRoot: workspaceRoot,
+		Root:          instanceRoot,
+		Config:        filepath.Join(instanceRoot, "config.toml"),
+		Auth:          filepath.Join(instanceRoot, "auth.json"),
+		Lock:          filepath.Join(instanceRoot, "kgosd.lock"),
+		Database:      filepath.Join(instanceRoot, "kgos.db"),
+		CacheDir:      filepath.Join(instanceRoot, "cache"),
+		ExtensionsDir: filepath.Join(instanceRoot, "extensions"),
+		LogsDir:       filepath.Join(instanceRoot, "logs"),
 	}, nil
 }
 

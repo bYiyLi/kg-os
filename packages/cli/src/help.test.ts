@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import { commandHelp, rootHelp, versionText } from "./help.js";
 
 describe("CLI help", () => {
-  it("exposes the explicit-root command tree", () => {
-    expect(rootHelp()).toContain("--root <instance-root>");
+  it("exposes Workspace Root precedence and the command tree", () => {
+    expect(rootHelp()).toContain("--root <workspace-root>");
+    expect(rootHelp()).toContain("KGOS_ROOT=<workspace-root>");
+    expect(rootHelp()).toContain("--root > KGOS_ROOT");
     expect(rootHelp()).toContain("ontology");
     expect(versionText()).toBe("0.1.1\n");
   });
@@ -35,6 +37,15 @@ describe("CLI help", () => {
     expect(leaf).toContain("--expected-revision <n>");
     expect(leaf).toContain("--resolutions-file <path>");
     expect(leaf).toContain("mutually exclusive");
+    expect(leaf).toContain("Examples:");
+    const init = commandHelp(["init", "--help"]);
+    expect(init).toContain("--extensions-file <path> | --no-additional-extensions");
+    expect(init).toContain("--fulltext-analyzer");
+    expect(init).toContain("defaults to jieba");
+    expect(commandHelp(["object", "read", "--help"])).toContain("--at branch/main");
+    expect(commandHelp(["evolution", "merge", "start", "--help"])).toContain(
+      "--source branch/experiment"
+    );
   });
 
   it("keeps command topology in Chinese help", () => {

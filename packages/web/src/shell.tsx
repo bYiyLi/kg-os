@@ -6,7 +6,7 @@ export function Shell() {
       <p className="eyebrow">KG OS local runtime</p>
       <h1 id="page-title">{PRODUCT_NAME}</h1>
       <p className="summary">
-        Explicit Instance Root、Lithograph Host 与内置 Web 共用当前 kgosd endpoint。
+        Workspace Root、Lithograph Host 与内置 Web 共用当前 kgosd endpoint。
       </p>
       <div className="status" role="status">
         <span className="status-dot" aria-hidden="true" />

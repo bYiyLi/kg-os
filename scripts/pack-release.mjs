@@ -235,19 +235,77 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
   if (versionResult.stdout !== version + "\n") {
     throw new Error("packed kg returned the wrong version");
   }
+  const helpResult = await runCapture("npm", ["exec", "--yes", "--", "kg", "--help"], {
+    cwd: smokeRoot
+  });
+  if (
+    !helpResult.stdout.includes("--root <workspace-root>") ||
+    !helpResult.stdout.includes("KGOS_ROOT")
+  ) {
+    throw new Error("packed root help did not expose Workspace Root resolution");
+  }
 
   const rootA = resolve(smokeRoot, "instance-a");
   const rootB = resolve(smokeRoot, "instance-b");
+  const additionalExtension = await buildPackedCallerExtension();
+  const extensionsFile = resolve(smokeRoot, "additional-extensions.json");
+  await writeFile(
+    extensionsFile,
+    JSON.stringify(
+      [{ source: additionalExtension, entrypoint: "sqlite3_phase12_fixture_init" }],
+      null,
+      2
+    ) + "\n"
+  );
   const provider = await startPackedProvider();
   process.env.KGOS_PACK_PROVIDER_KEY = provider.secret;
   try {
-    await initPackedInstance(rootA, undefined, provider.baseURL, "KGOS_PACK_PROVIDER_KEY");
+    await initPackedInstance(
+      rootA,
+      undefined,
+      provider.baseURL,
+      "KGOS_PACK_PROVIDER_KEY",
+      extensionsFile
+    );
     await initPackedInstance(rootB, "unicode61");
-    await assertStoppedDoctor(rootA);
+
+    const initStateA = await runKgJSON(rootA, ["evolution", "overview"]);
+    const initTokenA = await readPackedToken(rootA);
+    const repeatedInit = JSON.parse((await runKg(rootA, ["init"])).stdout);
+    if (
+      repeatedInit.status !== "already_initialized" ||
+      repeatedInit.root !== rootA ||
+      repeatedInit.instance !== resolve(rootA, ".kgos")
+    ) {
+      throw new Error("packed repeat init was not idempotent");
+    }
+    const repeatedStateA = await runKgJSON(rootA, ["evolution", "overview"]);
+    if (
+      repeatedStateA.state !== initStateA.state ||
+      (await readPackedToken(rootA)) !== initTokenA
+    ) {
+      throw new Error("packed repeat init changed Instance identity or bootstrap State");
+    }
+
+    const initializedLocatorA = await readPackedLocator(rootA);
+    const initializedLocatorB = await readPackedLocator(rootB);
+    killPackedDaemon(initializedLocatorA.pid);
+    killPackedDaemon(initializedLocatorB.pid);
+    await Promise.all([
+      waitForProcessExit(initializedLocatorA.pid, "packed init daemon A did not stop"),
+      waitForProcessExit(initializedLocatorB.pid, "packed init daemon B did not stop")
+    ]);
+    await assertStoppedDoctor(rootA, { additional: 1, viaEnvironment: true });
     await assertStoppedDoctor(rootB);
+    const explicitDoctor = await runKgJSON(rootB, ["doctor", "--json"], {
+      KGOS_ROOT: rootA
+    });
+    if (explicitDoctor.root !== rootB) {
+      throw new Error("packed --root did not override KGOS_ROOT");
+    }
 
     const [overviewA1, overviewA2] = await Promise.all([
-      runKgJSON(rootA, ["evolution", "overview"]),
+      runKgJSONWithEnvironment(rootA, ["evolution", "overview"]),
       runKgJSON(rootA, ["evolution", "overview"])
     ]);
     if (
@@ -269,17 +327,20 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
     if (locatorA.endpoint === locatorB.endpoint || tokenA === tokenB) {
       throw new Error("packed Instances did not isolate endpoint/token");
     }
-    await Promise.all([access(resolve(rootA, "kgos.db")), access(resolve(rootB, "kgos.db"))]);
+    await Promise.all([
+      access(resolve(rootA, ".kgos", "kgos.db")),
+      access(resolve(rootB, ".kgos", "kgos.db"))
+    ]);
 
     await writeFile(
-      resolve(rootA, "kgosd.lock"),
+      resolve(rootA, ".kgos", "kgosd.lock"),
       JSON.stringify({ ...locatorA, endpoint: locatorB.endpoint }) + "\n"
     );
     await expectPackedFailure(rootA, ["evolution", "overview"], "AUTHENTICATION_FAILED");
-    await writeFile(resolve(rootA, "kgosd.lock"), JSON.stringify(locatorA) + "\n");
+    await writeFile(resolve(rootA, ".kgos", "kgosd.lock"), JSON.stringify(locatorA) + "\n");
 
     await writeFile(
-      resolve(rootB, "kgosd.lock"),
+      resolve(rootB, ".kgos", "kgosd.lock"),
       JSON.stringify({ ...locatorB, endpoint: "http://127.0.0.1:1" }) + "\n"
     );
     await expectPackedFailure(
@@ -287,12 +348,12 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
       ["evolution", "overview"],
       "kgosd did not publish a usable endpoint"
     );
-    await writeFile(resolve(rootB, "kgosd.lock"), JSON.stringify(locatorB) + "\n");
+    await writeFile(resolve(rootB, ".kgos", "kgosd.lock"), JSON.stringify(locatorB) + "\n");
     if ((await readPackedLocator(rootB)).pid !== locatorB.pid) {
       throw new Error("live lock owner was replaced during unavailable endpoint recovery");
     }
 
-    const ontology = await runKg(rootA, ["ontology", "--at", "branch/main"]);
+    const ontology = await runKgWithEnvironment(rootA, ["ontology", "--at", "branch/main"]);
     if (ontology.stdout.trim() === "") {
       throw new Error("packed Ontology read returned empty output");
     }
@@ -373,7 +434,7 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
     killPackedDaemon(locatorA.pid);
     await waitForProcessExit(locatorA.pid, "packed kgosd did not exit after SIGTERM");
     await writeFile(
-      resolve(rootA, "kgosd.lock"),
+      resolve(rootA, ".kgos", "kgosd.lock"),
       JSON.stringify({ ...locatorA, pid: process.pid }) + "\n"
     );
     const staleDoctor = await runKgJSON(rootA, ["doctor", "--json"]);
@@ -500,7 +561,8 @@ async function initPackedInstance(
   instanceRoot,
   analyzer,
   baseURL = "https://example.invalid/v1",
-  apiKeyEnv = ""
+  apiKeyEnv = "",
+  extensionsFile
 ) {
   const args = [
     "init",
@@ -519,13 +581,22 @@ async function initPackedInstance(
     "--embedding-api-key-env",
     apiKeyEnv
   ];
+  if (extensionsFile === undefined) {
+    args.push("--no-additional-extensions");
+  } else {
+    args.push("--extensions-file", extensionsFile);
+  }
   if (analyzer !== undefined) args.push("--fulltext-analyzer", analyzer);
   const init = await runKg(instanceRoot, args);
   const result = JSON.parse(init.stdout);
-  if (result.status !== "initialized" || result.root !== instanceRoot) {
+  if (
+    result.status !== "initialized" ||
+    result.root !== instanceRoot ||
+    result.instance !== resolve(instanceRoot, ".kgos")
+  ) {
     throw new Error("packed kg init returned an unexpected result");
   }
-  const config = await readFile(resolve(instanceRoot, "config.toml"), "utf8");
+  const config = await readFile(resolve(instanceRoot, ".kgos", "config.toml"), "utf8");
   if (!config.includes(`analyzer = "${analyzer ?? "jieba"}"`)) {
     throw new Error("packed init did not persist the selected Full-text analyzer");
   }
@@ -534,21 +605,41 @@ async function initPackedInstance(
   }
 }
 
-async function assertStoppedDoctor(instanceRoot) {
-  const doctor = await runKgJSON(instanceRoot, ["doctor", "--json"]);
+async function assertStoppedDoctor(instanceRoot, { additional = 0, viaEnvironment = false } = {}) {
+  const doctor = viaEnvironment
+    ? await runKgJSONWithEnvironment(instanceRoot, ["doctor", "--json"])
+    : await runKgJSON(instanceRoot, ["doctor", "--json"]);
   if (doctor.ready !== true) {
-    throw new Error("packed kg doctor did not report a ready stopped Instance");
+    throw new Error(
+      "packed kg doctor did not report a ready stopped Instance: " + JSON.stringify(doctor)
+    );
+  }
+  const extensions = doctor.checks?.find((check) => check.id === "extensions");
+  if (extensions?.details?.additional !== additional) {
+    throw new Error("packed kg doctor reported an unexpected additional extension count");
   }
 }
 
-async function runKg(instanceRoot, args) {
+async function runKg(instanceRoot, args, extraEnv = {}) {
   return runCapture("npm", ["exec", "--yes", "--", "kg", "--root", instanceRoot, ...args], {
-    cwd: smokeRoot
+    cwd: smokeRoot,
+    env: { ...process.env, ...extraEnv }
   });
 }
 
-async function runKgJSON(instanceRoot, args) {
-  return JSON.parse((await runKg(instanceRoot, args)).stdout);
+async function runKgJSON(instanceRoot, args, extraEnv = {}) {
+  return JSON.parse((await runKg(instanceRoot, args, extraEnv)).stdout);
+}
+
+async function runKgWithEnvironment(instanceRoot, args) {
+  return runCapture("npm", ["exec", "--yes", "--", "kg", ...args], {
+    cwd: smokeRoot,
+    env: { ...process.env, KGOS_ROOT: instanceRoot }
+  });
+}
+
+async function runKgJSONWithEnvironment(instanceRoot, args) {
+  return JSON.parse((await runKgWithEnvironment(instanceRoot, args)).stdout);
 }
 
 async function expectPackedFailure(instanceRoot, args, expectedText) {
@@ -564,7 +655,7 @@ async function expectPackedFailure(instanceRoot, args, expectedText) {
 }
 
 async function readPackedLocator(instanceRoot) {
-  const locator = JSON.parse(await readFile(resolve(instanceRoot, "kgosd.lock"), "utf8"));
+  const locator = JSON.parse(await readFile(resolve(instanceRoot, ".kgos", "kgosd.lock"), "utf8"));
   if (
     !Number.isSafeInteger(locator.pid) ||
     locator.pid <= 0 ||
@@ -577,11 +668,47 @@ async function readPackedLocator(instanceRoot) {
 }
 
 async function readPackedToken(instanceRoot) {
-  const credential = JSON.parse(await readFile(resolve(instanceRoot, "auth.json"), "utf8"));
+  const credential = JSON.parse(
+    await readFile(resolve(instanceRoot, ".kgos", "auth.json"), "utf8")
+  );
   if (typeof credential.token !== "string" || credential.token === "") {
     throw new Error("packed kgosd did not publish a valid credential");
   }
   return credential.token;
+}
+
+async function buildPackedCallerExtension() {
+  const source = resolve(smokeRoot, "phase12-extension.c");
+  const suffix =
+    process.platform === "win32" ? ".dll" : process.platform === "darwin" ? ".dylib" : ".so";
+  const library = resolve(smokeRoot, "phase12-extension" + suffix);
+  await writeFile(
+    source,
+    [
+      "#if defined(_WIN32)",
+      // cspell:disable-next-line
+      "#define KGOS_EXPORT __declspec(dllexport)",
+      "#else",
+      '#define KGOS_EXPORT __attribute__((visibility("default")))',
+      "#endif",
+      "KGOS_EXPORT int sqlite3_phase12_fixture_init(void *db, char **error, const void *api) {",
+      "  (void)db;",
+      "  (void)error;",
+      "  (void)api;",
+      "  return 0;",
+      "}",
+      ""
+    ].join("\n")
+  );
+  const compiler = process.env.CC ?? (process.platform === "win32" ? "gcc" : "cc");
+  const args =
+    process.platform === "darwin"
+      ? ["-dynamiclib", "-O2", "-o", library, source]
+      : process.platform === "win32"
+        ? ["-shared", "-O2", "-o", library, source]
+        : ["-shared", "-fPIC", "-O2", "-o", library, source];
+  await run(compiler, args, { cwd: smokeRoot });
+  return library;
 }
 
 async function startPackedProvider() {

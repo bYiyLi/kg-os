@@ -7,7 +7,10 @@ export interface RootArguments {
   args: string[];
 }
 
-export function extractRoot(args: readonly string[]): RootArguments {
+export function extractRoot(
+  args: readonly string[],
+  environmentRoot = process.env["KGOS_ROOT"]
+): RootArguments {
   const remaining: string[] = [];
   let root: string | undefined;
   for (let index = 0; index < args.length; index += 1) {
@@ -27,7 +30,10 @@ export function extractRoot(args: readonly string[]): RootArguments {
     index += 1;
   }
   if (root === undefined) {
-    throw usageError("--root is required");
+    if (environmentRoot === undefined || environmentRoot.trim() === "") {
+      throw usageError("--root or KGOS_ROOT is required");
+    }
+    root = environmentRoot;
   }
   return { root: resolve(root), args: remaining };
 }

@@ -11,6 +11,6 @@ describe("Shell", () => {
     expect(markup).toContain("Runtime shell ready");
     expect(markup).toContain("API 已由 daemon 提供");
     expect(markup).toContain("Lithograph Host");
-    expect(markup).toContain("Instance Root");
+    expect(markup).toContain("Workspace Root");
   });
 });

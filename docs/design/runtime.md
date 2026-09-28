@@ -145,12 +145,23 @@ one Workspace Root
     ├── auth.json
     ├── kgosd.lock
     ├── kgos.db
+    ├── initialized.json
     ├── cache/
     ├── extensions/
     └── logs/
 ```
 
 Workspace Root 可以包含任意调用方文件；KG OS 不在其顶层散落 Instance 内部文件。下文未特别说明时，“Instance Directory”都指 `<root>/.kgos`。旧 v0.1.x root-is-Instance 布局不是当前合同；Runtime 不自动搬迁或双读两种路径。
+
+<a id="initialized-json"></a>
+
+### `initialized.json`
+
+`initialized.json` 是 CLI-owned、versioned 的本地 **first-run completion receipt**。它不是 startup configuration、Knowledge Base State、Commit metadata 或配置 fingerprint；当前格式只包含 `{"version":1}`。CLI 只有在当前 `config.toml` 已发布、daemon 完成 official/additional extension materialization、credential 与 `kgos.db` 建立、Lithograph / KG OS bootstrap 完成，并且使用同一 Instance token 做 authenticated readiness 成功后，才原子发布该 receipt。
+
+receipt 缺失表示首次 `init` 尚未完成，即使 `config.toml` 已存在；业务命令的 Runtime ensure 必须明确要求先执行 `kg init`，不能把正常业务调用变成隐式首次 bootstrap。再次 `init` 可以在合法 config 上恢复缺失步骤，并在最终 readiness 成功后补写 receipt。receipt 已存在但 `auth.json` / `kgos.db` 等完成态必要 artifact 缺失属于不一致状态，必须 fail closed，不自动重建成另一个 Instance。
+
+`doctor` 可以用这个 receipt 区分 config-only recovery state 与“已初始化但 daemon 当前 stopped”的正常状态。删除 receipt 不删除 Knowledge Base，也不修改 config；它只会让下一次 `init` 重新证明当前 Instance 的完整 readiness。KG OS 不把 receipt 内容用于 Ontology / Object / Graph / Evolution 语义，也不因为它存在就绕过 daemon 自身的数据库/extension/bootstrap 校验。
 
 ### `config.toml`
 
@@ -415,6 +426,8 @@ KG OS 不检测运行中的 `config.toml` 是否被修改，也不因为文件�
 
 endpoint 永远是本机 loopback URL。token绝不能写入lock；CLI从同一Instance Directory的 `auth.json` 取得credential。**文件存在本身不表示 daemon正在运行。** daemon ownership只由进程持有的OS file lock仲裁；locator用于client发现，业务request的Bearer认证再提供错连Instance时的fail-closed保护。进程崩溃时OS释放lock，即使文件内容残留也只是stale locator。下一次成功取得lock的daemon覆盖它。
 
+正常 graceful shutdown 与 crash 的 locator 语义不同：持有权威 lock 的 daemon 在正常关闭时先把 locator 内容清空并 sync，再释放 OS lock；因此已完成初始化的 Instance 在正常 stop 后由 CLI 观察为 `stopped`。SIGKILL、进程崩溃或机器异常不能保证执行这一步，残留内容仍按 D79 作为 stale locator处理，`doctor` 报 `unavailable`，下一业务 Runtime ensure 只能通过新的 daemon contender 实际取得 OS lock来确认并恢复，CLI 不自行删除或锁定文件。
+
 ### `logs/`
 
 `logs/` 保存 `kgosd` 的本地诊断日志。日志格式、rotation 与 retention 属于运维实现合同；它不是 Knowledge Base history，也不能成为业务状态真源。
@@ -509,6 +522,7 @@ daemon 自身仍保留统一 graceful shutdown path；Unix SIGINT / SIGTERM 或�
 → 让已接受操作到达安全完成点；未提交 transaction 必须 rollback
 → 关闭 Lithograph / SQLite connection lifecycle
 → flush 必要日志
+→ 在仍持有 OS lock 时清空并 sync kgosd.lock locator
 → 退出进程并释放 OS lock
 ```
 

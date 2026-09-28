@@ -15,7 +15,7 @@ import (
 const (
 	RecommendedCachePath        = "cache/openai-compatible.db"
 	RecommendedCacheMaxSizeMB   = int64(4096)
-	RecommendedFullTextAnalyzer = "unicode61"
+	RecommendedFullTextAnalyzer = "jieba"
 	RecommendedEmbeddingBaseURL = "https://api.openai.com/v1"
 	RecommendedEmbeddingModel   = "text-embedding-3-small"
 	RecommendedDimensions       = 1536

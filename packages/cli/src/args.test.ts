@@ -13,21 +13,32 @@ import {
 import { CLIError } from "./errors.js";
 
 describe("CLI argument parsing", () => {
-  it("resolves a relative root and preserves command arguments", () => {
-    expect(extractRoot(["--root", "./instance", "object", "read"])).toEqual({
-      root: resolve("./instance"),
+  it("resolves an explicit Workspace Root and preserves command arguments", () => {
+    expect(extractRoot(["--root", "./workspace", "object", "read"], "/ignored")).toEqual({
+      root: resolve("./workspace"),
       args: ["object", "read"]
     });
-    expect(extractRoot(["object", "--root", "./instance", "read"]).args).toEqual([
+    expect(extractRoot(["object", "--root", "./workspace", "read"], "/ignored").args).toEqual([
       "object",
       "read"
     ]);
   });
 
-  it("rejects missing and duplicate roots", () => {
-    expect(() => extractRoot(["object"])).toThrow(CLIError);
-    expect(() => extractRoot(["--root"])).toThrow(CLIError);
-    expect(() => extractRoot(["--root", "a", "--root", "b"])).toThrow(CLIError);
+  it("uses KGOS_ROOT only when --root is absent", () => {
+    expect(extractRoot(["doctor"], "./environment")).toEqual({
+      root: resolve("./environment"),
+      args: ["doctor"]
+    });
+    expect(extractRoot(["--root", "./explicit", "doctor"], "./environment").root).toBe(
+      resolve("./explicit")
+    );
+  });
+
+  it("rejects missing, empty, and duplicate roots", () => {
+    expect(() => extractRoot(["object"], undefined)).toThrow(CLIError);
+    expect(() => extractRoot(["object"], "   ")).toThrow(CLIError);
+    expect(() => extractRoot(["--root"], undefined)).toThrow(CLIError);
+    expect(() => extractRoot(["--root", "a", "--root", "b"], undefined)).toThrow(CLIError);
   });
 
   it("parses boolean, value, and positional options", () => {

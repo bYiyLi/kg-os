@@ -327,6 +327,8 @@ The following settings must not be changed after initialization.
 
 首次配置原子发布后，CLI 启动当前 native `kgosd --root <workspace-root>`；daemon 复用唯一 Runtime resolver 完成 official/additional extension materialization、auth、database、Lithograph init 与 KG OS bootstrap，避免在 TypeScript CLI 复制第二套 native resolver。CLI 等待 active endpoint、读取同一 Instance token 并做最小 authenticated readiness 验证；成功后 daemon 保持运行。失败时保留可安全重试的 durable 结果，再次 `init` 从实际状态恢复；业务命令不能代替 `init` 自动完成首次 bootstrap。
 
+为让“配置已发布”和“首次初始化已经完整成功”具有稳定、可恢复的本地判据，CLI 在 authenticated readiness 成功后才原子写入 `.kgos/initialized.json` completion receipt。该 receipt 只表达 first-run completion，不保存配置副本、不进入 Knowledge Base、不替代 daemon / database validation；具体格式与恢复语义由 [Runtime](runtime.md#initialized-json) 定义。业务 Runtime ensure 只有在 receipt 有效时才允许执行正常 stopped→auto-start 流程。
+
 对 legacy v0.1.x “root 本身就是 Instance 目录”的布局不做自动移动或隐式兼容。如果 Workspace Root 下没有 `.kgos/config.toml`，但 root 顶层出现可识别的旧 `config.toml/auth.json/kgos.db` Instance 组合，`init` / `doctor` 必须给出明确 legacy-layout 诊断并停止，不能在旧 Instance 里再静默创建嵌套新 Instance。
 
 交互向导实际询问过至少一个字段时，Review 只展示 Workspace/Instance、Cache、built-in/additional extensions、Full-text 与 Embedding 的有效摘要，并只在真正执行前确认一次；执行阶段用少量高密度状态行表示 Configuration / Extensions / Credential / Knowledge Base / Runtime 的结果，失败时才展开对应错误。完全参数化、零交互 init 成功时遵守 JSON-first 规则，stdout 返回稳定 JSON，例如 `{"status":"initialized","root":"<absolute-workspace-root>","instance":"<absolute-workspace-root>/.kgos"}`。already-initialized 的零交互成功使用 `status="already_initialized"`。这些状态值不翻译。

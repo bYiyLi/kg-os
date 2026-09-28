@@ -575,7 +575,11 @@ func TestPhase02SearchHiddenConfigSurvivesRuntimeDefaultChanges(t *testing.T) {
 		t.Fatalf("close runtime: %v", err)
 	}
 
-	configPath := filepath.Join(home, "config.toml")
+	paths, err := runtimeprofile.ResolvePaths(home)
+	if err != nil {
+		t.Fatalf("resolve Runtime paths: %v", err)
+	}
+	configPath := paths.Config
 	configBody, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("read config: %v", err)
@@ -2156,11 +2160,18 @@ func queryIndexOptions(
 
 func writeKernelIntegrationConfig(t *testing.T, root string) {
 	t.Helper()
+	paths, err := runtimeprofile.ResolvePaths(root)
+	if err != nil {
+		t.Fatalf("resolve Kernel Runtime paths: %v", err)
+	}
+	if err := runtimeprofile.EnsureDirectories(paths); err != nil {
+		t.Fatalf("create Kernel Runtime directories: %v", err)
+	}
 	body := "[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n" +
 		"[fulltext]\nanalyzer = \"unicode61\"\n\n" +
 		"[embedding]\nbase_url = \"https://example.invalid/v1\"\n" +
 		"model = \"phase02-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n"
-	if err := os.WriteFile(filepath.Join(root, "config.toml"), []byte(body), 0o600); err != nil {
+	if err := os.WriteFile(paths.Config, []byte(body), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 }

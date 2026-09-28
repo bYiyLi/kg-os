@@ -90,7 +90,8 @@ func TestRuntimeOpenLockResolverCredentialAndReopen(t *testing.T) {
 
 func TestRuntimeStartupFailureReleasesLock(t *testing.T) {
 	home := t.TempDir()
-	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("[cache]\npath = \"cache/x.db\"\n"), 0o600); err != nil {
+	paths := integrationPaths(t, home)
+	if err := os.WriteFile(paths.Config, []byte("[cache]\npath = \"cache/x.db\"\n"), 0o600); err != nil {
 		t.Fatalf("write invalid config: %v", err)
 	}
 	opened, err := openIntegrationRuntime(context.Background(), home)
@@ -99,10 +100,6 @@ func TestRuntimeStartupFailureReleasesLock(t *testing.T) {
 	}
 	if err == nil {
 		t.Fatal("invalid runtime config was accepted")
-	}
-	paths, err := runtimeprofile.ResolvePaths(home)
-	if err != nil {
-		t.Fatalf("resolve paths: %v", err)
 	}
 	lock, err := runtimeprofile.AcquireLock(paths.Lock)
 	if err != nil {
@@ -117,7 +114,8 @@ func TestRuntimeStartupFailuresAfterConfigReleaseLock(t *testing.T) {
 	t.Run("malformed credential", func(t *testing.T) {
 		home := t.TempDir()
 		writeIntegrationConfig(t, home, "")
-		if err := os.WriteFile(filepath.Join(home, "auth.json"), []byte("{"), 0o600); err != nil {
+		paths := integrationPaths(t, home)
+		if err := os.WriteFile(paths.Auth, []byte("{"), 0o600); err != nil {
 			t.Fatalf("write malformed auth.json: %v", err)
 		}
 		opened, err := openIntegrationRuntime(context.Background(), home)
@@ -151,7 +149,8 @@ func TestRuntimeStartupFailuresAfterConfigReleaseLock(t *testing.T) {
 	t.Run("missing extension", func(t *testing.T) {
 		home := t.TempDir()
 		writeIntegrationConfig(t, home, "")
-		body, err := os.ReadFile(filepath.Join(home, "config.toml"))
+		paths := integrationPaths(t, home)
+		body, err := os.ReadFile(paths.Config)
 		if err != nil {
 			t.Fatalf("read config.toml: %v", err)
 		}
@@ -160,7 +159,7 @@ func TestRuntimeStartupFailuresAfterConfigReleaseLock(t *testing.T) {
 			"\n[[sqlite.extensions]]\nsource = "+strconv.Quote(missing)+
 				"\nentrypoint = \"sqlite3_fixture_init\"\n",
 		)...)
-		if err := os.WriteFile(filepath.Join(home, "config.toml"), body, 0o600); err != nil {
+		if err := os.WriteFile(paths.Config, body, 0o600); err != nil {
 			t.Fatalf("rewrite config.toml: %v", err)
 		}
 		opened, err := openIntegrationRuntime(context.Background(), home)
@@ -211,6 +210,7 @@ func TestRuntimeCreatesExternalProviderCacheParentWithoutCreatingCacheDatabase(t
 
 func writeIntegrationConfig(t *testing.T, home string, cachePath string) {
 	t.Helper()
+	paths := integrationPaths(t, home)
 	if cachePath == "" {
 		cachePath = "cache/openai-compatible.db"
 	}
@@ -219,9 +219,21 @@ func writeIntegrationConfig(t *testing.T, home string, cachePath string) {
 		"[fulltext]\nanalyzer = \"unicode61\"\n\n" +
 		"[embedding]\nbase_url = \"https://example.invalid/v1\"\n" +
 		"model = \"phase01-fixture\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n"
-	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(body), 0o600); err != nil {
+	if err := os.WriteFile(paths.Config, []byte(body), 0o600); err != nil {
 		t.Fatalf("write config.toml: %v", err)
 	}
+}
+
+func integrationPaths(t *testing.T, root string) runtimeprofile.Paths {
+	t.Helper()
+	paths, err := runtimeprofile.ResolvePaths(root)
+	if err != nil {
+		t.Fatalf("resolve integration Runtime paths: %v", err)
+	}
+	if err := runtimeprofile.EnsureDirectories(paths); err != nil {
+		t.Fatalf("create integration Runtime directories: %v", err)
+	}
+	return paths
 }
 
 func openIntegrationRuntime(ctx context.Context, root string) (*Runtime, error) {

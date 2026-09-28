@@ -5,10 +5,10 @@ import (
 )
 
 const kgosdHelp = "KG OS daemon\n\n" +
-	"Usage: kgosd --root <absolute-instance-root>\n" +
+	"Usage: kgosd --root <absolute-workspace-root>\n" +
 	"       kgosd [--help] [--version]\n\n" +
 	"Options:\n" +
-	"      --root     Absolute KG OS Instance Root\n" +
+	"      --root     Absolute KG OS Workspace Root\n" +
 	"  -h, --help     Show this help\n" +
 	"  -V, --version  Show the installed version\n"
 
@@ -40,6 +40,6 @@ func EvaluateKGOSD(args []string) DaemonEvaluation {
 	}
 	return DaemonEvaluation{
 		Mode:   DaemonModeResult,
-		Result: Result{ExitCode: 2, Stderr: "kgosd: --root <absolute-instance-root> is required\n"},
+		Result: Result{ExitCode: 2, Stderr: "kgosd: --root <absolute-workspace-root> is required\n"},
 	}
 }

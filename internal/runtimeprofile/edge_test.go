@@ -753,8 +753,8 @@ func TestValidateLibraryPathRejectsUnsafeForms(t *testing.T) {
 }
 
 func TestRuntimeProfileRejectsMissingRootAndNULConfig(t *testing.T) {
-	if _, err := ResolvePaths(""); err == nil || !strings.Contains(err.Error(), "instance root") {
-		t.Fatalf("missing Instance Root error = %v", err)
+	if _, err := ResolvePaths(""); err == nil || !strings.Contains(err.Error(), "workspace root") {
+		t.Fatalf("missing Workspace Root error = %v", err)
 	}
 
 	if _, _, err := validateAndClassifyExtensionConfig(&ExtensionConfig{

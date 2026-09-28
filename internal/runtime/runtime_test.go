@@ -29,10 +29,10 @@ func TestRuntimeLocalEndpointAndClosedState(t *testing.T) {
 	}
 }
 
-func TestOpenRejectsInstanceRootThatIsAFile(t *testing.T) {
+func TestOpenRejectsWorkspaceRootThatIsAFile(t *testing.T) {
 	root := t.TempDir() + "/instance-file"
 	if err := os.WriteFile(root, []byte("not a directory"), 0o600); err != nil {
-		t.Fatalf("write Instance Root fixture: %v", err)
+		t.Fatalf("write Workspace Root fixture: %v", err)
 	}
 	opened, err := OpenWithOfficialExtensions(
 		context.Background(),
@@ -48,6 +48,6 @@ func TestOpenRejectsInstanceRootThatIsAFile(t *testing.T) {
 		_ = opened.Close()
 	}
 	if err == nil || !strings.Contains(err.Error(), "create instance root") {
-		t.Fatalf("file Instance Root error = %v", err)
+		t.Fatalf("file Workspace Root error = %v", err)
 	}
 }

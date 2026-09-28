@@ -1,13 +1,15 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  configPath,
   encodeConfig,
   loadConfig,
   parentWritable,
+  parseExtensionsJSON,
   parseConfig,
   validateRequiredEnvironment,
   validateRootShape,
@@ -35,9 +37,10 @@ describe("Instance config", () => {
   it("round-trips and normalizes the complete explicit config", async () => {
     const root = await mkdtemp(join(tmpdir(), "kgos-config-"));
     const parsed = parseConfig(root, encodeConfig(BASE));
-    expect(parsed.cache.path).toBe(join(root, "cache/openai-compatible.db"));
+    expect(parsed.cache.path).toBe(join(root, ".kgos", "cache/openai-compatible.db"));
     expect(parsed.embedding.base_url).toBe("https://example.test/v1");
-    await writeFile(join(root, "config.toml"), encodeConfig(BASE));
+    await mkdir(join(root, ".kgos"));
+    await writeFile(configPath(root), encodeConfig(BASE));
     await expect(loadConfig(root)).resolves.toMatchObject({
       fulltext: { analyzer: "unicode61" }
     });
@@ -63,6 +66,22 @@ describe("Instance config", () => {
       sqlite: { extensions: [{ source: "https://example.test/plugin.zip", entrypoint: "x" }] }
     };
     expect(() => parseConfig(root, encodeConfig(remote))).toThrow(CLIError);
+    expect(() =>
+      parseExtensionsJSON(
+        JSON.stringify([
+          {
+            source: "https://example.test/plugin.zip",
+            entrypoint: "sqlite3_custom_init",
+            sha256: "0".repeat(64)
+          }
+        ])
+      )
+    ).toThrow(CLIError);
+    expect(
+      parseExtensionsJSON(
+        JSON.stringify([{ source: extension, entrypoint: "sqlite3_custom_init" }])
+      )
+    ).toHaveLength(1);
   });
 
   it("rejects incomplete, unknown, and invalid configuration", async () => {

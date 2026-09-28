@@ -31,7 +31,7 @@ Native npm package metadata
 
 正式 Client 层使用 TypeScript：`@kgos/cli -> @kgos/sdk -> HTTP -> kgosd`。Go 只拥有 daemon、Kernel、SQLite / Lithograph Host 与服务端编译/投影逻辑；仓库不再包含 Go `kg` CLI。
 
-Instance 只由显式 `--root <path>` 定位。不存在默认 `KG_HOME`、`KG_TOKEN` 或固定本机 server port。每个 root 拥有自己的 `config.toml`、`auth.json`、`kgos.db`、`kgosd.lock`、cache/extensions/logs；active daemon 只监听 OS 分配的 loopback dynamic endpoint。
+CLI 按 `--root <workspace-root>` > 非空 `KGOS_ROOT` > error 选择 Workspace；不存在默认 `KG_HOME`、cwd/父目录自动发现或固定本机 server port。每个 Workspace 的 KG OS Instance 固定在 `<root>/.kgos`，其中拥有自己的 `config.toml`、`auth.json`、`kgos.db`、`kgosd.lock`、`initialized.json` 与 cache/extensions/logs；active daemon 只监听 OS 分配的 loopback dynamic endpoint。
 
 ## 工具链
 
@@ -77,10 +77,11 @@ pnpm dev
 当前 `pnpm dev`：
 
 1. 执行当前平台完整 build；
-2. 生成仓库内已忽略的 `.kgos-dev/config.toml`；
+2. 生成仓库内已忽略的 `.kgos-dev/.kgos/config.toml`；
 3. 从 `artifacts/npm/runtime-<target>/` 启动完整 packaged `kgosd --root <absolute-root>`；
-4. 等待 `.kgos-dev/kgosd.lock` 发布 dynamic endpoint；
-5. 启动 Vite `http://127.0.0.1:5173`，把 `/api` 代理到该 endpoint。
+4. 等待 `.kgos-dev/.kgos/kgosd.lock` 发布 dynamic endpoint；
+5. 使用 daemon 生成的 `auth.json` 完成一次 authenticated Evolution overview，并在成功后写入开发 Instance 的 `initialized.json` completion receipt；
+6. 启动 Vite `http://127.0.0.1:5173`，把 `/api` 代理到该 endpoint。
 
 daemon 实际 endpoint 每次由 OS 分配，并打印到终端；不要假设固定端口。Ctrl-C/SIGTERM 会联动停止 daemon 与 Vite。
 
@@ -92,7 +93,7 @@ node packages/cli/dist/bin.js \
   evolution overview
 ```
 
-这里业务命令会复用已经运行的 daemon。需要验证 Runtime package discovery、`doctor`、lazy-start 或首次初始化时，使用下一节的 packed npm candidate，而不是绕过 package topology。
+这里业务命令会复用已经运行的 daemon。需要验证 Runtime package discovery、`doctor`、已初始化 Instance 的 Runtime auto-start 或首次初始化时，使用下一节的 packed npm candidate，而不是绕过 package topology。
 
 ## 验证首次本地使用
 
@@ -129,14 +130,16 @@ npm exec --yes -- kg --root "$ROOT" doctor --json
 npm exec --yes -- kg --root "$ROOT" init \
   --cache-path cache/openai-compatible.db \
   --cache-max-size-mb 4096 \
+  --no-additional-extensions \
   --embedding-base-url https://example.invalid/v1 \
   --embedding-model local-fixture \
   --embedding-dimensions 3 \
   --embedding-similarity cosine \
   --embedding-api-key-env ""
 
-# init 只创建完整 config 与 runtime-owned 目录。
-# 第一个业务命令才创建 auth.json / kgos.db、启动 daemon 并 bootstrap。
+# init 成功即表示 .kgos/config.toml、official/additional extensions、
+# auth.json、kgos.db、bootstrap、authenticated readiness 与 active daemon 全部完成。
+npm exec --yes -- kg --root "$ROOT" doctor --json
 npm exec --yes -- kg --root "$ROOT" evolution overview
 npm exec --yes -- kg --root "$ROOT" ontology --at branch/main
 ```
@@ -148,7 +151,10 @@ npm exec --yes -- kg --root "$ROOT" ontology --at branch/main
 正式 registry 发布后，AI / CI 的设计入口为：
 
 ```text
-npx --yes @kgos/cli@<version> --root <instance-root> <command>
+npx --yes @kgos/cli@<version> --root <workspace-root> <command>
+
+# 或在 shell / CI 中固定 Workspace：
+KGOS_ROOT=<workspace-root> npx --yes @kgos/cli@<version> <command>
 ```
 
 当前 Phase 本地验收只生成/安装 tarball candidate，不冒充 npm registry 已发布。

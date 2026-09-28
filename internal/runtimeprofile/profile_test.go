@@ -11,18 +11,22 @@ import (
 )
 
 func TestResolvePathsAndEnsureDirectories(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "instance")
-	paths, err := ResolvePaths(root)
+	workspaceRoot := filepath.Join(t.TempDir(), "workspace")
+	paths, err := ResolvePaths(workspaceRoot)
 	if err != nil {
-		t.Fatalf("resolve explicit Instance Root: %v", err)
+		t.Fatalf("resolve explicit Workspace Root: %v", err)
 	}
-	if paths.Root != root {
-		t.Fatalf("root = %q, want %q", paths.Root, root)
+	instanceRoot := filepath.Join(workspaceRoot, ".kgos")
+	if paths.WorkspaceRoot != workspaceRoot {
+		t.Fatalf("workspace root = %q, want %q", paths.WorkspaceRoot, workspaceRoot)
 	}
-	if paths.Config != filepath.Join(root, "config.toml") ||
-		paths.Auth != filepath.Join(root, "auth.json") ||
-		paths.Lock != filepath.Join(root, "kgosd.lock") ||
-		paths.Database != filepath.Join(root, "kgos.db") {
+	if paths.Root != instanceRoot {
+		t.Fatalf("instance root = %q, want %q", paths.Root, instanceRoot)
+	}
+	if paths.Config != filepath.Join(instanceRoot, "config.toml") ||
+		paths.Auth != filepath.Join(instanceRoot, "auth.json") ||
+		paths.Lock != filepath.Join(instanceRoot, "kgosd.lock") ||
+		paths.Database != filepath.Join(instanceRoot, "kgos.db") {
 		t.Fatalf("unexpected profile paths: %#v", paths)
 	}
 	if err := EnsureDirectories(paths); err != nil {
@@ -383,6 +387,16 @@ func TestInstanceLockLifecycle(t *testing.T) {
 	}
 	if err := lock.Close(); err != nil {
 		t.Fatalf("close lock: %v", err)
+	}
+	content, err = os.ReadFile(paths.Lock)
+	if err != nil {
+		t.Fatalf("read lock after close: %v", err)
+	}
+	if len(content) != 0 {
+		t.Fatalf("closed lock retained locator: %q", content)
+	}
+	if status := InspectDaemon(paths.Lock); status.State != DaemonStopped {
+		t.Fatalf("daemon state after close = %q, want stopped", status.State)
 	}
 	if err := lock.Close(); err != nil {
 		t.Fatalf("close lock twice: %v", err)

@@ -244,14 +244,31 @@ func (lock *InstanceLock) Close() error {
 	if lock.closed {
 		return nil
 	}
+	clearErr := clearLocator(lock.file)
 	lock.closed = true
 	unlockErr := unlockFile(lock.file)
 	closeErr := lock.file.Close()
+	if clearErr != nil {
+		return clearErr
+	}
 	if unlockErr != nil {
 		return fmt.Errorf("release kgosd.lock: %w", unlockErr)
 	}
 	if closeErr != nil {
 		return fmt.Errorf("close kgosd.lock: %w", closeErr)
+	}
+	return nil
+}
+
+func clearLocator(file *os.File) error {
+	if err := file.Truncate(0); err != nil {
+		return fmt.Errorf("truncate kgosd.lock on close: %w", err)
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("seek kgosd.lock on close: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("sync kgosd.lock on close: %w", err)
 	}
 	return nil
 }

@@ -9,6 +9,7 @@ import { createRequire } from "node:module";
 import { KGOSClient, KGOS_VERSION } from "@kgos/sdk";
 
 import { localAuthenticationError, localIOError, runtimeError, targetError } from "./errors.js";
+import { isInitializationComplete, resolveWorkspacePaths } from "./paths.js";
 
 const require = createRequire(import.meta.url);
 const START_TIMEOUT_MS = 10_000;
@@ -25,6 +26,12 @@ export interface NativeRuntime {
   root: string;
   daemon: string;
   version: string;
+  extensions: RuntimeArtifact[];
+}
+
+interface RuntimeArtifact {
+  file: string;
+  sha256: string;
 }
 
 interface RuntimeManifestFile {
@@ -104,7 +111,10 @@ export async function resolveNativeRuntime(): Promise<NativeRuntime> {
     name: target.packageName,
     root,
     daemon: join(root, process.platform === "win32" ? "kgosd.exe" : "kgosd"),
-    version: manifest.version
+    version: manifest.version,
+    extensions: manifest.files
+      .filter((file) => file.file.startsWith("extensions/"))
+      .map((file) => ({ file: file.file, sha256: file.sha256 }))
   };
 }
 
@@ -225,9 +235,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function readLocator(root: string): Promise<RuntimeLocator | undefined> {
+  const paths = resolveWorkspacePaths(root);
   let body: string;
   try {
-    body = await readFile(join(root, "kgosd.lock"), "utf8");
+    body = await readFile(paths.lock, "utf8");
   } catch (error) {
     if (isNodeError(error) && error.code === "ENOENT") {
       return undefined;
@@ -287,6 +298,27 @@ export async function ensureClient(
   root: string,
   nativeRuntime?: NativeRuntime
 ): Promise<KGOSClient> {
+  if (!(await isInitializationComplete(root))) {
+    throw localIOError("KG OS Instance initialization is incomplete; run kg init", {
+      instance: resolveWorkspacePaths(root).instanceRoot
+    });
+  }
+  return await connectOrStartClient(root, nativeRuntime);
+}
+
+export async function initializeClient(
+  root: string,
+  nativeRuntime?: NativeRuntime
+): Promise<KGOSClient> {
+  const client = await connectOrStartClient(root, nativeRuntime);
+  await client.evolution.overview();
+  return client;
+}
+
+async function connectOrStartClient(
+  root: string,
+  nativeRuntime?: NativeRuntime
+): Promise<KGOSClient> {
   const existing = await usableLocator(root);
   if (existing !== undefined) {
     return await clientForLocator(root, existing);
@@ -319,7 +351,7 @@ async function usableLocator(root: string): Promise<RuntimeLocator | undefined> 
 }
 
 async function spawnRuntime(root: string, runtime: NativeRuntime): Promise<void> {
-  const logs = join(root, "logs");
+  const logs = resolveWorkspacePaths(root).logsDir;
   try {
     await mkdir(logs, { recursive: true, mode: 0o700 });
     await access(runtime.daemon);
@@ -374,9 +406,21 @@ async function clientForLocator(root: string, locator: RuntimeLocator): Promise<
 }
 
 export async function readToken(root: string): Promise<string> {
+  const paths = resolveWorkspacePaths(root);
+  if (process.platform !== "win32") {
+    let info: Awaited<ReturnType<typeof stat>>;
+    try {
+      info = await stat(paths.auth);
+    } catch {
+      throw localAuthenticationError("local KG OS credential is unavailable");
+    }
+    if ((info.mode & 0o777) !== 0o600) {
+      throw localAuthenticationError("auth.json permissions must be 0600");
+    }
+  }
   let body: string;
   try {
-    body = await readFile(join(root, "auth.json"), "utf8");
+    body = await readFile(paths.auth, "utf8");
   } catch {
     throw localAuthenticationError("local KG OS credential is unavailable");
   }

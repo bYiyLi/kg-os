@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/bYiyLi/kg-os/internal/buildinfo"
+	"github.com/bYiyLi/kg-os/internal/runtimeprofile"
 )
 
 func TestRunStartsPackagedRuntimeAndStopsOnContextCancellation(t *testing.T) {
@@ -155,17 +156,28 @@ func prepareKGOSDTestRuntimePackage(t *testing.T) {
 
 func writeKGOSDIntegrationConfig(t *testing.T, root string) {
 	t.Helper()
+	paths, err := runtimeprofile.ResolvePaths(root)
+	if err != nil {
+		t.Fatalf("resolve Runtime paths: %v", err)
+	}
+	if err := runtimeprofile.EnsureDirectories(paths); err != nil {
+		t.Fatalf("create Runtime directories: %v", err)
+	}
 	body := "[cache]\npath = \"cache/openai-compatible.db\"\nmax_size_mb = 16\n\n" +
 		"[fulltext]\nanalyzer = \"unicode61\"\n\n" +
 		"[embedding]\nbase_url = \"https://example.invalid/v1\"\n" +
 		"model = \"kgosd-integration\"\ndimensions = 3\nsimilarity = \"cosine\"\napi_key_env = \"\"\n"
-	if err := os.WriteFile(filepath.Join(root, "config.toml"), []byte(body), 0o600); err != nil {
+	if err := os.WriteFile(paths.Config, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func waitForKGOSDLocator(t *testing.T, root string, done <-chan int, stderr *bytes.Buffer) {
 	t.Helper()
+	paths, err := runtimeprofile.ResolvePaths(root)
+	if err != nil {
+		t.Fatalf("resolve Runtime paths: %v", err)
+	}
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		select {
@@ -173,7 +185,7 @@ func waitForKGOSDLocator(t *testing.T, root string, done <-chan int, stderr *byt
 			t.Fatalf("kgosd exited before publishing a locator: code=%d stderr=%q", code, stderr.String())
 		default:
 		}
-		body, err := os.ReadFile(filepath.Join(root, "kgosd.lock"))
+		body, err := os.ReadFile(paths.Lock)
 		if err == nil {
 			var locator map[string]any
 			if json.Unmarshal(body, &locator) == nil {

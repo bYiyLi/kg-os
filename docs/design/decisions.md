@@ -802,7 +802,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 - 决定：CLI Instance 命令先按 `--root <workspace-root>` > 非空 `KGOS_ROOT` > error 解析唯一 Workspace Root；不使用默认 home、cwd、父目录搜索或 `.kgos` 自动发现。daemon 仍要求显式 `--root <workspace-root>`，环境变量只属于 CLI adapter。每个 Workspace 的唯一 Instance Directory 固定为 `<root>/.kgos`。
 - Instance identity：one Workspace Root = one `.kgos` = one `config.toml` = one `auth.json` = one `kgos.db` = at most one active `kgosd`。用户项目文件留在 Workspace 顶层，KG OS 内部状态不再散落其中；relative Instance paths（如 `cache/openai-compatible.db`）以 `.kgos` 为基准。
-- 兼容边界：不自动迁移或双读 v0.1.x root-is-Instance 布局。若新 CLI 在 Workspace 顶层检测到可识别的 legacy `config.toml/auth.json/kgos.db` 组合而 `.kgos` 尚不存在，`doctor/init` 明确诊断并停止，不能静默创建嵌套新 Instance 覆盖用户判断。
+- 兼容边界：不自动迁移或双读 v0.1.x root-is-Instance 布局。若新 CLI 在 Workspace 顶层检测到可识别的 legacy `config.toml/auth.json/kgos.db` 组合，而当前 `.kgos/config.toml` 尚不存在，`doctor/init` 明确诊断并停止；即使用户已手工创建空 `.kgos/` 目录，也不能因此绕过 legacy 识别并静默形成嵌套新 Instance。
 - 依据：真实 Windows 首次使用把 `--root C:\...\kgos-demo` 直接变成配置、数据库、cache、extension、log 混合目录，Workspace 与 KG OS 内部状态职责不清；同时重复 `--root` 对日常 shell/CI 不友好。固定 `.kgos` 保持 one-root/one-instance 确定性，`KGOS_ROOT` 提供明确环境级选择而不引入 cwd 猜测。
 - 备选：继续 root-is-Instance；自动从 cwd/父目录寻找 `.kgos`；默认 `~/.kgos`。第一项污染 Workspace 语义，后两项重新引入隐藏 Instance context，均不采用。
 - 取舍：这是对已发布 v0.1.1 本地布局的 breaking change，需要新版本真实 fresh-user 验收；换取 Workspace 语义清晰、内部状态隔离以及 AI/CI/shell 可控的 root 选择。
@@ -814,7 +814,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 - 决定：`init` 从“只写 config”的命令改为完整 Instance Setup。成功必须已经完成完整配置、native Runtime 验证、official 与 caller additional extension materialization、credential 建立、`kgos.db` 创建/打开、Lithograph init、KG OS bootstrap、daemon ready 与 authenticated readiness 验证；成功后 daemon 保持运行。业务命令只负责已初始化 Instance 的 Runtime ensure，不替代首次 init。
 - Runtime ownership：official Lithograph / OpenAI-compatible Provider / Jieba 仍由 native Runtime package 拥有，不写入 `config.toml`。CLI 在配置发布后启动同一个 `kgosd` startup path，由 daemon 唯一 resolver 把 official/additional artifacts 固定到 `.kgos/extensions/<sha256>`，不在 TypeScript 复制 native resolver。
-- Recovery：`config.toml` 存在不等于 ready。合法 config + incomplete runtime state 时再次 `init` 继续缺失步骤；ready 时幂等成功；非法 config fail closed；已有 config 时不接受新的配置 flags，避免把 resume 变成隐式 config mutation。初始化失败只保留可安全复用的 durable 结果，重跑按真实状态恢复。
+- Recovery：`config.toml` 存在不等于 ready。CLI 在完整 authenticated readiness 成功后才在 `.kgos` 原子发布 versioned `initialized.json` completion receipt；它只是 first-run 完成判据，不是 config fingerprint、State 或业务语义。合法 config + receipt 缺失/incomplete runtime state 时再次 `init` 继续缺失步骤；receipt 有效且实际 Runtime readiness 仍成立时幂等成功；非法 config 或完成态 artifact 不一致时 fail closed；已有 config 时不接受新的配置 flags，避免把 resume 变成隐式 config mutation。初始化失败只保留可安全复用的 durable 结果，重跑按真实状态恢复。
 - Additional extensions：interactive wizard 先询问是否进入高级配置，再逐个收集 `source/entrypoint/optional library/conditional sha256`；非交互使用 `--extensions-file` 或 `--no-additional-extensions` 明确解析该集合。official artifacts 不得通过 additional surface 重复声明或替换。
 - 依据：真实首次体验中 init 结束后只有 `config.toml` 与空目录，用户无法从“initialized”判断 Knowledge Base、credential、plugins 或 daemon 是否真的可用；同时配置 parser 支持 `sqlite.extensions` 但 init surface 无法生成，首次 setup 不完整。
 - 备选：保留 lazy first-business-command bootstrap；CLI 自己复制一套 extension resolver；init 只 materialize plugins 但不建库。它们分别继续让“initialized”语义含糊、复制 native 安全逻辑或保留半初始化状态，均不采用。
