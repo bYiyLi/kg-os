@@ -34,7 +34,7 @@ beforeEach(() => {
     name: "@kgos/runtime-darwin-arm64",
     root: "/runtime",
     daemon: "/runtime/kgosd",
-    version: "0.1.1",
+    version: "0.2.0",
     extensions: []
   });
   runtimeMocks.readLocator.mockResolvedValue(undefined);
@@ -154,7 +154,7 @@ describe("kg doctor", () => {
       name: "@kgos/runtime-darwin-arm64",
       root: "/runtime",
       daemon: "/runtime/kgosd",
-      version: "0.1.1",
+      version: "0.2.0",
       extensions: [{ file: "extensions/lithograph.dylib", sha256 }]
     });
 
