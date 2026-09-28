@@ -295,8 +295,8 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
       waitForProcessExit(initializedLocatorA.pid, "packed init daemon A did not stop"),
       waitForProcessExit(initializedLocatorB.pid, "packed init daemon B did not stop")
     ]);
-    await assertStoppedDoctor(rootA, { additional: 1, viaEnvironment: true });
-    await assertStoppedDoctor(rootB);
+    await assertPostTerminationDoctor(rootA, { additional: 1, viaEnvironment: true });
+    await assertPostTerminationDoctor(rootB);
     const explicitDoctor = await runKgJSON(rootB, ["doctor", "--json"], {
       KGOS_ROOT: rootA
     });
@@ -605,13 +605,28 @@ async function initPackedInstance(
   }
 }
 
-async function assertStoppedDoctor(instanceRoot, { additional = 0, viaEnvironment = false } = {}) {
+async function assertPostTerminationDoctor(
+  instanceRoot,
+  { additional = 0, viaEnvironment = false } = {}
+) {
   const doctor = viaEnvironment
     ? await runKgJSONWithEnvironment(instanceRoot, ["doctor", "--json"])
     : await runKgJSON(instanceRoot, ["doctor", "--json"]);
-  if (doctor.ready !== true) {
+  const daemonState = doctor.checks?.find((check) => check.id === "daemon")?.details?.state;
+  if (process.platform === "win32") {
+    // Node process.kill() force-terminates Windows processes instead of delivering
+    // a graceful SIGTERM. The OS lock is released, but the locator intentionally
+    // remains stale until the next daemon contender recovers it per D79.
+    if (doctor.ready !== false || daemonState !== "unavailable") {
+      throw new Error(
+        "packed kg doctor did not preserve stale-locator semantics after Windows termination: " +
+          JSON.stringify(doctor)
+      );
+    }
+  } else if (doctor.ready !== true || daemonState !== "stopped") {
     throw new Error(
-      "packed kg doctor did not report a ready stopped Instance: " + JSON.stringify(doctor)
+      "packed kg doctor did not report a ready gracefully stopped Instance: " +
+        JSON.stringify(doctor)
     );
   }
   const extensions = doctor.checks?.find((check) => check.id === "extensions");
