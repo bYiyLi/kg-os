@@ -290,13 +290,22 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
     const initializedLocatorA = await readPackedLocator(rootA);
     const initializedLocatorB = await readPackedLocator(rootB);
     killPackedDaemon(initializedLocatorA.pid);
-    killPackedDaemon(initializedLocatorB.pid);
-    await Promise.all([
-      waitForProcessExit(initializedLocatorA.pid, "packed init daemon A did not stop"),
-      waitForProcessExit(initializedLocatorB.pid, "packed init daemon B did not stop")
-    ]);
+    const terminated = [
+      waitForProcessExit(initializedLocatorA.pid, "packed init daemon A did not stop")
+    ];
+    if (process.platform !== "win32") {
+      killPackedDaemon(initializedLocatorB.pid);
+      terminated.push(
+        waitForProcessExit(initializedLocatorB.pid, "packed init daemon B did not stop")
+      );
+    }
+    await Promise.all(terminated);
     await assertPostTerminationDoctor(rootA, { additional: 1, viaEnvironment: true });
-    await assertPostTerminationDoctor(rootB);
+    if (process.platform === "win32") {
+      await assertRunningDoctor(rootB);
+    } else {
+      await assertPostTerminationDoctor(rootB);
+    }
     const explicitDoctor = await runKgJSON(rootB, ["doctor", "--json"], {
       KGOS_ROOT: rootA
     });
@@ -632,6 +641,17 @@ async function assertPostTerminationDoctor(
   const extensions = doctor.checks?.find((check) => check.id === "extensions");
   if (extensions?.details?.additional !== additional) {
     throw new Error("packed kg doctor reported an unexpected additional extension count");
+  }
+}
+
+async function assertRunningDoctor(instanceRoot) {
+  const doctor = await runKgJSON(instanceRoot, ["doctor", "--json"]);
+  const daemonState = doctor.checks?.find((check) => check.id === "daemon")?.details?.state;
+  if (doctor.ready !== true || daemonState !== "running") {
+    throw new Error(
+      "packed kg doctor did not report the second Windows Instance as running: " +
+        JSON.stringify(doctor)
+    );
   }
 }
 
