@@ -23,8 +23,6 @@ const (
 	RecommendedAPIKeyEnv        = "OPENAI_API_KEY"
 )
 
-type LookupEnv func(string) (string, bool)
-
 type Config struct {
 	Cache     CacheConfig     `toml:"cache"`
 	SQLite    SQLiteConfig    `toml:"sqlite"`
@@ -72,19 +70,13 @@ type SemanticDefaults struct {
 	CacheMaxBytes int64
 }
 
-func LoadConfig(paths Paths, lookupEnv LookupEnv) (Config, error) {
-	if lookupEnv == nil {
-		lookupEnv = os.LookupEnv
-	}
+func LoadConfig(paths Paths) (Config, error) {
 	body, err := os.ReadFile(paths.Config)
 	if err != nil {
 		return Config{}, fmt.Errorf("load config.toml: %w", err)
 	}
 	config, err := ParseConfig(paths, body)
 	if err != nil {
-		return Config{}, err
-	}
-	if err := ValidateEmbeddingEnvironment(config, lookupEnv); err != nil {
 		return Config{}, err
 	}
 	return config, nil
@@ -186,22 +178,8 @@ func normalizeEmbedding(config *EmbeddingConfig) error {
 	}
 	if config.APIKeyEnv != "" {
 		if strings.TrimSpace(config.APIKeyEnv) == "" || strings.ContainsRune(config.APIKeyEnv, 0) {
-			return fmt.Errorf("embedding.api_key_env must be non-empty and contain no NUL")
+			return fmt.Errorf("embedding.api_key_env must be empty for no authentication or non-blank and contain no NUL")
 		}
-	}
-	return nil
-}
-
-func ValidateEmbeddingEnvironment(config Config, lookupEnv LookupEnv) error {
-	if lookupEnv == nil {
-		lookupEnv = os.LookupEnv
-	}
-	if config.Embedding.APIKeyEnv == "" {
-		return nil
-	}
-	value, ok := lookupEnv(config.Embedding.APIKeyEnv)
-	if !ok || value == "" {
-		return fmt.Errorf("embedding.api_key_env %q is not set or empty", config.Embedding.APIKeyEnv)
 	}
 	return nil
 }

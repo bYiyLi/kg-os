@@ -408,7 +408,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D50 KG OS v1 只支持 OpenAI-compatible Embeddings API（2026-09-16）
 
-> 后续调整：OpenAI-compatible 协议选择延续；HTTP 执行 owner、wire 映射与认证配置由 [D57](#d57-managed-semantic) 调整，当前只保留 api_key_env，不再支持内联 api_key；[D72](#d72-local-install-runtime-onboarding) 进一步要求 embedding 配置字段完整显式，similarity 不再靠缺失字段取默认，api_key_env 字段必须存在。
+> 后续调整：OpenAI-compatible 协议选择延续；HTTP 执行 owner、wire 映射与认证配置由 [D57](#d57-managed-semantic) 调整，当前只保留 api_key_env，不再支持内联 api_key；[D72](#d72-local-install-runtime-onboarding) 进一步要求 embedding 配置字段完整显式，similarity 不再靠缺失字段取默认，api_key_env 字段必须存在；[D84](#d84-late-bound-embedding-credential) 再把 env value 解析从 init/startup 移到 Provider operation-time，下面“启动时解析”只保留历史依据。
 
 - 决定：v1 不提供 `provider` 配置、provider registry 或插件系统，唯一远端 embedding protocol 是 OpenAI-compatible Embeddings 子集。`[embedding]` 必填 `base_url / model / dimensions`，`similarity` 缺省 `cosine`；认证可用 `api_key` 或 `api_key_env`，二者互斥，也允许都不配置表示无认证。`api_key_env` 在启动时解析为非空环境变量；任一方式得到 credential 后使用 `Authorization: Bearer <credential>`。
 - Wire 子集：KG OS 向 `${base_url}/embeddings` 发送 JSON `model + input`；`input` 支持 String / Array<String> 以便内部批量生成。v1 不发送 `dimensions/user/encoding_format` 或 provider-specific options。响应使用 `data[].index + data[].embedding`，每个 embedding 必须是 finite numeric array 且长度严格等于配置 `dimensions`；其它 OpenAI response 字段不是 correctness source。
@@ -831,3 +831,15 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 依据：真实用户运行 `ontology --help` 时现有输出只有 usage/一句话/子命令，无法高效完成下一步；反向把全部设计信息塞入 help 或让 wizard 逐字段确认内部事实同样会降低可用性。
 - 取舍：CLI presentation 需要按命令职责维护结构化 metadata 与 targeted tests，而不是一份极简字符串表；换取自发现性与人/AI 都可消费的稳定高信号入口。
 - 当前合同：[CLI](cli.md)、[Phase 12](../development/phases/12-first-run-cli-productization.md)。
+
+<a id="d84-late-bound-embedding-credential"></a>
+
+### D84 Embedding credential 延迟到 Provider operation-time，init wizard 对可恢复输入原地重试（2026-09-29）
+
+- Credential 决定：`embedding.api_key_env` 的非空值只表示 OpenAI-compatible Provider 将来读取 credential 的环境变量**名称**。KG OS 的 config parser / `init`、CLI 业务命令入口与 `kgosd` startup 都只校验该名称的静态合法性，不要求当前进程环境已经存在同名变量，也不把缺失变量作为 Instance readiness blocker。真正执行调用 Provider 的 Semantic operation 时，由 Provider 按 index 中保存的 `api_key_env` 在 operation-time 解析环境变量并形成 effective request identity；即使 Provider cache 命中而最终不发 HTTP，也不把 credential 解析提前到 init/startup；缺失/空值只使该次需要 credential 的 operation 以 Lithograph `INVALID_ARGUMENT` 失败。
+- Doctor 决定：`doctor` 可以 side-effect-free 地报告**本次 CLI invocation** 中 configured credential env 是否 available。env存在时 environment check 为 `ok/non-blocking`，配置了 env name 但当前缺失/为空时为 `info/non-blocking`，`api_key_env=""` 时为 `ok/non-blocking` 并说明 no-auth；该结果不代表已经运行中的 `kgosd` 拥有相同进程环境，不得单独令已完成 init 的 Instance 变为 not ready，也不得读取后回显 secret value。
+- Wizard 决定：交互推荐值统一显示为 `[value]`，Enter 表示采用；additional-extension 分支明确称为额外第三方/自定义 SQLite extension，不把 Runtime-owned official Lithograph / Provider / Jieba 暗示为需要用户安装。进入分支后 prompt 给出 source/entrypoint 等必要格式提示。TTY 中 scalar 的显式非法值、extension 必填字段空值/非法值和 yes/no 等可以通过重新输入修复的错误在当前字段原地提示并重试；普通 scalar 的空 Enter 继续表示采用 `[default]`；文件 I/O、Runtime/materialization、daemon/bootstrap 等执行失败以及 non-interactive 输入继续 fail-fast。
+- 依据：v0.2.0 真实 first-run 中，“添加附加 SQLite 扩展”被自然理解为是否安装 KG OS 自带插件，选择 `y` 后空 `Source/Entrypoint` 又直接终止整个 init；同时 `OPENAI_API_KEY` 作为默认 env name 被 CLI 与 daemon 当成全局 startup prerequisite，使完全不使用 Semantic Provider 的 Ontology/Object/Evolution 等能力也被无关 secret 阻塞。Lithograph 当前 OpenAI-compatible Provider 已冻结为静态 `validate` 不解析 `api_key_env`，仅在实际 Semantic Provider operation 形成 effective request identity 时读取该变量，因此 KG OS 无需维护更早的一套重复 credential preflight。
+- 备选：继续要求 init/startup 前设置 secret；只删除 TypeScript init 检查但保留 CLI global/Go startup gate；给 Embedding 增加 enable/disable、credential store 或 `.env` loader。这些方案分别继续制造无关阻塞、留下语义不一致或为当前不存在的需求增加配置/secret 管理层，均不采用。
+- 取舍：daemon ready 不再证明未来每一次 Semantic Provider operation 的外部 credential 都可用，`doctor` 也只能报告当前进程环境的即时状态；换取 Instance lifecycle 与按需外部服务依赖解耦，普通图/知识能力不再被未使用的 Embedding secret 阻塞，并与底层 Provider 的既有 operation-time credential contract 对齐。
+- 当前合同：[CLI Doctor](cli.md#doctor) / [Init](cli.md#init)、[Runtime Embedding](runtime.md#embedding-配置与索引映射)、[公共错误合同](contracts.md#公共错误合同)、[Phase 13](../development/phases/13-init-wizard-credential-boundary.md)。

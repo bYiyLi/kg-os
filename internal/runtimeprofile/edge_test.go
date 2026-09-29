@@ -674,7 +674,7 @@ func TestAdditionalConfigFailures(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			writeConfig(t, paths, test.body)
-			if _, err := LoadConfig(paths, func(string) (string, bool) { return "value", true }); err == nil ||
+			if _, err := LoadConfig(paths); err == nil ||
 				!strings.Contains(err.Error(), test.want) {
 				t.Fatalf("config error = %v, want %q", err, test.want)
 			}

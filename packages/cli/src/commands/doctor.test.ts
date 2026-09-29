@@ -75,6 +75,37 @@ describe("kg doctor", () => {
     });
     expect(result.checks.find((item) => item.id === "initialization")?.status).toBe("ok");
     expect(result.checks.find((item) => item.id === "credential")?.status).toBe("ok");
+    expect(result.checks.find((item) => item.id === "environment")).toMatchObject({
+      status: "ok",
+      blocking: false,
+      details: { scope: "cli_process", authentication: "none" }
+    });
+  });
+
+  it("reports embedding credential availability without making it a readiness blocker", async () => {
+    const config = {
+      ...CONFIG,
+      embedding: { ...CONFIG.embedding, api_key_env: "PHASE13_DOCTOR_KEY" }
+    };
+    const root = await readyInstance(config);
+
+    const missing = await diagnose(root);
+    expect(missing.ready).toBe(true);
+    expect(missing.checks.find((item) => item.id === "environment")).toMatchObject({
+      status: "info",
+      blocking: false,
+      details: { scope: "cli_process", name: "PHASE13_DOCTOR_KEY", available: false }
+    });
+
+    vi.stubEnv("PHASE13_DOCTOR_KEY", "phase13-secret");
+    const available = await diagnose(root);
+    expect(available.ready).toBe(true);
+    expect(available.checks.find((item) => item.id === "environment")).toMatchObject({
+      status: "ok",
+      blocking: false,
+      details: { scope: "cli_process", name: "PHASE13_DOCTOR_KEY", available: true }
+    });
+    expect(JSON.stringify(available)).not.toContain("phase13-secret");
   });
 
   it("does not treat config-only recovery state as ready", async () => {
@@ -90,7 +121,7 @@ describe("kg doctor", () => {
     });
   });
 
-  it("surfaces Runtime, config, and environment failures", async () => {
+  it("surfaces Runtime failures while keeping a missing embedding credential informational", async () => {
     const root = await mkdtemp(join(tmpdir(), "kgos-doctor-"));
     await mkdir(join(root, ".kgos"), { recursive: true });
     await writeFile(
@@ -105,7 +136,10 @@ describe("kg doctor", () => {
     const result = await diagnose(root);
     expect(result.ready).toBe(false);
     expect(result.checks.find((item) => item.id === "runtime")?.status).toBe("error");
-    expect(result.checks.find((item) => item.id === "environment")?.status).toBe("error");
+    expect(result.checks.find((item) => item.id === "environment")).toMatchObject({
+      status: "info",
+      blocking: false
+    });
   });
 
   it("fails closed when a local additional extension violates its configured SHA-256", async () => {
@@ -202,11 +236,11 @@ describe("kg doctor", () => {
   });
 });
 
-async function readyInstance(): Promise<string> {
+async function readyInstance(config: InstanceConfig = CONFIG): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "kgos-doctor-"));
   const instance = join(root, ".kgos");
   await mkdir(join(instance, "extensions"), { recursive: true });
-  await writeFile(configPath(root), encodeConfig(CONFIG));
+  await writeFile(configPath(root), encodeConfig(config));
   await writeFile(join(instance, "auth.json"), '{"token":"secret"}\n');
   await writeFile(join(instance, "kgos.db"), "");
   await writeFile(join(instance, "initialized.json"), '{"version":1}\n');

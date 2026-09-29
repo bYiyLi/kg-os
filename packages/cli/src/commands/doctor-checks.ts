@@ -2,7 +2,7 @@ import { access, lstat } from "node:fs/promises";
 
 import { KGOSClient, KGOS_VERSION } from "@kgos/sdk";
 
-import { loadConfig, validateRequiredEnvironment, type InstanceConfig } from "../config.js";
+import { loadConfig, type InstanceConfig } from "../config.js";
 import { CLIError } from "../errors.js";
 import { isInitializationComplete } from "../paths.js";
 import {
@@ -147,20 +147,29 @@ export function diagnoseEnvironment(config: InstanceConfig | undefined): DoctorC
       message: "environment cannot be evaluated without valid config"
     });
   }
-  try {
-    validateRequiredEnvironment(config);
+  const name = config.embedding.api_key_env;
+  if (name === "") {
     return check("environment", {
       status: "ok",
       blocking: false,
-      message: "required environment is available"
-    });
-  } catch (error) {
-    return check("environment", {
-      status: "error",
-      blocking: true,
-      message: diagnosticMessage(error)
+      message: "Embedding Provider requires no authentication for this Instance",
+      details: { scope: "cli_process", authentication: "none" }
     });
   }
+  if ((process.env[name] ?? "") !== "") {
+    return check("environment", {
+      status: "ok",
+      blocking: false,
+      message: `Embedding credential environment variable ${name} is available in this CLI process`,
+      details: { scope: "cli_process", name, available: true }
+    });
+  }
+  return check("environment", {
+    status: "info",
+    blocking: false,
+    message: `Embedding credential environment variable ${name} is missing or empty in this CLI process`,
+    details: { scope: "cli_process", name, available: false }
+  });
 }
 
 export async function diagnoseCredential(

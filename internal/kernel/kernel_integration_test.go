@@ -2069,7 +2069,7 @@ func openRawLithograph(t *testing.T, home string) *lithograph.Host {
 	if err != nil {
 		t.Fatalf("resolve raw Lithograph paths: %v", err)
 	}
-	config, err := runtimeprofile.LoadConfig(paths, nil)
+	config, err := runtimeprofile.LoadConfig(paths)
 	if err != nil {
 		t.Fatalf("load raw Lithograph config: %v", err)
 	}

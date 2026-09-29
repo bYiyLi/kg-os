@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { parse, stringify } from "smol-toml";
 
 import { localIOError, usageError } from "./errors.js";
-import { INIT_FIELD_SPECS, type InitField } from "./init-schema.js";
+import { INIT_FIELD_SPECS, type InitField, type InitFieldSpec } from "./init-schema.js";
 import { resolveWorkspacePaths } from "./paths.js";
 
 export interface InstanceConfig {
@@ -159,6 +159,25 @@ export function classifyExtensionSource(source: string): {
   return { remote: true, archive: isArchivePath(url.pathname) };
 }
 
+export function validateInitFieldInput(root: string, spec: InitFieldSpec, value: string): void {
+  const validated = validateCLIValue(spec, value);
+  if (spec.kind === "cache-path") {
+    normalizeCachePath(root, String(validated));
+  }
+}
+
+export function validateExtensionEntrypoint(value: string): void {
+  requireExtensionEntrypoint(value, "extension.entrypoint");
+}
+
+export function validateExtensionLibraryPath(value: string): void {
+  validateLibraryPath(value, "extension");
+}
+
+export function validateExtensionSHA256(value: string): void {
+  requireSHA256(value, "extension.sha256");
+}
+
 export async function loadConfig(root: string): Promise<InstanceConfig> {
   let body: string;
   try {
@@ -167,15 +186,6 @@ export async function loadConfig(root: string): Promise<InstanceConfig> {
     throw localIOError("config.toml cannot be read");
   }
   return parseConfig(root, body);
-}
-
-export function validateRequiredEnvironment(config: InstanceConfig): void {
-  const name = config.embedding.api_key_env;
-  if (name !== "" && (process.env[name] ?? "") === "") {
-    throw localIOError("required embedding credential environment variable is missing or empty", {
-      name
-    });
-  }
 }
 
 export async function validateRootShape(root: string): Promise<"missing" | "directory"> {
@@ -238,10 +248,7 @@ function parseExtension(value: unknown, index: number, collection: string): Exte
   const extension = requireRecord(value, label);
   assertOnlyKeys(extension, ["source", "library", "entrypoint", "sha256"], label);
   const source = requireString(extension["source"], label + ".source");
-  const entrypoint = requireString(extension["entrypoint"], label + ".entrypoint");
-  if (OFFICIAL_ENTRYPOINTS.has(entrypoint)) {
-    throw usageError(label + " cannot configure an official Runtime extension");
-  }
+  const entrypoint = requireExtensionEntrypoint(extension["entrypoint"], label + ".entrypoint");
   let sourceClass: ReturnType<typeof classifyExtensionSource>;
   try {
     sourceClass = classifyExtensionSource(source);
@@ -258,11 +265,7 @@ function parseExtension(value: unknown, index: number, collection: string): Exte
   }
   const hash = extension["sha256"];
   if (hash !== undefined) {
-    const sha256 = requireString(hash, label + ".sha256");
-    if (!/^[0-9a-f]{64}$/.test(sha256)) {
-      throw usageError(label + ".sha256 must be 64 lowercase hexadecimal characters");
-    }
-    parsed.sha256 = sha256;
+    parsed.sha256 = requireSHA256(hash, label + ".sha256");
   }
   if (sourceClass.remote && parsed.sha256 === undefined) {
     throw usageError(label + ".sha256 is required for HTTPS sources");
@@ -291,17 +294,14 @@ function normalizeCachePath(root: string, path: string): string {
   return absolute;
 }
 
-function validateConfigScalar(
-  spec: (typeof INIT_FIELD_SPECS)[number],
-  value: unknown
-): string | number {
+function validateConfigScalar(spec: InitFieldSpec, value: unknown): string | number {
   const label = `${spec.section}.${spec.key}`;
   switch (spec.kind) {
     case "cache-path":
     case "string":
       return requireString(value, label);
     case "credential-env":
-      return requirePresentString(value, label);
+      return requireCredentialEnv(value, label);
     case "positive-integer":
       return requirePositiveInteger(value, label);
     case "dimensions":
@@ -313,7 +313,7 @@ function validateConfigScalar(
   }
 }
 
-function validateCLIValue(spec: (typeof INIT_FIELD_SPECS)[number], value: string): string | number {
+function validateCLIValue(spec: InitFieldSpec, value: string): string | number {
   if (spec.kind === "positive-integer" || spec.kind === "dimensions") {
     const parsed = Number(value);
     return spec.kind === "positive-integer"
@@ -387,11 +387,32 @@ function requireString(value: unknown, label: string): string {
   return value;
 }
 
-function requirePresentString(value: unknown, label: string): string {
+function requireCredentialEnv(value: unknown, label: string): string {
   if (typeof value !== "string" || value.includes("\0")) {
     throw usageError(label + " must be a string containing no NUL");
   }
+  if (value !== "" && value.trim() === "") {
+    throw usageError(
+      label + " must be empty for no authentication or a non-blank environment name"
+    );
+  }
   return value;
+}
+
+function requireExtensionEntrypoint(value: unknown, label: string): string {
+  const entrypoint = requireString(value, label);
+  if (OFFICIAL_ENTRYPOINTS.has(entrypoint)) {
+    throw usageError(label + " cannot configure an official Runtime extension");
+  }
+  return entrypoint;
+}
+
+function requireSHA256(value: unknown, label: string): string {
+  const sha256 = requireString(value, label);
+  if (!/^[0-9a-f]{64}$/.test(sha256)) {
+    throw usageError(label + " must be 64 lowercase hexadecimal characters");
+  }
+  return sha256;
 }
 
 function requirePositiveInteger(value: unknown, label: string): number {

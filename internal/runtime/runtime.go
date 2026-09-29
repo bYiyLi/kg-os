@@ -75,7 +75,7 @@ func OpenWithOfficialExtensions(
 	if err := runtimeprofile.EnsureDirectories(paths); err != nil {
 		return nil, err
 	}
-	config, err := runtimeprofile.LoadConfig(paths, nil)
+	config, err := runtimeprofile.LoadConfig(paths)
 	if err != nil {
 		return nil, err
 	}

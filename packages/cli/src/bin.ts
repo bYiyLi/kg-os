@@ -7,7 +7,7 @@ import { runGraph } from "./commands/graph.js";
 import { runInit } from "./commands/init.js";
 import { runObject } from "./commands/object.js";
 import { runOntology } from "./commands/ontology.js";
-import { loadConfig, validateRequiredEnvironment } from "./config.js";
+import { loadConfig } from "./config.js";
 import { errorJSON, normalizeError, usageError } from "./errors.js";
 import { commandHelp, rootHelp, versionText } from "./help.js";
 import { ensureClient } from "./runtime.js";
@@ -47,8 +47,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       case "object":
       case "graph":
       case "evolution": {
-        const config = await loadConfig(root);
-        validateRequiredEnvironment(config);
+        await loadConfig(root);
         const client = await ensureClient(root);
         if (command === "ontology") {
           await runOntology(client, args.slice(1));

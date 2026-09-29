@@ -350,9 +350,9 @@ KG OS v1 继续使用 OpenAI-compatible Embeddings。`[embedding]` 是 Knowledge
 | `model` | 必填非空模型 ID，不通过 List Models 猜测 |
 | `dimensions` | 必填 Integer 1..4096，必须等于服务实际返回维度 |
 | `similarity` | 必填，允许 `cosine` / `euclidean`，映射到索引配置 |
-| `api_key_env` | 字段必填；非空时必须是环境变量名且启动时检查其值存在且非空，空字符串表示调用方明确配置了无需认证的 endpoint |
+| `api_key_env` | 字段必填；非空时是 Provider operation-time 读取 credential 的环境变量名，startup 只校验名称本身，不要求当前值存在；空字符串表示调用方明确配置了无需认证的 endpoint |
 
-KG OS 不接受字段缺失来表达 embedding 默认或禁用；也不接受内联 `api_key`。未知字段返回配置错误，不开放任意 headers/options bag。`[embedding]` 与本地扩展依然是 daemon 的运行前置条件；启动不发远端 health check 或 sample embedding 请求。
+KG OS 不接受字段缺失来表达 embedding 默认或禁用；也不接受内联 `api_key`。未知字段返回配置错误，不开放任意 headers/options bag。`[embedding]` 的**静态配置**与 official Provider registration 依然是 daemon 的运行前置条件，但非空 `api_key_env` 对应的 secret 不是 startup readiness 条件；启动不解析该变量、不发远端 health check 或 sample embedding 请求。
 
 `api_key_env` 路径的 compiler 映射示例：
 
@@ -387,7 +387,7 @@ Relationship 使用同形的 `createRelationshipIndex`。startup config 的 `emb
 
 #### 凭证不落库
 
-KG OS 只保留 `api_key_env` 这一认证输入，不增加内联密钥的转接层。配置值非空时，索引只保存环境变量**名称**；Provider 在发请求时读取 kgosd 环境中的实际值，KG OS 不把解析后的 secret 写回 `providerConfig`、State、日志或错误。配置值为空时表示 no-auth endpoint，索引不保存 `api_key_env`。
+KG OS 只保留 `api_key_env` 这一认证输入，不增加内联密钥的转接层。配置值非空时，索引只保存环境变量**名称**；`init`、普通 CLI Runtime ensure 与 `kgosd` startup 都不预先解析这个变量。Provider 只在实际 Semantic operation 需要形成 effective request identity 时读取 kgosd 环境中的实际值；这一步可能发生在 Provider cache lookup 之前，因此即使最终不发 HTTP，也属于该次 Semantic operation 的按需解析；缺失/空值使该次 Semantic operation 按 Lithograph 当前 Provider mapping 以 `INVALID_ARGUMENT` 失败，但不影响 daemon startup、Ontology/Object/Evolution 或不需要 Semantic Provider 的 Graph operation。KG OS 不把解析后的 secret 写回 `providerConfig`、State、日志或错误。配置值为空时表示 no-auth endpoint，索引不保存 `api_key_env`。
 
 环境变量名称随索引定义保存；历史索引仍引用原名称，修改当前默认名称不改写它们。普通 credential rotation 可保持同名变量并重启进程；若新 credential 会把相同 endpoint/model 路由到不同 embedding space，则必须按新的索引配置处理，不能把它当作只有认证值变化的轮换。KG OS 不增加 secret registry 或隐藏环境变量约定。Lithograph 本身仍支持直接配置 `api_key`，但该低层能力不进入 KG OS 的公共配置 profile。
 
@@ -459,7 +459,7 @@ require and resolve --root <absolute-workspace-root>
 → verify this kgosd native package manifest / target / version
 → load <root>/.kgos/config.toml once
 → load existing <root>/.kgos/auth.json or securely create it once
-→ validate cache + caller sqlite.extensions + fulltext + embedding config
+→ statically validate cache + caller sqlite.extensions + fulltext + embedding config; do not resolve embedding api_key_env
 → resolve official Runtime extensions + caller configured extensions to <root>/.kgos/extensions/<sha256>
 → open one exclusive read-write bootstrap connection to <root>/.kgos/kgos.db
 → connection hook loads official Lithograph → official Provider → caller additional extensions → official Jieba and verifies host SQLite >=3.45 + FTS5

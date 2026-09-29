@@ -106,7 +106,13 @@ describe("kg init", () => {
     const root = await mkdtemp(join(tmpdir(), "kgos-init-"));
     const instance = join(root, ".kgos");
     await mkdir(instance);
-    await writeFile(configPath(root), encodeConfig(CONFIG));
+    await writeFile(
+      configPath(root),
+      encodeConfig({
+        ...CONFIG,
+        embedding: { ...CONFIG.embedding, api_key_env: "MISSING_RESUME_KEY" }
+      })
+    );
     const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     await runInit(root, []);
@@ -222,13 +228,16 @@ describe("kg init", () => {
     await expect(access(configPath(legacy))).rejects.toThrow();
   });
 
-  it("validates required credential environment before publishing config", async () => {
+  it("does not require the configured embedding credential during initialization", async () => {
     const root = join(await mkdtemp(join(tmpdir(), "kgos-init-")), "workspace");
     const args: string[] = [...FULL_ARGS];
     const index = args.indexOf("--embedding-api-key-env");
     args[index + 1] = "MISSING_INIT_KEY";
-    await expect(runInit(root, args)).rejects.toMatchObject({ code: "IO_ERROR" });
-    await expect(access(configPath(root))).rejects.toThrow();
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runInit(root, args)).resolves.toBeUndefined();
+    expect(await readFile(configPath(root), "utf8")).toContain('api_key_env = "MISSING_INIT_KEY"');
+    await expect(access(join(root, ".kgos", "initialized.json"))).resolves.toBeUndefined();
   });
 });
 

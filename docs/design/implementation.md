@@ -174,7 +174,7 @@ Web 还需细化页面布局、导航与具体操作交互，状态由 [Runtime]
 | 同请求新建 Node/Relationship/Domain | alias 跨 entry 解析，与文本顺序无关，最终 from/to/includes 为正式 Ref |
 | required / unique / 复合 KEY | 单字段和联合规则不混淆，类型/空值/冲突遵守对应数据库语义 |
 | Object / Ontology caller-owned Vector | 高层 Object / Ontology profile 仍拒绝 Vector；Graph 直接执行不受该 profile 限制，后续高层读取按一致性合同处理 |
-| Embedding config 缺失/非法 | 缺失或非法配置拒绝开放业务能力；api_key 字段拒绝，api_key_env 只存变量名，实际 secret 不进入 Schema/SHOW/history/log |
+| Embedding config 缺失/非法 | 缺失或非法配置拒绝开放业务能力；api_key 字段拒绝，api_key_env 只存变量名，init/CLI/daemon startup 不要求对应 env value 已存在；实际 secret 仅在 Semantic Provider operation-time 解析且不进入 Schema/SHOW/history/log |
 | Provider 暂时不可用 | Provider extension 缺失时 semantic 操作失败；扩展已加载而远端不可用时，只影响实际需要计算 embedding 的检索；普通 read/source write 继续工作 |
 | Provider HTTP diagnostics | 401/403/429/5xx/timeout等真实远端失败保留底层公开category与准确HTTP status/安全诊断，不拼接无关errno、不泄露credential；若污染来自KG OS SQLite driver 的结构化 `SystemErrno`，adapter只剔除该字段确定附加的尾部；若缺陷在Lithograph Provider则以owner修复后的release artifact完成KG OS验收，不按任意message文本猜分类 |
 | Semantic source mapping | 首版单字段 exact UTF-8 source 直接映射 Managed Semantic；共享索引的每个 target 使用同名 source；明确拒绝多字段拼接声明，不静默截断、拆索引或恢复隐藏向量 Property |

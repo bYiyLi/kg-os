@@ -7,7 +7,6 @@ import {
   configPath,
   parseExtensionsJSON,
   parseConfig,
-  validateRequiredEnvironment,
   type ExtensionConfig,
   type InstanceConfig
 } from "../config.js";
@@ -66,8 +65,7 @@ async function resumeInit(
   if (hasConfigurationOptions(parsed)) {
     throw usageError("configuration options cannot be provided for an initialized Instance");
   }
-  const config = parseConfig(root, body);
-  validateRequiredEnvironment(config);
+  parseConfig(root, body);
   const runtime = await resolveNativeRuntime();
   if (await isInitializationComplete(root)) {
     await assertCompletedArtifacts(root);
@@ -167,7 +165,6 @@ async function completeFreshInitialization(
   runtime: NativeRuntime | undefined
 ): Promise<void> {
   const built = buildConfigFromInitValues(root, values, extensions);
-  validateRequiredEnvironment(built.normalized);
   await publishConfig(root, built.normalized, built.body);
   const resolvedRuntime = runtime ?? (await resolveNativeRuntime());
   await initializeClient(root, resolvedRuntime);

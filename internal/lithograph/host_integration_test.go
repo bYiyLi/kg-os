@@ -785,6 +785,57 @@ func TestSemanticProviderHTTPDiagnostics(t *testing.T) {
 	})
 }
 
+func TestSemanticProviderCredentialIsResolvedAtOperationTime(t *testing.T) {
+	const environment = "KGOS_PHASE13_MISSING_PROVIDER_KEY"
+	t.Setenv(environment, "")
+	paths := integrationPaths(t)
+	semantic := integrationSemantic(paths, false)
+	semantic.APIKeyEnv = environment
+
+	host, err := Open(
+		context.Background(),
+		paths.Database,
+		integrationExtensions(t),
+		"unicode61",
+		semantic,
+	)
+	if err != nil {
+		t.Fatalf("open host without embedding credential: %v", err)
+	}
+	defer host.Close()
+
+	if _, err := host.Execute(context.Background(), ExecuteRequest{
+		Branch: "main",
+		Cypher: "CALL db.index.semantic.createNodeIndex($name, [$label], $property, $options)",
+		Params: map[string]any{
+			"name":     "phase13_missing_credential",
+			"label":    "Phase13Credential",
+			"property": "content",
+			"options":  semantic.IndexOptions(),
+		},
+	}); err != nil {
+		t.Fatalf("create Semantic index without resolving credential: %v", err)
+	}
+	if _, err := host.Execute(context.Background(), ExecuteRequest{
+		Branch: "main",
+		Cypher: "CREATE (:Phase13Credential {content: 'fixture'})",
+	}); err != nil {
+		t.Fatalf("create Semantic source: %v", err)
+	}
+
+	_, err = host.Query(context.Background(), QueryRequest{
+		At:     "branch/main",
+		Cypher: "CALL db.index.semantic.queryNodes('phase13_missing_credential', 'fixture', {limit: 10}) YIELD node RETURN node",
+	})
+	if err == nil {
+		t.Fatal("Semantic Provider operation unexpectedly succeeded without its configured credential")
+	}
+	category, message, _, ok := ErrorDetails(err)
+	if !ok || category != CategoryInvalidArgument || !strings.Contains(message, environment) {
+		t.Fatalf("missing credential diagnostics = (%q, %q, %v)", category, message, err)
+	}
+}
+
 func assertProviderFailure(t *testing.T, baseURL string, timeoutMS int, want string, secret string) {
 	t.Helper()
 	paths := integrationPaths(t)

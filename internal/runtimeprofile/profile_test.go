@@ -62,7 +62,7 @@ func TestLoadConfigRequiresExplicitValuesAndMapsSemanticDefaults(t *testing.T) {
 		"",
 	))
 
-	config, err := LoadConfig(paths, func(string) (string, bool) { return "", false })
+	config, err := LoadConfig(paths)
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
@@ -115,9 +115,7 @@ func TestLoadConfigExplicitValues(t *testing.T) {
 	}, "\n")
 	writeConfig(t, paths, configText)
 
-	config, err := LoadConfig(paths, func(name string) (string, bool) {
-		return "secret", name == "FIXTURE_KEY"
-	})
+	config, err := LoadConfig(paths)
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
@@ -143,7 +141,6 @@ func TestLoadConfigRejectsInvalidInputs(t *testing.T) {
 	tests := []struct {
 		name       string
 		config     string
-		lookup     LookupEnv
 		wantSubstr string
 	}{
 		{
@@ -237,25 +234,34 @@ func TestLoadConfigRejectsInvalidInputs(t *testing.T) {
 			config:     strings.Replace(valid, "api_key_env = \"\"\n", "", 1),
 			wantSubstr: "embedding.api_key_env",
 		},
-		{
-			name:       "missing api key environment value",
-			config:     strings.Replace(valid, "api_key_env = \"\"", "api_key_env = \"MISSING_KEY\"", 1),
-			lookup:     func(string) (string, bool) { return "", false },
-			wantSubstr: "not set or empty",
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			writeConfig(t, paths, test.config)
-			lookup := test.lookup
-			if lookup == nil {
-				lookup = func(string) (string, bool) { return "", false }
-			}
-			_, err := LoadConfig(paths, lookup)
+			_, err := LoadConfig(paths)
 			if err == nil || !strings.Contains(err.Error(), test.wantSubstr) {
 				t.Fatalf("error = %v, want substring %q", err, test.wantSubstr)
 			}
 		})
+	}
+}
+
+func TestLoadConfigDoesNotResolveEmbeddingCredentialEnvironment(t *testing.T) {
+	paths := testProfilePaths(t)
+	writeConfig(t, paths, strings.Replace(
+		completeRuntimeConfig("", ""),
+		"api_key_env = \"\"",
+		"api_key_env = \"PHASE13_MISSING_KEY\"",
+		1,
+	))
+
+	config, err := LoadConfig(paths)
+	if err != nil {
+		t.Fatalf("load config without credential environment: %v", err)
+	}
+	if config.Embedding.APIKeyEnv != "PHASE13_MISSING_KEY" ||
+		config.SemanticDefaults().APIKeyEnv != "PHASE13_MISSING_KEY" {
+		t.Fatalf("embedding credential env = %q", config.Embedding.APIKeyEnv)
 	}
 }
 

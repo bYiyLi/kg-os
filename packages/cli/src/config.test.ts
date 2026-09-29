@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   configPath,
@@ -11,7 +11,6 @@ import {
   parentWritable,
   parseExtensionsJSON,
   parseConfig,
-  validateRequiredEnvironment,
   validateRootShape,
   type InstanceConfig
 } from "./config.js";
@@ -28,10 +27,6 @@ const BASE: InstanceConfig = {
     api_key_env: ""
   }
 };
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
 
 describe("Instance config", () => {
   it("round-trips and normalizes the complete explicit config", async () => {
@@ -104,18 +99,17 @@ describe("Instance config", () => {
     ).toThrow(CLIError);
   });
 
-  it("validates the configured credential environment", () => {
+  it("treats the configured credential as a statically validated environment name", () => {
+    const root = "/tmp/kgos-config-static-credential";
     const config = { ...BASE, embedding: { ...BASE.embedding, api_key_env: "FIXTURE_KEY" } };
-    expect(() => {
-      validateRequiredEnvironment(config);
-    }).toThrow(CLIError);
-    vi.stubEnv("FIXTURE_KEY", "secret");
-    expect(() => {
-      validateRequiredEnvironment(config);
-    }).not.toThrow();
-    expect(() => {
-      validateRequiredEnvironment(BASE);
-    }).not.toThrow();
+    expect(parseConfig(root, encodeConfig(config)).embedding.api_key_env).toBe("FIXTURE_KEY");
+    expect(() =>
+      parseConfig(
+        root,
+        encodeConfig({ ...BASE, embedding: { ...BASE.embedding, api_key_env: " " } })
+      )
+    ).toThrow(CLIError);
+    expect(parseConfig(root, encodeConfig(BASE)).embedding.api_key_env).toBe("");
   });
 
   it("classifies root shape and writable parents", async () => {

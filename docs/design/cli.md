@@ -228,11 +228,13 @@ v1 exit code 只表达粗粒度执行层级，稳定业务分类始终读取 err
 kg doctor [--json]
 ```
 
-`doctor` 是 side-effect-free 本地诊断入口。它检查 Workspace Root、`.kgos` Instance Directory、`config.toml` 完整性与静态合法性、当前 npm native Runtime package 完整性、official/additional extension materialization 的可确定状态、必需环境变量、`auth.json/kgos.db` 存在状态以及 daemon locator / version / authentication 状态；不得创建目录或文件、下载 artifact、启动 daemon、生成 credential、打开/初始化 `kgos.db` 或执行 Knowledge Base bootstrap。
+`doctor` 是 side-effect-free 本地诊断入口。它检查 Workspace Root、`.kgos` Instance Directory、`config.toml` 完整性与静态合法性、当前 npm native Runtime package 完整性、official/additional extension materialization 的可确定状态、`auth.json/kgos.db` 存在状态以及 daemon locator / version / authentication 状态；如果 `embedding.api_key_env` 非空，还可以观察本次 CLI invocation 环境中同名变量是否可用，但该项只是 Semantic Provider 的运行环境提示，**不阻塞 Instance readiness**。不得创建目录或文件、下载 artifact、启动 daemon、生成 credential、打开/初始化 `kgos.db` 或执行 Knowledge Base bootstrap，也不得回显 resolved secret。
 
 成功完成过 `init` 的 Instance 即使 daemon 当前 `stopped` 仍可以是 ready，因为后续业务命令会自动启动 Runtime；未完成首次 init 的 Instance 不能靠业务命令隐式完成 bootstrap。`starting/running/unavailable/version_mismatch` 必须如实报告。默认 TTY 输出使用当前 locale 的高密度诊断文本，至少明确 Workspace / Instance 路径以及 blocking 项；`--json` 输出稳定 machine result，至少包含 overall readiness、每个 check 的稳定 `id/status/blocking` 与适用的缺失配置 key，不翻译这些 identifier。
 
-`doctor` 的 machine status 只使用 `ok | info | error`；daemon lifecycle state 放在对应 check 的 `details.state`。`stopped` 对应 `status=info, blocking=false`；`version_mismatch` 必须 blocking。只要诊断过程本身完成，`doctor` 即 exit `0`，环境是否 ready 由 `ready` 与 `blocking` 表达；CLI usage / 无法读取必需诊断输入等命令自身失败才使用通用非零 exit code。
+`doctor` 的 machine status 只使用 `ok | info | error`；daemon lifecycle state 放在对应 check 的 `details.state`。`stopped` 对应 `status=info, blocking=false`；`version_mismatch` 必须 blocking。Embedding credential env 诊断只描述**本次 CLI invocation 的环境**：configured env 当前存在且非空时对应 environment check 使用 `status=ok, blocking=false`；缺失/空时使用 `status=info, blocking=false`；`api_key_env=""` 时使用 `status=ok, blocking=false` 并说明 no authentication required。该检查不声称一个已经运行中的 daemon 拥有相同环境，以上状态也不得单独把 `ready` 变为 false。只要诊断过程本身完成，`doctor` 即 exit `0`，环境是否 ready 由 `ready` 与 `blocking` 表达；CLI usage / 无法读取必需诊断输入等命令自身失败才使用通用非零 exit code。
+
+Ontology / Object / Graph / Evolution 命令不得因为当前进程缺少 `embedding.api_key_env` 指向的变量而做全局 preflight 失败。只有实际执行到调用 OpenAI-compatible Provider 的 Semantic operation 时，Provider 才解析该环境变量并形成 effective request identity；不使用 Semantic Provider 的命令与操作不依赖该 secret。
 
 ## Init
 
@@ -257,7 +259,7 @@ kg init
 Workspace / Instance      → 展示解析结果，不询问内部路径
 Runtime                   → 自动验证 package / target / official artifacts
 Cache                     → 收集 path / max size
-Additional extensions     → 默认 none；用户选择添加后才展开 extension fields
+Custom SQLite extensions  → 默认 none；用户选择添加额外第三方 extension 后才展开 fields
 Full-text                 → 展示 built-in jieba 默认；显式 override 时使用调用方值
 Embedding                 → 收集 endpoint / model / dimensions / similarity / credential env name
 Review                    → 只汇总会影响用户决策的最终值
@@ -266,9 +268,11 @@ Initialize                → materialize / credential / database / bootstrap / 
 
 Runtime package、official Lithograph、official OpenAI-compatible Provider、official Jieba、`.kgos` 内部文件名、lock/log/cache目录等都由 KG OS 自己确定，wizard 只显示必要状态，不询问“是否安装”或要求用户输入官方 library path。交互过程只在第一次进入初始化后不可变的 Full-text / Embedding 配置范围时显示一次简短提示，不重复责任说明。
 
-Human-facing prompt 使用当前阶段的业务标签与单位，不直接把 CLI flag 名当作问题文案。例如 Cache 阶段显示 `Path` / `Maximum size (MB)`，Embedding 阶段显示 `Base URL` / `Model` / `Dimensions` / `Similarity` / `API key environment variable`；对应 `--cache-path` / `--embedding-model` 等 flag 只属于非交互 adapter 和 help。推荐值以内联默认形式展示，不为默认值增加第二次确认。
+Human-facing prompt 使用当前阶段的业务标签与单位，不直接把 CLI flag 名当作问题文案。例如 Cache 阶段显示 `Path` / `Maximum size (MB)`，Embedding 阶段显示 `Base URL` / `Model` / `Dimensions` / `Similarity` / `API key environment variable`；对应 `--cache-path` / `--embedding-model` 等 flag 只属于非交互 adapter 和 help。交互推荐值统一用 `[value]` 内联显示，用户直接 Enter 表示采用该值，不再额外显示“推荐/recommended”或增加第二次确认。
 
-Additional extension 的公共配置仍是 `source / entrypoint / optional library / conditional sha256`。交互模式先以一个高层问题决定是否进入高级 extension 配置；选择 none 后不再询问其字段。非交互模式使用 `--extensions-file <path>` 提供 UTF-8 JSON array，元素字段与 `[[sqlite.extensions]]` 一致；`--no-additional-extensions` 显式表示空集合，两者互斥。official Runtime extensions 不允许通过该文件重复声明或替换。
+Additional extension 的公共配置仍是 `source / entrypoint / optional library / conditional sha256`。交互模式把该分支明确表述为**额外的第三方 / 自定义 SQLite extension**，避免与 Runtime 自动携带的 official Lithograph / OpenAI-compatible Provider / Jieba 混淆；先以一个高层 yes/no 问题决定是否进入高级配置，选择 none 后不再询问其字段。展开后，`source` prompt 必须说明“absolute local path or HTTPS URL”，`entrypoint` 必须说明它是 SQLite extension init symbol，archive 的 `library` 与 remote 的 `sha256` 只在适用时出现。非交互模式使用 `--extensions-file <path>` 提供 UTF-8 JSON array，元素字段与 `[[sqlite.extensions]]` 一致；`--no-additional-extensions` 显式表示空集合，两者互斥。official Runtime extensions 不允许通过该文件重复声明或替换。
+
+TTY wizard 中可以由用户重新输入修正的字段错误必须在当前字段原地提示并重试，包括 scalar 的显式非法格式/范围、extension 必填字段空值或 source/entrypoint/library/sha256 非法值，以及 yes/no 非法输入；不得因为一次可恢复输入错误终止整个 `init`。普通 scalar 直接 Enter 仍表示采用 `[default]`，不是错误。文件 I/O、Runtime/extension materialization、daemon/bootstrap 等执行错误仍按正常错误合同终止。非交互参数和文件输入保持 fail-fast，不引入 retry 语义。
 
 初始化配置解析先应用 KG OS 明确冻结的产品默认，再处理其余用户可配置字段。v1 唯一无需询问即可自动解析的初始化字段是 `fulltext.analyzer`：
 
@@ -286,10 +290,10 @@ CLI flag 已提供 → 直接采用，不询问
         ↓
 字段缺失且不可交互 → INIT_CONFIGURATION_INCOMPLETE
         ↓
-所有字段 resolved → validate（含required credential env）→ Review（仅实际进入过 wizard 时）→ 初始化 pipeline
+所有字段 resolved → 静态 validate → Review（仅实际进入过 wizard 时）→ 初始化 pipeline
 ```
 
-交互提示展示推荐值时，用户直接 Enter 表示明确采用该值；最终 `config.toml` 仍写出完整 scalar 字段。省略 `--fulltext-analyzer` 不属于“缺少配置”，最终文件必须显式写出 `analyzer = "jieba"`。完全参数化且没有进入 wizard 的调用必须零 prompt；非空 `embedding.api_key_env` 指向的环境变量在配置发布前必须存在且非空，init 不询问或持久化 secret；非交互仍缺必需 scalar 字段或既未提供 `--extensions-file` 也未显式 `--no-additional-extensions` 时使用 CLI-local 稳定 code `INIT_CONFIGURATION_INCOMPLETE`，exit `2`，`details.missing` 使用稳定 config key / `sqlite.extensions` identifier。
+交互提示中的 `[value]` 表示用户直接 Enter 即明确采用该值；最终 `config.toml` 仍写出完整 scalar 字段。省略 `--fulltext-analyzer` 不属于“缺少配置”，最终文件必须显式写出 `analyzer = "jieba"`。完全参数化且没有进入 wizard 的调用必须零 prompt。非空 `embedding.api_key_env` 只声明 Provider 在真正需要认证时读取的环境变量**名称**；`init` 只校验该字符串本身，不要求当前 shell / CI / daemon 启动环境已经存在同名变量，也不询问或持久化 secret。非交互仍缺必需 scalar 字段或既未提供 `--extensions-file` 也未显式 `--no-additional-extensions` 时使用 CLI-local 稳定 code `INIT_CONFIGURATION_INCOMPLETE`，exit `2`，`details.missing` 使用稳定 config key / `sqlite.extensions` identifier。
 
 v1 init 的产品默认与交互推荐值冻结为：
 
@@ -331,7 +335,7 @@ The following settings must not be changed after initialization.
 
 对 legacy v0.1.x “root 本身就是 Instance 目录”的布局不做自动移动或隐式兼容。如果 Workspace Root 下没有 `.kgos/config.toml`，但 root 顶层出现可识别的旧 `config.toml/auth.json/kgos.db` Instance 组合，`init` / `doctor` 必须给出明确 legacy-layout 诊断并停止，不能在旧 Instance 里再静默创建嵌套新 Instance。
 
-交互向导实际询问过至少一个字段时，Review 只展示 Workspace/Instance、Cache、built-in/additional extensions、Full-text 与 Embedding 的有效摘要，并只在真正执行前确认一次；执行阶段用少量高密度状态行表示 Configuration / Extensions / Credential / Knowledge Base / Runtime 的结果，失败时才展开对应错误。完全参数化、零交互 init 成功时遵守 JSON-first 规则，stdout 返回稳定 JSON，例如 `{"status":"initialized","root":"<absolute-workspace-root>","instance":"<absolute-workspace-root>/.kgos"}`。already-initialized 的零交互成功使用 `status="already_initialized"`。这些状态值不翻译。
+交互向导实际询问过至少一个字段时，Review 以分组形式展示 Workspace/Instance、Cache、custom SQLite extensions、Full-text 与 Embedding 的有效摘要；Embedding 只显示 credential environment variable 的**名称**或 no-auth，不检查/显示 secret，并只在真正执行前确认一次。执行阶段用少量高密度状态行表示 Configuration / Extensions / **Instance auth** / Knowledge Base / Runtime 的结果，避免把已经建立的本地 `auth.json` credential 与按需解析的 Embedding Provider credential 混为一谈；失败时才展开对应错误。完全参数化、零交互 init 成功时遵守 JSON-first 规则，stdout 返回稳定 JSON，例如 `{"status":"initialized","root":"<absolute-workspace-root>","instance":"<absolute-workspace-root>/.kgos"}`。already-initialized 的零交互成功使用 `status="already_initialized"`。这些状态值不翻译。
 
 v1 不增加 `setup`、`config set` 或另一套配置持久化接口；init resume 只补齐当前已确定配置下的初始化步骤，不提供修改已初始化配置的第二条路径。
 

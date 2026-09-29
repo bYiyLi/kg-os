@@ -258,16 +258,28 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
     ) + "\n"
   );
   const provider = await startPackedProvider();
-  process.env.KGOS_PACK_PROVIDER_KEY = provider.secret;
+  const originalOpenAIKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
   try {
-    await initPackedInstance(
-      rootA,
-      undefined,
-      provider.baseURL,
-      "KGOS_PACK_PROVIDER_KEY",
-      extensionsFile
-    );
+    await initPackedInstance(rootA, undefined, provider.baseURL, "OPENAI_API_KEY", extensionsFile);
     await initPackedInstance(rootB, "unicode61");
+
+    const missingCredentialDoctor = await runKgJSON(rootA, ["doctor", "--json"]);
+    const missingCredentialEnvironment = missingCredentialDoctor.checks?.find(
+      (check) => check.id === "environment"
+    );
+    if (
+      missingCredentialDoctor.ready !== true ||
+      missingCredentialEnvironment?.status !== "info" ||
+      missingCredentialEnvironment?.blocking !== false ||
+      missingCredentialEnvironment?.details?.name !== "OPENAI_API_KEY" ||
+      missingCredentialEnvironment?.details?.available !== false
+    ) {
+      throw new Error(
+        "packed doctor did not keep a missing embedding credential non-blocking: " +
+          JSON.stringify(missingCredentialDoctor)
+      );
+    }
 
     const initStateA = await runKgJSON(rootA, ["evolution", "overview"]);
     const initTokenA = await readPackedToken(rootA);
@@ -508,6 +520,26 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
     if (typeof patchedOntology.state !== "string") {
       throw new Error("packed Ontology Patch did not create a State");
     }
+
+    const semanticQueryArgs = [
+      "graph",
+      "query",
+      "--at",
+      "branch/main",
+      "--cypher",
+      "CALL db.index.semantic.queryNodes('phase10_doc_semantic', 'semantic smoke', {limit:10}) " +
+        "YIELD node, score RETURN node.content AS content"
+    ];
+    await expectPackedFailure(rootA, semanticQueryArgs, "INVALID_ARGUMENT");
+    killPackedDaemon(restartedLocator.pid);
+    await waitForProcessExit(
+      restartedLocator.pid,
+      "packed kgosd without Provider credential did not exit after SIGTERM"
+    );
+    process.env.OPENAI_API_KEY = provider.secret;
+    await runKgJSON(rootA, ["evolution", "overview"]);
+    const providerLocator = await readPackedLocator(rootA);
+
     await runKgJSON(rootA, [
       "graph",
       "execute",
@@ -528,15 +560,7 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
       throw new Error("packed official Jieba did not match the Chinese corpus");
     }
 
-    const semantic = await runKgJSON(rootA, [
-      "graph",
-      "query",
-      "--at",
-      "branch/main",
-      "--cypher",
-      "CALL db.index.semantic.queryNodes('phase10_doc_semantic', 'semantic smoke', {limit:10}) " +
-        "YIELD node, score RETURN node.content AS content"
-    ]);
+    const semantic = await runKgJSON(rootA, semanticQueryArgs);
     if (semantic.rows?.[0]?.[0] !== "这是知识图。" || provider.requests === 0) {
       throw new Error("packed Semantic Provider request did not return the indexed Knowledge");
     }
@@ -549,10 +573,13 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
       throw new Error("abrupt daemon exit did not recover through the OS lock");
     }
 
-    killPackedDaemon(restartedLocator.pid);
+    killPackedDaemon(providerLocator.pid);
     killPackedDaemon(abruptRestart.pid);
     await Promise.all([
-      waitForProcessExit(restartedLocator.pid, "restarted packed kgosd did not exit after SIGTERM"),
+      waitForProcessExit(
+        providerLocator.pid,
+        "Provider-enabled packed kgosd did not exit after SIGTERM"
+      ),
       waitForProcessExit(
         abruptRestart.pid,
         "abruptly recovered packed kgosd did not exit after SIGTERM"
@@ -560,7 +587,11 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
     ]);
     await assertNoPackedSecret([rootA, rootB], provider.secret);
   } finally {
-    delete process.env.KGOS_PACK_PROVIDER_KEY;
+    if (originalOpenAIKey === undefined) {
+      delete process.env.OPENAI_API_KEY;
+    } else {
+      process.env.OPENAI_API_KEY = originalOpenAIKey;
+    }
     await cleanupPackedDaemons([rootA, rootB]);
     await provider.close();
   }

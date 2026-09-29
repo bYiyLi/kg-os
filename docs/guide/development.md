@@ -146,7 +146,7 @@ npm exec --yes -- kg --root "$ROOT" ontology --at branch/main
 
 省略 `--fulltext-analyzer` 时，新 Instance 的 `config.toml` 显式写入 `jieba`；如需英文或其它已安装FTS5 tokenizer，可在 `init` 时显式传 `--fulltext-analyzer unicode61` 等值。已有 Instance 不会被自动改写。
 
-如果 `embedding.api_key_env` 配置为非空变量名，应在需要 Semantic Provider 的 daemon startup 前提供同名环境变量。KG OS 只持久化环境变量名称，不持久化 secret。
+如果 `embedding.api_key_env` 配置为非空变量名，`init`、普通 CLI 命令与 daemon startup 都不要求当前环境已经存在同名变量；只有实际执行需要 OpenAI-compatible Provider 的 Semantic operation 时，Provider 才从该 daemon 进程环境读取 credential。KG OS 只持久化环境变量名称，不持久化 secret。可用 `kg doctor --json` 查看**本次 CLI invocation** 是否能看到该变量；该诊断是 non-blocking，也不代表已经运行中的 daemon 继承了相同环境。
 
 正式 registry 发布后，AI / CI 的设计入口为：
 
