@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-`in_progress`。本阶段实现 [D84 Embedding credential / wizard boundary](../../design/decisions.md#d84-late-bound-embedding-credential)，修复 v0.2.0 真实 first-run 暴露的交互误导与 credential 过早校验问题；不增加新的 Knowledge / Ontology / Graph / Evolution 业务能力。
+`done`。本阶段实现 [D84 Embedding credential / wizard boundary](../../design/decisions.md#d84-late-bound-embedding-credential)，修复 v0.2.0 真实 first-run 暴露的交互误导与 credential 过早校验问题；不增加新的 Knowledge / Ontology / Graph / Evolution 业务能力。
 
 完成后的可观察结果：
 
@@ -17,7 +17,7 @@ kg init
   → only Semantic Provider operations resolve the credential
 ```
 
-当前公开版本仍为 **v0.2.0**。Phase 13 的代码实现、本地主工作树/fresh-source 门禁与 macOS arm64 repo-out packed / TTY 验收已完成；六平台远端 native/package CI 尚未执行，因此阶段保持 `in_progress`。本阶段不包含版本发布；只有全部 Acceptance 与六平台远端门禁实际完成后才能更新为 `done`。
+当前公开版本仍为 **v0.2.0**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`；本地主工作树/fresh-source 门禁、macOS arm64 repo-out packed / 中英文 TTY 验收，以及该提交的六平台远端 native/package CI 均已通过，因此阶段已完成。本阶段不包含版本发布，未执行 npm publish、Git tag 或 GitHub Release。
 
 ## 设计输入
 
@@ -209,7 +209,7 @@ Review发现问题后在同一阶段修复并重新执行受影响验证，不�
 
 ## 当前实现与验收证据
 
-截至 2026-09-29，本工作树已经完成 P13-01–P13-08 的本地实现与验收，远端六平台 CI 除外：
+截至 2026-09-29，P13-01–P13-08 已全部实现并完成本地与远端验收：
 
 - TypeScript CLI 已删除 init、resume/already-initialized 与业务命令入口的 credential env-value preflight；Go `runtimeprofile.LoadConfig` 同样只做静态配置校验，不再解析环境变量值。`api_key_env=""` 继续表示 no-auth，非空名称只在实际 Semantic Provider operation 中解析。
 - `doctor` 的 `environment` check 只观察当前 CLI process：available 为 `ok/non-blocking`，missing/empty 为 `info/non-blocking`，no-auth 为 `ok/non-blocking`；JSON、Review 与错误路径均不回显 resolved secret。
@@ -219,11 +219,12 @@ Review发现问题后在同一阶段修复并重新执行受影响验证，不�
 - repo 外安装当前 packed `@kgos/sdk` / `@kgos/cli` / macOS arm64 Runtime 后，英文和中文真实 PTY 默认 wizard 均在 `OPENAI_API_KEY` 未提供时完成 `init`；随后 `doctor --json` 为 `ready=true` 且 environment 为 `info/non-blocking`，`ontology --at branch/main` 正常工作。
 - packed smoke 在 key 缺失时完成 init、doctor 与 Ontology/Object/Evolution/non-Semantic Graph 路径，并验证真实 Semantic request 以 Lithograph `INVALID_ARGUMENT` 失败；提供 credential 后重启 daemon，Semantic query 成功。
 - final local review 已复查 credential ownership、secret safety、TTY/non-TTY error boundary、custom extension 信息设计与 Phase 12 recovery/idempotency，没有剩余本阶段 task-affecting finding。
+- 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `origin/main`。GitHub Actions CI Run `36505717058` 为 `success`：Validate job `109206590191`、darwin-arm64 `109206590439`、darwin-x64 `109206590427`、linux-arm64 `109206590468`、linux-x64 `109206590506`、win32-arm64 `109206590409`、win32-x64 `109206590531` 全部成功；六个平台均执行了 native Runtime / official extension load 与 packed npm candidate smoke。
 
-尚未执行：Phase 13 revision 的 commit/push、六平台远端 native/package CI、npm publish、Git tag 或 GitHub Release。按照本计划完成条件，当前唯一阶段完成 blocker 是要求的六平台远端 CI 证据。
+本阶段没有执行 npm publish、Git tag 或 GitHub Release；这些动作不属于 Phase 13 完成条件，也不因阶段 `done` 自动获得授权。
 
 ## 完成条件
 
 只有 P13-01–P13-08 全部实现、Acceptance 取得真实证据、相关设计/计划/使用文档按职责同步、final diff/review无剩余本阶段 finding，并且本阶段要求的六平台远端 CI 实际成功后，Phase 13 才能从 `ready/in_progress` 更新为 `done`。
 
-当前本地实现与验收已闭环，但六平台远端 CI 尚未执行；因此 Phase 13 保持 **`in_progress`**，不得提前标记 `done`。代码仍未提交/推送，本阶段也未执行任何发布动作。
+P13-01–P13-08、Acceptance、final review、本地完整门禁、fresh-source、repo-out packed / 中英文 TTY 验收与六平台远端 CI 均已取得真实证据；Phase 13 = **`done`**。实现已提交并推送；本阶段未执行发布动作。

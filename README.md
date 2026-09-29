@@ -35,9 +35,9 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 ## 当前状态
 
-**Phase 00–12 均已完成；当前公开版本为 v0.2.0。** Phase 12 实现与本地/fresh-source/fresh-user验收已闭环；发布 revision `ac5eda19cc6d7cc849f8036419143c80c1b6427d` 的 CI Run `36407257662` Validate + 六平台 native/package matrix 全绿，`v0.2.0` tag 指向同一 revision。Release Run `36410721397` 成功完成六平台 immutable candidates、八包 OIDC npm publish、exact-version/`latest` verification、六平台 public-registry `npx` smoke 与 GitHub Release。 Phase 08 已把正式 Client / local Runtime distribution 迁移到真实 `@kgos/sdk` + TypeScript `@kgos/cli` + platform npm Runtime packages，并冻结显式 `--root`、`init/doctor`、per-instance dynamic `kgosd` 与同 root endpoint/token；Go `kg` 已在 parity 证明后删除。实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`，主工作树完整 validation、独立 fresh-source、final review 与 GitHub Actions run `36103842748` 的 Validate + macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix 均成功。
+**Phase 00–13 均已完成；当前公开版本仍为 v0.2.0。** Phase 12 的正式发布 revision `ac5eda19cc6d7cc849f8036419143c80c1b6427d`、CI Run `36407257662`、Release Run `36410721397`、八包 OIDC npm publish、六平台 public-registry `npx` smoke 与 GitHub Release 均已闭环。Phase 13 在其后完成了 D84 的仓库实现与六平台 CI 验收，但没有执行新版本发布，因此当前 npm `latest` / GitHub Release 的产品事实仍以 v0.2.0 为准。
 
-**Phase 13 当前为 `in_progress`。** D84 的 Init Wizard UX 与 Embedding credential boundary 已在本地工作树实现，主工作树完整 validation、独立 fresh-source、packed no-key smoke 与 macOS arm64 中英文 repo-out TTY first-run 均通过；六平台远端 native/package CI 尚未执行，因此这些改动尚未标记 `done`、尚未提交/推送，也不属于当前公开 v0.2.0 的发布事实。完整范围与证据见[Phase 13](docs/development/phases/13-init-wizard-credential-boundary.md)。
+**Phase 13 当前为 `done`。** 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`；主工作树完整 validation、独立 fresh-source、packed no-key smoke、macOS arm64 中英文 repo-out TTY first-run，以及 CI Run `36505717058` 的 Validate + darwin/linux/win32 arm64/x64 六平台 native/package matrix 全部成功。该阶段没有执行 npm publish、Git tag 或 GitHub Release。完整范围与证据见[Phase 13](docs/development/phases/13-init-wizard-credential-boundary.md)。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
@@ -99,5 +99,6 @@ KG OS 采用双许可模式：
 - [Phase 10 计划](docs/development/phases/10-runtime-cli-hardening.md)：Runtime connection state isolation、stale daemon recovery、official Jieba default、CLI help/pretty、Provider diagnostics、Node baseline与真实用户回归。
 - [Phase 11 计划](docs/development/phases/11-windows-runtime-acceptance.md)：Windows x64/arm64 native package、六平台 CI、`0.1.1` 发布与 registry smoke。
 - [Phase 12 计划](docs/development/phases/12-first-run-cli-productization.md)：Workspace Root / `.kgos`、`KGOS_ROOT`、完整 init readiness、extension setup、分层高信息密度 help 与 fresh-user 验收。
+- [Phase 13 计划](docs/development/phases/13-init-wizard-credential-boundary.md)：Init Wizard UX、custom SQLite extension 输入恢复、late-bound Embedding credential 与 doctor non-blocking 诊断的范围和验收。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

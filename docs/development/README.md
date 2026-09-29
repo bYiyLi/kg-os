@@ -81,7 +81,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 12 First-Run & CLI Productization 当前为 `done`，并已作为 v0.2.0 正式发布。** Workspace Root→`.kgos`、`--root > KGOS_ROOT`、完整 init/readiness/recovery、additional extension setup、doctor 与分层 help 已完成实现与多轮 review；本地/fresh-source/packed/PTY/dev 与阶段六平台 CI 均通过。后续独立发布授权将版本提升至 `0.2.0`；发布 revision `ac5eda19cc6d7cc849f8036419143c80c1b6427d` 的 CI Run `36407257662` 全绿，Release Run `36410721397` 成功完成六平台 candidates、八包纯 OIDC npm publish、exact-version/`latest` verification、六平台 public-registry `npx` smoke 与 GitHub Release。完整工作与 Acceptance 见[Phase 12](phases/12-first-run-cli-productization.md)。
 
-**Phase 13 Init Wizard UX & Embedding Credential Boundary 当前为 `in_progress`。** D84 已在当前工作树实现：credential env-value 从 init / 普通 CLI / `kgosd` startup 前置条件移到实际 Semantic Provider operation，doctor 改为 current-CLI-process non-blocking 诊断，TTY wizard 改为清晰 defaults、custom-extension 语义与字段级 retry。主工作树完整 `pnpm validate`、独立 fresh-source `setup && validate`、packed no-key smoke 与 macOS arm64 中英文 repo-out TTY first-run 均通过；final local review 无剩余 task-affecting finding。六平台远端 native/package CI 尚未执行，所以阶段不能转为 `done`。详见[Phase 13](phases/13-init-wizard-credential-boundary.md)。
+**Phase 13 Init Wizard UX & Embedding Credential Boundary 当前为 `done`。** D84 已实现：credential env-value 从 init / 普通 CLI / `kgosd` startup 前置条件移到实际 Semantic Provider operation，doctor 改为 current-CLI-process non-blocking 诊断，TTY wizard 改为清晰 defaults、custom-extension 语义与字段级 retry。主工作树完整 `pnpm validate`、独立 fresh-source `setup && validate`、packed no-key smoke 与 macOS arm64 中英文 repo-out TTY first-run 均通过；实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`，CI Run `36505717058` 的 Validate 与 darwin/linux/win32 arm64/x64 六个平台 native/package jobs 全部成功，final review 无剩余 task-affecting finding。详见[Phase 13](phases/13-init-wizard-credential-boundary.md)。
 
 ## 5. 路线总览
 
@@ -100,7 +100,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [10 Runtime & CLI Hardening](phases/10-runtime-cli-hardening.md) | `done` | 本地与fresh-source完整验证、repo外packed真实Provider、macOS arm64/x64 + Linux glibc arm64/x64 CI native/package matrix全部通过 | [D78](../design/decisions.md#d78-operation-scoped-branch)、[D79](../design/decisions.md#d79-stale-daemon-recovery)、[D80](../design/decisions.md#d80-official-jieba)、[Runtime](../design/runtime.md)、[CLI](../design/cli.md) |
 | [11 Windows Runtime CI 验收与六平台发布](phases/11-windows-runtime-acceptance.md) | `done` | 六平台 CI、`0.1.1` 八包、六平台 registry smoke、GitHub Release、Windows Trusted Publisher 与 credential cleanup 均完成 | [Client](../design/client.md#npm-package-topology)、[Runtime](../design/runtime.md#native-runtime-package) |
 | [12 First-Run & CLI Productization](phases/12-first-run-cli-productization.md) | `done` | Workspace Root / `.kgos`、`KGOS_ROOT`、complete init/readiness/recovery、extension setup、responsibility-scoped high-density help、fresh-user acceptance；本地/fresh-source/六平台 CI 验收与 v0.2.0 八包/六平台正式发布完成 | [D81](../design/decisions.md#d81-workspace-root)、[D82](../design/decisions.md#d82-init-readiness)、[D83](../design/decisions.md#d83-cli-progressive-disclosure) |
-| [13 Init Wizard UX & Embedding Credential Boundary](phases/13-init-wizard-credential-boundary.md) | `in_progress` | local implementation + main/fresh-source/packed/TTY acceptance complete；six-platform remote native/package CI pending | [D84](../design/decisions.md#d84-late-bound-embedding-credential)、[CLI](../design/cli.md#init)、[Runtime Embedding](../design/runtime.md#embedding-配置与索引映射) |
+| [13 Init Wizard UX & Embedding Credential Boundary](phases/13-init-wizard-credential-boundary.md) | `done` | clear defaults/custom-extension prompts、TTY field retry、operation-time Embedding credential、doctor non-blocking diagnostic；main/fresh-source/packed/TTY + six-platform remote CI acceptance complete | [D84](../design/decisions.md#d84-late-bound-embedding-credential)、[CLI](../design/cli.md#init)、[Runtime Embedding](../design/runtime.md#embedding-配置与索引映射) |
 
 当前实现依赖顺序：
 
@@ -134,7 +134,7 @@ Go Engineering Foundation
   -> later Web / Skill phases
 ```
 
-Phase 02–12 均已完成，当前公开版本为 **v0.2.0**。Phase 13 当前为 **`in_progress`**：D84 已在本地工作树实现，主工作树/fresh-source/packed/中英文 PTY 本地验收已通过，但尚无该 revision 的六平台远端 CI 证据，也尚未提交、推送或发布；因此这些行为不能描述为 v0.2.0 已发布事实。Phase 12 的本地/fresh-source/packed/PTY/dev验收、阶段六平台 CI 与后续正式发布均已闭环；`v0.2.0` tag 指向 `ac5eda19cc6d7cc849f8036419143c80c1b6427d`，Release Run `36410721397` 完成八包 OIDC publish、六平台 registry smoke 与 GitHub Release。Phase 09 的 `v0.1.0` 六包/四平台发布与 OIDC workflow closure、Phase 11 的 `v0.1.1` 八包/六平台首发及 Windows credential cleanup 继续保留为各自历史基线，不被 v0.2.0 追溯改写。Web / Skill 继续留在其后独立阶段。
+Phase 02–13 均已完成，当前公开版本仍为 **v0.2.0**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`，主工作树/fresh-source/packed/中英文 PTY 本地验收与 CI Run `36505717058` 的 Validate + 六平台 native/package matrix 均已通过；Phase 13 本身没有执行版本发布，因此 D84 的当前仓库实现状态与 v0.2.0 的已发布能力必须继续区分。Phase 12 的正式发布仍由 `v0.2.0` tag `ac5eda19cc6d7cc849f8036419143c80c1b6427d` 与 Release Run `36410721397` 证明。Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 历史发布基线继续保留。Web / Skill 继续留在其后独立阶段。
 
 ## 6. Phase 通用完成标准
 
