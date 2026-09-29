@@ -29,15 +29,15 @@ Node / Relationship Definition 一起表达字段、约束和索引。单字段�
 
 KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Host 使用 Go；`@kgos/sdk`、`@kgos/cli` 与浏览器 Web 使用 TypeScript。**`kgosd` 自带 Web**：页面与 API 由每个 Instance 自己的 daemon 同 endpoint 提供，不需要单独部署 Web 服务；具体边界见 [运行架构](docs/design/architecture.md#v1-运行时与技术分层)、[Client](docs/design/client.md) 和 [Web hosting](docs/design/runtime.md#web-hosting)。
 
-正式 AI / CI Client 分发形态为 `npx --yes @kgos/cli@<version> --root <workspace-root> ...`；`@kgos/cli` 的正式运行前置是 **Node.js >= 24.15.0**，`--yes` 属于 npm 自身的首次 package acquisition 确认，普通人类交互可省略。当前公开版本为 **v0.2.0**：它正式交付 Phase 12 的 `--root > KGOS_ROOT` Workspace Root 解析、固定 `<root>/.kgos` Instance、完整 `init` readiness/recovery、additional extension setup 与分层 CLI 信息设计。八个 npm package 均已发布为 `0.2.0` / `latest`，macOS、Linux glibc、Windows arm64/x64 六平台 public-registry `npx` smoke 与 GitHub Release 均已完成；v0.1.1 保持 Phase 11 的旧 root-is-Instance / lazy-bootstrap 历史事实。
+正式 AI / CI Client 分发形态为 `npx --yes @kgos/cli@<version> --root <workspace-root> ...`；`@kgos/cli` 的正式运行前置是 **Node.js >= 24.15.0**，`--yes` 属于 npm 自身的首次 package acquisition 确认，普通人类交互可省略。当前公开版本为 **v0.2.1**：它在 v0.2.0 的 Workspace Root / `.kgos` / complete init/readiness 基线上正式交付 Phase 13 的 D84 late-bound Embedding credential、改进后的 init wizard 与 doctor non-blocking credential 诊断。八个 npm package 均已发布为 `0.2.1` / `latest`，macOS、Linux glibc、Windows arm64/x64 六平台 public-registry `npx` smoke 与 GitHub Release 均已完成；v0.2.0 与 v0.1.1 继续保留为对应历史发布事实。
 
 配置、模型与调用示例，以及设计职责索引，统一从 [设计入口](docs/design.md)进入。本文只维护产品定义，具体配置、数据和接口规则由各 owner 文档维护。
 
 ## 当前状态
 
-**Phase 00–13 均已完成；当前公开版本仍为 v0.2.0。** Phase 12 的正式发布 revision `ac5eda19cc6d7cc849f8036419143c80c1b6427d`、CI Run `36407257662`、Release Run `36410721397`、八包 OIDC npm publish、六平台 public-registry `npx` smoke 与 GitHub Release 均已闭环。Phase 13 在其后完成了 D84 的仓库实现与六平台 CI 验收，但没有执行新版本发布，因此当前 npm `latest` / GitHub Release 的产品事实仍以 v0.2.0 为准。
+**Phase 00–13 均已完成；当前公开版本为 v0.2.1。** 发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` Validate + 六平台 native/package matrix 全绿，`v0.2.1` tag 精确指向该 revision。首次 Release Run `36510797281` 在六平台 immutable candidate / aggregate 成功后因 npm registry propagation timeout 停在部分发布；Recovery Run `36514243605` 复用同一 verified `release-set`，完成缺失 SDK/CLI、八包 exact-version/`latest=0.2.1` verification、六平台 public-registry `npx` smoke 与 GitHub Release `KG OS v0.2.1`。
 
-**Phase 13 当前为 `done`。** 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`；主工作树完整 validation、独立 fresh-source、packed no-key smoke、macOS arm64 中英文 repo-out TTY first-run，以及 CI Run `36505717058` 的 Validate + darwin/linux/win32 arm64/x64 六平台 native/package matrix 全部成功。该阶段没有执行 npm publish、Git tag 或 GitHub Release。完整范围与证据见[Phase 13](docs/development/phases/13-init-wizard-credential-boundary.md)。
+**Phase 13 当前为 `done`，并已随后作为 v0.2.1 正式发布。** 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`；主工作树完整 validation、独立 fresh-source、packed no-key smoke、macOS arm64 中英文 repo-out TTY first-run，以及 CI Run `36505717058` 的 Validate + darwin/linux/win32 arm64/x64 六平台 native/package matrix 全部成功。阶段关闭时发布不属于其完成条件；后续独立 release 授权将版本提升至 `0.2.1`，发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 与 Recovery Release Run `36514243605` 已完成正式公开发布。完整范围与证据见[Phase 13](docs/development/phases/13-init-wizard-credential-boundary.md)。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
 
@@ -63,7 +63,7 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 **Phase 11 Windows Runtime CI 验收与六平台发布当前为 `done`。** 发布源码 `1509eaf` 的 Validate 与六平台 native/package CI 已通过；`v0.1.1` 的八包、六平台 public-registry smoke 与 GitHub Release 已完成。两个 Windows package 的 Trusted Publisher、严格 publishing access 与短期首发凭据清理均已完成；长期发布工作流已移除 bootstrap token 路径。完整证据与后续 OIDC 实际发布边界见[Phase 11](docs/development/phases/11-windows-runtime-acceptance.md)。
 
-**Phase 12 First-Run & CLI Productization 当前为 `done`，并已作为 v0.2.0 正式发布。** Workspace Root→`.kgos`、`--root > KGOS_ROOT`、完整 init/readiness/recovery、additional extension setup、doctor 与分层高信息密度 help 已实现并完成多轮 review。阶段实现 CI Run `36399393826` 全绿；后续独立发布授权将版本提升至 `0.2.0`，发布 revision `ac5eda19cc6d7cc849f8036419143c80c1b6427d` 的 CI Run `36407257662` 与 Release Run `36410721397` 均成功。八个 npm package 的 `latest` 为 `0.2.0`，六平台 public-registry fresh-user smoke 与 GitHub Release `KG OS v0.2.0` 已完成。
+**Phase 12 First-Run & CLI Productization 当前为 `done`，并已作为 v0.2.0 正式发布。** Workspace Root→`.kgos`、`--root > KGOS_ROOT`、完整 init/readiness/recovery、additional extension setup、doctor 与分层高信息密度 help 已实现并完成多轮 review。阶段实现 CI Run `36399393826` 全绿；后续独立发布授权将版本提升至 `0.2.0`，发布 revision `ac5eda19cc6d7cc849f8036419143c80c1b6427d` 的 CI Run `36407257662` 与 Release Run `36410721397` 均成功。v0.2.0 发布完成时八个 npm package 的 `latest` 均为 `0.2.0`，六平台 public-registry fresh-user smoke 与 GitHub Release `KG OS v0.2.0` 已完成；当前 `latest` 已由后续 v0.2.1 发布推进。
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、Client迁移、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 

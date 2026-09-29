@@ -17,7 +17,7 @@ kg init
   → only Semantic Provider operations resolve the credential
 ```
 
-当前公开版本仍为 **v0.2.0**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`；本地主工作树/fresh-source 门禁、macOS arm64 repo-out packed / 中英文 TTY 验收，以及该提交的六平台远端 native/package CI 均已通过，因此阶段已完成。本阶段不包含版本发布，未执行 npm publish、Git tag 或 GitHub Release。
+当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`；本地主工作树/fresh-source 门禁、macOS arm64 repo-out packed / 中英文 TTY 验收，以及该提交的六平台远端 native/package CI 均已通过，因此阶段按原 Acceptance 完成。版本发布不属于本阶段完成条件；阶段关闭后，用户另行授权 v0.2.1 release，D84 已随该版本正式公开交付。
 
 ## 设计输入
 
@@ -220,11 +220,13 @@ Review发现问题后在同一阶段修复并重新执行受影响验证，不�
 - packed smoke 在 key 缺失时完成 init、doctor 与 Ontology/Object/Evolution/non-Semantic Graph 路径，并验证真实 Semantic request 以 Lithograph `INVALID_ARGUMENT` 失败；提供 credential 后重启 daemon，Semantic query 成功。
 - final local review 已复查 credential ownership、secret safety、TTY/non-TTY error boundary、custom extension 信息设计与 Phase 12 recovery/idempotency，没有剩余本阶段 task-affecting finding。
 - 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `origin/main`。GitHub Actions CI Run `36505717058` 为 `success`：Validate job `109206590191`、darwin-arm64 `109206590439`、darwin-x64 `109206590427`、linux-arm64 `109206590468`、linux-x64 `109206590506`、win32-arm64 `109206590409`、win32-x64 `109206590531` 全部成功；六个平台均执行了 native Runtime / official extension load 与 packed npm candidate smoke。
+- 后续独立 release 将版本提升到 `0.2.1`。发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` Validate + 六平台 native/package matrix 全绿，`v0.2.1` tag 精确指向该 revision。
+- 首次 Release Run `36510797281` 的 preflight、六平台 immutable candidates 与 aggregate 成功；publish 已把六个 Runtime package 发布为 `0.2.1` / `latest` 后，因 `@kgos/runtime-linux-x64@0.2.1` registry propagation 超过等待窗口而停止，SDK / CLI 尚未发布。Recovery Run `36514243605` 复用该 Run 的 verified immutable `release-set`，跳过重建 candidates，完成缺失 SDK / CLI、八包 exact-version/`latest=0.2.1` verification、darwin/linux/win32 arm64/x64 六平台 public-registry `npx` smoke 与 GitHub Release `KG OS v0.2.1`。
 
-本阶段没有执行 npm publish、Git tag 或 GitHub Release；这些动作不属于 Phase 13 完成条件，也不因阶段 `done` 自动获得授权。
+Phase 13 本身的完成动作没有包含 npm publish、Git tag 或 GitHub Release；这些动作在阶段 `done` 后由用户单独授权并按上述 v0.2.1 release evidence 完成。
 
 ## 完成条件
 
 只有 P13-01–P13-08 全部实现、Acceptance 取得真实证据、相关设计/计划/使用文档按职责同步、final diff/review无剩余本阶段 finding，并且本阶段要求的六平台远端 CI 实际成功后，Phase 13 才能从 `ready/in_progress` 更新为 `done`。
 
-P13-01–P13-08、Acceptance、final review、本地完整门禁、fresh-source、repo-out packed / 中英文 TTY 验收与六平台远端 CI 均已取得真实证据；Phase 13 = **`done`**。实现已提交并推送；本阶段未执行发布动作。
+P13-01–P13-08、Acceptance、final review、本地完整门禁、fresh-source、repo-out packed / 中英文 TTY 验收与六平台远端 CI 均已取得真实证据；Phase 13 = **`done`**。实现已提交并推送。阶段关闭后另行授权的 v0.2.1 正式发布也已完成，但不追溯改变本阶段原完成条件。

@@ -321,9 +321,9 @@ publish job 具备 GitHub Actions OIDC `id-token: write`，长期认证使用 np
 - Workflow filename：`release.yml`
 - Allowed action：允许 `npm publish`
 
-全部配置完成并核对后，删除 repository secret `NPM_TOKEN`，撤销 npm 上的短期 bootstrap token；后续 `v*` Release 使用 OIDC，无需长期 npm publish token。`0.1.1` 的两项清理已完成；`v0.2.0` Release Run `36410721397` 已进一步真实证明八个 package 都能通过当前无 token、`id-token: write` 的 Trusted Publishing 路径发布。
+全部配置完成并核对后，删除 repository secret `NPM_TOKEN`，撤销 npm 上的短期 bootstrap token；后续 `v*` Release 使用 OIDC，无需长期 npm publish token。`0.1.1` 的两项清理已完成；`v0.2.0` Release Run `36410721397` 已真实证明八个 package 都能通过当前无 token、`id-token: write` 的 Trusted Publishing 路径发布。`v0.2.1` 首次 Release Run `36510797281` 在六个 Runtime 已发布后遇到 registry propagation timeout；Recovery Run `36514243605` 按上面的 `reuse_release_run` 合同复用 verified `release-set`，跳过 candidate 重建并成功完成剩余 SDK / CLI、八包 registry verification、六平台 smoke 与 GitHub Release，验证了部分发布恢复路径。
 
-只完成本地 candidate、workflow 配置、部分 npm publish 或单独 Git tag 都不等于公开 Release 完成；`0.1.0` 真实状态以 [Phase 09](../development/phases/09-mvp-release-closure.md)、`0.1.1` 以 [Phase 11](../development/phases/11-windows-runtime-acceptance.md)、`0.2.0` 以 [Phase 12](../development/phases/12-first-run-cli-productization.md) 的 registry/tag/Release 证据为准。
+只完成本地 candidate、workflow 配置、部分 npm publish 或单独 Git tag 都不等于公开 Release 完成；`0.1.0` 真实状态以 [Phase 09](../development/phases/09-mvp-release-closure.md)、`0.1.1` 以 [Phase 11](../development/phases/11-windows-runtime-acceptance.md)、`0.2.0` 以 [Phase 12](../development/phases/12-first-run-cli-productization.md)、`0.2.1` 以 [Phase 13](../development/phases/13-init-wizard-credential-boundary.md) 的 registry/tag/Release 证据为准。
 
 ## 常见问题
 
