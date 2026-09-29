@@ -52,7 +52,7 @@ beforeEach(() => {
     name: "@kgos/runtime-darwin-arm64",
     root: "/runtime",
     daemon: "/runtime/kgosd",
-    version: "0.2.0",
+    version: "0.2.1",
     extensions: []
   });
   runtimeMocks.initializeClient.mockImplementation(async (root: string) => {

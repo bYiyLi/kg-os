@@ -96,29 +96,29 @@ importers:
   packages/cli:
     dependencies:
       '@kgos/sdk':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../sdk
       smol-toml:
         specifier: 1.8.0
         version: 1.8.0
     optionalDependencies:
       '@kgos/runtime-darwin-arm64':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../runtime-darwin-arm64
       '@kgos/runtime-darwin-x64':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../runtime-darwin-x64
       '@kgos/runtime-linux-arm64':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../runtime-linux-arm64
       '@kgos/runtime-linux-x64':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../runtime-linux-x64
       '@kgos/runtime-win32-arm64':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../runtime-win32-arm64
       '@kgos/runtime-win32-x64':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../runtime-win32-x64
 
   packages/runtime-darwin-arm64: {}
