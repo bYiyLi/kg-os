@@ -149,8 +149,8 @@ func (store *Store) prepare(ctx context.Context) error {
 		if err := store.guardFiles(); err != nil {
 			return ioError(err)
 		}
-		file, fileErr := os.Lstat(store.path)
-		directory, directoryErr := os.Lstat(store.root)
+		file, fileErr := pathIdentity(store.path, false)
+		directory, directoryErr := pathIdentity(store.root, true)
 		if fileErr != nil || directoryErr != nil || !os.SameFile(file, store.fileIdentity) || !os.SameFile(directory, store.directoryIdentity) {
 			return consistency(fmt.Errorf("managed Web storage was replaced while open"))
 		}
@@ -248,11 +248,11 @@ func (store *Store) prepare(ctx context.Context) error {
 	if err := store.secureFiles(); err != nil {
 		return ioError(err)
 	}
-	store.fileIdentity, err = os.Lstat(store.path)
+	store.fileIdentity, err = pathIdentity(store.path, false)
 	if err != nil {
 		return ioError(err)
 	}
-	store.directoryIdentity, err = os.Lstat(store.root)
+	store.directoryIdentity, err = pathIdentity(store.root, true)
 	if err != nil {
 		return ioError(err)
 	}

@@ -25,6 +25,20 @@ func guardPath(path string, directory bool, allowMissing bool) error {
 	return rejectReparse(path)
 }
 
+func pathIdentity(path string, directory bool) (os.FileInfo, error) {
+	if err := guardPath(path, directory, false); err != nil {
+		return nil, err
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	// File.Stat captures the identity from the open handle. On Windows Lstat
+	// otherwise defers reading the file ID until SameFile, after replacement.
+	return file.Stat()
+}
+
 func privateDirectory(path string) error {
 	if err := guardPath(path, true, true); err != nil {
 		return err

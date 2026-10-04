@@ -134,15 +134,28 @@ func TestOriginalReplacementAndUnavailablePathsStopWrites(t *testing.T) {
 	if err := os.WriteFile(store.path, []byte("replacement original"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	status := store.Info(testContext)
-	if status.StorageStatus != "unavailable" || status.Error.Code != kernel.CodeConsistency {
-		t.Fatalf("replacement not detected: %+v", status)
+	archived, err := os.ReadFile(store.path + ".archived")
+	if err != nil {
+		t.Fatal(err)
 	}
-	_, err := store.Save(testContext, SaveRequest{ReadRequest: ReadRequest{StoreID: info.StoreID, Kind: "editor", ID: NewID()}, MutationID: NewID(), Data: json.RawMessage(`{"version":1}`)})
-	wantCode(t, err, kernel.CodeConsistency)
+	// Check before touching SQLite: a closed connection on Windows can itself
+	// make Info fail and hide a missed physical replacement.
+	wantCode(t, store.prepare(testContext), kernel.CodeConsistency)
+	for range 2 {
+		status := store.Info(testContext)
+		if status.StorageStatus != "unavailable" || status.Error.Code != kernel.CodeConsistency {
+			t.Fatalf("replacement not detected: %+v", status)
+		}
+		_, err := store.Save(testContext, SaveRequest{ReadRequest: ReadRequest{StoreID: info.StoreID, Kind: "editor", ID: NewID()}, MutationID: NewID(), Data: json.RawMessage(`{"version":1}`)})
+		wantCode(t, err, kernel.CodeConsistency)
+	}
 	data, err := os.ReadFile(store.path)
 	if err != nil || string(data) != "replacement original" {
 		t.Fatalf("new original changed: %s %v", data, err)
+	}
+	data, err = os.ReadFile(store.path + ".archived")
+	if err != nil || string(data) != string(archived) {
+		t.Fatalf("archived original changed: %v", err)
 	}
 	for _, root := range []string{"", "relative", filepath.Join(t.TempDir(), "missing-parent", "web")} {
 		store := New(root, testDatabase)

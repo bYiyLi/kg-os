@@ -76,9 +76,9 @@ Ontology read / batch edit 与 aggregate Patch 使用相同错误 envelope。Ont
 
 ## Web 持久数据错误方案
 
-以下是 [Web 工作区数据](web.md#web-工作区数据)的新增工程映射，**当前 code / route 尚未实现**；它们使用相同 `code/message/details` envelope，不更改现有 Knowledge API 分类。
+以下是 [Web 工作区数据](web.md#web-工作区数据)的工程映射，已接入 [Web HTTP adapter](../../internal/daemon/web.go)与[持久存储](../../internal/webstore/store.go)；它们使用相同 `code/message/details` envelope，不更改现有 Knowledge API 分类。实际验收范围见 [Phase 14](../development/phases/14-web.md)。
 
-| 类别 | 拟用 code 与 HTTP status |
+| 类别 | code 与 HTTP status |
 | --- | --- |
 | Web request 携带的 expected daemon boot 与本次进程不符 | `WEB_CONNECTION_CHANGED` / 409；Web 停止旧连接操作并保留输入，只能显式重连，不自动取新 guard 后重发 |
 | storeId 已变化、创建 ID 已占用 / 已删除、record expectedRevision 不符 | `WEB_DATA_CHANGED` / 409；仅附 kind、id、观察到的 revision / deleted 信息，不自动覆盖或冒用 `STALE_BASE_STATE` |
