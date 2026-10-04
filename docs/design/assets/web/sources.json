@@ -1,0 +1,366 @@
+{
+  "formatVersion": 1,
+  "assets": [
+    {
+      "board": "E1",
+      "role": "core",
+      "file": "E1-object-drafts.png",
+      "libraryFileId": "libfile_b220f3f32f5c8191b593d5fb3fd94a04",
+      "libraryVersion": 1,
+      "sourceFileId": "file_000000005f8c81f58b4954e1d9867446",
+      "sourceFilename": "E1-object-drafts.png",
+      "bytes": 1511822,
+      "width": 1448,
+      "height": 1086,
+      "sha256": "515edef3c0a183514f2a34c66bff90370b2a255260c69df282efa9396ecf666d"
+    },
+    {
+      "board": "R1",
+      "role": "core",
+      "file": "R1-local-connection.png",
+      "libraryFileId": "libfile_59573c16b2c48191902354b48b257ac5",
+      "libraryVersion": 2,
+      "sourceFileId": "file_00000000369481f58d99e29e3669aed8",
+      "sourceFilename": "R1-local-connection.png",
+      "bytes": 1383907,
+      "width": 1672,
+      "height": 941,
+      "sha256": "364090c0c133aec79e2dc7020ea33668c99b2739d120380a8207a76f643a9bc9"
+    },
+    {
+      "board": "V1",
+      "role": "core",
+      "file": "V1-version-overlay.png",
+      "libraryFileId": "libfile_a184cb734fbc81918c2da83a0cbdce66",
+      "libraryVersion": 0,
+      "sourceFileId": "file_0000000032cc81f9a82938dfaaa14925",
+      "sourceFilename": "V1-version-overlay.png",
+      "bytes": 1638011,
+      "width": 1024,
+      "height": 1536,
+      "sha256": "1011e3c286d3ecbea592d57a49927866fac94a92b02304d4cc31bf81c9f77c0d"
+    },
+    {
+      "board": "O1",
+      "role": "core",
+      "file": "O1-ontology-organization.png",
+      "libraryFileId": "libfile_11e1b341ff9c8191a3d16ed19dd6b435",
+      "libraryVersion": 1,
+      "sourceFileId": "file_000000004c8c81f5b50a787a14095f3c",
+      "sourceFilename": "O1-ontology-organization.png",
+      "bytes": 1455652,
+      "width": 1586,
+      "height": 992,
+      "sha256": "f1ad0b7e1e1c35f6a71a5a3ff4ee1dea8143b0fb6316506e006422de35b75a6a"
+    },
+    {
+      "board": "E2",
+      "role": "core",
+      "file": "E2-patch-submit-receipts.png",
+      "libraryFileId": "libfile_3b99ff6702dc81918575d012db1a46da",
+      "libraryVersion": 0,
+      "sourceFileId": "file_000000007a3081f6868af66471c0ec99",
+      "sourceFilename": "E2-patch-submit-receipts.png",
+      "bytes": 1519750,
+      "width": 1448,
+      "height": 1086,
+      "sha256": "9cb384178347153467b80c90063c256e146d8c9fba31b05521fa1319cf71402b"
+    },
+    {
+      "board": "Q1",
+      "role": "core",
+      "file": "Q1-query-workspace.png",
+      "libraryFileId": "libfile_a32f5e85d7748191af3e3eb460cd3f52",
+      "libraryVersion": 0,
+      "sourceFileId": "file_0000000055dc81f6875891e2ba30f025",
+      "sourceFilename": "Q1-query-workspace.png",
+      "bytes": 1312045,
+      "width": 1586,
+      "height": 992,
+      "sha256": "2259db7f3d950663e7e240a89b641a1b4452b40c8ce55e3ed096853651267dd2"
+    },
+    {
+      "board": "V2",
+      "role": "core",
+      "file": "V2-state-detail.png",
+      "libraryFileId": "libfile_141ce7eb9bc88191ba7522a9e74c0cc1",
+      "libraryVersion": 1,
+      "sourceFileId": "file_000000004c8081f5be05a3b2dc113570",
+      "sourceFilename": "V2-state-detail.png",
+      "bytes": 1611483,
+      "width": 1024,
+      "height": 1536,
+      "sha256": "9f480d295c1f82dcb3a3bd2f387c1b9f6f8770e90d88a7313ffb8202f7a4dd77"
+    },
+    {
+      "board": "Q2",
+      "role": "core",
+      "file": "Q2-fullscreen-inspection.png",
+      "libraryFileId": "libfile_97af776ccc888191b796694cd80fe2d6",
+      "libraryVersion": 1,
+      "sourceFileId": "file_00000000bd4481f6ace88bdaa41340a7",
+      "sourceFilename": "Q2-fullscreen-inspection.png",
+      "bytes": 1361000,
+      "width": 1586,
+      "height": 992,
+      "sha256": "1d8e88434f95e44325194156e3af36829dbff83ce6ceb9f4d28fb3ff963fc2fc"
+    },
+    {
+      "board": "Q1",
+      "role": "component",
+      "file": "Q1-states.png",
+      "libraryFileId": "libfile_c52a2602715881919532f62e2265d08c",
+      "libraryVersion": 0,
+      "sourceFileId": "file_00000000473c81f5a8d361b2bca0af33",
+      "sourceFilename": "Q1-states.png",
+      "bytes": 1342735,
+      "width": 1586,
+      "height": 992,
+      "sha256": "52204d39f5ae27a4f5b05a7bbc19b0dbbb82263fc4ff39787fe1eb3bac878c3e"
+    },
+    {
+      "board": "O2",
+      "role": "core",
+      "file": "O2-definition-aggregate.png",
+      "libraryFileId": "libfile_aa1e318c2cf881919ad91721d3fd1bdd",
+      "libraryVersion": 2,
+      "sourceFileId": "file_0000000012f081f58672db5ad213d692",
+      "sourceFilename": "O2-definition-aggregate.png",
+      "bytes": 1352405,
+      "width": 1586,
+      "height": 992,
+      "sha256": "3989bfb837017f48b00ba2e653c41e93c29c5b157651d2ee3a5f8d6afd62ee97"
+    },
+    {
+      "board": "V3",
+      "role": "core",
+      "file": "V3-state-diff.png",
+      "libraryFileId": "libfile_5b55354f422c8191935b0c1521c1e443",
+      "libraryVersion": 1,
+      "sourceFileId": "file_00000000ad1881f595d45161f0e3d398",
+      "sourceFilename": "V3-state-diff.png",
+      "bytes": 1414113,
+      "width": 1585,
+      "height": 992,
+      "sha256": "f169e60e8f376c4114bd941d4028e9826e35fb9bd9dda876ac9c5e146ab841d7"
+    },
+    {
+      "board": "E3",
+      "role": "core",
+      "file": "E3-raw-cypher-safety.png",
+      "libraryFileId": "libfile_21f936e7d49c819195fa33a79be52f4f",
+      "libraryVersion": 0,
+      "sourceFileId": "file_0000000093f081f5a050f0b2d23bf09b",
+      "sourceFilename": "E3-raw-cypher-safety.png",
+      "bytes": 1602430,
+      "width": 1448,
+      "height": 1086,
+      "sha256": "8fbb1e96a66a307c27dd478a1baab1f69460e1fa39f4324873f441c57d16578d"
+    },
+    {
+      "board": "O2",
+      "role": "component",
+      "file": "O2-states.png",
+      "libraryFileId": "libfile_09e4b307db7081919fe84289ec171057",
+      "libraryVersion": 0,
+      "sourceFileId": "file_00000000a87481f5ac70712b2791ae13",
+      "sourceFilename": "O2-states.png",
+      "bytes": 1495467,
+      "width": 1448,
+      "height": 1086,
+      "sha256": "2477709effb9b344558ac1e799e29465362fb4e36ee94fff8344e14acee98e8b"
+    },
+    {
+      "board": "V4",
+      "role": "core",
+      "file": "V4-merge-session.png",
+      "libraryFileId": "libfile_1aa8b6cf779c81918336f1073975d47e",
+      "libraryVersion": 0,
+      "sourceFileId": "file_00000000616881f5bbdd76a680f90251",
+      "sourceFilename": "V4-merge-session.png",
+      "bytes": 1605029,
+      "width": 1024,
+      "height": 1536,
+      "sha256": "fc11108a3765bc6c29511e77157759872d4b5e236ffaea4210bc84b4d28fe2f0"
+    },
+    {
+      "board": "V4",
+      "role": "component",
+      "file": "V4-merge-outcomes.png",
+      "libraryFileId": "libfile_20d69c075888819188b32e9c18b57c2f",
+      "libraryVersion": 0,
+      "sourceFileId": "file_0000000078a881f589d7d9ac0a257bfa",
+      "sourceFilename": "V4-merge-outcomes.png",
+      "bytes": 1460985,
+      "width": 1672,
+      "height": 941,
+      "sha256": "dd15ba47e1d94bb724e42f1fe03d289b49f103427b72a4b8390a5012abe2ea13"
+    },
+    {
+      "board": "R1",
+      "role": "component",
+      "file": "R1-states.png",
+      "libraryFileId": "libfile_01a3c7ab08148191b25872db52ac0310",
+      "libraryVersion": 2,
+      "sourceFileId": "file_0000000080c481f5a96bacb0a2784c40",
+      "sourceFilename": "R1-states.png",
+      "bytes": 800018,
+      "width": 1672,
+      "height": 941,
+      "sha256": "f3bc27a14fbe3d879f3b3953d907575428ef2d2c7ce72863c9ad57a4148a6617"
+    },
+    {
+      "board": "R2",
+      "role": "core",
+      "file": "R2-workspace-recovery.png",
+      "libraryFileId": "libfile_37ef8bfc4c2c8191bc9afc90a615cd16",
+      "libraryVersion": 1,
+      "sourceFileId": "file_00000000d7b881f5bec20ff13568e04a",
+      "sourceFilename": "R2-workspace-recovery.png",
+      "bytes": 1160160,
+      "width": 1516,
+      "height": 1038,
+      "sha256": "6d5f371d6c86cae17ea180eb4cc036a9846d993dc453ef73c9cff021a2fea465"
+    },
+    {
+      "board": "R2",
+      "role": "component",
+      "file": "R2-states.png",
+      "libraryFileId": "libfile_38f25fd33b308191b998080a6c6a166b",
+      "libraryVersion": 2,
+      "sourceFileId": "file_000000006f2c81f59d11f6f4395823cd",
+      "sourceFilename": "R2-states.png",
+      "bytes": 1107027,
+      "width": 1536,
+      "height": 1024,
+      "sha256": "a99cabc347e8071555e4a00b37bc59a3c5e65d9bc18c462f807d534e2c696a4a"
+    },
+    {
+      "board": "A1",
+      "role": "core",
+      "file": "A1-responsive-accessibility.png",
+      "libraryFileId": "libfile_a7ae8c76165481918c21f39a24ac025d",
+      "libraryVersion": 0,
+      "sourceFileId": "file_00000000370c81f5830ad19e01dacbbf",
+      "sourceFilename": "A1-responsive-accessibility.png",
+      "bytes": 1571846,
+      "width": 1536,
+      "height": 1024,
+      "sha256": "38f57e51840a49ce3776a27edc752909185c9b2b15cd7bf7642c02f2b6d3646a"
+    }
+  ],
+  "documents": [
+    {
+      "file": "KGOS-Web-Design.pdf",
+      "role": "collection",
+      "libraryFileId": "libfile_9f8baab8ffd08191b2f8822fc51cfa5d",
+      "libraryVersion": 1,
+      "sourceFileId": "file_0000000082e081f590ddff4c8f64ac81",
+      "sourceFilename": "KGOS-Web-Design.pdf",
+      "bytes": 10046988,
+      "sha256": "e03614632ff925569d3fae8cf79956fb5dd8ae695222ec496fe2a5dda40e28e9",
+      "pages": 21,
+      "fontObjects": 0,
+      "bookmarkCount": 28,
+      "tocLinks": 19,
+      "returnLinks": 19,
+      "pageSources": [
+        {
+          "page": 3,
+          "file": "Q1-query-workspace.png",
+          "sha256": "2259db7f3d950663e7e240a89b641a1b4452b40c8ce55e3ed096853651267dd2"
+        },
+        {
+          "page": 4,
+          "file": "Q2-fullscreen-inspection.png",
+          "sha256": "1d8e88434f95e44325194156e3af36829dbff83ce6ceb9f4d28fb3ff963fc2fc"
+        },
+        {
+          "page": 5,
+          "file": "E1-object-drafts.png",
+          "sha256": "515edef3c0a183514f2a34c66bff90370b2a255260c69df282efa9396ecf666d"
+        },
+        {
+          "page": 6,
+          "file": "E2-patch-submit-receipts.png",
+          "sha256": "9cb384178347153467b80c90063c256e146d8c9fba31b05521fa1319cf71402b"
+        },
+        {
+          "page": 7,
+          "file": "E3-raw-cypher-safety.png",
+          "sha256": "8fbb1e96a66a307c27dd478a1baab1f69460e1fa39f4324873f441c57d16578d"
+        },
+        {
+          "page": 8,
+          "file": "O1-ontology-organization.png",
+          "sha256": "f1ad0b7e1e1c35f6a71a5a3ff4ee1dea8143b0fb6316506e006422de35b75a6a"
+        },
+        {
+          "page": 9,
+          "file": "O2-definition-aggregate.png",
+          "sha256": "3989bfb837017f48b00ba2e653c41e93c29c5b157651d2ee3a5f8d6afd62ee97"
+        },
+        {
+          "page": 10,
+          "file": "V1-version-overlay.png",
+          "sha256": "1011e3c286d3ecbea592d57a49927866fac94a92b02304d4cc31bf81c9f77c0d"
+        },
+        {
+          "page": 11,
+          "file": "V2-state-detail.png",
+          "sha256": "9f480d295c1f82dcb3a3bd2f387c1b9f6f8770e90d88a7313ffb8202f7a4dd77"
+        },
+        {
+          "page": 12,
+          "file": "V3-state-diff.png",
+          "sha256": "f169e60e8f376c4114bd941d4028e9826e35fb9bd9dda876ac9c5e146ab841d7"
+        },
+        {
+          "page": 13,
+          "file": "V4-merge-session.png",
+          "sha256": "fc11108a3765bc6c29511e77157759872d4b5e236ffaea4210bc84b4d28fe2f0"
+        },
+        {
+          "page": 14,
+          "file": "R1-local-connection.png",
+          "sha256": "364090c0c133aec79e2dc7020ea33668c99b2739d120380a8207a76f643a9bc9"
+        },
+        {
+          "page": 15,
+          "file": "R2-workspace-recovery.png",
+          "sha256": "6d5f371d6c86cae17ea180eb4cc036a9846d993dc453ef73c9cff021a2fea465"
+        },
+        {
+          "page": 16,
+          "file": "Q1-states.png",
+          "sha256": "52204d39f5ae27a4f5b05a7bbc19b0dbbb82263fc4ff39787fe1eb3bac878c3e"
+        },
+        {
+          "page": 17,
+          "file": "O2-states.png",
+          "sha256": "2477709effb9b344558ac1e799e29465362fb4e36ee94fff8344e14acee98e8b"
+        },
+        {
+          "page": 18,
+          "file": "V4-merge-outcomes.png",
+          "sha256": "dd15ba47e1d94bb724e42f1fe03d289b49f103427b72a4b8390a5012abe2ea13"
+        },
+        {
+          "page": 19,
+          "file": "R1-states.png",
+          "sha256": "f3bc27a14fbe3d879f3b3953d907575428ef2d2c7ce72863c9ad57a4148a6617"
+        },
+        {
+          "page": 20,
+          "file": "R2-states.png",
+          "sha256": "a99cabc347e8071555e4a00b37bc59a3c5e65d9bc18c462f807d534e2c696a4a"
+        },
+        {
+          "page": 21,
+          "file": "A1-responsive-accessibility.png",
+          "sha256": "38f57e51840a49ce3776a27edc752909185c9b2b15cd7bf7642c02f2b6d3646a"
+        }
+      ]
+    }
+  ]
+}

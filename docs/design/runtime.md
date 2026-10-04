@@ -67,7 +67,7 @@ Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemo
 
 ### Web 交互设计状态
 
-已确认 Web 内置于 `kgosd` 的交付与运行流程，与 CLI / SDK 共用 Kernel、业务合同和实例认证；人通过 Web 查看、管理和纠正知识。具体页面布局、导航与操作交互尚未细化，需在 Web 实施阶段沿用 Ontology / Object / Graph / Evolution 的现有能力补充。此项不阻塞 Kernel、daemon、CLI 或 SDK 的实现，也不表示 Web 页面设计已经完成。
+已确认 Web 内置于 `kgosd` 的交付与运行流程，与 CLI / SDK 共用 Kernel、业务合同和实例认证；人通过 Web 查看、管理和纠正知识。页面布局、版本覆盖式 DAG、独立查询结果帧、本体聚合编辑、持久 UI / 草稿、连接适配与状态覆盖由 [Web 设计](web.md)拥有。该文区分用户已确认默认与工程方案；当前 Web 仍是壳层，新增 UI 存储 / API 也尚未实现，设计文档不表示页面交互已经实现或验收。此项不阻塞 Kernel、daemon、CLI 或 SDK 的实现。
 
 ## 单 Token 实例认证
 
@@ -100,7 +100,7 @@ Authorization: Bearer <token>
 - Human-facing Web 不拥有 credential-free API 旁路；浏览器端必须先取得 token，再对所有 API request 发送同一 Bearer credential。exact browser credential entry/storage 属于 Web adapter 实现合同，但不得让 token 进入 URL 或 server-side session account；
 - `kgosd` 自身启动、首次创建 `auth.json` 与本地 CLI 为业务命令自动 spawn daemon 都不是 HTTP API request，因此不要求预先存在客户端 token；daemon ready 后，原始业务 request 仍必须按上述规则取得 token 并发送 Bearer header。
 
-固定 loopback bind 是当前安全边界的一部分。Bearer token提供**认证**，并额外让错误/stale endpoint无法静默连接到另一个 KG OS Instance；它不提供 transport confidentiality。v1 CLI-managed Runtime不暴露LAN bind，也不内置TLS；多用户、远程访问、细粒度授权或公网部署必须另行设计。
+固定 loopback bind 是当前安全边界的一部分。Bearer token 提供**认证**，错误 / stale endpoint 指向持有不同 token 的 Instance 时会拒绝请求；完整复制 `.kgos` 可保留相同 token，单靠 Bearer 不能证明物理目录归属，这一端口复用场景由下文拟新增的 [Web connection guard](#web-operational-数据目录)检测。现有无 guard 的 CLI / 第三方请求不因此新增物理 identity 保证。Bearer 不提供 transport confidentiality。v1 CLI-managed Runtime不暴露LAN bind，也不内置TLS；多用户、远程访问、细粒度授权或公网部署必须另行设计。
 
 ## Native Runtime package
 
@@ -148,10 +148,21 @@ one Workspace Root
     ├── initialized.json
     ├── cache/
     ├── extensions/
-    └── logs/
+    ├── logs/
+    └── web/             # 新增设计，当前路径实现尚未建立
+        ├── ui.db        # 独立普通 SQLite；运行时可有 -wal / -shm
+        └── cache/       # 可淘汰的 Web 结果缓存
 ```
 
 Workspace Root 可以包含任意调用方文件；KG OS 不在其顶层散落 Instance 内部文件。下文未特别说明时，“Instance Directory”都指 `<root>/.kgos`。旧 v0.1.x root-is-Instance 布局不是当前合同；Runtime 不自动搬迁或双读两种路径。
+
+### Web operational 数据目录
+
+本轮 Web 持久化方案固定使用 `<root>/.kgos/web/ui.db` 与 `<root>/.kgos/web/cache/`，由该 Instance 的唯一 daemon 管理；普通 UI SQLite 不加载 Lithograph / Provider extensions，与 Knowledge Base 和 Provider cache 隔离。UI 文件绑定 daemon 实际验证的 databaseId，记录与恢复语义由 [Web 工作区数据](web.md#web-工作区数据)拥有；内部库绑定不等于新增全局物理 Instance identity。
+
+浏览器通过拟新增的已认证 daemon API 读写规定记录，不能指定 root / 文件路径或读取 `auth.json`。目录采用当前用户私有权限并拒绝路径重定向；UI 库在首次已认证 Web 请求时按需建立，其失败不阻断已有 Kernel API，也不成为 `init` / Runtime readiness 前置条件。当前 Runtime Paths、HTTP 与 SDK 均尚未实现此目录或接口；本段是工程设计，不是当前落盘事实。
+
+Web 方案另需一个待实现的 HTTP connection guard：daemon 每次 startup 生成非持久随机 `daemonBootId`，已认证 Web bootstrap info 可读取；API request 若带可选 `X-KGOS-Expected-Daemon-Boot`，在认证后、dispatch 前核对本次进程值，mismatch 返回 `WEB_CONNECTION_CHANGED`。它是连接生命周期前置条件，不是第二认证 credential 或全局物理 Instance identity；无该 header 的现有 CLI / 第三方请求不改变。Web 客户端的显式重连行为见 [连接、认证与恢复](web.md#连接认证与恢复)。
 
 <a id="initialized-json"></a>
 

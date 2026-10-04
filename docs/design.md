@@ -15,10 +15,11 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [object.md](design/object.md) | 公共 aggregate/Knowledge Ref、共享 YAML/JSON、batch read 与统一 Patch |
 | [graph.md](design/graph.md) | Knowledge 数据模型、Graph query / execute、Cypher 与搜索边界 |
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
-| [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同 |
+| [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同，以及 Web 持久数据错误方案 |
 | [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、npm/npx 分发、platform native Runtime package、Client version/package topology |
 | [cli.md](design/cli.md) | AI-first CLI command tree、`--root` / `KGOS_ROOT`、分层 help、`doctor/init` setup、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、内置 Web / HTTP、dynamic loopback endpoint、`auth.json` / `kgosd.lock`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
+| [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
 | [decisions.md](design/decisions.md) | D1–D84 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
@@ -31,6 +32,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | kgosd 怎么配置扩展、模型和凭证 | [Runtime config](design/runtime.md#configtoml)、[Embedding 配置映射](design/runtime.md#embedding-配置与索引映射) |
 | 使用方怎么定义模型和索引 | [Ontology 公共格式](design/ontology.md#公共可编辑格式)、[完整编辑示例](design/ontology.md#编辑示例) |
 | 调用方怎么保存正文和查询 | [Graph 合同](design/graph.md#graph-公共调用合同)、[CLI query](design/cli.md#query)、[CLI execute](design/cli.md#execute) |
+| 人怎样浏览图谱、查询、编辑和管理版本 | [Web 设计](design/web.md)、[功能画板与覆盖](design/web-materials.md)、[一致评审样例](design/web-examples.md)；内置同源交付见 [Runtime](design/runtime.md#web-hosting) |
 | 需要实现和验证什么 | [工程待办与验收](design/implementation.md) |
 | 第一阶段怎么搭开发环境 | [开发路线](development/README.md)、[Phase 00 计划](development/phases/00-engineering-foundation.md)、[本地开发指南](guide/development.md) |
 
@@ -43,7 +45,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 已确认调整 | [D59 Cypher passthrough](design/decisions.md#d59-cypher-passthrough)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](design/decisions.md#d66-lithograph-v030-sql-only)、[D67–D74](design/decisions.md)、[D75 TypeScript Client](design/decisions.md#d75-typescript-client)、[D76 npm distribution](design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](design/decisions.md#d79-stale-daemon-recovery)、[D80 official Jieba](design/decisions.md#d80-official-jieba)。D78–D80在不增加新业务能力的前提下收紧 Runtime connection/recovery 与默认 Full-text 行为；[D81](design/decisions.md#d81-workspace-root)、[D82](design/decisions.md#d82-init-readiness)、[D83](design/decisions.md#d83-cli-progressive-disclosure)进一步重做 Workspace/Instance、first-run readiness 与 CLI 信息设计；[D84](design/decisions.md#d84-late-bound-embedding-credential) 的 Embedding credential operation-time 解析与 init wizard 输入恢复边界已由 Phase 13 实现并验收 |
 | 检索范围与限制 | [首版 Semantic 只支持单字段且不公开 filterProperties，Cypher 联合检索可组合；post-YIELD 过滤不等价于过滤范围内 top-k](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
 | 工程待办 | Phase 00–13 均已完成；D81–D83 已随 v0.2.0 公开交付，D84 已随 v0.2.1 正式公开交付。Web 页面 / Skill 继续留在后续独立阶段 |
-| Web 待细化 | [kgosd 内置交付、同源服务与共享 Kernel 已定，具体页面布局和交互尚未展开](design/runtime.md#web-交互设计状态)；不阻塞 Kernel、daemon、CLI 或 SDK 的实现 |
+| Web 设计 | [图谱优先、覆盖式版本 DAG、独立查询结果帧与帧内检查器方向已认可](design/web.md#依据与状态)；原 State 重跑、Branch 前进仅提示刷新及 `.kgos` 下恢复 Web 数据已确认，首版按[本轮简化范围](design/web.md#信息架构与当前上下文)收敛；[当前接口与工程待办](design/web.md#当前能力与工程待办)区分已有能力和本轮持久化方案。页面仍为壳层，不代表实现或动态验收完成；内置交付见 [Runtime](design/runtime.md#web-交互设计状态) |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库、真实 loadable extension、SQL streaming 与 cancellation 集成测试。
 
@@ -52,6 +54,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 - 产品定义先读 [README](../README.md)，架构与存储边界读 [Architecture](design/architecture.md)。
 - 按“配置 → 模型 → 调用”理解本次语义检索设计，使用上面的入口。
 - 查询 / 写入的完整事务与错误边界分别读 [Object](design/object.md)、[Graph](design/graph.md)、[Evolution](design/evolution.md) 和 [公共合同](design/contracts.md)。
+- 人的图形阅读、查询结果帧、版本导航与前端编辑读 [Web](design/web.md)；按功能浏览 [Web 材料与覆盖矩阵](design/web-materials.md)，一致样例见 [Web 样例](design/web-examples.md)。
 - 决策依据与被替换规则读 [Decisions](design/decisions.md)；历史条目的后续调整不与 owner 正文并行生效。
 - 实现只能沿用对应 owner 已确认的规则；剩余 mapping / 验收由 [Implementation](design/implementation.md)记录。
 - 开发顺序、阶段状态与完成证据读[开发计划](development/README.md)；安装和命令读[开发指南](guide/development.md)。

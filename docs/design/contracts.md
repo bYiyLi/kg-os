@@ -1,6 +1,6 @@
 # 共享公共合同
 
-本文件只拥有 **跨 Ontology read / Object / Graph / Evolution 的共享公共错误合同**。各能力自己的 request / result / identity 语义仍由对应职责文件拥有。
+本文件只拥有 **跨 Ontology read / Object / Graph / Evolution 的共享公共错误合同**，以及下文明确标为待实现的 Web 持久数据错误方案。各能力自己的 request / result / identity 语义仍由对应职责文件拥有。
 
 ## 公共错误合同
 
@@ -73,3 +73,21 @@ Object Patch 的错误归类固定为：
 Ontology read / batch edit 与 aggregate Patch 使用相同错误 envelope。Ontology batch 的重复 Ref、超过 100 个 Ref、batch `--edit` 携带 pagination 参数，以及 `ontology patch` 出现 Knowledge target / alias kind，都返回 `INVALID_ARGUMENT`；任一 Ref 不存在返回 `OBJECT_NOT_FOUND`；完整 batch 输出超过资源限制返回 `RESOURCE_ERROR`。这些错误都发生在 stdout 产生之前，不能返回 partial Markdown / YAML stream。对 Property/Constraint/Index 的错误，details 使用公开的 `ref`（Domain/Definition）与 `path`（RFC 6901，必要时指向整个相关 collection），可附真实 name 与受影响 Definition refs。不能要求调用方改用独立 index/constraint API，也不能泄露内部 Binding identity。
 
 不支持的旧 Object kind/Ref、Ontology search 参数和无目标 Overview --edit 返回 `INVALID_ARGUMENT`。共享索引的相同显式目标合并不算冲突；不同目标、delete/update 竞争或依赖未解决返回 `OBJECT_CONFLICT`。底层 immediate constraint failure 仍返回对应数据库公开分类，整个 Patch rollback。
+
+## Web 持久数据错误方案
+
+以下是 [Web 工作区数据](web.md#web-工作区数据)的新增工程映射，**当前 code / route 尚未实现**；它们使用相同 `code/message/details` envelope，不更改现有 Knowledge API 分类。
+
+| 类别 | 拟用 code 与 HTTP status |
+| --- | --- |
+| Web request 携带的 expected daemon boot 与本次进程不符 | `WEB_CONNECTION_CHANGED` / 409；Web 停止旧连接操作并保留输入，只能显式重连，不自动取新 guard 后重发 |
+| storeId 已变化、创建 ID 已占用 / 已删除、record expectedRevision 不符 | `WEB_DATA_CHANGED` / 409；仅附 kind、id、观察到的 revision / deleted 信息，不自动覆盖或冒用 `STALE_BASE_STATE` |
+| read 的 record 不存在 | `WEB_DATA_NOT_FOUND` / 404；不混同 `OBJECT_NOT_FOUND` 或 cache miss |
+| cache write 对应 frame 不存在 / 已删除 | 不存在用 `WEB_DATA_NOT_FOUND` / 404，已删除用 `WEB_DATA_CHANGED` / 409；同 frame 的 cache read 为 miss，不能重建记录 |
+| request / UI payload shape、UUID、格式字段、cursor 非法 | `INVALID_ARGUMENT` / 400；autosave 不把未完成 YAML / Cypher 当存储语法错误 |
+| 存储格式较新、无适用迁移器 | `UNSUPPORTED_OPERATION` / 400；保留原件并允许可完成的一致备份导出 |
+| UI 库损坏或 databaseId 绑定不符 | `CONSISTENCY_ERROR` / 500；binding diagnostic 与受限恢复读取 / 导出可用，不套用到新库或重建空库 |
+| 记录 / 存储预算不足 | `RESOURCE_ERROR` / 413；保留原版本与本窗口输入，不自动删除草稿 |
+| UI SQLite 或导出 I/O 失败 | `IO_ERROR` / 500；保存确认不得早于真实 commit；响应丢失另作为 transport 结果未知 |
+
+认证仍用既有 `AUTHENTICATION_FAILED` / 401。缓存未命中、过期或有界清理不是持久数据错误；cache API 显式返回 miss。所有诊断不含 token、auth 文件、宿主路径或 credential；revision 只用于 Web 记录 CAS，不能证明 Knowledge Patch 的 baseState / Branch head 仍有效。

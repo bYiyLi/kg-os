@@ -6,7 +6,7 @@
 
 Ontology 已确认渐进式读取与 Domain/Definition aggregate 编辑；不能因为仍需实现 compiler，就把它退回“模型尚未设计”或要求 AI 操作单独的 Property/Constraint/Index。逻辑字段和行为只在各 owner 文档维护。
 
-[模型修改](ontology.md#patch-到真实变化)、[批量 Object Patch](object.md#object-公共调用合同)与 [Merge Session](evolution.md#evolution-公共调用合同)的产品规则已经确定，剩余工作是 compiler、业务 projection、冲突映射与公共 surface 的实现和验证。Phase 01 已为[只读 / 读写 connection、Provider-owned cache mapping、SQL streaming、cancellation 与 explicit transaction](#managed-semantic-integration-readiness)建立真实 Go adapter 和 native integration 基线；后续业务实现必须复用这些 primitive，而不是再建立第二套数据库 host。这些工程待办不表示需要重新确认对应核心设计；Web 页面细化单独见 [Runtime](runtime.md#web-交互设计状态)。
+[模型修改](ontology.md#patch-到真实变化)、[批量 Object Patch](object.md#object-公共调用合同)与 [Merge Session](evolution.md#evolution-公共调用合同)的产品规则已经确定，剩余工作是 compiler、业务 projection、冲突映射与公共 surface 的实现和验证。Phase 01 已为[只读 / 读写 connection、Provider-owned cache mapping、SQL streaming、cancellation 与 explicit transaction](#managed-semantic-integration-readiness)建立真实 Go adapter 和 native integration 基线；后续业务实现必须复用这些 primitive，而不是再建立第二套数据库 host。这些工程待办不表示需要重新确认对应核心设计；Web 交互与现有接口接入边界见 [Web 设计](web.md#当前能力与工程待办)，内置交付继续由 [Runtime](runtime.md#web-hosting)拥有。
 
 | 已确认的合同 | 工程工作 |
 | --- | --- |
@@ -124,7 +124,7 @@ Workspace Root→`.kgos` 单Instance、单库、同Instance认证和通用 exten
 - **Merge**：Phase 07 已实现 Merge Session 的 public conflict projection、渐进 resolution、固定 candidate revision 一致性检查、finalize/abort、authenticated HTTP 与 `kg evolution merge`；继续复用 Phase 06 State/Object/Change 与同一个 Lithograph Host，没有第二套 Merge workspace 或版本模型，并已通过本地/fresh-source/Ubuntu CI 验收。阶段完成证据仍以 [Phase 07 Evolution Merge Session](../development/phases/07-evolution-merge.md) 为准。
 - **Client surfaces**：Phase 00–07 的 Go `kg` 已作为 Phase 08 parity 基准完成迁移；当前实现由真实 `@kgos/sdk` 统一 HTTP transport，`@kgos/cli` 复用 SDK 并拥有本地 Runtime 职责，Go CLI 已在 parity 证据后删除。CLI 的 root/help/init presentation 必须从共享的 command/config metadata 与验证规则取得约束，避免再次出现 runtime config 已支持而 init/help 遗漏字段。Web 继续复用 SDK 类型边界，页面构建产物由同一 Workspace Instance 的 `kgosd` 交付。
 
-Web 还需细化页面布局、导航与具体操作交互，状态由 [Runtime](runtime.md#web-交互设计状态)记录。页面细化是同一产品的前端工作，不产生单独部署的 Web 服务，也不是上面 Kernel、daemon、CLI 或 SDK 开工的前置条件；当前文档不把尚未细化的页面标为已设计完成。
+Web 页面布局、导航与具体操作交互由 [Web 设计](web.md)拥有，已认可方向与前端工程方案见[依据与状态](web.md#依据与状态)。原 State 重跑、Branch 前进仅提示刷新与 `.kgos` 下恢复 Web 数据已按[本轮用户决定](web.md#已确认默认与本次持久化方案)更新；后续工作是 Web 工程接入、[独立 UI SQLite / 缓存及受控 API](web.md#web-工作区数据)的实现和[动态验收](web.md#设计自查与后续动态验收边界)，设计文档不表示页面交互或持久化已经实现。这些前端工作沿用 [Runtime 内置交付](runtime.md#web-hosting)边界，不产生单独部署的 Web 服务，也不是 Kernel、daemon、CLI 或 SDK 开工的前置条件。
 
 ## Ontology 专项验收
 

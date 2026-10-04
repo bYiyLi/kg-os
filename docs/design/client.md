@@ -26,6 +26,12 @@ TS Application ┘
 
 `@kgos/sdk` 映射 KG OS 已确认的公共 HTTP logical contract，按 `ontology / object / graph / evolution` 暴露对应 namespace。各 namespace 只适配对应 owner 已定义的 request/result/error，不重新发明第二套产品模型。
 
+[Web 工作区数据](web.md#受控-api-与多窗口保存)另提出 `web.data / web.cache` namespace，对应同 daemon、同 Bearer 的受控记录 / 缓存 API；当前 SDK / HTTP 尚无这些能力。后续 adapter 沿用浏览器 Web Platform 边界和共享错误 envelope，下载使用 Blob，不加入本地文件系统访问、root discovery、Knowledge State 或自动 mutation retry。
+
+Web 的[连接生命周期校验](web.md#连接认证与恢复)使用当前已有 `KGOSClientOptions.fetch` 注入点，为显式连接后的请求追加拟新增的可选 expected-boot header；服务器映射尚未实现。SDK 不自动发现 / 更新 guard，普通 SDK / CLI 不因此要求新参数，也不自动重新发送旧 mutation。
+
+同一 Web fetch adapter 按[接收与显示预算](web.md#接收与显示预算)在 SDK JSON / NDJSON 解码前限制响应字节并分块；这项 Web 实现尚不存在，不是当前 SDK 已保证内存上限。它继续复用 SDK 的唯一协议解析和每请求 AbortSignal，不复制另一套 transport / value 语义。
+
 客户端构造必须由调用方显式提供 endpoint 与 token，例如：
 
 ```ts
