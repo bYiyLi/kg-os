@@ -26,11 +26,11 @@ const rootPackage = packages[0];
 if (rootPackage.packageManager !== "pnpm@10.34.5") {
   throw new Error("packageManager must remain pinned to pnpm@10.34.5");
 }
-if (rootPackage.engines?.node !== "24.15.0" || rootPackage.engines?.pnpm !== "10.34.5") {
+if (rootPackage.engines?.node !== "24.16.0" || rootPackage.engines?.pnpm !== "10.34.5") {
   throw new Error("Node.js and pnpm engines must use the pinned KG OS versions");
 }
-if ((await readFile(resolve(root, ".node-version"), "utf8")).trim() !== "24.15.0") {
-  throw new Error(".node-version must remain pinned to 24.15.0");
+if ((await readFile(resolve(root, ".node-version"), "utf8")).trim() !== "24.16.0") {
+  throw new Error(".node-version must remain pinned to 24.16.0");
 }
 if (packages[2].engines?.node !== ">=24.15.0") {
   throw new Error("@kgos/cli must declare Node.js >=24.15.0");

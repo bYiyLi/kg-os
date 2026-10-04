@@ -30,11 +30,13 @@ type patchEntry struct {
 }
 
 type patchHunk struct {
-	OldStart int
-	OldCount int
-	NewStart int
-	NewCount int
-	Lines    []string
+	OldStart     int
+	OldCount     int
+	NewStart     int
+	NewCount     int
+	Lines        []string
+	OldNoNewline bool
+	NewNoNewline bool
 }
 
 var hunkHeaderPattern = regexp.MustCompile(`^@@ -([0-9]+)(?:,([0-9]+))? \+([0-9]+)(?:,([0-9]+))? @@(?: .*)?$`)
@@ -204,6 +206,19 @@ func parsePatchHunk(lines []string, start int) (patchHunk, int, error) {
 	index := start + 1
 	for index < len(lines) {
 		line := lines[index]
+		if line == `\ No newline at end of file` {
+			if index == start+1 || lines[index-1] == line {
+				return patchHunk{}, start, publicError(CodeParse, "orphan or duplicate no-newline marker", nil)
+			}
+			if err := markHunkEOF(&hunk, lines[index-1][0], oldSeen, newSeen); err != nil {
+				return patchHunk{}, start, err
+			}
+			index++
+			continue
+		}
+		if oldSeen == oldCount && newSeen == newCount {
+			break
+		}
 		if strings.HasPrefix(line, "diff --git ") || strings.HasPrefix(line, "@@ ") {
 			break
 		}
@@ -212,22 +227,26 @@ func parsePatchHunk(lines []string, start int) (patchHunk, int, error) {
 		}
 		switch line[0] {
 		case ' ':
+			if hunk.OldNoNewline || hunk.NewNoNewline {
+				return patchHunk{}, start, publicError(CodeParse, "content follows a no-newline marker", nil)
+			}
 			oldSeen++
 			newSeen++
 		case '-':
+			if hunk.OldNoNewline {
+				return patchHunk{}, start, publicError(CodeParse, "old content follows a no-newline marker", nil)
+			}
 			oldSeen++
 		case '+':
+			if hunk.NewNoNewline {
+				return patchHunk{}, start, publicError(CodeParse, "new content follows a no-newline marker", nil)
+			}
 			newSeen++
-		case '\\':
-			return patchHunk{}, start, publicError(CodeUnsupportedOperation, "no-newline Git markers are not needed for canonical YAML", nil)
 		default:
 			return patchHunk{}, start, publicError(CodeParse, "invalid unified diff line prefix", nil)
 		}
 		hunk.Lines = append(hunk.Lines, line)
 		index++
-		if oldSeen == oldCount && newSeen == newCount {
-			break
-		}
 		if oldSeen > oldCount || newSeen > newCount {
 			return patchHunk{}, start, publicError(CodeParse, "hunk line counts exceed header ranges", nil)
 		}
@@ -238,17 +257,33 @@ func parsePatchHunk(lines []string, start int) (patchHunk, int, error) {
 	return hunk, index, nil
 }
 
+func markHunkEOF(hunk *patchHunk, prefix byte, oldSeen, newSeen int) error {
+	oldSide := prefix == '-' || prefix == ' '
+	newSide := prefix == '+' || prefix == ' '
+	if !oldSide && !newSide || oldSide && oldSeen != hunk.OldCount || newSide && newSeen != hunk.NewCount {
+		return publicError(CodeParse, "no-newline marker must follow the final line on its side", nil)
+	}
+	hunk.OldNoNewline = hunk.OldNoNewline || oldSide
+	hunk.NewNoNewline = hunk.NewNoNewline || newSide
+	return nil
+}
+
 func applyExactHunks(base string, hunks []patchHunk) (string, error) {
 	baseLines := documentLines(base)
 	output := make([]string, 0, len(baseLines))
 	baseIndex := 0
-	for _, hunk := range hunks {
+	noNewline := base != "" && !strings.HasSuffix(base, "\n")
+	for hunkIndex, hunk := range hunks {
 		position := hunk.OldStart - 1
 		if hunk.OldStart == 0 {
 			position = 0
 		}
 		if position < baseIndex || position > len(baseLines) {
 			return "", publicError(CodePatchBaseMismatch, "Patch hunk start does not match canonical base", nil)
+		}
+		oldEOF := hunk.OldCount > 0 && position+hunk.OldCount == len(baseLines)
+		if hunk.OldNoNewline && !oldEOF || oldEOF && hunk.OldNoNewline != (base != "" && !strings.HasSuffix(base, "\n")) {
+			return "", publicError(CodePatchBaseMismatch, "Patch old EOF does not match canonical base", nil)
 		}
 		output = append(output, baseLines[baseIndex:position]...)
 		baseIndex = position
@@ -284,12 +319,22 @@ func applyExactHunks(base string, hunks []patchHunk) (string, error) {
 		if oldUsed != hunk.OldCount || newUsed != hunk.NewCount {
 			return "", publicError(CodePatchBaseMismatch, "Patch hunk counts do not match canonical base", nil)
 		}
+		if hunk.NewNoNewline && (hunkIndex != len(hunks)-1 || baseIndex != len(baseLines)) {
+			return "", publicError(CodeParse, "new EOF marker is followed by document content", nil)
+		}
+		if oldEOF || hunk.NewNoNewline || position == len(baseLines) && hunk.NewCount > 0 {
+			noNewline = hunk.NewNoNewline
+		}
 	}
 	output = append(output, baseLines[baseIndex:]...)
 	if len(output) == 0 {
 		return "", nil
 	}
-	return strings.Join(output, "\n") + "\n", nil
+	text := strings.Join(output, "\n")
+	if !noNewline {
+		text += "\n"
+	}
+	return text, nil
 }
 
 func documentLines(body string) []string {

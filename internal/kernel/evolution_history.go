@@ -82,7 +82,7 @@ func (service *Service) EvolutionHistory(ctx context.Context, request EvolutionH
 			if getErr != nil {
 				return EvolutionHistoryResult{}, AsPublicError(getErr)
 			}
-			parents = append([]string(nil), meta.Parents...)
+			parents = append([]string{}, meta.Parents...)
 			nextNative = nativeCursor
 		} else {
 			var native *string
@@ -98,7 +98,7 @@ func (service *Service) EvolutionHistory(ctx context.Context, request EvolutionH
 			}
 			entry := entries[0]
 			current = entry.Commit
-			parents = append([]string(nil), entry.Parents...)
+			parents = append([]string{}, entry.Parents...)
 			if entry.Cursor != nil {
 				nextNative = *entry.Cursor
 			}

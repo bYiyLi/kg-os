@@ -10,8 +10,8 @@ const goEnv = {
   GOTOOLCHAIN: "go1.27.1"
 };
 
-if (process.version !== "v24.15.0") {
-  throw new Error("KG OS setup requires Node.js 24.15.0; got " + process.version);
+if (process.version !== "v24.16.0") {
+  throw new Error("KG OS setup requires Node.js 24.16.0; got " + process.version);
 }
 const pnpm = (await runCapture("pnpm", ["--version"], { cwd: root })).stdout.trim();
 if (pnpm !== "10.34.5") {

@@ -8,3 +8,4 @@ export {
   type KGOSClientOptions
 } from "./client.js";
 export * from "./types.js";
+export * from "./web-types.js";

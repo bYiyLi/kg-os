@@ -181,6 +181,7 @@ Object Patch v1 的 textual syntax 固定采用普通 two-way **Git Extended Dif
 
 - 每个 Object target 映射为一个标准 `diff --git a/<target> b/<target>` file entry；这里的 `<target>` 是 Object transport contract 序列化后的 owner-backed Object Ref，或新增 Object 的 request-local alias + object kind target。`a/` / `b/` 是 Git patch 的语法前缀，不是 KG OS 虚拟目录、Object Ref 的组成部分或持久 identity；
 - Update / Restructure 使用标准 `---` / `+++` 与 unified `@@ ... @@` hunks；Add 使用标准 `new file mode 100644`、`--- /dev/null`、`+++ b/<target>`；Delete 使用标准 `deleted file mode 100644`、`--- a/<target>`、`+++ /dev/null`；
+- 标准 `\ No newline at end of file` 属于前一条 hunk 内容的 EOF framing，不计入 old/new 行数：`-` 标记原侧、`+` 标记目标侧、context 标记两侧。原侧须与 canonical base 精确匹配；目标 YAML 可不以 LF 结束，按原字节解析，不能通过自动补 LF 改变 block String 的值。孤立、重复或该侧后续仍有内容的 marker 属于非法 Patch；
 - Rename 使用标准 `diff --git a/<old-target> b/<new-target>` 与 `rename from` / `rename to` extended headers，可以同时包含 unified hunks。`<old-target>` 定位 `baseState` 中已有 Object；`<new-target>` 只表达 rename 后的目标 locator，不改变 D23“Patch 内其它已有对象引用仍按 baseState Ref 解析”的规则；
 - 一个多 Object Patch 直接由多个标准 `diff --git` file entry 组成，不增加 KG OS 自有 Patch wrapper 或 section delimiter；
 - Object target 字符串放入 Git path slot 后，特殊字符的 quoting / escaping 服从 Git patch 的 pathname quoting 规则；KG OS 不再定义第二套 Patch path escaping。已有对象 target 使用上面 canonical Object Ref；新增对象使用 `new:<kind>:<alias-component>`；

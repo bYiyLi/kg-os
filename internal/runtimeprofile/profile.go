@@ -16,6 +16,9 @@ type Paths struct {
 	CacheDir      string
 	ExtensionsDir string
 	LogsDir       string
+	WebDir        string
+	WebDatabase   string
+	WebCacheDir   string
 }
 
 func ResolvePaths(root string) (Paths, error) {
@@ -38,6 +41,9 @@ func ResolvePaths(root string) (Paths, error) {
 		CacheDir:      filepath.Join(instanceRoot, "cache"),
 		ExtensionsDir: filepath.Join(instanceRoot, "extensions"),
 		LogsDir:       filepath.Join(instanceRoot, "logs"),
+		WebDir:        filepath.Join(instanceRoot, "web"),
+		WebDatabase:   filepath.Join(instanceRoot, "web", "ui.db"),
+		WebCacheDir:   filepath.Join(instanceRoot, "web", "cache"),
 	}, nil
 }
 

@@ -6,13 +6,13 @@
 
 ## 依据与状态
 
-2026-10-04 核对基线：`main@181628b45c1600476514dfc129a5053c6d394b9e`，版本 `0.2.1`。当前 [Web shell](../../packages/web/src/shell.tsx) 仅提供 React / TypeScript / Vite 壳层；本文不是页面已交付或交互验收报告。后端依据是当前 [SDK](../../packages/sdk/src/client.ts)、[类型](../../packages/sdk/src/types.ts) 和 [HTTP adapter](../../internal/daemon/api.go)，而非截图按钮。
+2026-10-04 核对基线：`main@181628b45c1600476514dfc129a5053c6d394b9e`，版本 `0.2.1`。此为设计提交时基线；当前 [Web 工作区](../../packages/web/src/shell.tsx) 正按 [Phase 14](../development/phases/14-web.md) 实施。本文不是页面已交付或交互验收报告。后端依据是当前 [SDK](../../packages/sdk/src/client.ts)、[类型](../../packages/sdk/src/types.ts) 和 [HTTP adapter](../../internal/daemon/api.go)，而非截图按钮。
 
 | 状态 | 本文处理 |
 | --- | --- |
 | 用户已认可 | 图谱优先；白 / 浅灰 / 蓝视觉；左侧紧凑版本列表与覆盖式纵向 DAG；顶部新查询编辑器；最新优先的独立结果帧；帧内图 / JSON 切换、概览与对象检查器；显式进入简单编辑；旧帧重跑原 State；Branch 前进提示刷新、不自动切换；Web 数据与草稿保存在 Workspace 的 `.kgos` 下并可恢复 |
 | 沿用现有产品合同 | 全世界 immutable State、同 State 读取、Definition 聚合、strict base Object Patch、Graph 原样执行与 Evolution 专用操作 |
-| 本次工程方案，尚未实现 | 帧状态、图投影、分页接入、表单到 Patch、局部校验、手动 token 输入与内存保存、错误反馈、键盘与窄屏规则；`.kgos/web/ui.db`、可丢弃结果缓存、受控 Web 数据 API 与按记录并发校验 |
+| 本次工程方案，实施中 | 帧状态、图投影、分页接入、表单到 Patch、局部校验、手动 token 输入与内存保存、错误反馈、键盘与窄屏规则；`.kgos/web/ui.db`、可丢弃结果缓存、受控 Web 数据 API 与按记录并发校验 |
 | 本轮决定更新 | 用户接受前两项默认，并追加“数据可以放到 kgos 下面，Web 临时数据也放里面”；按现有 Workspace→`.kgos` 合同理解，草稿不再默认随刷新丢失。随后明确“再简化点，不要过度设计”：首版只呈现常用工作流，保存 / 恢复在原编辑位置，缓存自动管理，普通错误就地短提示，真实冲突才打开比较。内部安全与持久化合同保留，均不代表已经实现 |
 
 ### 功能式设计材料
@@ -88,6 +88,8 @@
 
 运行时一次性冻结所见语句、解析后的 params、明确模式、目标 commit / Branch 和输入引用，作为新帧请求快照；后续编辑输入或切版本不修改它。上下文切换尚未完成时，主运行与按当前版本新跑都暂停，避免显示新引用却读取旧 commit；解析失败仍保留可用旧上下文，由用户明确恢复后运行。
 
+工程编码同时保留合法参数对象的原始 JSON 文本，帧保存、显示、复制及重跑使用这一冻结来源，避免 Number 重新编码把 `1.0`、`-0.0` 或大整数改变为另一 Lithograph 值。HTTP 请求通过 SDK 的同请求精确 JSON 选项发送；缓存指纹使用该来源解析的参数值。没有此可选来源的旧记录沿用既有 params，不补造已丢失的数字格式。
+
 帧头提供重跑、折叠、全屏、关闭；运行中显示取消。折叠保留语句、State、状态和计数，运行仍继续；全屏只扩大当前帧，退出恢复原位置与图相机。运行中关闭的动作写为“取消并关闭”，不能用移除 DOM 冒充后端取消成功。关闭一个完成帧不删除知识、State 或其他帧。
 
 取消先记录本窗口的取消状态，再 abort 原请求；关闭还设置 closed 并失效该帧执行 / 邻居 / 属性请求 generation，abort 这些请求。更新 rows、计数、选择、缓存或 autosave 前均检查对应生命周期，已经缓冲的 row / summary 不能把取消帧改成正常完成、重新打开关闭帧或覆盖另一帧。正常完成已确认的记录不因随后关闭改成取消。关闭状态通过该记录的 CAS 保存；迟到回调不使用最新 revision 回写旧整条记录。仅停止 async iteration 不等于取消 HTTP，必须沿同一个 AbortController 的 signal 中断。
@@ -122,7 +124,7 @@
 
 ### 接收与显示预算
 
-当前 SDK 的 NDJSON reader 会先缓冲整条 event 再 JSON.parse，HTTP 的 16 MiB 是请求体上限，都不能保证浏览器响应内存有界。Web 使用现有 `KGOSClientOptions.fetch` 注入点包装响应流：在 SDK 解码前按 UTF-8 bytes 计数、把交付 chunk 切成不超过 32 KiB，单 NDJSON event 初值不超过 1 MiB；未知规模的 Graph 默认用 streaming。非 streaming JSON / 缓存读取也在解析前限制响应为 16 MiB，容纳单条 8 MiB 记录及 envelope，超限完整失败，不展示截断 Object 表单；显式 SQLite 下载是独立下载流，不送入 JSON decoder。包装保留 SDK 的唯一协议解析器，不复制 error / value decoder，也不改变 CLI / 第三方 SDK 默认合同；上述 Web adapter 尚未实现。
+当前 SDK 的 NDJSON reader 会先缓冲整条 event 再 JSON.parse，HTTP 的 16 MiB 是请求体上限，都不能保证浏览器响应内存有界。Web 使用现有 `KGOSClientOptions.fetch` 注入点包装响应流：在 SDK 解码前按 UTF-8 bytes 计数、把交付 chunk 切成不超过 32 KiB，单 NDJSON event 初值不超过 1 MiB；未知规模的 Graph 默认用 streaming。非 streaming JSON / 缓存读取也在解析前限制响应为 16 MiB，容纳单条 8 MiB 记录及 envelope，超限完整失败，不展示截断 Object 表单；显式 SQLite 下载是独立下载流，不送入 JSON decoder。包装保留 SDK 的唯一协议解析器，不复制 error / value decoder，也不改变 CLI / 第三方 SDK 默认合同；实现见 [Web adapter](../../packages/web/src/transport.ts)，实际验收范围由阶段记录维护。
 
 初始前端预算为每帧最多保留 8 MiB 完整 rows 编码或 10,000 rows，整页 rows 最多 32 MiB，同时活跃流不超过 4；本窗口新运行超出并发数时排队并显示冻结的请求上下文，可取消待执行任务。达到接收 / rows 预算时主动 abort，保留已确认接收的部分，标前端预算原因、取消 / 不完整；没有正常 summary 与 EOF 就不标完成、不写完整缓存，execute 仍标写入结果待核对。这些是可调整的工程初值，不是准确的 JS heap 上限或已验证容量。
 
@@ -216,11 +218,11 @@ flowchart LR
 
 ## Web 工作区数据
 
-自动恢复与真实多窗口冲突见 [R2 工作区恢复](assets/web/R2-workspace-recovery.png)，开发状态规范见 [R2 状态表](assets/web/R2-states.png)。正常恢复留在原编辑位置，状态表不建立异常管理入口；材料已按本轮简化决定修订，持久化功能均为下述待实现方案。
+自动恢复与真实多窗口冲突见 [R2 工作区恢复](assets/web/R2-workspace-recovery.png)，开发状态规范见 [R2 状态表](assets/web/R2-states.png)。正常恢复留在原编辑位置，状态表不建立异常管理入口；材料已按本轮简化决定修订，持久化实现及验收记录见 [Phase 14](../development/phases/14-web.md)。
 
 ### 存储基线与目录
 
-现有 [Runtime](runtime.md#instance-root) 固定一个 Workspace 对应 `<root>/.kgos`、一个 `kgos.db` 与最多一个 daemon；当前 [路径实现](../../internal/runtimeprofile/profile.go) 没有 Web 数据目录，[HTTP adapter](../../internal/daemon/api.go) 和 [SDK](../../packages/sdk/src/client.ts) 也没有 Web 存储接口。下列是本轮新增工程设计，尚未实现；“保存到 kgos 下”不另建顶层 `kgos/`。
+现有 [Runtime](runtime.md#instance-root) 固定一个 Workspace 对应 `<root>/.kgos`、一个 `kgos.db` 与最多一个 daemon；当前 [路径实现](../../internal/runtimeprofile/profile.go)、[HTTP adapter](../../internal/daemon/web.go) 和 [SDK](../../packages/sdk/src/client.ts) 已接入 Web 存储工程合同；下列规则的跨平台与完整交付验收由 Phase 14 维护；“保存到 kgos 下”不另建顶层 `kgos/`。
 
 ```text
 <root>/.kgos/web/
@@ -258,7 +260,7 @@ flowchart LR
 
 UI 库的 metadata 至少含独立 `formatVersion=1`、随机 `storeId` 和 daemon 启动时已验证的 Lithograph `databaseId`；record 含 `kind/id/revision/deleted/data/lastMutationId`。`revision` 是递增的十进制字符串，客户端只作相等比较，不转换为可能失真的 Number；`data` 是各 kind 的 versioned JSON payload，草稿文本原样保存。SQLite 保存与 Knowledge State 无共同版本号或事务。`storeId` 只识别这一份 Web 存储的创建 / 显式重置，不是 Object Ref、StateRef 或新物理 Instance 身份。
 
-每个 daemon 只打开自己 `.kgos` 下的 UI 数据。内部 `databaseId` 当前已存在，但新的 Web API 读取这项绑定属于待实现的 adapter 合同。换端口不会改变目录归属；目录内换成不同 databaseId 的 `kgos.db` 时保留旧 `ui.db`，仅允许读取 / 导出其恢复资料，禁止套用到新库或继续保存。v1 不提供浏览器整体 reset / 文件替换接口；operator 明确停止 daemon 并完整归档旧 UI 库及其运行文件后，下一次 Web 请求才可为当前库建立新 storeId。数据库和整份 Workspace 的复制可能保留 databaseId / storeId，不意味着同一物理实例；不同 Workspace 各自管理本地记录，不按相同 ID 跨目录合并。完整备份恢复也要重新检查 State / Branch。
+每个 daemon 只打开自己 `.kgos` 下的 UI 数据。内部 `databaseId` 当前已存在，但Web API 从 Runtime 已验证的 Host baseline 取得该绑定。换端口不会改变目录归属；目录内换成不同 databaseId 的 `kgos.db` 时保留旧 `ui.db`，仅允许读取 / 导出其恢复资料，禁止套用到新库或继续保存。v1 不提供浏览器整体 reset / 文件替换接口；operator 明确停止 daemon 并完整归档旧 UI 库及其运行文件后，下一次 Web 请求才可为当前库建立新 storeId。数据库和整份 Workspace 的复制可能保留 databaseId / storeId，不意味着同一物理实例；不同 Workspace 各自管理本地记录，不按相同 ID 跨目录合并。完整备份恢复也要重新检查 State / Branch。
 
 Web 存储首次缺失可在已认证 Web 请求中创建空库，不能加入 `init` / Kernel readiness 的前置条件。首次创建由 daemon 内互斥串行化，在同目录私有临时 SQLite 完成 schema / metadata transaction、关闭并同步后原子发布；失败不把半建文件发布成 `ui.db`。已有库先核对格式 / 库绑定，再启用正常读写 / WAL 或明确迁移；现有文件损坏、库绑定不符或未来格式不支持时保留原文件并报告，不能静默重建空库。格式版本独立于 KG OS package / Lithograph storage format；只进行有明确迁移器、事务校验及可恢复原件的升级，失败保留旧数据，未知更高版本只读诊断 / 导出并返回 `UNSUPPORTED_OPERATION`。UI 子系统故障不阻断已有 Ontology / Object / Graph / Evolution API。
 
@@ -266,20 +268,20 @@ Web 存储首次缺失可在已认证 Web 请求中创建空库，不能加入 `
 
 ### 受控 API 与多窗口保存
 
-本轮新增方案使用 SDK `web.data / web.cache` 和 POST `/api/v1/web/data/*`、`/api/v1/web/cache/*`，与当前业务 API 共用 Bearer 和错误 envelope。**当前代码没有这些 namespace / routes。** 请求继续受现有 16 MiB transport 上限约束；单条 8 MiB 预算避免全工作区 replacement，list 只返回轻量 headers，默认 100、1..1000、opaque cursor。UI list 是存储记录分页，不是全历史搜索或 Object discovery。
+本轮新增方案使用 SDK `web.data / web.cache` 和 POST `/api/v1/web/data/*`、`/api/v1/web/cache/*`，与当前业务 API 共用 Bearer 和错误 envelope。实现见 [SDK](../../packages/sdk/src/client.ts) 与 [HTTP adapter](../../internal/daemon/web.go)，验收结果见 Phase 14。 请求继续受现有 16 MiB transport 上限约束；单条 8 MiB 预算避免全工作区 replacement，list 只返回轻量 headers，默认 100、1..1000、opaque cursor。UI list 是存储记录分页，不是全历史搜索或 Object discovery。
 
-| 拟新增调用 | 最小合同 |
+| 调用 | 最小合同 |
 | --- | --- |
 | `web.data.info({})` | 已认证后总能返回本次进程的 daemonBootId 与 storageStatus（ready / unavailable / unsupported / mismatch）；可安全读取时才附 formatVersion、storeId、保存 / 当前 databaseId、bindingStatus 和用量，否则附共享错误诊断，不猜字段。库绑定不符时只开放恢复读取 / 导出。daemonBootId 用于下文连接失效校验，不依赖 UI 库成功打开 |
 | `web.data.list({storeId, kind, limit?, cursor?})` / `read({storeId, kind, id})` | list 返回 kind/id/revision/deleted 等 headers，read 返回单条完整 record；cursor 绑定 storeId/kind 与该分页快照，不复用到新一组读取 |
 | `web.data.save({storeId, kind, id, expectedRevision, mutationId, data})` | 新记录用新 UUID 和 `expectedRevision=null`；已有记录用最后观察 revision。daemon 在同一 SQLite transaction 比较并发布新 revision，只有 commit 确认后才返回“已保存” |
 | `web.data.delete({storeId, kind, id, expectedRevision, mutationId})` | 仅删除明确记录并清空正文，保留 deleted ID/revision 以拒绝旧窗口重新创建；重用已删除 ID 不视为新建。批量清理逐条显示实际成功 / 失败，不宣称跨条原子 |
 | `web.data.export({})` | 从固定 `ui.db` 生成一致、压缩的 SQLite 副本，包含已提交内容而不带已删除正文的 free pages；使用服务端固定临时路径的 `VACUUM INTO`，成功后才下载，不把原文件 / WAL 直接打包，也不接收路径。有效但较新格式 / 库绑定不符时不解释 payload，仍可导出逻辑原件；压缩 / 备份失败明确报错，保留原件、不降级为带残留的普通副本。响应为下载流，SDK 返回 Web Platform Blob |
-| `web.cache.write({storeId, frameId, result})` / `read({storeId, frameId})` / `clear({storeId})` | 只读完整帧的 best-effort 缓存；result 保留 typed rows 和对应 state。服务端限制格式 / 大小、绑定帧 / 库 / commit；不存在或 deleted frame 的 read 返回 miss，write 拒绝，不接受文件名 / 任意路径 |
+| `web.cache.write({storeId, frameId, frameRevision, result})` / `read({storeId, frameId})` / `clear({storeId})` | 只读完整帧的 best-effort 缓存；result 保留 typed rows 和对应 state。服务端限制 typed 格式 / 大小、绑定帧 / 库 / commit；write 的 frameRevision 是写入前可靠确认的帧 revision，拒绝修改后迟到的结果。只改变视口等展示信息但查询指纹未变时保留原缓存；不存在或 deleted frame 的 read 返回 miss，write 拒绝，不接受文件名 / 任意路径 |
 
 record ID 与 Web store metadata不成为公共 Object；autosave 只验证存储 envelope、kind 的 UI payload shape、格式及预算，不要求其中的草稿是有效模型或可提交 Patch。保存失败使用[Web 持久数据错误方案](contracts.md#web-持久数据错误方案)，不能用 `STALE_BASE_STATE` 代替 UI revision 冲突。
 
-导出使用压缩副本是清理合同的工程编码：[SQLite VACUUM INTO](https://www.sqlite.org/lang_vacuum.html) 提供一致的逻辑副本并去除删除内容；普通 [Backup API](https://www.sqlite.org/backup.html) 的按位快照不具备同样的删除清理边界。临时副本不加载 extensions、不依赖可变 ROWID 作 UI record identity，未完成时不提供下载；此行为仍待实际 driver 与跨平台验证。
+导出使用压缩副本是清理合同的工程编码：[SQLite VACUUM INTO](https://www.sqlite.org/lang_vacuum.html) 提供一致的逻辑副本并去除删除内容；普通 [Backup API](https://www.sqlite.org/backup.html) 的按位快照不具备同样的删除清理边界。临时副本不加载 extensions、不依赖可变 ROWID 作 UI record identity，未完成时不提供下载；实际 driver 与跨平台验证范围见 Phase 14。
 
 编辑约 500ms 无新输入时保存，一条记录最多一个 in-flight 请求；新输入保持 dirty，旧响应只确认发送时那一版。编辑器附近用小标识显示“正在保存 / 已保存 / 未保存”；保存冲突或结果未知时给出适用的局部处理，不展开常驻诊断卡。未确认保存才显示离开提醒，浏览器关闭事件不被当作保证可完成最后写入。响应丢失后 read 对应 ID，核对 `lastMutationId` 与内容，不能仅因 revision 增加就声称本窗口已保存；未能核对前保留本地输入，暂停依赖可靠保存的提交。
 
@@ -355,11 +357,11 @@ resolve / finalize / abort 都携带最后观察到的 `expectedRevision`。reso
 
 本次最小适配方案是：用户按本地 Runtime locator 打开当前 endpoint，在简短连接 dialog 手动提供当前 Instance 的完整 Bearer token；输入遮蔽，token 只存在当前页面内存，构造 SDK 后对 API 发 Bearer。顶部正常只显示简短连接状态，endpoint 可展开查看；boot ID、库 ID 与原始错误码不作为日常主显示。页面刷新或显式“断开并清除凭证”清除内存；不放 URL、cookie、localStorage、草稿、日志或设计示例。浏览器自动交接凭证、持久保存与跨端口恢复未被假定为现有能力。
 
-对应材料见 [R1 显式连接](assets/web/R1-local-connection.png)、[R1 状态表](assets/web/R1-states.png)与 [R1 / R2 覆盖矩阵](web-materials.md#功能覆盖矩阵)；材料中的连接与持久化工程方案仍需实现。
+对应材料见 [R1 显式连接](assets/web/R1-local-connection.png)、[R1 状态表](assets/web/R1-states.png)与 [R1 / R2 覆盖矩阵](web-materials.md#功能覆盖矩阵)；连接与持久化实现的验收记录由 [Phase 14](../development/phases/14-web.md)维护。
 
-Web 新增工程适配还需检测 daemon 生命周期：每次进程启动生成内存中的随机 UUID `daemonBootId`，首次显式连接通过 `web.data.info` 取得；之后 Web 借现有 SDK 的 `fetch` 注入点对全部 API request 携带 `X-KGOS-Expected-Daemon-Boot`。HTTP adapter 在 Bearer 认证后、执行操作前比较该可选 header，不符返回 `WEB_CONNECTION_CHANGED`，Web 暂停读取 / autosave / mutation、保留输入并要求显式重新连接，不能自动重新获取 boot 值接着发送。没有 header 的现有 CLI / 第三方 SDK 合同不变；Web bootstrap 的无 header info 仅发生在用户显式连接时，尚未取得 boot 值前不发其他操作。
+Web 工程适配检测 daemon 生命周期：每次进程启动生成内存中的随机 UUID `daemonBootId`，首次显式连接通过 `web.data.info` 取得；之后 Web 借现有 SDK 的 `fetch` 注入点对全部 API request 携带 `X-KGOS-Expected-Daemon-Boot`。HTTP adapter 在 Bearer 认证后、执行操作前比较该可选 header，不符返回 `WEB_CONNECTION_CHANGED`，Web 暂停读取 / autosave / mutation、保留输入并要求显式重新连接，不能自动重新获取 boot 值接着发送。没有 header 的现有 CLI / 第三方 SDK 合同不变；Web bootstrap 的无 header info 仅发生在用户显式连接时，尚未取得 boot 值前不发其他操作。
 
-此 guard 当前尚未实现，不是第二个 secret、账号权限或稳定物理 Instance identity。它解决完整复制 `.kgos` 保留 token / databaseId / storeId、另一个 daemon 复用旧端口时旧页面继续发送的情况；正常 daemon 重启也会失效，用户重新连接后再按原 store / 库绑定核对恢复。daemonBootId 不进 UI 持久记录或导出，不用 endpoint、PID 或持久 ID 冒充进程生命周期。
+此 guard 已在 HTTP adapter 与 Web fetch 接入，不是第二个 secret、账号权限或稳定物理 Instance identity。它解决完整复制 `.kgos` 保留 token / databaseId / storeId、另一个 daemon 复用旧端口时旧页面继续发送的情况；正常 daemon 重启也会失效，用户重新连接后再按原 store / 库绑定核对恢复。daemonBootId 不进 UI 持久记录或导出，不用 endpoint、PID 或持久 ID 冒充进程生命周期。
 
 | 连接状态 | 页面行为 |
 | --- | --- |
@@ -411,23 +413,23 @@ Graph 数量始终写明当前返回 / 展开 / 已显示范围；没有后端�
 
 ### 接口能力核对
 
-以下是 2026-10-04 当前代码核对结果，不代表 Web 已接入；HTTP method 均为 POST，使用同一个 Bearer credential。
+以下是 2026-10-04 工作树接口与 Web 接入核对结果；实际验收范围见 [Phase 14](../development/phases/14-web.md)，不能从接口存在推断所有平台已通过。HTTP method 均为 POST，使用同一个 Bearer credential。
 
 | UI 需要 | 当前 SDK / HTTP | 前端责任或缺口 |
 | --- | --- | --- |
 | Ontology 概览 / Domain / Definition | `ontology.read` → `/api/v1/ontology/read` | 图布局、直接成员分页与范围提示；无 Ontology search |
 | 公共对象 / canonical base | `object.read / readText` → `/api/v1/object/read`、`read-text` | 结构化检查器与表单，保留 typed values；无 object list/search |
 | 统一高层提交 | `object.patch / ontology.patch` → 各自 `patch` | 本地草稿、Git Extended Diff、strict base 反馈；无独立 preview/validate 或提交状态接口 |
-| 查询 / 执行 / NDJSON | `graph.query / execute / streamQuery / streamExecute` → `/api/v1/graph/query`、`execute` | 图投影、非图 JSON、write summary；现有 fetch 注入点可适配 Web 有界接收，预算 reader 尚未实现；无 affected IDs 或保证的图返回 |
+| 查询 / 执行 / NDJSON | `graph.query / execute / streamQuery / streamExecute` → `/api/v1/graph/query`、`execute` | 图投影、非图 JSON、write summary；现有 fetch 注入点可适配 Web 有界接收，预算 reader 已接入，动态验证见 Phase 14；无 affected IDs 或保证的图返回 |
 | 取消 | SDK `RequestOptions.signal` + HTTP disconnect | 每请求 AbortController；无 query-id cancel，写入副作用不能由取消推断 |
 | 版本导航 / 详情 | `evolution.overview / get / ancestry / history` → 对应 `/api/v1/evolution/*` | 先 pin、DAG 虚拟化、局部文本搜索；summary / parents 不含 State Data 的快照内容 |
 | 两 State 差异 | `evolution.diff` | 结构化 Change 图与字段对照、有界分页；不是提交 Patch 文本 |
 | Branch / Tag / State Data | SDK `evolution.branch / tag / state` → 对应 route | 原样接现有操作；Branch 无专用 move/rename，ref list 无 cursor |
 | Merge | SDK `evolution.merge` 的 start/list/get/conflicts/resolve/finalize/abort | 精确 revision 工作流与恢复；无公开共同基底字段或高层全局影响预览 |
-| 连接 | SDK 显式 `endpoint/token`、fetch 注入点与 401 公共错误 | 手动输入、页面内存 credential；拟新增 boot guard 尚未实现，无浏览器自动凭证交接、稳定 Instance identity 或跨端口发现 |
-| Web 持久 UI / 草稿 / 结果缓存 | 当前无 SDK namespace / HTTP route / Web store | 按[本轮存储与 API 方案](#web-工作区数据)新增 daemon adapter 与 SDK；不借用 State Data、Knowledge Patch 或任意文件接口 |
+| 连接 | SDK 显式 `endpoint/token`、fetch 注入点与 401 公共错误 | 手动输入、页面内存 credential及可选 boot guard 已接入；无浏览器自动凭证交接、稳定 Instance identity 或跨端口发现 |
+| Web 持久 UI / 草稿 / 结果缓存 | `web.data / web.cache` 与固定 `.kgos/web` SQLite store | 按[本轮存储与 API 方案](#web-工作区数据)实现 daemon adapter 与 SDK；不借用 State Data、Knowledge Patch 或任意文件接口 |
 
-没有把剩余工作解释为 Object / Ontology 尚未设计；高层模型、身份与生命周期已经有 owner。缺口是 Web 工程接入、局部可视化、本轮新增的 UI 存储 / API 与真实动态验收；下列默认行为已按用户本轮决定更新。
+高层模型、身份与生命周期沿用对应 owner；Web 工程接入、局部可视化及 UI 存储 / API 已实现，剩余验收与实际阻塞由 Phase 14 记录。下列默认行为已按用户本轮决定更新。
 
 <a id="待确认产品选择"></a>
 
@@ -440,11 +442,11 @@ Graph 数量始终写明当前返回 / 展开 / 已显示范围；没有后端�
 | 跨刷新恢复 Web 数据与草稿 | 用户已认可数据放在 KG OS 目录；本轮在已有 `.kgos/` 下设计 `web/`，隔离持久 UI 与可淘汰缓存。已保存记录重新认证后恢复，草稿无自动 TTL；尚未确认保存才提醒可能丢失 |
 | 首版交互范围 | 用户已要求简化：保存 / 恢复留在原编辑位置，缓存后台自动管理，普通失败短提示，真实内容 / CAS 冲突才比较；不设恢复中心、缓存 / 容量管理页或常驻诊断卡，维护导入 / 导出 / 整份清理不进入首版常用流程 |
 
-token 的手动输入 / 内存保存、记录 CAS、格式与分页、预算 / 缓存 TTL、错误映射与组件尺寸属于本次工程方案，仍待实现和动态验证。自动交接 credential 或远程部署需另有明确需求和合同，当前不为它新增接口。
+token 的手动输入 / 内存保存、记录 CAS、格式与分页、预算 / 缓存 TTL、错误映射与组件尺寸属于本次工程实现；动态与交付验证见 Phase 14。自动交接 credential 或远程部署需另有明确需求和合同，当前不为它新增接口。
 
 ### 设计自查与后续动态验收边界
 
-本文和样例按以下有限用例核对。文字与资产核对可确认方案一致性；交互、性能、后端集成仍待产品实现后取得证据，不在此新建开发阶段。
+本文和样例按以下有限用例核对。文字与资产核对可确认方案一致性；交互、性能、后端集成的实际证据及未验证边界由 Phase 14 维护，不在此新建开发阶段。
 
 | 场景 | 应观察到的结果 |
 | --- | --- |

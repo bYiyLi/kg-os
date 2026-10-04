@@ -1,0 +1,170 @@
+[
+  [
+    "new:node-definition:model",
+    {
+      "name": "Model",
+      "labels": [],
+      "properties": [
+        {
+          "name": "name",
+          "type": "STRING"
+        },
+        {
+          "name": "parameters",
+          "type": "INTEGER"
+        },
+        {
+          "name": "description",
+          "type": "STRING"
+        }
+      ],
+      "constraints": []
+    }
+  ],
+  [
+    "new:node-definition:paper",
+    {
+      "name": "Paper",
+      "labels": [],
+      "properties": [
+        {
+          "name": "name",
+          "type": "STRING"
+        },
+        {
+          "name": "year",
+          "type": "INTEGER"
+        }
+      ],
+      "constraints": []
+    }
+  ],
+  [
+    "new:relationship-definition:describes",
+    {
+      "name": "DESCRIBES",
+      "from": "new:node-definition:paper",
+      "to": "new:node-definition:model",
+      "properties": [
+        {
+          "name": "evidence",
+          "type": "STRING"
+        }
+      ],
+      "constraints": []
+    }
+  ],
+  [
+    "new:relationship-definition:related",
+    {
+      "name": "RELATES",
+      "from": null,
+      "to": null,
+      "properties": [
+        {
+          "name": "evidence",
+          "type": "STRING"
+        }
+      ],
+      "constraints": []
+    }
+  ],
+  [
+    "new:domain:research",
+    {
+      "name": "Research",
+      "includes": [
+        "new:node-definition:model",
+        "new:node-definition:paper",
+        "new:relationship-definition:describes",
+        "new:relationship-definition:related",
+        "new:domain:lab"
+      ]
+    }
+  ],
+  [
+    "new:domain:lab",
+    {
+      "name": "Lab",
+      "includes": ["new:domain:research", "new:node-definition:model"]
+    }
+  ],
+  [
+    "new:knowledge-node:model",
+    {
+      "labels": ["Model"],
+      "properties": {
+        "name": "Lumen-7B",
+        "parameters": {
+          "$type": "Integer",
+          "value": "9223372036854775807"
+        },
+        "description": "真实 Runtime 研究模型"
+      }
+    }
+  ],
+  [
+    "new:knowledge-node:paper",
+    {
+      "labels": ["Paper"],
+      "properties": {
+        "name": "Lumen Technical Report",
+        "year": 2025
+      }
+    }
+  ],
+  [
+    "new:knowledge-node:unlabelled",
+    {
+      "labels": [],
+      "properties": {
+        "name": "无 Label 节点",
+        "count": 42
+      }
+    }
+  ],
+  [
+    "new:knowledge-relationship:describes-one",
+    {
+      "type": "DESCRIBES",
+      "start": "new:knowledge-node:paper",
+      "end": "new:knowledge-node:model",
+      "properties": {
+        "evidence": "main report"
+      }
+    }
+  ],
+  [
+    "new:knowledge-relationship:describes-two",
+    {
+      "type": "DESCRIBES",
+      "start": "new:knowledge-node:paper",
+      "end": "new:knowledge-node:model",
+      "properties": {
+        "evidence": "parallel proof"
+      }
+    }
+  ],
+  [
+    "new:knowledge-relationship:self",
+    {
+      "type": "RELATES",
+      "start": "new:knowledge-node:model",
+      "end": "new:knowledge-node:model",
+      "properties": {
+        "evidence": "self loop"
+      }
+    }
+  ],
+  [
+    "new:knowledge-relationship:reverse",
+    {
+      "type": "RELATES",
+      "start": "new:knowledge-node:model",
+      "end": "new:knowledge-node:paper",
+      "properties": {
+        "evidence": "reverse direction"
+      }
+    }
+  ]
+]

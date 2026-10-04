@@ -15,6 +15,7 @@ import (
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	runtimehost "github.com/bYiyLi/kg-os/internal/runtime"
+	"github.com/bYiyLi/kg-os/internal/webstore"
 )
 
 const maxAPIRequestBytes = 16 << 20
@@ -24,6 +25,8 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 		fallback = http.NotFoundHandler()
 	}
 	mux := http.NewServeMux()
+	bootID := webstore.NewID()
+	registerWeb(mux, runtime, bootID)
 	mux.HandleFunc("/api/v1/graph/query", func(response http.ResponseWriter, request *http.Request) {
 		var input kernel.GraphQueryRequest
 		mediaType, ok := prepareGraphRequest(
@@ -215,7 +218,7 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 	mux.HandleFunc("/api/v1/evolution/merge/finalize", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeFinalize))
 	mux.HandleFunc("/api/v1/evolution/merge/abort", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeAbort))
 	mux.Handle("/", fallback)
-	return mux
+	return guardDaemonBoot(runtime, bootID, mux)
 }
 
 func postJSONHandler[Request any, Result any](

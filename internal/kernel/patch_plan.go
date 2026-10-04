@@ -102,6 +102,7 @@ func planOntologyEntries(base *snapshot, entries []patchEntry) (*plannedState, e
 			return nil, errorWithDetails(AsPublicError(err).Code, AsPublicError(err).Message, map[string]any{"ref": ref.String()})
 		}
 	}
+	plan.removeDeletedMemberships()
 	if err := materializeAnonymousConstraintNames(plan.Objects); err != nil {
 		return nil, err
 	}
@@ -109,6 +110,39 @@ func planOntologyEntries(base *snapshot, entries []patchEntry) (*plannedState, e
 		return nil, err
 	}
 	return plan, nil
+}
+
+func (plan *plannedState) removeDeletedMemberships() {
+	deleted := map[string]struct{}{}
+	recordDeletion := func(ref OntologyRef) {
+		_, exists := plan.Objects[ref]
+		_, renamed := plan.Transitions[ref.String()]
+		if !exists && !renamed {
+			deleted[ref.String()] = struct{}{}
+		}
+	}
+	for name := range plan.Base.Domains {
+		recordDeletion(OntologyRef{Kind: KindDomain, Name: name})
+	}
+	for ref := range plan.Base.Definitions {
+		recordDeletion(ref)
+	}
+	if len(deleted) == 0 {
+		return
+	}
+	for _, object := range plan.Objects {
+		domain := object.Value.Domain
+		if domain == nil {
+			continue
+		}
+		includes := domain.Includes[:0]
+		for _, ref := range domain.Includes {
+			if _, removed := deleted[ref]; !removed {
+				includes = append(includes, ref)
+			}
+		}
+		domain.Includes = includes
+	}
 }
 
 func materializeAnonymousConstraintNames(objects map[OntologyRef]*plannedObject) error {

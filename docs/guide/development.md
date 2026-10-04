@@ -13,7 +13,7 @@ Go
     ├── daemon / kernel
     ├── lithograph
     ├── runtime / runtimeprofile
-    └── webui
+    └── webstore / webui
 
 TypeScript
 ├── packages/sdk                 # @kgos/sdk
@@ -39,11 +39,13 @@ CLI 按 `--root <workspace-root>` > 非空 `KGOS_ROOT` > error 选择 Workspace�
 | --- | --- |
 | Go | `1.27.1`；仓库任务通过 `GOTOOLCHAIN=go1.27.1` 执行 |
 | C compiler | CGO 必需；macOS 使用 Apple Clang，Linux / Windows runner 使用 GCC 或经 CI 验证的目标编译器 |
-| Node.js | `24.15.0`，由 [`.node-version`](../../.node-version) 固定 |
+| Node.js | `24.16.0`，由 [`.node-version`](../../.node-version) 固定 |
 | pnpm | `10.34.5`，由根 `packageManager` / `engines` 固定 |
 | Rust | `1.97.1`，用于构建 `native/jieba/` 的official FTS5 tokenizer |
 | SQLite driver | `github.com/mattn/go-sqlite3 v1.14.52`，bundled SQLite + CGO + `sqlite_fts5` |
 | Lithograph | `v0.3.0` release artifacts，覆盖 macOS / Linux / Windows arm64/x64 |
+
+仓库开发与 CI 固定使用 Node.js 24.16.0，包含 [Windows TCP 版本探测初始化修复](https://github.com/libuv/libuv/commit/aabb7651de)。
 
 先确认基础工具：
 
@@ -94,6 +96,16 @@ node packages/cli/dist/bin.js \
 ```
 
 这里业务命令会复用已经运行的 daemon。需要验证 Runtime package discovery、`doctor`、已初始化 Instance 的 Runtime auto-start 或首次初始化时，使用下一节的 packed npm candidate，而不是绕过 package topology。
+
+### 使用内置 Web 工作区
+
+1. 打开终端报告的当前 daemon endpoint；开发时也可打开 Vite 的 `http://127.0.0.1:5173`。
+2. 在“连接”中手动提供该 Workspace `<root>/.kgos/auth.json` 的 token。凭证只保留在当前页面内存，刷新或 daemon 重启后需要明确重新连接；不要把 token 写入查询、草稿或测试报告。
+3. 选择 Branch / Tag / State，运行只读查询；每次结果在自己的帧中固定原 State。高级执行先选择模式和 Branch，再核对并确认一次发送。
+4. 从帧内对象或本体 Definition 显式进入编辑，检查具体 Patch、Branch 和 base 后提交。成功后通过显式导航查看新 State，旧帧保持原 State。
+5. 已确认保存的输入、帧位置和草稿在 `.kgos/web` 自动保存；刷新后重新连接即可恢复。缓存缺失时由用户按原 State 另建帧重跑；保存冲突或写入结果未知先在原任务中核对。
+
+仓库浏览器测试使用构建后 tarball 安装到仓库外的 fresh Workspace，fixture credential 不经页面或 HTTP 旁路交接。`pnpm test:e2e` 会先重建产物并运行现有 Playwright runner；不要在它运行期间并发 clean 或替换 artifacts。维护用导出和缓存清理 API 不增加日常管理页。
 
 ## 验证首次本地使用
 

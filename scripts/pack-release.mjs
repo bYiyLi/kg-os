@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
 import { run, runCapture, waitForProcessExit } from "./process.mjs";
+import { verifyPackedWebSmoke } from "./packed-web-smoke.mjs";
 import { currentRuntimeTarget } from "./runtime-package.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -352,6 +353,15 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
       access(resolve(rootA, ".kgos", "kgos.db")),
       access(resolve(rootB, ".kgos", "kgos.db"))
     ]);
+    const verifyWebRestart = await verifyPackedWebSmoke({
+      smokeRoot,
+      rootA,
+      rootB,
+      locatorA,
+      locatorB,
+      tokenA,
+      tokenB
+    });
 
     await writeFile(
       resolve(rootA, ".kgos", "kgosd.lock"),
@@ -479,6 +489,7 @@ async function verifyPackedSmoke({ sdkTarball, runtimeTarball, cliTarball }) {
     ) {
       throw new Error("packed daemon restart did not preserve Instance identity");
     }
+    await verifyWebRestart(restartedLocator.endpoint);
 
     const ontologyBody = [
       'name: "Phase10Doc"',

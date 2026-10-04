@@ -1,8 +1,10 @@
 # Phase 14：Web
 
+<!-- cspell:ignore EEXIST GHSA -->
+
 ## 目标与状态
 
-`ready`。本阶段把已确认的 [Web 设计](../../design/web.md)接入现有 Runtime、SDK 与业务 API，交付可以真实浏览、查询、编辑和管理版本的内置 Web 工作区。
+`in_progress`。本阶段把已确认的 [Web 设计](../../design/web.md)接入现有 Runtime、SDK 与业务 API，交付可以真实浏览、查询、编辑和管理版本的内置 Web 工作区。
 
 完成后的主流程：
 
@@ -15,7 +17,7 @@
   → 刷新 / 重开后重新认证，恢复已保存输入和工作位置
 ```
 
-这是一个完整的交付与验收 Phase，内部按五组 Feature 实施。局部测试、组件画板或先后依赖不另建顶层 Phase。当前设计输入、既有前置能力、Feature 顺序和 Acceptance 已具备；`ready` 不表示产品实现、运行测试或远端门禁已经完成。本次授权仅编写和 Review 计划，不启动产品开发、提交、推送或发布。
+这是一个完整的交付与验收 Phase，内部按五组 Feature 实施。局部测试、组件画板或先后依赖不另建顶层 Phase。用户明确授权按本计划进行功能开发、审查修正与验收，并于本轮另行授权提交推送和六平台 CI 跟进；五组功能已实现并取得本地功能证据，安全门禁与交付 revision 的六平台 CI 尚未闭环，实际结果见[本轮实施记录](#本轮实施记录)。发布或部署不在本轮授权内。
 
 ## 设计输入
 
@@ -28,7 +30,7 @@
 - [Client SDK](../../design/client.md#kgossdk)、[Runtime 内置 Web](../../design/runtime.md#web-hosting)、[Web operational 数据](../../design/runtime.md#web-operational-数据目录)、[公共错误](../../design/contracts.md#公共错误合同)及 [Web 错误映射](../../design/contracts.md#web-持久数据错误方案)：共享 transport、同源 loopback、认证、存储隔离与错误分类。
 - [工程映射](../../design/implementation.md)、[共同完成条件](../README.md#6-phase-通用完成标准)和[开发指南](../../guide/development.md)：实现边界、仓库门禁与实际操作入口。本计划不复制产品规范或维护第二套命令指南。
 
-## 前置依赖与当前实现缺口
+## 开始实施前的前置依赖与缺口
 
 2026-10-04 核对 `main@181628b45c1600476514dfc129a5053c6d394b9e` 与当前未提交 Web 设计工作树。Phase 00–13 已完成；其历史成功是前置基线，不是本阶段验收证据。
 
@@ -87,7 +89,7 @@
 
 ## Acceptance
 
-以下是实施后必须取得的证据，当前均未运行。验收引用 owner 的规则和工程初值；不另建第二份产品合同。
+以下是本阶段必须取得的证据，实际结果集中记录在[本轮实施记录](#本轮实施记录)。验收引用 owner 的规则和工程初值；不另建第二份产品合同。
 
 ### A14-01 Daemon 存储与接口
 
@@ -206,9 +208,9 @@
 - 本地、fresh-source、真实业务E2E、packed交付与规定六平台远端结果适用于最终交付revision；缺失证据保持`in_progress`或准确记录真实阻塞。
 - Commit/push、版本发布与部署分别记录真实动作；它们不因本计划完成而自动执行，正式发布不是本阶段完成条件。
 
-## 当前实现与验收证据
+## 计划建立时的评审证据
 
-截至2026-10-04，本阶段产品实现未开始，P14-01–11及A14-01–11均待执行；现有页面仍为shell。`ready`依据是设计、前置实现基线、实施依赖与验收计划齐备，不能引用Phase13的运行成功替代本阶段证据。
+建立计划时，本阶段产品实现未开始，P14-01–11及A14-01–11均待执行，页面仍为shell。此处保留当时的 `ready` 依据与计划评审，不作为当前实施状态；最新结果见[本轮实施记录](#本轮实施记录)。不能引用Phase13的运行成功替代本阶段证据。
 
 本次只编写阶段计划与同步开发入口，未修改产品代码或图册，未运行产品测试、构建、fresh-source、packed或远端CI，未提交/推送。当前代码基线为`181628b45c1600476514dfc129a5053c6d394b9e`；设计输入使用当前未提交工作树的Web owner与相关引用。审核前后 Web owner、材料入口和资产来源记录 hash一致，Web owner SHA-256为`3a51ff3cb0e04070459e0f6a5a2fb553fc2f9aa99c04f97d8dc5432818fd2dab`；原有设计与资产改动保留。
 
@@ -230,4 +232,106 @@
 
 后续实际实施时，在本节追加各验收的场景/命令、环境、源码revision或所应用工作树diff、结果及报告位置；本次文档检查不得填作A14验收成功。
 
-尚无必须追加产品决定的阻塞。产品实施与运行验收仍是待执行工作，不记作计划缺陷或已通过测试。
+计划评审当时没有必须追加产品决定的阻塞；当时尚未执行的产品实施与运行验收不记作计划缺陷或已通过测试。
+
+## 本轮实施记录
+
+2026-10-04，在 `main@b46a94944298bdfd046053cba0de0f143372edfe` 的干净工作树上开始实施。20:44 UTC 用户另行授权本轮提交、推送与六平台 CI 跟进；当前仍待取得交付 revision 的远端结果。Phase 保持 `in_progress`。
+
+五组产品实现已接通；源码及定向证据如下。最终门禁和 Acceptance 结果分别记录在后面的表格，不将实现完成替代阶段验收完成：
+
+最终 Review 的具体问题已修正并复验：Diff/History Change、完整对象两侧与 Merge conflict side 保留合法 `1.0/-0.0` 原文；320px 图谱使用实际 SVG viewport，节点和文字不被一起压缩，本体只在首次范围加载时定位；最小 zoom 与显式 fit 的节点命中区保持至少 44px；单侧无冲突 Property 变化不再误拒绝可安全表达的 scalar Merge conflict。分别沿用 request/page identity、原相机与手动平移，以及 [Evolution logical slot](../../design/evolution.md#evolution) 的映射合同，没有追加产品模型。下面 396/49 项结果均来自这些修正后的源文件集合。
+
+| Feature | 当前实现与定向证据 |
+| --- | --- |
+| P14-01 | [webstore](../../../internal/webstore/) 与 [daemon adapter](../../../internal/daemon/web.go)实现独立普通 SQLite、CAS/分页/墓碑、完整缓存、导出、预算、固定路径与认证后 boot guard。真实 daemon/native 测试与 Go 检查通过；追加参数原文测试后存储单包 coverage 91.6%。Windows ACL/reparse 有实现和测试，尚未在 Windows 执行 |
+| P14-02 | [SDK](../../../packages/sdk/src/client.ts)、[连接](../../../packages/web/src/connection.ts)与[有界 transport](../../../packages/web/src/transport.ts)接入同源认证、boot guard、Blob 和原始 JSON；401/旧连接 generation/AbortSignal 回归通过 |
+| P14-03 | [Records](../../../packages/web/src/records.ts)及各草稿按记录自动保存、CAS、lost-response 核对、比较/副本/删除与原位置恢复；collection 不自动执行，legacy frame 的原文缺失有兼容读取 |
+| P14-04 | [Frame](../../../packages/web/src/frame.ts)和[执行器](../../../packages/web/src/frame-engine.ts)冻结语句、原始 params 与 State/Branch，维护独立四流队列、summary+EOF、取消/关闭与原文接收预算；可靠保存后才写完整只读缓存 |
+| P14-05 | [图投影](../../../packages/web/src/projection.ts)、[GraphView](../../../packages/web/src/graph-view.tsx)与帧内检查器提供真实 typed 图、局部视口、同 State 详情/邻居和分段 JSON；raw row 的缓存/恢复/释放、320px resize、最小 zoom 的图形外真实点击与 44px 命中区均有回归 |
+| P14-06 | [Object controller](../../../packages/web/src/edit-controller.ts)与[高层 Patch](../../../packages/web/src/edit-patch.ts)复用 canonical base、无损 YAML、预览、可靠保存、单次提交和真实回执；编辑范围 58 项定向测试通过，消失 State 恢复保留输入并禁止提交 |
+| P14-07 | [Ontology 工作区](../../../packages/web/src/ontology-workspace.tsx)和[聚合 controller](../../../packages/web/src/ontology-controller.ts)提供模型图、字段/约束/共享 Index/Domain 编辑；真实收紧拒绝、共享资源与成员保留浏览器回归已纳入最终套件 |
+| P14-08 | [版本列表与纵向 DAG](../../../packages/web/src/version-timeline.tsx)保留实际 parents、分页与局部过滤，抽屉覆盖图谱；节点选择、外部 ref 变化和删除原 ref 不静默切 State |
+| P14-09 | State/History/Diff/ref 与 [State Data](../../../packages/web/src/version-state.ts)接入真实 Evolution；读取/比较/保存及 Change/完整对象两侧保留 Runtime 原始 JSON，Float 与 Integer 不合并。版本/合并范围最终 81 项定向测试通过 |
+| P14-10 | [Merge controller](../../../packages/web/src/merge-controller.ts)执行实际 Session/revision 和冲突分页、resolve/finalize/abort；version 1 草稿、原文 conflict identity、lost start 与关闭重开迟到回执均有回归，不自动重放写入。Knowledge scalar conflict 的准确投影和反向映射在真实 native/HTTP/浏览器复验通过 |
+| P14-11 | [真实 Runtime fixture](../../../tests/e2e/runtime-fixture.ts)由仓库外 Runtime tarball 建独立 Workspace；最终 49 项真实浏览器场景、本机 native 与 packed SDK/store smoke 通过，性能和键盘测量已取得。系统 Chrome 的 18 张主截图与 8 张长草稿补充截图已实际查看；安全门禁与六平台交付证据见下方未闭环项 |
+
+持续 Review 修正了 typed 缓存校验、DB+WAL 合计预算、重复 JSON token 的参数指纹、原文数值保留、图对象鼠标选择与按钮 hover 对比、删除共享 Index 和 Domain ownership、canonical Patch EOF、empty Diff、Merge payload 格式以及迟到响应。已发现问题都追加了具体输入的回归，不把原始 UI 样本当作实际 Runtime 证据。
+
+最终验收明确保留以下四项回归；裸大整数 transport 注入只证明序列化边界，不代表 Runtime 返回裸 unsafe integer：
+
+| 回归 | 实际输入、修正与通过证据 |
+| --- | --- |
+| Empty Diff | 同 State 和显式 empty-delta State，在 all/ontology/knowledge scope 均返回 `items: []`；genesis parents、History parents 与空集合按合法数组编码。[native 回归](../../../internal/kernel/evolution_empty_integration_test.go)和[真实版本浏览器流程](../../../tests/e2e/evolution-workflow.spec.ts)通过，修正原 `null` 返回 |
+| Merge 草稿格式 | 保存未发送 resolution 时携带 `version: 1`，重新认证恢复仍核对 Session/revision/conflictId。[controller 回归](../../../packages/web/src/merge-controller.test.ts)和[真实冲突 Merge 流程](../../../tests/e2e/evolution-workflow.spec.ts)通过，不将格式校验失败或 Session 已变化误报为可重放 |
+| State Data 数值原文 | 真实 Runtime 输入相邻 `9007199254740992/9007199254740993`，响应各自使用 `Integer` tag；原始 Float `1.0/-0.0` 在读取、草稿恢复与比较中保留。外部将 `1.0` 改成 `1` 后显示变化并阻止未核对提交。[原文测试](../../../packages/web/src/version-json-source.test.ts)和[真实 HTTP/浏览器回归](../../../tests/e2e/evolution-workflow.spec.ts)通过 |
+| 标准 Patch EOF | 接受标准 `\ No newline at end of file`，精确保留 YAML block scalar 的实际末尾换行；仅格式等价变化为 no-op，真正 String LF 变化创建 State。错误/重复 EOF 标记仍拒绝。[parser 回归](../../../internal/kernel/patch_eof_test.go)和[native Object Patch 回归](../../../internal/kernel/patch_eof_integration_test.go)通过 |
+
+最终追加的 [Version 原文 E2E](../../../tests/e2e/version-values.spec.ts)使用真实 22 节点：Diff 分页 20+2、History 20+20 的 `1.0/-0.0 → 1/0` 变化，以及 Merge scalar `/properties/score` 分页 20+2 的 `base=1.0 / ours=1 / theirs=2.0` 均保持原文与请求身份。读两侧完整 Object、改参数后分页 anchor、重开 Session/revision 均核对真实 HTTP。原失败输入在 [native Merge 回归](../../../internal/kernel/evolution_merge_property_integration_test.go)验证 ours/theirs/custom、另一无冲突字段不被覆盖、Relationship 多属性及 RFC 6901 转义、stale revision/cursor 和两 parents；旧 aggregate 校验与非法候选拒绝仍保留。
+
+[实际视口 E2E](../../../tests/e2e/viewport.spec.ts)验证 320px 的 nominal 144×56 节点和 13px 文字、resize 不改相机/选择/State、本体手动平移不被扩展或 resize 重置；zoom 0.1 的视觉图形约 14.7×5.9px、透明命中区为 44×44px，在图形外 17px 处真实点击后以原 State 读取 Object。显式三节点 fit 的命中区约 67.89×44px。最初新测试的 stroke 测量、accessible select locator 和包含内部图的无过滤 fixture 假设已纠正；最终实际输入限定准确 refs，未通过放宽目标、deadline 或重试掩盖失败。
+
+### 本地 Acceptance 结果
+
+下面的“通过”限定于本机 darwin-arm64、当前未提交实现及对应测试范围；Windows 权限/路径、其他 native 平台与完整阶段交付仍受后面的工程门禁约束。既有 Kernel 合同测试在本轮完整 native 套件中重新执行，未以旧阶段的历史结果代替本轮证据。
+
+| Acceptance | 实际证据与结果 |
+| --- | --- |
+| A14-01 | 本机通过。[store 测试](../../../internal/webstore/)覆盖并发初始化、私有路径、CAS/墓碑/分页、DB+WAL/quota、失败保留原件、完整 typed cache/TTL/LRU、紧凑导出；[真实 daemon 测试](../../../internal/daemon/web_integration_test.go)、[两个 Workspace/boot 隔离](../../../tests/e2e/runtime-boundaries.spec.ts)与[packed smoke](../../../scripts/packed-web-smoke.mjs)通过。Windows ACL/junction 测试需真实 runner |
+| A14-02 | 本机通过。[SDK 回归](../../../packages/sdk/src/web.test.ts)、[连接](../../../packages/web/src/connection.test.ts)、[transport](../../../packages/web/src/transport.test.ts)、[导航](../../../tests/e2e/navigation.spec.ts)、[重启](../../../tests/e2e/restart-cache.spec.ts)和[真实 401](../../../tests/e2e/transport-recovery.spec.ts)覆盖 Blob/预算、同 signal/boot、凭证仅内存、failed/late State 与对象读取、旧帧及 ref 变化 |
+| A14-03 | 本机通过。[Records](../../../packages/web/src/records.test.ts)、[Workspace](../../../packages/web/src/workspace.test.ts)、[真实两窗口 CAS](../../../tests/e2e/transport-recovery.spec.ts)、[重启/缓存缺失](../../../tests/e2e/restart-cache.spec.ts)覆盖单记录 in-flight、lost response 核对、局部对照/副本、原位置恢复及不自动执行；原 State 消失保留输入的 controller 回归通过 |
+| A14-04 | 本机通过。[帧生命周期](../../../packages/web/src/frame.test.ts)、[原文](../../../packages/web/src/frame-source.test.ts)、[真实预算与队列](../../../tests/e2e/budgets.spec.ts)、[迟到数据取消/关闭](../../../tests/e2e/transport-recovery.spec.ts)及[高级执行](../../../tests/e2e/knowledge-workflow.spec.ts)覆盖冻结输入/State、summary+EOF、四个活跃流、第五个排队、取消和结果未知；不完整结果不存完整缓存 |
+| A14-05 | 本机通过。[typed 投影](../../../packages/web/src/projection.test.ts)、[GraphView](../../../packages/web/src/graph-view.test.tsx)、[真实知识图流程](../../../tests/e2e/knowledge-workflow.spec.ts)覆盖 0 Label、自环/平行边/方向、同 State 属性与邻居、大整数及独立相机；[视口与命中](../../../tests/e2e/viewport.spec.ts)和[压力测试](../../../tests/e2e/budgets.spec.ts)取得真实尺寸/点击、投影/DOM/堆内存与交互数据，见下表 |
+| A14-06 | 本机通过。[表单/YAML](../../../packages/web/src/edit-fields.test.tsx)、[controller](../../../packages/web/src/edit-controller.test.ts)、[真实单次 Patch](../../../tests/e2e/knowledge-workflow.spec.ts)、[stale/前置保存失败/响应丢失](../../../tests/e2e/edit-recovery.spec.ts)与[知识成功但 Web 回执失败](../../../tests/e2e/runtime-boundaries.spec.ts)通过；alias/Type/endpoint transition、incident/dependency reject 和同 Patch 处理另由本轮重跑的 Object native 套件验证 |
+| A14-07 | 本机通过。[真实本体编辑/收紧拒绝](../../../tests/e2e/ontology-workflow.spec.ts)、[共享 Index/Domain 边界](../../../tests/e2e/ontology-boundaries.spec.ts)、[聚合与组织 controller](../../../packages/web/src/ontology-controller.test.ts)通过；native 套件覆盖 rename/required/unique/endpoint/依赖及同 Patch 处理。新增[成员边 identity](../../../internal/kernel/compiler_membership_integration_test.go)和[删除 Domain/Definition](../../../internal/kernel/patch_domain_delete_integration_test.go)回归通过，删除 Domain 保留成员、Knowledge 与历史 cycle |
+| A14-08 | 本机通过。[真实大历史](../../../tests/e2e/navigation.spec.ts)加载 142 commits/8 页/2 泳道，root/cursor 固定、未加载 parent 与合并两 parent 保留；滚动前后各渲染 16 节点。抽屉开关前后实际图尺寸/viewBox/选择不变，导航不改变旧帧 |
+| A14-09 | 本机通过。[版本 controller](../../../packages/web/src/version-core.test.ts)、[State Data](../../../packages/web/src/version-state.test.ts)、[原文](../../../packages/web/src/version-json-source.test.ts)、[真实 refs/State/History/Diff](../../../tests/e2e/evolution-workflow.spec.ts)及[Change/完整两侧原文](../../../tests/e2e/version-values.spec.ts)通过；包括 absence/null、空 delta、同 State 多 Change、合法两侧 anchor、空 Diff、数值类型改变和未发送输入恢复 |
+| A14-10 | 本机通过。[Merge controller](../../../packages/web/src/merge-controller.test.ts)、[工作流](../../../packages/web/src/merge-workspace.test.ts)、[真实冲突 Merge](../../../tests/e2e/evolution-workflow.spec.ts)、[scalar 原文分页](../../../tests/e2e/version-values.spec.ts)与本轮 native Merge 套件通过：精确 revision、分页、changed/head moved、候选一致性拒绝、up-to-date/fast-forward/merged、两 parent、关闭保留与显式 abort、结果未知不重发 |
+| A14-11 | 本地核心流程通过，阶段交付未全部通过。最终新构建主树与 fresh-source 均 49/49 真实 Runtime E2E、native/packed 通过，独立 Review 的具体功能问题已复验；对比度/目标尺寸、长文本、键盘/减少动态、窄屏与原生 200% 的行为、截图和长草稿滚动核对通过。完整 audit 与六平台 CI 仍未闭环 |
+
+### 最终构建与测量证据
+
+环境：Node 24.16.0、pnpm 10.34.5、Go 1.27.1、Rust 1.97.1、Lithograph v0.3.0；本机 darwin-arm64。没有跳过 hooks、降低 coverage/type/audit 门槛或排除业务代码。
+
+| 检查 | 实际结果 / 报告 |
+| --- | --- |
+| 主工作树 `pnpm validate` | 实际 exit 1，唯一失败步骤 `check:security` 的两项 high；此前 install/dependency、Go 静态/race/coverage/security、TS type/lint/test、duplicate/unused/version/dedupe、build/exports、浏览器/native/packed/license 全部通过。日志 `/tmp/kgos-p14-validate-reviewed.log`；audit 后的 diff 未自动运行，最终另行执行 `pnpm check:diff` |
+| 独立 fresh-source | 相同 baseline 独立 checkout，最终逐文件应用 189 项修改并核对 SHA-256；初次 setup 前没有复制主树 node_modules/cache/artifacts/dist，后续复用本目录自行生成的产物。最终 setup exit 0；validate 的 install 至 Go race 成功后执行服务连接中断，coverage 尚未完成，原 run 未记成功。从 coverage 按当前 `scripts/tasks.mjs` 顺序续跑，396 TS 测试、49/49 E2E、native/packed/license 均 exit 0；仅两项 high audit exit 1。日志 `/tmp/kgos-p14-fresh-setup-reviewed.log`、`/tmp/kgos-p14-fresh-validate-reviewed.log`、`/tmp/kgos-p14-fresh-resume-reviewed.log`，逐步退出证据 `/tmp/kgos-p14-fresh-resume-results.json`。176 项非文档/README 源文件集合 SHA-256 为 `96b43cbadbfaf6e8011ad22d8c78f63db6d81d3ec6c7b5e2fc6bc0191b45c253`；主树/独立目录一致，最终只同步文档并做定向检查 |
+| 覆盖率与静态门禁 | 主树和 fresh-source Go 总 statements 90.4%；TS 48 files/396 tests，statements 97.10%、branches 93.05%、functions 97.10%、lines 98.43%；strict type coverage 99.84%；197 个生产文件分析发现 0 clones；govulncheck 未发现漏洞 |
+| 最终真实 Runtime E2E | 主树与 fresh-source 均 49/49 通过、2 workers，分别 146.60s/145.39s；零重试、skip、flaky。所有业务 fixture 来自真实 packed Runtime/正式 API，不用 mock rows 替代关键成功；故障注入仅位于适用 transport/存储边界。主报告 `playwright-report/index.html`，提取证据 `/tmp/kgos-p14-validate-reviewed-measurements.json` 与 `/tmp/kgos-p14-fresh-reviewed-measurements.json` |
+| native 与 packed | `pnpm test:native` 本机全部通过；`pnpm check:package` 仓库外安装/运行实际 SDK/CLI/Runtime，内嵌 Web、data CRUD/CAS/cache/export/guard、重启恢复与旧 boot 拒绝均通过；未发布 tarball |
+| 大图/JSON 压力 | 主树实际 1500 行 → 1000 投影节点 → 20 个节点图元；完整接收 133.56ms、缩放交互 44.48ms，JS heap 增量 3,888,496 bytes；JSON 分页仅 20 行。数字为此 fixture/运行观测，非所有数据的容量保证 |
+| 接收预算 | 真实大 scalar 流触发 8 MiB/帧与 32 MiB/页面，五帧分别接收 167/167/167/167/2 行；10000 行上限主动停止流并保留 metadata；超限不冒充完成 |
+| 对比度与点击区 | 最终渲染六项 text/boundary 对比度依次 7.086/6.443/5.435/12.083/3.197/3.480，达到对应 4.5/3 阈值；被测 HTML 操作目标及最小 zoom/fit 的节点命中区宽高均至少 44px |
+| 原生 Chrome 行为与视觉 | 系统 Chrome 154.0.8037.93、独立临时 profile：桌面 1280 CSS px、原生 200% outer 1280 / inner 640 / DPR 2、320 CSS px 均通过查询/草稿/本体/DAG/嵌套历史的键盘与布局断言。CSS zoom=1、visual viewport scale=1；无页面横向溢出，减少动态开启，local/session storage 与 cookies 为空；真实 API 确认返回知识页保存位置。18 张主截图逐张查看；另在 200%/320px 滚动到实际 Object/模型字段及查看 Patch 操作，8 张补充截图可读且目标在视口内。报告 `/tmp/kgos-p14-native-chrome-qa.json`、`/tmp/kgos-p14-native-chrome-scroll-qa.json` 与 `/tmp/kgos-p14-visual-review-reviewed.json`；旧 blank capture 不计通过，最终 200% 使用实际 Chrome surface capture，无 CSS clip |
+
+### 最终 Review 与未闭环项
+
+作者自查和独立 Review 对照 Web owner、真实材料、源码、正式 API、SQLite/原始 JSON 与实际 Knowledge graph data；没有再设计一套产品。修正后的功能问题已用明确输入复验，包括 Domain 成员 physical identity 在 Knowledge-only 两分支 Merge 中保持、删除组织不删业务成员、共享 Index 作用域、原文 typed 数值、保存/提交未知、旧请求 generation 和嵌套弹窗。
+
+实际系统 Chrome 发现 Shift+Tab 可跳到 body，以及 React 嵌套 `cancel` 冒泡令两层同时关闭；[Modal](../../../packages/web/src/dialog.tsx)分别补充真实可见/非 inert 元素的焦点循环和阻止 cancel 冒泡。[11 项 Modal 回归](../../../packages/web/src/dialog.test.tsx)、[真实嵌套历史测试](../../../tests/e2e/accessibility.spec.ts)和系统 Chrome 行为复验通过。关闭的 details、visibility hidden、disabled/inert 与 SVG 的适用性有明确回归，不靠广泛 layout mock 掩盖浏览器行为。
+
+初次 fresh-source 浏览器执行在 4 workers 且主工作树 Go race 并行时出现一次 fixture locator 10s 启动超时，未记通过；最终采用固定 2 workers、独立目录串行门禁，仍保留原启动截止与零本地重试。[生命周期工具](../../../scripts/p14-runtime-lifecycle.mjs)追加失败后停止并等待真实 child exit；初次 EEXIST 和坏 TOML 重启探针确认旧/失败进程均退出，报告 `/tmp/kgos-p14-startup-cleanup-probe.json`。这是测试基础设施修正，不把不确定启动当作业务成功。
+
+当前必须保留的未闭环项：
+
+1. 安全审计尚有 `braces@3.0.3` 的 [GHSA-vfj7-8cjw-p6xm / CVE-2026-93687](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)。已发布最新 `braces@3.0.3` 和 `type-coverage/core@2.30.3` 仍保留受影响依赖；[上游深度保护 PR](https://github.com/micromatch/braces/pull/72)尚未合并或发布。当前保留固定 `type-coverage@2.30.1` 的 strict 99% 门禁，不能用普通 TypeScript strict 检查、旧版 TS 2/3/4 工具或未验证的新覆盖率算法代替。需获得可验证的上游修复/审计纠正，或另行完成等价类型覆盖工具替换；不忽略告警、不降低阈值，完整 validate 仍未通过。
+2. 六平台交付 revision CI 尚待执行结果。当前只实际验证 darwin-arm64；darwin-x64、Linux glibc arm64/x64、Windows arm64/x64 不能用源代码编译或旧 CI 代替。用户已授权本轮正常提交推送与失败修复，仍须取得规定 Validate/native/package 结果；正式发布不是完成条件。
+
+基线 CI 的 Windows x64 packed smoke 在 Node 24.15.0 上返回 `0xC0000409`。对应官方 libuv 修复已进入 Node 24.16.0，开发固定版本已同步并验证本机官方 darwin-arm64 归档；原失败没有 native stack，归因仍是有证据的候选，不能代替 Windows 回归结果。安全审计的两项 moderate 已按公开 patched release 更新。
+
+### 安全追查与工具替换
+
+以下发生在上述完整主树/fresh-source 验证之后；原 396 tests / 49 E2E 和源集合 SHA 保留其实际范围，不将定向复测改写成另一次完整 validate。
+
+- `http-cache-semantics` 的 [CVE-2026-93748](https://github.com/advisories/GHSA-ch52-4w7c-c8xp)来自 `license-checker-rseidelsohn → @npmcli/arborist → make-fetch-happen` 等分支。官方 4.2.0/4.3.0 归档 diff 和隔离探针确认相关 max-stale 判断未改；[上游异议](https://github.com/github/advisory-database/issues/10139)也未令 advisory 撤回，因此没有用 4.3.0 的版本范围消失冒充已验证修复。实际原 CLI/Web 许可证扫描各一次加载模块、零 CachePolicy 构造/判断、零 HTTP/HTTPS/fetch；只表示这两次观测，不代表库的所有调用均不可达。
+- [npm 许可证门禁](../../../scripts/check-npm-licenses.mjs)改用固定 pnpm 10.34.5 的全 workspace `--prod` 扫描，配合[原许可名单与 SPDX 判定](../../../scripts/npm-license-policy.mjs)。保留 private / `@kgos/` 排除，逐真实 manifest 核对身份、版本/path 对、声明许可和完整生产闭包；AND 要求每项许可获准，OR 可选获准分支，修正原字符串包含判断会放行 `MIT AND GPL` 的缺陷。23 项[回归](../../../scripts/npm-license-policy.test.mjs)覆盖 GPL/unknown/畸形结果、缺包、遗漏、workspace/optional/peer、private 子依赖及不同 peer 实例；真实缺 store index 退出 1 被传递。移除原工具后 `http-cache-semantics` 不再出现于 lockfile/实际依赖链，实际扫描仍为原五个外部生产包：MIT 3、ISC 1、BSD-3-Clause 1。
+- [Markdown 薄入口](../../../scripts/check-markdown.mjs)改用 `markdownlint-cli@0.49.1`，规则引擎仍为 `markdownlint@0.41.1`。原 YAML 继续拥有 config/globs/ignores，wrapper 显式传入选择参数；当前 54 文件和真实违规 fixture 的规则/诊断与旧工具逐项一致，Markdown 的两条 braces 路径已移除。macOS/Windows 下未来 `*.MD` 会更严格纳入检查，不能宣称所有 glob 输入通用等价；动态调用的 CLI 在 Knip 登记为已使用依赖。
+- 两项漏洞均不进入当前十个 workspace 的生产依赖；Runtime/API/SDK/Web/CLI 没有 braces 调用入口。`braces.expand` 的本机隔离反例长 9999、深 4998，42ms 退出 1 并产生递归 RangeError；固定 TS include/exclude 的 brace depth 为 0。此可达性范围不能代替安全门禁通过。剩余路径是 `type-coverage → type-coverage-core → fast-glob → micromatch → braces`。
+- 新许可证 adapter 对缺失路径保持拒绝。当前五个外部生产包均跨平台且实际安装；未来引入不适用主机的第三方 optional 包时，须补充明确的平台/skipped 分类验证，不能静默忽略缺包。独立 Review 确认当前范围没有遗留替换缺陷。
+
+原功能源码与构建未改变；工具替换只补受影响验证。最新真实 npm audit 仍退出 1，moderate/critical 为 0，high 从 2 降为 1；没有新增 audit 忽略规则、降低阈值或修改凭证/安全设置。调查证据位于 `/tmp/kgos-p14-http-cache-research/` 与 `/tmp/kgos-braces-security-investigation/`。
+
+最终工具定向复验：主树 14 步中 13 步 exit 0，fresh-source 15 步中 14 步 exit 0；两者唯一失败均为原 high 阈值的 audit。包含 frozen install、依赖版本、Markdown、npm license、strict type coverage 99.84%、version/dedupe/unused/duplicate、定向 ESLint/Prettier/CSpell/diff；fresh 另执行 23 项许可证回归。逐步日志/hash/退出证据为 `/tmp/kgos-p14-security-repair-main-results.json` 与 `/tmp/kgos-p14-security-repair-fresh-results.json`。193 项修改逐文件同步，180 项非文档/README 源集合 SHA-256 为 `59f82929f4960c63e6a70fbaa3b98877f8362d640281b4e756ad5578320a6dd5`；160 项产品/E2E 文件与原完整验证集合逐 hash 相等。没有将原完整 validate 的失败改写为成功。
+
+五组/11 个 Feature 的产品实现、本机功能验收和具体 Review 修正已完成；P14-11 的安全门禁与跨平台交付仍按上述结果保持未闭环，因此整个 Phase 14 仍为 `in_progress`。本轮提交推送与 CI 已获授权，发布或部署尚未授权。
