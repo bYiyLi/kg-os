@@ -1,6 +1,6 @@
 # Phase 14：Web
 
-<!-- cspell:ignore EEXIST GHSA -->
+<!-- cspell:ignore EACCES EEXIST GHSA -->
 
 ## 目标与状态
 
@@ -17,7 +17,7 @@
   → 刷新 / 重开后重新认证，恢复已保存输入和工作位置
 ```
 
-这是一个完整的交付与验收 Phase，内部按五组 Feature 实施。局部测试、组件画板或先后依赖不另建顶层 Phase。用户明确授权按本计划进行功能开发、审查修正与验收，并于本轮另行授权提交推送和六平台 CI 跟进；五组功能已实现并取得本地功能证据，安全门禁与交付 revision 的六平台 CI 尚未闭环，实际结果见[本轮实施记录](#本轮实施记录)。发布或部署不在本轮授权内。
+这是一个完整的交付与验收 Phase，内部按五组 Feature 实施。局部测试、组件画板或先后依赖不另建顶层 Phase。用户明确授权按本计划进行功能开发、审查修正与验收，并于本轮另行授权提交推送和六平台 CI 跟进；五组功能已实现，修复后的产品源码取得本地与六平台 native/package 证据，完整安全门禁仍未闭环，实际结果见[本轮实施记录](#本轮实施记录)。发布或部署不在本轮授权内。
 
 ## 设计输入
 
@@ -287,7 +287,7 @@
 | A14-08 | 本机通过。[真实大历史](../../../tests/e2e/navigation.spec.ts)加载 142 commits/8 页/2 泳道，root/cursor 固定、未加载 parent 与合并两 parent 保留；滚动前后各渲染 16 节点。抽屉开关前后实际图尺寸/viewBox/选择不变，导航不改变旧帧 |
 | A14-09 | 本机通过。[版本 controller](../../../packages/web/src/version-core.test.ts)、[State Data](../../../packages/web/src/version-state.test.ts)、[原文](../../../packages/web/src/version-json-source.test.ts)、[真实 refs/State/History/Diff](../../../tests/e2e/evolution-workflow.spec.ts)及[Change/完整两侧原文](../../../tests/e2e/version-values.spec.ts)通过；包括 absence/null、空 delta、同 State 多 Change、合法两侧 anchor、空 Diff、数值类型改变和未发送输入恢复 |
 | A14-10 | 本机通过。[Merge controller](../../../packages/web/src/merge-controller.test.ts)、[工作流](../../../packages/web/src/merge-workspace.test.ts)、[真实冲突 Merge](../../../tests/e2e/evolution-workflow.spec.ts)、[scalar 原文分页](../../../tests/e2e/version-values.spec.ts)与本轮 native Merge 套件通过：精确 revision、分页、changed/head moved、候选一致性拒绝、up-to-date/fast-forward/merged、两 parent、关闭保留与显式 abort、结果未知不重发 |
-| A14-11 | 本地核心流程通过，阶段交付未全部通过。最终新构建主树与 fresh-source 均 49/49 真实 Runtime E2E、native/packed 通过，独立 Review 的具体功能问题已复验；对比度/目标尺寸、长文本、键盘/减少动态、窄屏与原生 200% 的行为、截图和长草稿滚动核对通过。完整 audit 与六平台 CI 仍未闭环 |
+| A14-11 | 本地核心流程通过，阶段交付未全部通过。最终新构建主树与 fresh-source 均 49/49 真实 Runtime E2E、native/packed 通过，独立 Review 的具体功能问题已复验；对比度/目标尺寸、长文本、键盘/减少动态、窄屏与原生 200% 的行为、截图和长草稿滚动核对通过。修复产品源码 `c2a1791` 的六平台 native/package 已成功，完整 audit 仍失败 |
 
 ### 最终构建与测量证据
 
@@ -313,10 +313,7 @@
 
 初次 fresh-source 浏览器执行在 4 workers 且主工作树 Go race 并行时出现一次 fixture locator 10s 启动超时，未记通过；最终采用固定 2 workers、独立目录串行门禁，仍保留原启动截止与零本地重试。[生命周期工具](../../../scripts/p14-runtime-lifecycle.mjs)追加失败后停止并等待真实 child exit；初次 EEXIST 和坏 TOML 重启探针确认旧/失败进程均退出，报告 `/tmp/kgos-p14-startup-cleanup-probe.json`。这是测试基础设施修正，不把不确定启动当作业务成功。
 
-当前必须保留的未闭环项：
-
-1. 安全审计尚有 `braces@3.0.3` 的 [GHSA-vfj7-8cjw-p6xm / CVE-2026-93687](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)。已发布最新 `braces@3.0.3` 和 `type-coverage/core@2.30.3` 仍保留受影响依赖；[上游深度保护 PR](https://github.com/micromatch/braces/pull/72)尚未合并或发布。当前保留固定 `type-coverage@2.30.1` 的 strict 99% 门禁，不能用普通 TypeScript strict 检查、旧版 TS 2/3/4 工具或未验证的新覆盖率算法代替。需获得可验证的上游修复/审计纠正，或另行完成等价类型覆盖工具替换；不忽略告警、不降低阈值，完整 validate 仍未通过。
-2. 首轮交付 revision `c2b9bed` 的 CI 已结束：darwin/linux arm64/x64 四平台 native/package 通过，两个 Windows 平台在同一 Web 原文件替换回归失败。文件身份捕获修复已写入并独立 Review，修复后六平台实证待取得；不能将首轮 Unix 成功记成后续修复版本的完整成功。正式发布不是完成条件。
+当前已查明的完整门禁阻塞是 `braces@3.0.3` 的 [GHSA-vfj7-8cjw-p6xm / CVE-2026-93687](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)。已发布最新 `braces@3.0.3` 和 `type-coverage/core@2.30.3` 仍保留受影响依赖；[上游深度保护 PR](https://github.com/micromatch/braces/pull/72)尚未合并或发布。当前保留固定 `type-coverage@2.30.1` 的 strict 99% 门禁，不能用普通 TypeScript strict 检查、旧版 TS 2/3/4 工具或未验证的新覆盖率算法代替。需获得可验证的上游修复/审计纠正，或另行完成等价类型覆盖工具替换；不忽略告警、不降低阈值，完整 validate 仍未通过。替换目前只作只读评估，等待用户批准，未修改计数算法或依赖。
 
 基线 CI 的 Windows x64 packed smoke 在 Node 24.15.0 上返回 `0xC0000409`。对应官方 libuv 修复已进入 Node 24.16.0，开发固定版本已同步并验证本机官方 darwin-arm64 归档；原失败没有 native stack，归因仍是有证据的候选，不能代替 Windows 回归结果。安全审计的两项 moderate 已按公开 patched release 更新。
 
@@ -352,6 +349,26 @@
 
 Windows 根因已由真实失败日志和固定 Go 1.27.1 标准库核对：路径 `Lstat` 的文件 ID 在第一次 `SameFile` 才加载，立即替换路径会让原快照也读取替换文件。已有测试在 Windows 先关闭 SQLite，`Info` 的 closed DB 错误恰好掩盖身份漏检。修复[身份捕获](../../../internal/webstore/files.go)保留路径/reparse guard，改为短暂打开句柄后 `File.Stat()` 立即取得文件与目录身份；不扩大权限或改变公共错误规则。[新增回归](../../../internal/webstore/files_test.go)覆盖文件/目录、cold/warm 替换；[原失败回归](../../../internal/webstore/failure_test.go)在访问 SQLite 前直接检查 `prepare`，重复 Info/Save 并核对替换文件和归档原件未变。独立只读 Review 未发现新增阻塞。
 
-修复后本机 Webstore 定向回归通过；主树 Go check/race/coverage、build、native、packed 六步与独立 fresh-source 的 Go check/build/native/packed 四步均实际 exit 0，新 Go coverage 为 90.3%，门槛仍为 90%。日志与逐步退出/hash 证据分别为 `/tmp/kgos-p14-windows-identity-main-results.json` 与 `/tmp/kgos-p14-windows-identity-fresh-results.json`。相对于最初设计基线，195 项修改逐文件同步，181 项非文档/README 源集合 SHA-256 为 `208075f5be846ed9765a3f7fdc3f7859b1aaba7880ac9e78d3de29aa77357f53`；上述旧完整验证与首轮 CI 保留其原 revision 范围，修复提交的真实 Windows 与六平台结果待取得。
+修复后本机 Webstore 定向回归通过；主树 Go check/race/coverage、build、native、packed 六步与独立 fresh-source 的 Go check/build/native/packed 四步均实际 exit 0，新 Go coverage 为 90.3%，门槛仍为 90%。日志与逐步退出/hash 证据分别为 `/tmp/kgos-p14-windows-identity-main-results.json` 与 `/tmp/kgos-p14-windows-identity-fresh-results.json`。相对于最初设计基线，195 项修改逐文件同步，181 项非文档/README 源集合 SHA-256 为 `208075f5be846ed9765a3f7fdc3f7859b1aaba7880ac9e78d3de29aa77357f53`；上述旧完整验证与首轮 CI 保留其原 revision 范围。
 
-五组/11 个 Feature 的产品实现、本机功能验收和具体 Review 修正已完成；P14-11 的安全门禁与跨平台交付仍按上述结果保持未闭环，因此整个 Phase 14 仍为 `in_progress`。提交推送已执行，发布或部署未执行。
+### 修复提交与第二轮验收
+
+修复提交 `c2a1791cc5bcfadb1cf96806157318e49caff732` 已正常 hooks 提交推送，8 个修复/证据文件，pre-commit 49 files / 419 tests 通过；远端 `main` SHA 一致，提交后工作区干净。源码集合为上述 `208075…`。
+
+[CI Run 37237656778](https://github.com/bYiyLi/kg-os/actions/runs/37237656778)已结束，head 精确匹配修复提交：
+
+| Job | 实际结果 |
+| --- | --- |
+| [Validate](https://github.com/bYiyLi/kg-os/actions/runs/37237656778/job/111539897684) | 失败，唯一失败仍为一项 high audit；此前 Go check/race/90.3% coverage/security、419 TS 测试、99.84% type coverage、49/49 真实 Runtime E2E、native/packed/license 均通过。audit 后的 diff 未自动执行，本地另行检查 |
+| [darwin-arm64](https://github.com/bYiyLi/kg-os/actions/runs/37237656778/job/111539897927) | native、npm candidate pack、仓库外 smoke 成功 |
+| [darwin-x64](https://github.com/bYiyLi/kg-os/actions/runs/37237656778/job/111539897970) | native、npm candidate pack、仓库外 smoke 成功 |
+| [linux-arm64](https://github.com/bYiyLi/kg-os/actions/runs/37237656778/job/111539897894) | native、npm candidate pack、仓库外 smoke 成功 |
+| [linux-x64](https://github.com/bYiyLi/kg-os/actions/runs/37237656778/job/111539897915) | native、npm candidate pack、仓库外 smoke 成功 |
+| [win32-arm64](https://github.com/bYiyLi/kg-os/actions/runs/37237656778/job/111539897859) | native 包含 Webstore 回归成功，packed SDK CRUD/CAS/cache/export/guard、内嵌资产及 restart/previous-boot guard 成功 |
+| [win32-x64](https://github.com/bYiyLi/kg-os/actions/runs/37237656778/job/111539897951) | 同上，native 与 packed smoke 成功；原文件替换失败关闭 |
+
+当前两 Windows runner 使用 Node 24.16.0，packed smoke 均成功，旧 `0xC0000409` 在本次未复现；这提供实际回归结果，不将没有原生 stack 的历史失败唯一归因于 libuv。六平台 native/package 是 Runtime 分发验收，浏览器业务 E2E 仍由 Validate 的 Playwright runner 执行，不称为六浏览器验收。完整日志、步骤/平台结果与 head 保存在 `/tmp/kgos-p14-ci-37237656778-*`。
+
+类型覆盖率等价替换的只读评估保留现有 CLI、async core 2.30.1、配置转换、计数算法、strict 与 99% 阈值，只拟替换文件枚举并从真实依赖图删除 fast-glob/micromatch/braces。当前枚举三种方式均得 88 个 roots，但裸 Node glob/TS 枚举会吞 EACCES 并丢失文件；`lintSync` 还缺少当前 strict 的 unused-ignore 扣分，均不能直接替代。候选需传播读取错误，并比较完整 root/source 集合、compiler options、全局/逐文件计数、每条 uncovered、比例及退出码，再以 fresh frozen install、冷模块加载、lock/list/audit 验证依赖移除。只读报告位于 `/tmp/kgos-type-coverage-replacement-review/review.md` 与 `review.json`；尚未实施，不能记成审计修复成功。
+
+五组/11 个 Feature 的产品实现、本机功能验收、具体 Review 修正和当前产品源码六平台 native/package 验收已完成；P14-11 的完整安全门禁仍未通过，因此整个 Phase 14 保持 `in_progress`。提交推送已执行，发布或部署未执行。
