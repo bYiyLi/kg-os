@@ -67,7 +67,7 @@ Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemo
 
 ### Web 交互设计状态
 
-已确认 Web 内置于 `kgosd` 的交付与运行流程，与 CLI / SDK 共用 Kernel、业务合同和实例认证；人通过 Web 查看、管理和纠正知识。页面布局、版本覆盖式 DAG、独立查询结果帧、本体聚合编辑、持久 UI / 草稿、连接适配与状态覆盖由 [Web 设计](web.md)拥有。当前工作树已接入这些功能和 Web 存储 / API；实际验收结果、交付 revision 和未验证平台见 [Phase 14](../development/phases/14-web.md)，设计材料不代替动态证据。
+已确认 Web 内置于 `kgosd` 的交付与运行流程，与 CLI / SDK 共用 Kernel、业务合同和实例认证；人通过 Web 查看、管理和纠正知识。页面布局、版本覆盖式 DAG、独立查询结果帧、本体聚合编辑、持久 UI / 草稿、连接适配与状态覆盖由 [Web 设计](web.md)拥有。该文区分用户已确认默认与工程方案；当前 Web 仍是壳层，新增 UI 存储 / API 也尚未实现，设计文档不表示页面交互已经实现或验收。此项不阻塞 Kernel、daemon、CLI 或 SDK 的实现。
 
 ## 单 Token 实例认证
 
@@ -149,7 +149,7 @@ one Workspace Root
     ├── cache/
     ├── extensions/
     ├── logs/
-    └── web/             # daemon-owned Web operational 数据
+    └── web/             # 新增设计，当前路径实现尚未建立
         ├── ui.db        # 独立普通 SQLite；运行时可有 -wal / -shm
         └── cache/       # 可淘汰的 Web 结果缓存
 ```
@@ -160,9 +160,9 @@ Workspace Root 可以包含任意调用方文件；KG OS 不在其顶层散落 I
 
 本轮 Web 持久化方案固定使用 `<root>/.kgos/web/ui.db` 与 `<root>/.kgos/web/cache/`，由该 Instance 的唯一 daemon 管理；普通 UI SQLite 不加载 Lithograph / Provider extensions，与 Knowledge Base 和 Provider cache 隔离。UI 文件绑定 daemon 实际验证的 databaseId，记录与恢复语义由 [Web 工作区数据](web.md#web-工作区数据)拥有；内部库绑定不等于新增全局物理 Instance identity。
 
-浏览器通过已认证 daemon API 读写规定记录，不能指定 root / 文件路径或读取 `auth.json`。目录采用当前用户私有权限并拒绝路径重定向；UI 库在首次已认证 Web 请求时按需建立，其失败不阻断已有 Kernel API，也不成为 `init` / Runtime readiness 前置条件。目录、存储与 API 实现分别见 [Runtime Paths](../../internal/runtimeprofile/profile.go)、[Web store](../../internal/webstore/store.go)与 [HTTP adapter](../../internal/daemon/web.go)；平台证据见 Phase 14。
+浏览器通过拟新增的已认证 daemon API 读写规定记录，不能指定 root / 文件路径或读取 `auth.json`。目录采用当前用户私有权限并拒绝路径重定向；UI 库在首次已认证 Web 请求时按需建立，其失败不阻断已有 Kernel API，也不成为 `init` / Runtime readiness 前置条件。当前 Runtime Paths、HTTP 与 SDK 均尚未实现此目录或接口；本段是工程设计，不是当前落盘事实。
 
-HTTP connection guard 已接入：daemon 每次 startup 生成非持久随机 `daemonBootId`，已认证 Web bootstrap info 可读取；API request 若带可选 `X-KGOS-Expected-Daemon-Boot`，在认证后、dispatch 前核对本次进程值，mismatch 返回 `WEB_CONNECTION_CHANGED`。它是连接生命周期前置条件，不是第二认证 credential 或全局物理 Instance identity；无该 header 的现有 CLI / 第三方请求不改变。Web 客户端的显式重连行为见 [连接、认证与恢复](web.md#连接认证与恢复)。
+Web 方案另需一个待实现的 HTTP connection guard：daemon 每次 startup 生成非持久随机 `daemonBootId`，已认证 Web bootstrap info 可读取；API request 若带可选 `X-KGOS-Expected-Daemon-Boot`，在认证后、dispatch 前核对本次进程值，mismatch 返回 `WEB_CONNECTION_CHANGED`。它是连接生命周期前置条件，不是第二认证 credential 或全局物理 Instance identity；无该 header 的现有 CLI / 第三方请求不改变。Web 客户端的显式重连行为见 [连接、认证与恢复](web.md#连接认证与恢复)。
 
 <a id="initialized-json"></a>
 
@@ -485,7 +485,7 @@ require and resolve --root <absolute-workspace-root>
 → resolve bundled Web assets
 → bind 127.0.0.1:0 for Web + API
 → write active pid/endpoint/version into kgosd.lock
-→ serve built-in Web + authenticated API
+→ serve Web shell + authenticated API
 ```
 
 任一步失败都必须结束该次启动并释放OS lock；不能留下一个“看起来active”的逻辑实例。首次 `init` 在配置发布后把 `kgosd` 作为detached/background child启动并等待它达到 `running`，再做 authenticated readiness 检查；成功后 daemon 保持运行。后续业务 Runtime ensure 使用同一 spawn/startup path 恢复已完成初始化但当前 stopped 的 Instance。daemon 自身仍保持 foreground process 语义。对于原本没有active daemon的root，父CLI等待winner完成config/auth/database validation和HTTP bind后发布endpoint，或观察child提前退出 / startup timeout。endpoint publication就是本地ready signal，不新增credential-free或authenticated health route；ready后 CLI 读取同一 Workspace 的 `.kgos/auth.json`，直接用该 token 发送原始业务 request。

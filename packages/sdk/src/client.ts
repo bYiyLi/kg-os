@@ -51,20 +51,6 @@ import type {
   TagMoveRequest,
   TagMutationResult
 } from "./types.js";
-import type {
-  WebCacheReadRequest,
-  WebCacheReadResult,
-  WebCacheWriteRequest,
-  WebDeleteRequest,
-  WebListRequest,
-  WebListResult,
-  WebReadRequest,
-  WebRecord,
-  WebSaveRequest,
-  WebStoreInfo
-} from "./web-types.js";
-import { serializeWebCache } from "./web-values.js";
-import { requestJSON } from "./request-json.js";
 
 export interface KGOSClientOptions {
   endpoint: string;
@@ -234,7 +220,6 @@ async function* graphEvents(
         throw invalidResponse("KG OS daemon sent data after the terminal Graph event");
       }
       const event = decodeGraphLine(line);
-      options?.onGraphJSON?.(line, event);
       terminal = event.type === "summary";
       yield event;
     }
@@ -247,50 +232,6 @@ async function* graphEvents(
 }
 
 export class KGOSClient {
-  readonly web = {
-    data: {
-      info: (options?: RequestOptions) =>
-        this.post<WebStoreInfo>("/api/v1/web/data/info", {}, options),
-      list: (request: WebListRequest, options?: RequestOptions) =>
-        this.post<WebListResult>("/api/v1/web/data/list", request, options),
-      read: (request: WebReadRequest, options?: RequestOptions) =>
-        this.post<WebRecord>("/api/v1/web/data/read", request, options),
-      save: (request: WebSaveRequest, options?: RequestOptions) =>
-        this.post<WebRecord>("/api/v1/web/data/save", request, options),
-      delete: (request: WebDeleteRequest, options?: RequestOptions) =>
-        this.post<WebRecord>("/api/v1/web/data/delete", request, options),
-      export: async (options?: RequestOptions): Promise<Blob> => {
-        const response = await this.request(
-          "/api/v1/web/data/export",
-          {},
-          "application/vnd.sqlite3",
-          options
-        );
-        try {
-          return await response.blob();
-        } catch (error) {
-          throw new KGOSTransportError("KG OS daemon export could not be read", {
-            aborted: isAbort(error) || options?.signal?.aborted === true,
-            cause: error
-          });
-        }
-      }
-    },
-    cache: {
-      write: (request: WebCacheWriteRequest, options?: RequestOptions) =>
-        this.post<{ stored: boolean }>(
-          "/api/v1/web/cache/write",
-          request,
-          options,
-          options?.encodedJSON === undefined ? serializeWebCache(request) : undefined
-        ),
-      read: (request: WebCacheReadRequest, options?: RequestOptions) =>
-        this.post<WebCacheReadResult>("/api/v1/web/cache/read", request, options),
-      clear: (request: { storeId: string }, options?: RequestOptions) =>
-        this.post<{ cleared: number }>("/api/v1/web/cache/clear", request, options)
-    }
-  };
-
   readonly ontology = {
     read: (request: OntologyReadRequest, options?: RequestOptions) =>
       this.post<OntologyReadResult>("/api/v1/ontology/read", request, options),
@@ -401,15 +342,11 @@ export class KGOSClient {
   private async post<Result>(
     path: string,
     request: object,
-    options?: RequestOptions,
-    body?: string
+    options?: RequestOptions
   ): Promise<Result> {
-    const response = await this.request(path, request, "application/json", { ...options, body });
+    const response = await this.request(path, request, "application/json", options);
     try {
-      const source = await response.text();
-      const result = JSON.parse(source) as Result;
-      options?.onJSONResponse?.(source);
-      return result;
+      return (await response.json()) as Result;
     } catch (error) {
       throw invalidResponse("KG OS daemon returned invalid JSON", error);
     }
@@ -433,7 +370,7 @@ export class KGOSClient {
     path: string,
     request: object,
     accept: string,
-    options?: RequestOptions & { body?: string | undefined }
+    options?: RequestOptions
   ): Promise<Response> {
     let response: Response;
     try {
@@ -444,7 +381,7 @@ export class KGOSClient {
           Authorization: "Bearer " + this.token,
           "Content-Type": "application/json"
         },
-        body: requestJSON(request, options?.encodedJSON ?? options?.body),
+        body: JSON.stringify(request),
         signal: options?.signal ?? null
       });
     } catch (error) {

@@ -106,7 +106,7 @@ func (service *Service) EvolutionDiff(ctx context.Context, request EvolutionDiff
 	if end > len(changes) {
 		end = len(changes)
 	}
-	page := append([]Change{}, changes[start:end]...)
+	page := append([]Change(nil), changes[start:end]...)
 	next := ""
 	if end < len(changes) && len(page) > 0 {
 		expectedAnchorRef := ""

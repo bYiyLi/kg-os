@@ -354,19 +354,11 @@ func RenderObjectJSON(value ObjectValue) ([]byte, error) {
 	var err error
 	switch value.Kind {
 	case KindDomain:
-		domain := *value.Domain
-		if domain.Includes == nil {
-			domain.Includes = []string{}
-		}
-		body, err = json.Marshal(domain)
+		body, err = json.Marshal(value.Domain)
 	case KindNodeDefinition, KindRelationshipDefinition:
 		body, err = marshalDefinitionJSON(value.Definition)
 	case KindKnowledgeNode:
-		node := *value.KnowledgeNode
-		if node.Labels == nil {
-			node.Labels = []string{}
-		}
-		body, err = json.Marshal(node)
+		body, err = json.Marshal(value.KnowledgeNode)
 	case KindKnowledgeRelationship:
 		body, err = json.Marshal(value.KnowledgeRelationship)
 	default:

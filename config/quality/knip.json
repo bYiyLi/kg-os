@@ -3,7 +3,7 @@
   "ignoreDependencies": [
     "@arethetypeswrong/cli",
     "@secretlint/secretlint-rule-preset-recommend",
-    "markdownlint-cli",
+    "license-checker-rseidelsohn",
     "secretlint",
     "publint"
   ],
@@ -19,7 +19,7 @@
       "project": ["src/**/*.ts"]
     },
     "packages/web": {
-      "project": ["src/**/*.{ts,tsx}"]
+      "project": ["src/**/*.tsx"]
     }
   }
 }

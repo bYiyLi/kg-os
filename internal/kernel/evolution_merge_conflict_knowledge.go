@@ -161,8 +161,18 @@ func (service *Service) projectKnowledgeNodeConflict(
 		if !oursObject || !theirsObject {
 			return mergeConflictProjection{}, unsafeMergeProjectionError()
 		}
+		nativeToPublic, toNative, err = knowledgePropertyAggregateMappers(
+			native, property, oursValue, theirsValue,
+		)
+		if err != nil {
+			return mergeConflictProjection{}, err
+		}
+		base, convertErr := nativeToPublic(native.Base)
+		if convertErr != nil {
+			return mergeConflictProjection{}, convertErr
+		}
 		public.BaseRef = ref.String()
-		return projectKnowledgePropertyMergeConflict(public, native, property, oursValue, theirsValue)
+		public.Base = base
 	case label != "":
 		if !oursObject || !theirsObject {
 			return mergeConflictProjection{}, unsafeMergeProjectionError()
@@ -230,8 +240,22 @@ func (service *Service) projectKnowledgeRelationshipConflict(
 		if !oursObject || !theirsObject {
 			return mergeConflictProjection{}, unsafeMergeProjectionError()
 		}
+		convert, toNative, mapErr := knowledgePropertyAggregateMappers(
+			native, property, oursValue, theirsValue,
+		)
+		if mapErr != nil {
+			return mergeConflictProjection{}, mapErr
+		}
+		base, convertErr := convert(native.Base)
+		if convertErr != nil {
+			return mergeConflictProjection{}, convertErr
+		}
 		public.BaseRef = ref.String()
-		return projectKnowledgePropertyMergeConflict(public, native, property, oursValue, theirsValue)
+		public.Base = base
+		if err := projectNativeMergeResolution(&public, native.Resolution, convert); err != nil {
+			return mergeConflictProjection{}, err
+		}
+		return mergeConflictProjection{Public: public, ToNative: toNative}, nil
 	}
 
 	nativeToPublic := relationshipNativeToPublic(path, native, public.Ours, public.Theirs)

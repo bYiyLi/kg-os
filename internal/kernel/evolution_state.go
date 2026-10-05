@@ -57,7 +57,7 @@ func (service *Service) EvolutionGet(ctx context.Context, request EvolutionGetRe
 		return EvolutionGetResult{}, err
 	}
 	result := EvolutionGetResult{
-		State: state, Parents: append([]string{}, commit.Parents...),
+		State: state, Parents: append([]string(nil), commit.Parents...),
 		Author: commit.Author, Message: commit.Message, CommittedAt: commit.CommittedAt,
 		Consistency: consistency, HasData: commit.HasData,
 	}
@@ -343,7 +343,7 @@ func evolutionRefList(refs []lithograph.VersionRef) EvolutionRefListResult {
 
 func stateSummaryFromLog(entry lithograph.LogEntry) StateSummary {
 	return StateSummary{
-		State: entry.Commit, Parents: append([]string{}, entry.Parents...), Author: entry.Author,
+		State: entry.Commit, Parents: append([]string(nil), entry.Parents...), Author: entry.Author,
 		Message: entry.Message, CommittedAt: entry.CommittedAt,
 	}
 }

@@ -692,8 +692,6 @@ Relationship Type rename 在底层需要 replacement 时保持端点与 Property
 
 删除聚合时清理只服务被删结构的类型/必填/唯一声明、专属索引、对应 Binding，以及 Definition 的 Domain membership。这是已删除聚合的结构清理，不是删除实际业务数据。涉及其它存活字段/Definition 的 composite/shared 规则必须在同一 Patch 中明确处理，不能凭包含关系级联删除。
 
-内部组织图按实际 Binding 端点的成员变化执行差量维护：删除 Domain 或 Definition 时移除相应组织边，未变化的成员边保留 element identity；单独修改 Knowledge 属性不重建 Domain membership。Definition / Domain rename 沿 Binding 连续性更新定位，不能制造两分支共同结构的无关身份变化。此处是现有结构清理与身份连续性规则的 compiler 映射，不增加删除模式或绕过 Merge candidate 一致性校验。
-
 删除一条索引只删除其 versioned definition，不删除业务正文。Provider-owned embedding cache独立于 Lithograph Index lifecycle；DROP 不要求 KG OS/Lithograph去扫描或清理 Provider cache。删除 Domain 只移除组织关系。所有删除只改变新 State，历史 State 的结构、语义、索引定义与知识按原 Snapshot 解释。
 
 ### 正反向映射验收

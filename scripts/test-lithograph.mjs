@@ -42,8 +42,6 @@ await run(
     "./internal/lithographtest",
     "./internal/kernel",
     "./internal/daemon",
-    // cspell:disable-next-line
-    "./internal/webstore",
     "./cmd/kgosd"
   ],
   { cwd: root, env }

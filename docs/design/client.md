@@ -26,13 +26,11 @@ TS Application ┘
 
 `@kgos/sdk` 映射 KG OS 已确认的公共 HTTP logical contract，按 `ontology / object / graph / evolution` 暴露对应 namespace。各 namespace 只适配对应 owner 已定义的 request/result/error，不重新发明第二套产品模型。
 
-[Web 工作区数据](web.md#受控-api-与多窗口保存)的 `web.data / web.cache` namespace 已接入同 daemon、同 Bearer 的受控记录 / 缓存 API；[Phase 14](../development/phases/14-web.md)记录本轮实现与交付验收边界。adapter 沿用浏览器 Web Platform 边界和共享错误 envelope，下载使用 Blob，不加入本地文件系统访问、root discovery、Knowledge State 或自动 mutation retry。
+[Web 工作区数据](web.md#受控-api-与多窗口保存)另提出 `web.data / web.cache` namespace，对应同 daemon、同 Bearer 的受控记录 / 缓存 API；当前 SDK / HTTP 尚无这些能力。后续 adapter 沿用浏览器 Web Platform 边界和共享错误 envelope，下载使用 Blob，不加入本地文件系统访问、root discovery、Knowledge State 或自动 mutation retry。
 
-Web 的[连接生命周期校验](web.md#连接认证与恢复)使用 `KGOSClientOptions.fetch` 注入点，为显式连接后的请求追加可选 expected-boot header；服务器映射及 Web generation 隔离已接入，完整交付验收见 Phase 14。SDK 不自动发现 / 更新 guard，普通 SDK / CLI 不因此要求新参数，也不自动重新发送旧 mutation。
+Web 的[连接生命周期校验](web.md#连接认证与恢复)使用当前已有 `KGOSClientOptions.fetch` 注入点，为显式连接后的请求追加拟新增的可选 expected-boot header；服务器映射尚未实现。SDK 不自动发现 / 更新 guard，普通 SDK / CLI 不因此要求新参数，也不自动重新发送旧 mutation。
 
-同一 Web fetch adapter 按[接收与显示预算](web.md#接收与显示预算)在 SDK JSON / NDJSON 解码前限制响应字节并分块；实现及验收由 Phase 14 维护。这是 Web adapter 的预算，通用 SDK 不因此保证相同内存上限；它继续复用 SDK 的唯一协议解析和每请求 AbortSignal。
-
-`RequestOptions.encodedJSON` 可提供同一 typed request 的完整标准 JSON 文本。SDK 先验证解析后的结构和值与 request 一致（不依赖 object key 顺序），再按原字节发送，不能借此替换 session、revision、Branch 等字段。Web 用它保留 Merge 自定义 public value 中 `1.0`、`-0.0` 等对 Lithograph value family 有意义的数字编码；这是传输编码选项，不增加 HTTP 字段或业务 mutation。`web.data/web.cache` 的最小调用及生命周期由 [Web](web.md#受控-api-与多窗口保存)拥有；缓存 result serializer 保留大 integral Float 的 exponent 与负零，Integer tag 和其余 typed envelope 原样传输。
+同一 Web fetch adapter 按[接收与显示预算](web.md#接收与显示预算)在 SDK JSON / NDJSON 解码前限制响应字节并分块；这项 Web 实现尚不存在，不是当前 SDK 已保证内存上限。它继续复用 SDK 的唯一协议解析和每请求 AbortSignal，不复制另一套 transport / value 语义。
 
 客户端构造必须由调用方显式提供 endpoint 与 token，例如：
 
@@ -46,10 +44,6 @@ new KGOSClient({
 SDK 不读取 `--root`、`KGOS_ROOT`、`auth.json`、`kgosd.lock`、环境变量或 npm package location；本机 CLI 负责解析 Workspace Root，并从 `<root>/.kgos` 取得 Instance locator/credential 后再创建 SDK client。
 
 SDK 使用标准 Web Platform 能力，同时服务 Node.js、`kgosd` 内置浏览器 Web 与第三方 TypeScript / JavaScript application；不得依赖 Node-only `fs`、`child_process`、process signal、native addon 或 KG OS platform package。
-
-读取需要保留数值 lexical encoding 的 JSON 时，`RequestOptions.onJSONResponse(source)` 可取得成功、合法的完整 JSON 响应原文；既有 typed result 不变。Web 用其中 State Data 的原始字段编码初始化和比较注释，不能先经过 `JSON.parse` / `JSON.stringify` 把有限 Float 或 signed zero 改成 Integer。原文指实际响应的 typed JSON，不承诺底层逐字回传提交时的输入；Lithograph 仍可按公共值格式编码大整数等值。
-
-Graph streaming 的 `RequestOptions.onGraphJSON(source, event)` 对每个已验证 event 提供其原始 NDJSON 文本。Web 在同一接收预算内保留 row 来源，原始 JSON 阅读、完整缓存写入和缓存加载沿用实际数字编码；普通 SDK / CLI 仍得到原有 async event 类型，callback 不增加 HTTP 字段，也不使不完整流成为成功结果。
 
 Object namespace 可以同时提供 structured `read` 与 canonical-text `readText` convenience。两者映射同一个 Object logical read；`readText` 由 daemon 在同一次 batch State pin 后调用唯一 Go canonical renderer并返回 `state/kind/ref/body`，SDK 不在 TypeScript 中复制 YAML serializer，也不按 Ref 循环重新读取 State。
 

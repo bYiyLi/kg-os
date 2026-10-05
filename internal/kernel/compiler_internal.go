@@ -12,6 +12,13 @@ func syncInternalGraph(
 	transaction *lithograph.Transaction,
 	plan *plannedState,
 ) error {
+	if _, err := transaction.Execute(ctx,
+		"MATCH (d:"+domainLabel+")-[r:"+includesType+"]->() DELETE r FINISH",
+		nil, nil,
+	); err != nil {
+		return AsPublicError(err)
+	}
+
 	retained := map[string]struct{}{}
 	domainIDs := map[OntologyRef]string{}
 	definitionIDs := map[OntologyRef]string{}
@@ -130,57 +137,19 @@ func syncInternalGraph(
 		}
 	}
 
-	membershipRemovals, additions, err := plannedDomainMembershipChanges(plan, domainIDs, definitionIDs)
-	if err != nil {
-		return err
-	}
-	for _, id := range membershipRemovals {
-		if _, err := transaction.Execute(ctx,
-			"MATCH ()-[r]->() WHERE elementId(r) = $id DELETE r FINISH",
-			map[string]any{"id": id}, nil,
-		); err != nil {
-			return AsPublicError(err)
-		}
-	}
-	for _, membership := range additions {
-		if err := createDomainMembership(ctx, transaction, membership.DomainID, membership.TargetID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type domainMembership struct {
-	DomainID string
-	TargetID string
-}
-
-func plannedDomainMembershipChanges(
-	plan *plannedState,
-	domainIDs map[OntologyRef]string,
-	definitionIDs map[OntologyRef]string,
-) ([]string, []domainMembership, error) {
-	existing := map[domainMembership]struct{}{}
-	for _, relationship := range plan.Base.internalRelationships {
-		if relationship.Type == includesType {
-			existing[domainMembership{DomainID: relationship.Start, TargetID: relationship.End}] = struct{}{}
-		}
-	}
-	desired := map[domainMembership]struct{}{}
-	var additions []domainMembership
-	for _, ref := range plan.sortedObjects() {
+	for _, ref := range refs {
 		object := plan.Objects[ref]
 		if object.Value.Domain == nil {
 			continue
 		}
 		domainID := domainIDs[ref]
 		if domainID == "" {
-			return nil, nil, publicError(CodeConsistency, "Domain Binding identity is missing", nil)
+			return publicError(CodeConsistency, "Domain Binding identity is missing", nil)
 		}
 		for _, rawTarget := range object.Value.Domain.Includes {
 			target, err := ParseOntologyRef(rawTarget)
 			if err != nil {
-				return nil, nil, err
+				return err
 			}
 			targetID := ""
 			if target.Kind == KindDomain {
@@ -189,27 +158,14 @@ func plannedDomainMembershipChanges(
 				targetID = definitionIDs[target]
 			}
 			if targetID == "" {
-				return nil, nil, publicError(CodeConsistency, "Domain membership target Binding identity is missing", nil)
+				return publicError(CodeConsistency, "Domain membership target Binding identity is missing", nil)
 			}
-			membership := domainMembership{DomainID: domainID, TargetID: targetID}
-			desired[membership] = struct{}{}
-			if _, exists := existing[membership]; !exists {
-				additions = append(additions, membership)
+			if err := createDomainMembership(ctx, transaction, domainID, targetID); err != nil {
+				return err
 			}
 		}
 	}
-	var removals []string
-	for _, relationship := range plan.Base.internalRelationships {
-		if relationship.Type != includesType {
-			continue
-		}
-		membership := domainMembership{DomainID: relationship.Start, TargetID: relationship.End}
-		if _, retained := desired[membership]; !retained {
-			removals = append(removals, relationship.ElementID)
-		}
-	}
-	sort.Strings(removals)
-	return removals, additions, nil
+	return nil
 }
 
 func updateInternalNode(

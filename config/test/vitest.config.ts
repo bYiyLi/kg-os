@@ -15,7 +15,6 @@ export default defineConfig({
     coverage: {
       exclude: [
         "**/*.test.ts",
-        "**/*.test.tsx",
         // Thin process/browser entrypoints delegate to covered modules.
         "**/src/bin.ts",
         "**/src/dev.ts",

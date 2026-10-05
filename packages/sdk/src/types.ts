@@ -6,12 +6,6 @@ export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 
 export interface RequestOptions {
   signal?: AbortSignal;
-  // Optional exact JSON encoding of the same typed request, for lexical Graph values.
-  encodedJSON?: string;
-  // Complete successful JSON response source, before numeric conversion by the caller.
-  onJSONResponse?: (source: string) => void;
-  // Each validated Graph event with its original NDJSON encoding.
-  onGraphJSON?: (source: string, event: GraphStreamEvent) => void;
 }
 
 export type ObjectKind =

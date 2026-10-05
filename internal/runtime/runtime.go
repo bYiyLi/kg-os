@@ -12,7 +12,6 @@ import (
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/bYiyLi/kg-os/internal/lithograph"
 	"github.com/bYiyLi/kg-os/internal/runtimeprofile"
-	"github.com/bYiyLi/kg-os/internal/webstore"
 )
 
 type Runtime struct {
@@ -22,7 +21,6 @@ type Runtime struct {
 	Extensions []runtimeprofile.ResolvedExtension
 	Database   *lithograph.Host
 	Kernel     *kernel.Service
-	Web        *webstore.Store
 
 	lock   *runtimeprofile.InstanceLock
 	closed bool
@@ -123,7 +121,6 @@ func OpenWithOfficialExtensions(
 		Extensions: extensions,
 		Database:   database,
 		Kernel:     kernelService,
-		Web:        webstore.New(paths.WebDir, database.Baseline().DatabaseID),
 		lock:       lock,
 	}
 	return runtime, nil
@@ -153,11 +150,6 @@ func (runtime *Runtime) Close() error {
 	}
 	runtime.closed = true
 	var failures []string
-	if runtime.Web != nil {
-		if err := runtime.Web.Close(); err != nil {
-			failures = append(failures, "Web storage: "+err.Error())
-		}
-	}
 	if runtime.Database != nil {
 		if err := runtime.Database.Close(); err != nil {
 			failures = append(failures, "database: "+err.Error())

@@ -37,8 +37,6 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 **Phase 00–13 均已完成；当前公开版本为 v0.2.1。** 发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` Validate + 六平台 native/package matrix 全绿，`v0.2.1` tag 精确指向该 revision。首次 Release Run `36510797281` 在六平台 immutable candidate / aggregate 成功后因 npm registry propagation timeout 停在部分发布；Recovery Run `36514243605` 复用同一 verified `release-set`，完成缺失 SDK/CLI、八包 exact-version/`latest=0.2.1` verification、六平台 public-registry `npx` smoke 与 GitHub Release `KG OS v0.2.1`。
 
-当前正在执行 [Phase 14 Web](docs/development/phases/14-web.md)：内置图谱工作区、独立查询帧、Knowledge / 本体编辑、版本演化和 `.kgos/web` 持久恢复已接入，实际验收、安全工具修复及交付 revision 的六平台结果统一记录在阶段文件。当前公开版本仍为 v0.2.1。
-
 **Phase 13 当前为 `done`，并已随后作为 v0.2.1 正式发布。** 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`；主工作树完整 validation、独立 fresh-source、packed no-key smoke、macOS arm64 中英文 repo-out TTY first-run，以及 CI Run `36505717058` 的 Validate + darwin/linux/win32 arm64/x64 六平台 native/package matrix 全部成功。阶段关闭时发布不属于其完成条件；后续独立 release 授权将版本提升至 `0.2.1`，发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 与 Recovery Release Run `36514243605` 已完成正式公开发布。完整范围与证据见[Phase 13](docs/development/phases/13-init-wizard-credential-boundary.md)。
 
 **Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
