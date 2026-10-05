@@ -1,8 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { Shell } from "./shell.js";
-import "./style.css";
+import { App } from "./app/app.js";
+import "./app/app.css";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) {
@@ -11,6 +11,6 @@ if (app === null) {
 
 createRoot(app).render(
   <StrictMode>
-    <Shell />
+    <App />
   </StrictMode>
 );

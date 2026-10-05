@@ -1,11 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Shell } from "./shell.js";
+import { App } from "./app.js";
 
-describe("Shell", () => {
+describe("App", () => {
   it("renders the current local Runtime boundary", () => {
-    const markup = renderToStaticMarkup(<Shell />);
+    const markup = renderToStaticMarkup(<App />);
 
     expect(markup).toContain("KG OS");
     expect(markup).toContain("Runtime shell ready");

@@ -1,6 +1,6 @@
 import { PRODUCT_NAME } from "@kgos/sdk";
 
-export function Shell() {
+export function App() {
   return (
     <section className="shell" aria-labelledby="page-title">
       <p className="eyebrow">KG OS local runtime</p>

@@ -6,7 +6,7 @@
 
 ## 依据与状态
 
-2026-10-04 核对基线：`main@181628b45c1600476514dfc129a5053c6d394b9e`，版本 `0.2.1`。当前 [Web shell](../../packages/web/src/shell.tsx) 仅提供 React / TypeScript / Vite 壳层；本文不是页面已交付或交互验收报告。后端依据是当前 [SDK](../../packages/sdk/src/client.ts)、[类型](../../packages/sdk/src/types.ts) 和 [HTTP adapter](../../internal/daemon/api.go)，而非截图按钮。
+2026-10-04 核对基线：`main@181628b45c1600476514dfc129a5053c6d394b9e`，版本 `0.2.1`。当前 [Web app shell](../../packages/web/src/app/app.tsx) 仅提供 React / TypeScript / Vite 壳层；本文不是页面已交付或交互验收报告。后端依据是当前 [SDK](../../packages/sdk/src/client.ts)、[类型](../../packages/sdk/src/types.ts) 和 [HTTP adapter](../../internal/daemon/api.go)，而非截图按钮。
 
 | 状态 | 本文处理 |
 | --- | --- |
@@ -14,6 +14,42 @@
 | 沿用现有产品合同 | 全世界 immutable State、同 State 读取、Definition 聚合、strict base Object Patch、Graph 原样执行与 Evolution 专用操作 |
 | 本次工程方案，尚未实现 | 帧状态、图投影、分页接入、表单到 Patch、局部校验、手动 token 输入与内存保存、错误反馈、键盘与窄屏规则；`.kgos/web/ui.db`、可丢弃结果缓存、受控 Web 数据 API 与按记录并发校验 |
 | 本轮决定更新 | 用户接受前两项默认，并追加“数据可以放到 kgos 下面，Web 临时数据也放里面”；按现有 Workspace→`.kgos` 合同理解，草稿不再默认随刷新丢失。随后明确“再简化点，不要过度设计”：首版只呈现常用工作流，保存 / 恢复在原编辑位置，缓存自动管理，普通错误就地短提示，真实冲突才打开比较。内部安全与持久化合同保留，均不代表已经实现 |
+
+### 前端代码架构
+
+`packages/web/src` 采用四层模块化结构，而不是按技术类型建立全局
+`components/hooks/services/stores/utils` 目录，也不机械套用
+`pages/widgets/entities` 等额外层。当前层级与依赖方向为：
+
+```text
+main.tsx → app only within packages/web/src
+
+app      → features / core / shared / @kgos/sdk
+features → core / shared / @kgos/sdk
+core     → shared / @kgos/sdk
+shared   → browser / framework / generic third-party dependencies only
+```
+
+| 层 | 职责 | 边界 |
+| --- | --- | --- |
+| `app/` | React 应用根、主 Shell、全局 provider、主导航与 Feature 组合 | 不拥有 Graph / Patch / Merge 等业务规则 |
+| `core/` | 跨 Feature 的 Web 应用基础能力；首版按真实需求形成 `client/`、`workspace/`、`persistence/` | `client` 只拥有显式连接、Web fetch / guard / 预算等浏览器生命周期，不建立第二套 SDK service/repository；`workspace` 拥有 pinned State 上下文；`persistence` 只负责记录/CAS/autosave/cache，不判断业务草稿是否仍可提交 |
+| `features/` | 按完整用户能力垂直聚合；首版目标为 `connection/`、`query/`、`object-edit/`、`ontology/`、`versions/` | 不按按钮拆成 `run-query/rerun-query/move-tag` 等碎片；Feature 内可按真实复杂度继续分子目录 |
+| `shared/` | 无 KG OS 业务语义的 UI primitive、通用库和样式 | 不依赖 `app/core/features`，也不承载 SDK / Object / State / Graph 模型 |
+
+`@kgos/sdk` 继续是公共 HTTP Client 与 wire contract 的唯一 TypeScript
+实现；Web 不新增 `ObjectService`、`GraphRepository` 或 DTO 镜像层。Feature
+可以直接使用 SDK 公共类型，并通过 `core/client` 取得带 Web 生命周期约束的
+`KGOSClient`。需要共享 Object 编辑时，`query` / `ontology` 复用
+`features/object-edit` 的公共入口；其它 Feature 默认保持独立，出现真实复用再建立
+公开边界，不为理论纯度增加中转层。
+
+源码目录只在出现第一个真实 owner 时创建，不提交 `.gitkeep`、空
+`index.ts` 或占位 controller。单元测试与源码 colocate；仓库级真实浏览器流程继续放在
+`tests/e2e/`。Dependency Cruiser 强制 `main.tsx` 在 Web 内部只组合 `app`，并拒绝
+`app/core/features/shared` 对 entrypoint 的反向依赖，以及
+`shared → app/core/features/sdk`、`core → app/features`、
+`features → app` 的反向依赖；现有 no-circular 规则继续禁止实际循环。
 
 ### 功能式设计材料
 

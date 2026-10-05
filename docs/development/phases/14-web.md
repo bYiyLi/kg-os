@@ -38,7 +38,7 @@
 | Ontology / Object / Graph | [Phase 02](02-ontology.md)、[04](04-object.md)、[05](05-graph.md)已提供业务合同与实现；本阶段接入现有 API，不新建模型/对象发现、preview 或提交状态接口 |
 | Evolution Core / Merge | [Phase 06](06-evolution-core.md)、[07](07-evolution-merge.md)与 [SDK](../../../packages/sdk/src/client.ts)、[HTTP adapter](../../../internal/daemon/api.go)已有对应操作；新增的是前端工作流 |
 | TypeScript / npm Runtime | [Phase 08](08-typescript-client-npm-runtime.md)及后续六平台基线可复用；Web 通过 SDK 访问，不能调用 CLI 子进程或本机文件 |
-| Web 页面 | [当前 shell](../../../packages/web/src/shell.tsx)只有壳层，五组 Feature 均待实现 |
+| Web 页面 | [当前 app shell](../../../packages/web/src/app/app.tsx)只有壳层，五组 Feature 均待实现 |
 | Web 存储与受控接口 | [Runtime Paths](../../../internal/runtimeprofile/profile.go)、HTTP 与 SDK 尚无 `.kgos/web`、`web.data / web.cache`；P14-01/02 实现 owner 已确定的工程方案，包括维护用导出与缓存清理能力 |
 | 连接与响应预算 | 当前有 SDK fetch 注入点与 AbortSignal，没有 daemon boot guard 或 Web 有界接收 adapter；由 P14-01/02 实现，不改变 CLI / 第三方默认合同 |
 | 业务浏览器验收 | [现有 E2E](../../../tests/e2e/web-shell.spec.ts)仅验证真实 Runtime shell 与不存在的 readiness bypass；需扩展[现有 Runtime fixture](../../../scripts/serve-built-runtime.mjs)，不能把 shell 成功算作业务验收 |
