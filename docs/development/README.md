@@ -84,6 +84,10 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 13 Init Wizard UX & Embedding Credential Boundary 当前为 `done`，并已随后作为 v0.2.1 正式发布。** D84 已实现：credential env-value 从 init / 普通 CLI / `kgosd` startup 前置条件移到实际 Semantic Provider operation，doctor 改为 current-CLI-process non-blocking 诊断，TTY wizard 改为清晰 defaults、custom-extension 语义与字段级 retry。主工作树完整 `pnpm validate`、独立 fresh-source `setup && validate`、packed no-key smoke 与 macOS arm64 中英文 repo-out TTY first-run 均通过；实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 与 CI Run `36505717058` 已闭环。后续独立 release revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，Recovery Release Run `36514243605` 完成八包 `0.2.1` / `latest`、六平台 public-registry smoke 与 GitHub Release。详见[Phase 13](phases/13-init-wizard-credential-boundary.md)。
 
+**Phase 14 Web 当前为 `deferred`。** 保留原阶段范围与计划，尚未开展产品实现及动态验收；不作为 MCP 的前置依赖，详见[Phase 14](phases/14-web.md)。
+
+**Phase 15 MCP & Private Plugin 当前为 `ready`（仅计划就绪）。** [MCP owner](../design/mcp.md)与 D85–D88 已确认四个 Tool、受控 SDK/Sandbox、完整 Markdown 预览、历史导航和用户私人 Plugin 的目标范围。新增[Phase 15](phases/15-mcp.md)将 QuickJS WASM/Worker 可行性验证放在首位，之后实现独立服务、工具、官方 Skill、真实客户端接入及六平台验收；**尚无本阶段代码或验收结果**。该阶段独立于暂缓的 Web。
+
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |
@@ -103,6 +107,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [12 First-Run & CLI Productization](phases/12-first-run-cli-productization.md) | `done` | Workspace Root / `.kgos`、`KGOS_ROOT`、complete init/readiness/recovery、extension setup、responsibility-scoped high-density help、fresh-user acceptance；本地/fresh-source/六平台 CI 验收与 v0.2.0 八包/六平台正式发布完成 | [D81](../design/decisions.md#d81-workspace-root)、[D82](../design/decisions.md#d82-init-readiness)、[D83](../design/decisions.md#d83-cli-progressive-disclosure) |
 | [13 Init Wizard UX & Embedding Credential Boundary](phases/13-init-wizard-credential-boundary.md) | `done` | clear defaults/custom-extension prompts、TTY field retry、operation-time Embedding credential、doctor non-blocking diagnostic；main/fresh-source/packed/TTY + six-platform CI acceptance complete，后续 v0.2.1 八包/六平台正式发布完成 | [D84](../design/decisions.md#d84-late-bound-embedding-credential)、[CLI](../design/cli.md#init)、[Runtime Embedding](../design/runtime.md#embedding-配置与索引映射) |
 | [14 Web](phases/14-web.md) | `deferred` | 单一 Web Phase：连接与 `.kgos/web` 持久基础、独立查询帧、Knowledge / Ontology 编辑、版本演化及真实 Runtime / 打包 / 六平台验收；2026-10-11 决定暂缓，产品实现与运行验收尚未开始 | [Web owner](../design/web.md)、[统一材料入口](../design/web-materials.md)、现有 SDK / 业务 API 与 Phase 00–13 基线 |
+| [15 MCP & Private Plugin](phases/15-mcp.md) | `ready` | 独立 TypeScript MCP、四个 Tool、QuickJS WASM/Worker 读写 SDK Sandbox、官方 Skill 与私人 Plugin；从技术可行性到真实客户端、packed 与六平台 CI 验收的单阶段交付，当前未实现 | [MCP owner](../design/mcp.md)、[D85–D88](../design/decisions.md#d85-mcp-programmable-ai-client)、现有 SDK / Runtime |
 
 当前实现依赖顺序：
 
@@ -136,10 +141,11 @@ Go Engineering Foundation
   -> 后续独立安排的范围：
        Phase 14: Web [deferred]
          (connection / .kgos/web / independent frames / aggregate editing / versions / real acceptance)
-       Skill phase [later]
+       Phase 15: MCP & Private Plugin [ready; independent of Web]
+         (QuickJS proof / MCP auth / four Tools / official Skill / private Plugin / real acceptance)
 ```
 
-Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 当前为 `deferred`：2026-10-11 决定暂缓实施，已有计划与设计保留，产品实现和运行验收尚未开始；Skill 仍在后续，未因 Web 暂缓新增依赖。
+Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 当前为 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 当前为 `ready`，仅设计与开发计划已就绪，QuickJS/Sandbox、MCP Server、官方 Skill / 私人 Plugin 及运行验收尚未实现，不借用旧阶段成功证据。
 
 ## 6. Phase 通用完成标准
 
@@ -172,5 +178,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 12：First-Run & CLI Productization](phases/12-first-run-cli-productization.md)
 - [Phase 13：Init Wizard UX & Embedding Credential Boundary](phases/13-init-wizard-credential-boundary.md)
 - [Phase 14：Web](phases/14-web.md)
+- [Phase 15：MCP & Private Plugin](phases/15-mcp.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

@@ -843,3 +843,49 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 备选：继续要求 init/startup 前设置 secret；只删除 TypeScript init 检查但保留 CLI global/Go startup gate；给 Embedding 增加 enable/disable、credential store 或 `.env` loader。这些方案分别继续制造无关阻塞、留下语义不一致或为当前不存在的需求增加配置/secret 管理层，均不采用。
 - 取舍：daemon ready 不再证明未来每一次 Semantic Provider operation 的外部 credential 都可用，`doctor` 也只能报告当前进程环境的即时状态；换取 Instance lifecycle 与按需外部服务依赖解耦，普通图/知识能力不再被未使用的 Embedding secret 阻塞，并与底层 Provider 的既有 operation-time credential contract 对齐。
 - 当前合同：[CLI Doctor](cli.md#doctor) / [Init](cli.md#init)、[Runtime Embedding](runtime.md#embedding-配置与索引映射)、[公共错误合同](contracts.md#公共错误合同)、[Phase 13](../development/phases/13-init-wizard-credential-boundary.md)。
+
+<a id="d85-mcp-programmable-ai-client"></a>
+
+### D85 KG OS 使用独立 MCP + 受控 JavaScript SDK + 用户私人 Plugin（2026-10-11）
+
+- 决定：KG OS 以独立 TypeScript MCP Server 经 `@kgos/sdk` 访问绑定的本地 Instance；核心可编程入口为只读 `kgos_read` 与读写 `kgos_run`，由隔离 JavaScript 组合 SDK 能力，少量高价值原生只读工具用于直接发现知识库上下文。首版 Tool 确认为 `kgos_preview`、`state_ancestry`、`kgos_read`、`kgos_run`；不单独提供重复 SDK / Preview 的 `ontology_read`、`state_get`、`evolution_overview`、`branch_list`。MCP 不镜像 SDK 的全部方法成为独立 Tools，不修改 Kernel / Lithograph。
+- Plugin：每个用户自己部署 KG OS 与 MCP，ChatGPT 侧注册自己的连接并生成带官方 Skill 的私人 Plugin；不统一托管用户数据、不提交公共目录。运行服务端与 Plugin 模板同属 KG OS 仓库，但属于不同部署单元。Skill 教 AI 使用工具，不进入 Kernel。
+- 安全：本地 `kgosd` 保持 loopback + single-token；对外 MCP HTTPS / Tunnel 与调用者认证独立处理，QuickJS WASM Sandbox 与同进程 SDK 受控方法桥接防止脚本直接访问凭证 / 主机对象；**不新增独立 SDK Gateway 服务**。`node:vm` 不是安全沙箱，数据库只读 Cypher 也不等于完全没有其它副作用。
+- 依据：用户希望 AI 在有限 Tool 数量下通过 JavaScript 灵活组合全部公共知识操作，并能在 ChatGPT Web / Desktop 使用各自独立部署的 KG OS。
+- 备选：为每个 SDK 方法提供 MCP Tool；把 MCP Server 放进 KG OS Kernel / Plugin ZIP；集中部署公共 KG OS 服务；让用户 JavaScript 直接执行未受限 Node.js。前者增加 Tool 选择成本，其余方案违反独立部署、责任边界或安全要求。
+- 取舍：MCP Tool 面保持紧凑，但必须证明跨平台执行隔离、受控 SDK 方法桥接安全、远程授权与私人 Plugin 的实际可用性，才能宣称完成。
+- 当前合同：[MCP 架构与工具面](mcp.md)、[Client SDK](client.md)、[Runtime 本地服务](runtime.md#http-bind-与-active-endpoint)。
+
+<a id="d86-preview-and-commit-message"></a>
+
+### D86 Preview 是完整 Ontology 虚拟 Markdown，Commit Message 提供动态版本简介（2026-10-11）
+
+- 决定：`kgos_preview` 始终动态生成**全部 Branch** 的只读 Markdown 文档，不提供分支过滤参数；分支与 Head Commit 索引给出准确绝对 `Offset` / `Lines`，每个 Branch 的 pinned Commit 后附完整 Ontology Mermaid、Domain、Definition、Property、Constraint、Index 内容。`offset / limit` 只控制返回行窗口（`limit` 默认 300、允许 100..500），不删减 Ontology；`viewRevision` 使用 MCP 进程内缓存固定跨页文档，不建立真实文件或第二套持久化版本。
+- Message：Branch 不新增 Description/CRUD；官方 AI 写入规范在现有 Commit `message` 内使用 Markdown `## 简介`（提交后的完整知识世界简介）与 `## 改动`（本次变化）。预览只为**分支索引**从规范 Message 提取简介首行，正文以 `markdown` fenced code block **完整展示原始 Message，不拆分**；多个 Branch 共用 Commit 与 fast-forward 不创建 Commit 时遵守既有版本语义。该规范不改变 Kernel 对可选 Message 原文的接受规则，历史不规范 Message 原样保留。
+- 格式：Preview 以普通 Markdown 索引导航、`mermaid` 模型关系图及复用公共 Object canonical YAML 的 `yaml` 代码块呈现完整 Domain / Definition；外层不套代码围栏。代码围栏须适应数据中的反引号，绝对行号在最终渲染后计算，不删减原始说明、索引或约束。
+- 依据：用户需要首次连接就能了解不同 Branch 的知识模型；截断定义会丢失关键知识，全文一次进入模型上下文又过大；明确行窗口可由 AI 自主导航。动态简介随 Commit 自然演进，避免单独维护可变 Branch 描述。
+- 备选：固定只显示前 20 个 Ontology / 前 10 个 Branch、返回巨大 JSON、额外新增 Branch Description 字段、把 Markdown 变成持久可编辑文件或自动 AI 总结历史。它们分别损失完整性、增加上下文/模型负担或增加不必要的第二套数据语义。
+- 取舍：完整视图可能较大，必须正确处理大规模分页、绝对行号、并发 Branch 变更、缓存失效与超限失败；Message 不遵守约定时只能明确无规范简介，不能伪造。
+- 当前合同：[MCP Preview / Message 设计](mcp.md)、[Ontology](ontology.md)、[Evolution](evolution.md)。
+
+<a id="d87-ancestry-markdown-history"></a>
+
+### D87 Ancestry 按 Commit 分页展示完整 Markdown 历史（2026-10-11）
+
+- 决定：新增独立 `state_ancestry` 只读 MCP Tool，直接使用 `evolution.ancestry({root, limit?, cursor?})`；MCP 默认 `limit=20`，保留底层 1..1000 范围和固定 Root / Cursor 语义。返回 resolved `root`、本页 `count`、可选 `cursor` 及 `markdown`，不添加全量历史计数、持久索引或单独 Commit 模型。
+- 呈现：Markdown 使用本页 `mermaid` DAG、准确 Commit / Parent / Author / UTC microseconds 导航表和逐条详情；每个 Commit 的原始 Message 完整放进 `markdown` fenced code block，**不提炼、不拆 `简介` / `改动`**，历史非规范 Message 同样保留。跨页父结点标注未展开，不能画成历史终点。
+- 依据：AI 需要不用手写 JavaScript 就能直接检查版本演进，而 `kgos_preview` 只列当前 Branch Heads；代码块能区分原始 Message 与 MCP 导航标题，避免误读和 Markdown 结构污染。
+- 取舍：大型 Commit Message 可能需要缩小每页 `limit`，资源不足返回明确错误而不是静默截断；历史真实业务变化仍由 Evolution History / Diff 负责，Ancestry 不额外解析 Ontology 或 Knowledge。
+- 当前合同：[MCP Ancestry 设计](mcp.md#state_ancestrycommit-dag-markdown-历史)、[Evolution Ancestry](evolution.md#evolution-公共调用合同)。
+
+<a id="d88-javascript-sandbox-sdk-execution"></a>
+
+### D88 统一 JavaScript Sandbox 与完整 SDK 读写能力（2026-10-12）
+
+- 决定：`kgos_read` / `kgos_run` 只有一个 `code: string` 输入和同一 `{result: JsonValue}` 成功返回合同，`return` 是唯一正式结果出口。脚本直接使用 `ontology`、`object`、`graph`、`evolution` 四个顶层命名空间，不使用 `kgos.` / `sdk.` 前缀、初始化 Client 或配置连接；可调用的 SDK 方法及参数 / 返回值保持原样。`kgos_read` 只提供既有只读方法，`kgos_run` 提供完整公共 SDK；SDK 新方法须先分类，不能未经审查自动进入只读权限。
+- 实现选型：一个 **QuickJS WebAssembly + Node.js Worker** Sandbox 执行器服务两种权限，脚本上下文每次调用独立。SDK Client / Token 留在 MCP 宿主侧，经校验的内部方法桥接访问 SDK；不提供宿主进程、文件、网络、导入或任意 HTTP 路径，也不增加独立 SDK Gateway 服务。异步 Promise、并发、流式迭代、取消、CPU / 内存 / 时限 / 调用量 / 结果大小限制以及三平台隔离安全均须真实验证后才能声明实现完成。
+- 写入语义：`kgos_run` 不添加整个脚本的事务、`dryRun`、自动重试 / 补偿 / 回滚或逐 SDK 方法确认；每次操作保留自身的 Object Patch CAS、Graph Cypher 和 Evolution / Merge 合同。多个 SDK 写入可**部分成功**，脚本未捕获异常返回 MCP 错误也不能推断先前写入已回滚；取消、超时、断线后写入可能已生效，需要通过已有读取方法核实，不能盲目重放。
+- 错误与能力边界：结果必须 JSON-compatible，非法返回值明确报错；执行 / SDK / 资源 / 取消错误通过 MCP `isError: true` 与安全的公开错误信息区分。脚本沙箱只约束 JavaScript 的直接宿主访问，不增加 Cypher 语句检查、重写、网络或文件访问限制，也不宣传这些能力。`kgos_run` 在 Tool 层标识可能写入或删除；`kgos_read` 的数据库只读方法不等同于对底层全部副作用的保证。
+- 依据：AI 需要最少 Tool 和最简 API 完成完整读写 SDK 的异步组合，同时避免跨调用状态、第二套知识 API、单独部署服务或隐藏的事务承诺。
+- 备选：Node VM / vm2、额外独立 Gateway / Deno Runtime、为每个方法创建 MCP Tool、在脚本层自动包事务或回滚。它们分别无法独立承担隔离保证、增加部署和维护成本，或改变已确认的 SDK / 数据库语义。
+- 当前合同：[MCP JavaScript SDK 执行](mcp.md#javascript-sdk-执行)、[Client SDK](client.md)、[Graph](graph.md)、[Evolution](evolution.md)。

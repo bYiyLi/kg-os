@@ -74,6 +74,8 @@ KG OS 的设计必须建立在 Lithograph **公开能力**之上，而不是 Lit
 
 Ontology 阅读提供全局 → 可选 Domain → Definition 的明确入口；编辑仍使用共享 Object read/patch。它不是新的全套 CRUD，也不是虚拟文件系统。具体字段与读取规则唯一见 [Ontology](ontology.md)。
 
+后续 AI-facing MCP 是连接在 `@kgos/sdk` **之上的独立 TypeScript adapter**，可搭配用户私人 Plugin / Skill 使用；它不改变 Kernel、Lithograph 或本地 `kgosd` 的单 Instance 边界。完整 MCP / ChatGPT 接入与只读虚拟 Markdown 预览见 [MCP](mcp.md)，本节 v1 架构图仍描述已落地的本地基础层。
+
 ### v1 运行时与技术分层
 
 KG OS v1 使用 **Go 实现 `kgosd`、Kernel 与 SQLite / Lithograph Host**；TypeScript / npm 负责 `@kgos/sdk`、`@kgos/cli` 与浏览器 Web。Web 构建产物随 `kgosd` 一起交付，由每个 Instance 自己的 daemon endpoint 提供页面、静态资源与 API；浏览器是客户端，不对应另一个 Web 服务。当前目标运行时结构为：

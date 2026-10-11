@@ -24,6 +24,8 @@ State
 
 因此 KG OS 不引入 `ontologyVersion`、`knowledgeVersion` 或另一套 State history。Ontology、Knowledge 与 Evolution 共享同一个底层 Commit DAG。
 
+Commit 的 `message` 是可选 immutable 提交元数据，不是独立的 Branch Description。计划中的 [MCP Preview / 官方 AI 写入约定](mcp.md#commit-message-作为版本动态简介)可使用 Message 的“当前简介 + 本次改动”结构展示分支 Head 所代表的知识世界；**不改变**本文件允许任意合法 Message、允许缺省且不自动验证正文的现行公共合同。
+
 ### State Data：可修改的状态注释
 
 State Data 直接复用 Lithograph Commit Data，是调用方附加在某个 State 上的 mutable JSON annotation。KG OS 不预定义 `title`、`time`、`stage`、`world` 等业务字段，也不把 State Data 解释成领域事实。

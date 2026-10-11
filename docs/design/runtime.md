@@ -31,6 +31,8 @@ CLI-managed v1 Runtime 只使用 IPv4 loopback HTTP。每个 Instance daemon 启
 
 CLI 不从 `config.toml` 推测 endpoint，只使用当前 Instance Directory 的 active lock locator。v1 的 CLI-managed Runtime 不提供 LAN / wildcard bind；如果未来需要远程或多机访问，必须单独设计 TLS、endpoint discovery 与 deployment/security contract，不能把本地 single-token loopback 模型直接外推到不可信网络。
 
+后续 [MCP 远程接入设计](mcp.md#部署与责任划分)由**单独的 MCP Server**提供受保护的 HTTPS / 隧道入口，并在本机按同一 Instance locator / credential 使用 SDK；它不授权 `kgosd` 自身改绑公网，也不改变本节本地单 Token 合同。
+
 普通 API request / response 使用 HTTP + JSON。Phase 02 已有的 Ontology editable-body adapter 继续可以通过 `Accept: application/yaml | application/json` 返回单 Object body；D73 新增的**通用 Object batch read**则通过 JSON `ObjectReadResult` 一次传输整批 logical Object Value，canonical YAML / raw JSON batch body属于 client presentation，不要求 daemon 再逐 Object做 representation negotiation。Graph streaming 使用 HTTP streaming + NDJSON。具体 HTTP method / route / metadata carrier 仍属于 HTTP adapter mapping，但不得改变 logical contract。
 
 ### Graph HTTP streaming framing
