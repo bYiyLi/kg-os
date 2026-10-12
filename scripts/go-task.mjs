@@ -9,7 +9,7 @@ const task = process.argv[2];
 const goEnv = {
   ...process.env,
   CGO_ENABLED: "1",
-  GOTOOLCHAIN: "go1.27.1"
+  GOTOOLCHAIN: "go1.27.2"
 };
 const sqliteTags = "sqlite_fts5";
 const nativeTags = "sqlite_fts5,lithograph_smoke";
@@ -38,8 +38,8 @@ async function nativeEnvironment() {
 
 async function requireGo1271() {
   const result = await runCapture("go", ["version"], { cwd: root, env: goEnv });
-  if (!result.stdout.includes("go1.27.1")) {
-    throw new Error("KG OS requires Go 1.27.1; got " + result.stdout.trim());
+  if (!result.stdout.includes("go1.27.2")) {
+    throw new Error("KG OS requires Go 1.27.2; got " + result.stdout.trim());
   }
 }
 

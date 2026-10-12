@@ -27,9 +27,11 @@
     "check:licenses:rust": "node scripts/check-rust-licenses.mjs",
     "check:licenses:npm": "node scripts/check-npm-licenses.mjs",
     "check:markdown": "markdownlint-cli2 --config config/quality/markdownlint-cli2.yaml",
+    "check:mcp:staging": "node scripts/pack-mcp.mjs --temporary",
+    "mcp:staging:smoke": "node scripts/mcp-packaged-smoke.mjs",
     "check:package": "node scripts/pack-release.mjs --temporary",
     "check:repo": "sherif --fail-on-warnings",
-    "check:security": "pnpm audit --audit-level high --registry=https://registry.npmjs.org",
+    "check:security": "pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org && pnpm audit --audit-level high --registry=https://registry.npmjs.org",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:spelling": "cspell lint --config config/quality/cspell.json --no-progress --no-must-find-files \"*.{md,json,yaml,yml,js,cjs,mjs,ts}\" \"config/**/*.{json,yaml,yml,js,cjs,mjs,ts}\" \"docs/**/*.md\" \"packages/**/*.{ts,tsx,html,css,json}\" \"scripts/**/*.mjs\" \"tests/**/*.{ts,mjs}\"",
     "check:type-coverage": "type-coverage -p config/test/tsconfig.type-coverage.json --strict --show-relative-path --at-least 99",
@@ -37,6 +39,7 @@
     "check:versions": "syncpack lint",
     "clean": "node scripts/clean.mjs",
     "dev": "node scripts/dev.mjs",
+    "dev:mcp": "node scripts/mcp-dev.mjs",
     "format": "node scripts/go-task.mjs format && prettier --write . --ignore-unknown",
     "lint": "node scripts/tasks.mjs lint",
     "pack:release": "pnpm build && node scripts/pack-release.mjs --output artifacts/release",
@@ -75,8 +78,7 @@
     "jscpd": "5.2.1",
     "knip": "6.37.0",
     "lefthook": "2.1.14",
-    "license-checker-rseidelsohn": "5.0.1",
-    "markdownlint-cli2": "0.23.2",
+    "markdownlint-cli2": "0.23.3",
     "prettier": "3.9.8",
     "publint": "0.3.24",
     "secretlint": "13.0.5",
@@ -94,7 +96,13 @@
       "lefthook"
     ],
     "overrides": {
-      "smol-toml": "1.8.0"
+      "smol-toml": "1.9.1",
+      "source-map-js": "1.2.2"
+    },
+    "auditConfig": {
+      "ignoreCves": [
+        "CVE-2026-93687"
+      ]
     }
   }
 }

@@ -12,13 +12,6 @@ func syncInternalGraph(
 	transaction *lithograph.Transaction,
 	plan *plannedState,
 ) error {
-	if _, err := transaction.Execute(ctx,
-		"MATCH (d:"+domainLabel+")-[r:"+includesType+"]->() DELETE r FINISH",
-		nil, nil,
-	); err != nil {
-		return AsPublicError(err)
-	}
-
 	retained := map[string]struct{}{}
 	domainIDs := map[OntologyRef]string{}
 	definitionIDs := map[OntologyRef]string{}
@@ -146,6 +139,7 @@ func syncInternalGraph(
 		if domainID == "" {
 			return publicError(CodeConsistency, "Domain Binding identity is missing", nil)
 		}
+		targetIDs := make([]string, 0, len(object.Value.Domain.Includes))
 		for _, rawTarget := range object.Value.Domain.Includes {
 			target, err := ParseOntologyRef(rawTarget)
 			if err != nil {
@@ -160,9 +154,50 @@ func syncInternalGraph(
 			if targetID == "" {
 				return publicError(CodeConsistency, "Domain membership target Binding identity is missing", nil)
 			}
-			if err := createDomainMembership(ctx, transaction, domainID, targetID); err != nil {
-				return err
-			}
+			targetIDs = append(targetIDs, targetID)
+		}
+		if err := syncDomainMembership(ctx, transaction, plan.Base, domainID, targetIDs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Preserve the identity of every unchanged membership edge across all patches.
+// A whole-set rebuild duplicates edges in merge candidates when both branches
+// independently carry the same Domain, even for Knowledge-only mutations.
+func syncDomainMembership(
+	ctx context.Context,
+	transaction *lithograph.Transaction,
+	base *snapshot,
+	domainID string,
+	targetIDs []string,
+) error {
+	toCreate := make(map[string]struct{}, len(targetIDs))
+	for _, id := range targetIDs {
+		toCreate[id] = struct{}{}
+	}
+	for _, relationship := range base.internalRelationships {
+		if relationship.Type != includesType || relationship.Start != domainID {
+			continue
+		}
+		if _, exists := toCreate[relationship.End]; exists {
+			delete(toCreate, relationship.End)
+			continue
+		}
+		if _, err := transaction.Execute(ctx,
+			"MATCH ()-[r:"+includesType+"]->() WHERE elementId(r) = $id DELETE r FINISH",
+			map[string]any{"id": relationship.ElementID}, nil,
+		); err != nil {
+			return AsPublicError(err)
+		}
+	}
+	for _, targetID := range targetIDs {
+		if _, needed := toCreate[targetID]; !needed {
+			continue
+		}
+		if err := createDomainMembership(ctx, transaction, domainID, targetID); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "kgos",
+  "version": "0.1.0",
+  "description": "Privately explore and update a KG OS Instance through its authenticated MCP connection.",
+  "author": {
+    "name": "KG OS"
+  },
+  "extensions": {
+    "com.openai": {
+      "apps": "./.app.json",
+      "interface": {
+        "displayName": "KG OS",
+        "shortDescription": "Explore and update KG OS graphs",
+        "longDescription": "Use your own private KG OS Instance to inspect pinned knowledge graph versions, query data, and perform controlled changes.",
+        "developerName": "KG OS",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": "Inspect the current KG OS branches and ontology, then help me work with this knowledge graph."
+      }
+    }
+  }
+}

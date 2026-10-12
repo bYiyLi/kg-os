@@ -1,0 +1,8 @@
+{
+  "apps": {
+    "kgos": {
+      "id": "REPLACE_WITH_YOUR_REGISTERED_MCP_APP_ID",
+      "required": true
+    }
+  }
+}

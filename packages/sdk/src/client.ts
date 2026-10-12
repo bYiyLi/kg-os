@@ -195,7 +195,15 @@ async function* ndjsonLines(body: ReadableStream<Uint8Array>): AsyncGenerator<st
       yield tail;
     }
   } finally {
-    reader.releaseLock();
+    // Early AsyncIterator.return() must close the HTTP response body, not only
+    // unlock the reader while the daemon continues producing a stream.
+    try {
+      await reader.cancel();
+    } catch {
+      // Cancellation is cleanup; preserve the original stream/transport error.
+    } finally {
+      reader.releaseLock();
+    }
   }
 }
 

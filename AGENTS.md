@@ -44,8 +44,17 @@
 
 这些检查防止重复误读，不禁止发现有证据的新问题。
 
+## 开发、CI 与 Release 分工
+
+- **Mac 工作树是源码真源**：日常编码、定向测试、`pnpm validate` 与 Review 在本地进行。需要真实 Linux Docker 集成结果时，使用本项目的独立 [Dev 环境](docs/guide/dev-environment.md)，不要把从 Mac 临时连接远端 Docker Host 的额外构建当作规范中的验收入口。
+- **Linux Dev 负责发布前 MCP 真实验收**：`pnpm dev:mcp deploy` 按既有数据备份、源码同步、构建、切换和只读验收流程执行；`pnpm dev:mcp check` 只读。需要覆盖 31 个 SDK 方法、写入、重启和持久化时，在 Dev 主机使用现有隔离 Docker Smoke 的**独立临时镜像与 Volume**，绝不对长期 Dev Instance 执行破坏性测试。记录实际源码状态、镜像与测试结果；Dev 测试失败先处理实际 Dev 问题，不用临时跨机 Docker 构建代替。
+- **普通 CI（PR / main）只做工程检查**：保留 `pnpm validate`、现有 CLI/SDK/Runtime 六平台 native/package matrix，以及 Dev 脚本/Compose 的静态校验；不构建、运行或推送 MCP Docker 镜像，不需要 GHCR 写权限。源代码/镜像的 Dev 验收与普通 CI 代码门禁分别取证，不互相冒充。
+- **Release CI 只在获准的正式 `v*` 发布流程构建并发布正式镜像**：从明确的 release revision 构建 Linux amd64 MCP 镜像，执行待发布镜像必要的运行 Smoke，通过后推送 GHCR、校验 digest；现有 CLI/SDK/Runtime npm 发布仍按自己的产品合同继续运行。Release CI 是对正式产物的最终检查，**不能代替发布前 Dev 完整功能验收**。推送镜像不等于自动部署生产。
+- **状态与权限分离**：Dev 部署、Git Commit、Push、Tag、GHCR 发布和生产部署是不同动作，各自需要本次授权。Phase 完成依据**对应阶段明确要求**的验收、普通 CI 和 Review；Phase 15 特别要求 Linux Dev 实测，不要求提前 Release。不得为了取得 `done` 强制触发尚未授权的 Release，也不得把 Release workflow 已配置写成镜像已发布。具体命令以 [Dev Runbook](docs/guide/dev-environment.md)、[开发指南](docs/guide/development.md) 和当前 [Phase 15](docs/development/phases/15-mcp.md) 为准。
+
 ## 写入与验证
 
+- KG OS 的长期 Linux Dev 环境以 [远程开发环境](docs/guide/dev-environment.md)为唯一操作手册：本地 Mac 仓库是源码真源，`/data/apps/KgosDev` 是独立开发部署。远程开发部署优先使用仓库内 `pnpm dev:mcp` 和受控 Compose 脚本，不手工覆盖远端数据库、配置、Token 或备份；`rsync --delete` 只能针对明确的 `src/KGOS` 源码镜像。部署后的 `check` 必须只读，镜像回退不能冒充数据库回滚。Docker Dev 验证、正式 CI、Commit/Push/Release 分别报告、分别授权。
 - 获准整理设计时，保留已确认规则及其适用范围，区分新增决定、表达澄清与待核对解释。新格式必须与文字和图示一起核对，不能让示例成为唯一的规则来源。
 - 先更新规则所属真源，再同步受影响的入口与引用。本项目协作规则只在本文件维护；其他项目文档只引用本文件，不重复维护这些规则。
 - 检查现状 → 判断最小范围 → 修改 → 验证 → 检查 diff → 汇报。不得覆盖用户已有改动或为整理文档顺带引入代码、依赖、存储层和新公共接口。

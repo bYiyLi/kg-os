@@ -3,13 +3,16 @@
   "ignoreDependencies": [
     "@arethetypeswrong/cli",
     "@secretlint/secretlint-rule-preset-recommend",
-    "license-checker-rseidelsohn",
     "secretlint",
     "publint"
   ],
   "workspaces": {
     ".": {
-      "entry": ["scripts/prepare-lithograph.mjs", "scripts/prepare-jieba.mjs"],
+      "entry": [
+        "scripts/prepare-lithograph.mjs",
+        "scripts/prepare-jieba.mjs",
+        "scripts/mcp-dev-accept.mjs"
+      ],
       "project": ["config/test/*.ts", "scripts/*.mjs", "tests/**/*.ts"]
     },
     "packages/sdk": {

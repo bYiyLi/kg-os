@@ -120,6 +120,22 @@
     "kgosjieba",
     "rustc",
     "stopword",
-    "unreviewed"
+    "unreviewed",
+    "modelcontextprotocol",
+    "Streamable",
+    "quickjs",
+    "emscripten",
+    "MCPCLI",
+    "CIMD",
+    "PKCE",
+    "userinfo",
+    "formnovalidate",
+    "openclaw",
+    "Referer",
+    "GHSA",
+    "katex",
+    "pmpm",
+    "Cves",
+    "byiyli"
   ]
 }

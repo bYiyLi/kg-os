@@ -17,12 +17,13 @@ export default defineConfig({
         "**/*.test.ts",
         // Thin process/browser entrypoints delegate to covered modules.
         "**/src/bin.ts",
+        "packages/mcp/src/sandbox-worker.ts",
         "**/src/dev.ts",
         "**/src/types.ts",
         "packages/web/src/main.tsx",
         "**/dist/**"
       ],
-      include: ["packages/{sdk,web}/src/**/*.{ts,tsx}"],
+      include: ["packages/{sdk,web,mcp}/src/**/*.{ts,tsx}"],
       provider: "v8",
       thresholds: {
         branches: 90,

@@ -1,0 +1,48 @@
+# cspell:words healthcheck
+name: kgos-dev
+
+services:
+  mcp:
+    image: kgos-dev-mcp:local
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+      args:
+        NODE_IMAGE: ${KGOS_DEV_NODE_IMAGE:-node:24.15.0-bookworm-slim}
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        http_proxy: ${http_proxy:-}
+        https_proxy: ${https_proxy:-}
+    restart: unless-stopped
+    environment:
+      KGOS_ROOT: /workspace
+      KGOS_MCP_HOST: 0.0.0.0
+      KGOS_MCP_PORT: "3777"
+      KGOS_MCP_TOKEN_FILE: /run/secrets/kgos-mcp-token
+      KGOS_MCP_OAUTH_ISSUER: ${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}
+      NODE_USE_ENV_PROXY: "1"
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: 127.0.0.1,localhost
+    ports:
+      - "0.0.0.0:${KGOS_DEV_PORT:-3777}:3777"
+    volumes:
+      - type: bind
+        source: /data/apps/KgosDev/data/workspace
+        target: /workspace
+      - type: bind
+        source: /data/apps/KgosDev/data/secrets/mcp-token
+        target: /run/secrets/kgos-mcp-token
+        read_only: true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3777/mcp').then(r => process.exit(r.status === 401 ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 6
+    stop_grace_period: 20s

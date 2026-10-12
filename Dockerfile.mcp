@@ -1,0 +1,64 @@
+ARG NODE_IMAGE=node:24.15.0-bookworm-slim
+FROM ${NODE_IMAGE} AS builder
+WORKDIR /src
+RUN npm install --global --ignore-scripts --no-audit --no-fund pnpm@10.34.5
+COPY . .
+RUN pnpm install --frozen-lockfile --ignore-scripts \
+    && pnpm exec tsc -b --pretty false \
+    && pnpm --filter @kgos/web build \
+    && node scripts/pack-mcp.mjs --output /tmp/kgos-mcp-pack --no-smoke
+
+FROM ${NODE_IMAGE} AS daemon-builder
+ARG TARGETARCH
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ca-certificates curl gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+# Pin both the compiler and its upstream SHA-256: unlike an external Go builder
+# image this remains usable on Dev hosts with restricted Docker Hub access.
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) checksum=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5 ;; \
+      *) echo "Unsupported Linux Go build architecture" >&2; exit 1 ;; \
+    esac; \
+    curl --fail --location --retry 5 --retry-all-errors --output /tmp/go.tar.gz \
+      "https://go.dev/dl/go1.27.2.linux-${TARGETARCH}.tar.gz"; \
+    printf '%s  /tmp/go.tar.gz\n' "$checksum" | sha256sum --check; \
+    tar -C /usr/local -xzf /tmp/go.tar.gz; \
+    rm /tmp/go.tar.gz
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOTOOLCHAIN=local
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd ./cmd
+COPY internal ./internal
+COPY --from=builder /src/packages/web/dist ./internal/webui/dist
+RUN CGO_ENABLED=1 GOOS=linux go build -tags=sqlite_fts5 -trimpath -o /out/kgosd ./cmd/kgosd
+
+FROM ${NODE_IMAGE}
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ca-certificates tini \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt/kgos
+# Private workspace tarballs are image build inputs, not a published MCP npm distribution.
+COPY --from=builder /tmp/kgos-mcp-pack/ /tmp/packages/
+RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund \
+      /tmp/packages/sdk.tgz /tmp/packages/cli.tgz /tmp/packages/mcp.tgz \
+    && rm -rf /tmp/packages \
+    && mkdir -p /workspace \
+    && chown node:node /workspace
+COPY --from=daemon-builder /out/kgosd /tmp/kgosd
+# Use the current repository's Go daemon but retain pinned, separately distributed
+# Lithograph/Jieba extensions. Update the native Runtime manifest so CLI integrity
+# checking verifies the actual daemon; never bypass the manifest checks.
+RUN node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); const path = require("node:path"); const runtime = path.join("/opt/kgos/node_modules/@kgos", "runtime-linux-" + process.arch); const binary = path.join(runtime, "kgosd"); const manifestFile = path.join(runtime, "manifest.json"); const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8")); const entry = manifest.files.find((file) => file.file === "kgosd"); if (!entry) throw new Error("Runtime manifest is missing kgosd"); fs.copyFileSync("/tmp/kgosd", binary); fs.chmodSync(binary, 0o755); entry.sha256 = crypto.createHash("sha256").update(fs.readFileSync(binary)).digest("hex"); fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + String.fromCharCode(10));' \
+    && rm -f /tmp/kgosd
+COPY scripts/mcp-docker-entrypoint.sh /usr/local/bin/kgos-mcp-entrypoint
+RUN chmod 755 /usr/local/bin/kgos-mcp-entrypoint
+ENV KGOS_ROOT=/workspace
+ENV KGOS_MCP_HOST=0.0.0.0
+USER node
+VOLUME ["/workspace"]
+EXPOSE 3777
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/kgos-mcp-entrypoint"]
+CMD ["serve"]

@@ -4,7 +4,7 @@ import { run } from "./process.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 
-for (const name of ["sdk", "cli"]) {
+for (const name of ["sdk", "cli", "mcp"]) {
   const cwd = resolve(root, "packages", name);
   process.stdout.write("\nChecking package: @kgos/" + name + "\n");
   await run("pnpm", ["exec", "publint", "--strict"], { cwd });

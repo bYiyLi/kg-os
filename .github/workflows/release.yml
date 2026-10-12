@@ -68,7 +68,7 @@ jobs:
         with:
           cache: true
           cache-dependency-path: go.sum
-          go-version: 1.27.1
+          go-version: 1.27.2
 
       - name: Install Rust for official Jieba
         run: |
@@ -153,7 +153,7 @@ jobs:
         with:
           cache: true
           cache-dependency-path: go.sum
-          go-version: 1.27.1
+          go-version: 1.27.2
 
       - name: Install Rust for official Jieba
         run: |
@@ -381,13 +381,103 @@ jobs:
           test "$(node -p 'process.platform + "-" + process.arch')" = "${{ matrix.target }}"
           node scripts/release-registry-smoke.mjs --version "${{ needs.preflight.outputs.version }}"
 
+  docker-mcp:
+    name: Publish Linux amd64 MCP image
+    needs:
+      - preflight
+      - registry-smoke
+    if: ${{ always() && needs.preflight.result == 'success' && needs.registry-smoke.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+      digest_ref: ${{ steps.verify.outputs.digest_ref }}
+
+    steps:
+      - name: Check out exact release revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.revision }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.34.5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          cache: pnpm
+          node-version-file: .node-version
+
+      - name: Install dependencies for Docker MCP smoke
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Resolve version-tagged release image
+        id: image
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          OWNER=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/$OWNER/kgos-mcp:v$VERSION"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Build exact Linux amd64 release image
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          REVISION: ${{ needs.preflight.outputs.revision }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          docker build --platform linux/amd64 -f Dockerfile.mcp \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$REVISION" \
+            --label "org.opencontainers.image.version=v$VERSION" \
+            -t "$IMAGE" .
+
+      - name: Smoke-test the exact image before publishing
+        env:
+          KGOS_MCP_DOCKER_SMOKE_IMAGE: ${{ steps.image.outputs.image }}
+        run: node scripts/mcp-docker-smoke.mjs
+
+      - name: Authenticate to GHCR
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Publish Docker image
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: docker push "$IMAGE"
+
+      - name: Verify published image revision and platform
+        id: verify
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          REVISION: ${{ needs.preflight.outputs.revision }}
+        run: |
+          docker pull "$IMAGE"
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$IMAGE")" = "linux/amd64"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE")" = "$REVISION"
+          DIGEST_REF=$(docker image inspect --format '{{ index .RepoDigests 0 }}' "$IMAGE")
+          case "$DIGEST_REF" in
+            ghcr.io/*@sha256:*) ;;
+            *) echo "GHCR digest reference is missing" >&2; exit 1 ;;
+          esac
+          echo "digest_ref=$DIGEST_REF" >> "$GITHUB_OUTPUT"
+
   finalize:
     name: Create GitHub Release
     needs:
       - preflight
       - aggregate
       - registry-smoke
-    if: ${{ always() && needs.preflight.result == 'success' && needs.aggregate.result == 'success' && needs.registry-smoke.result == 'success' }}
+      - docker-mcp
+    if: ${{ always() && needs.preflight.result == 'success' && needs.aggregate.result == 'success' && needs.registry-smoke.result == 'success' && needs.docker-mcp.result == 'success' }}
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -430,6 +520,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
           VERSION: ${{ needs.preflight.outputs.version }}
+          MCP_IMAGE: ${{ needs.docker-mcp.outputs.image }}
+          MCP_DIGEST_REF: ${{ needs.docker-mcp.outputs.digest_ref }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           KG OS $VERSION
@@ -445,6 +537,12 @@ jobs:
           - @kgos/runtime-win32-x64@$VERSION
 
           Supported native targets: macOS, Linux glibc, and Windows arm64/x64.
+
+          MCP Server Docker image (Linux amd64 only):
+          - $MCP_IMAGE
+          - Immutable digest reference: $MCP_DIGEST_REF
+
+          The MCP server is not distributed as an npm package.
           EOF
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" \

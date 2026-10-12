@@ -7,7 +7,7 @@ const root = resolve(import.meta.dirname, "..");
 const goEnv = {
   ...process.env,
   CGO_ENABLED: "1",
-  GOTOOLCHAIN: "go1.27.1"
+  GOTOOLCHAIN: "go1.27.2"
 };
 
 if (process.version !== "v24.15.0") {
@@ -20,8 +20,8 @@ if (pnpm !== "10.34.5") {
 
 await access(resolve(root, "pnpm-lock.yaml"));
 const goVersion = (await runCapture("go", ["version"], { cwd: root, env: goEnv })).stdout;
-if (!goVersion.includes("go1.27.1")) {
-  throw new Error("KG OS setup requires Go 1.27.1; got " + goVersion.trim());
+if (!goVersion.includes("go1.27.2")) {
+  throw new Error("KG OS setup requires Go 1.27.2; got " + goVersion.trim());
 }
 const rustVersion = (await runCapture("rustc", ["--version"], { cwd: root })).stdout.trim();
 if (!rustVersion.startsWith("rustc 1.97.1 ")) {

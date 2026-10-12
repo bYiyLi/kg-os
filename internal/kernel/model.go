@@ -284,6 +284,11 @@ func normalizeDomain(domain *Domain) error {
 	if err := normalizeSet(&domain.Includes, "includes"); err != nil {
 		return err
 	}
+	// Preserve the public empty-set representation across the planner and
+	// staged SQLite snapshot; JSON null and [] are not canonically equal.
+	if domain.Includes == nil {
+		domain.Includes = []string{}
+	}
 	for _, ref := range domain.Includes {
 		if strings.HasPrefix(ref, "new:") {
 			continue

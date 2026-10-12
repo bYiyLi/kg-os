@@ -12,7 +12,7 @@ const daemonName = process.platform === "win32" ? "kgosd.exe" : "kgosd";
 const goEnv = {
   ...process.env,
   CGO_ENABLED: "1",
-  GOTOOLCHAIN: "go1.27.1"
+  GOTOOLCHAIN: "go1.27.2"
 };
 
 await run("pnpm", ["clean"], { cwd: root });

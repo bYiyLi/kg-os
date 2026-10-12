@@ -1,0 +1,17 @@
+.git
+.kgos
+.kgos-*
+native
+.cache
+.DS_Store
+node_modules
+**/node_modules
+**/dist
+artifacts
+coverage
+playwright-report
+test-results
+.env
+.env.*
+*.db
+*.lock

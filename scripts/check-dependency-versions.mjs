@@ -68,7 +68,7 @@ if (goVersionMatch?.[1] !== rootPackage.version) {
 
 const goMod = await readFile(resolve(root, "go.mod"), "utf8");
 for (const required of [
-  "go 1.27.1",
+  "go 1.27.2",
   "github.com/mattn/go-sqlite3 v1.14.52",
   "golang.org/x/vuln v1.8.0",
   "honnef.co/go/tools v0.8.1",

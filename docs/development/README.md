@@ -86,7 +86,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 14 Web 当前为 `deferred`。** 保留原阶段范围与计划，尚未开展产品实现及动态验收；不作为 MCP 的前置依赖，详见[Phase 14](phases/14-web.md)。
 
-**Phase 15 MCP & Private Plugin 当前为 `ready`（仅计划就绪）。** [MCP owner](../design/mcp.md)与 D85–D88 已确认四个 Tool、受控 SDK/Sandbox、完整 Markdown 预览、历史导航和用户私人 Plugin 的目标范围。新增[Phase 15](phases/15-mcp.md)将 QuickJS WASM/Worker 可行性验证放在首位，之后实现独立服务、工具、官方 Skill、真实客户端接入及六平台验收；**尚无本阶段代码或验收结果**。该阶段独立于暂缓的 Web。
+**Phase 15 MCP & Private Plugin 当前为 `in_progress`。** [MCP owner](../design/mcp.md)、[D91](../design/decisions.md#d91-mcp-docker-only-delivery) 与 [D92](../design/decisions.md#d92-mcp-dev-acceptance-and-release-ci) 定义四个 Tool、受控 SDK/Sandbox、完整 Markdown 预览、**仅 Linux amd64 Docker 交付**、统一 CLI / 环境变量合同、OAuth 认证、历史导航和用户私人 Plugin。Linux amd64 [长期 Dev](../guide/dev-environment.md) 已有真实 Docker 构建、四 Tool、31-method 隔离测试和重启持久化的历史实测；用户的真实 ChatGPT 私人连接也已完成基本读写。**新完成条件是 Dev 完整验收 + 普通 CI 代码/现有六平台 Runtime 回归 + Review，不要求提前正式发布镜像**。普通 CI 已移除 MCP Docker 构建；未来独立获授权的 `v*` Release 才从正式 Revision 构建、Smoke、推送 GHCR，并在 GitHub Release 记录 digest。当前配置不等于 Dev 最新源码全验收、普通 CI 或 GHCR 正式发布已完成；详见 [Phase 15](phases/15-mcp.md)。本阶段独立于暂缓的 Web，原有 CLI/SDK/Runtime npm 六平台发布责任保持不变。
 
 ## 5. 路线总览
 
@@ -107,7 +107,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [12 First-Run & CLI Productization](phases/12-first-run-cli-productization.md) | `done` | Workspace Root / `.kgos`、`KGOS_ROOT`、complete init/readiness/recovery、extension setup、responsibility-scoped high-density help、fresh-user acceptance；本地/fresh-source/六平台 CI 验收与 v0.2.0 八包/六平台正式发布完成 | [D81](../design/decisions.md#d81-workspace-root)、[D82](../design/decisions.md#d82-init-readiness)、[D83](../design/decisions.md#d83-cli-progressive-disclosure) |
 | [13 Init Wizard UX & Embedding Credential Boundary](phases/13-init-wizard-credential-boundary.md) | `done` | clear defaults/custom-extension prompts、TTY field retry、operation-time Embedding credential、doctor non-blocking diagnostic；main/fresh-source/packed/TTY + six-platform CI acceptance complete，后续 v0.2.1 八包/六平台正式发布完成 | [D84](../design/decisions.md#d84-late-bound-embedding-credential)、[CLI](../design/cli.md#init)、[Runtime Embedding](../design/runtime.md#embedding-配置与索引映射) |
 | [14 Web](phases/14-web.md) | `deferred` | 单一 Web Phase：连接与 `.kgos/web` 持久基础、独立查询帧、Knowledge / Ontology 编辑、版本演化及真实 Runtime / 打包 / 六平台验收；2026-10-11 决定暂缓，产品实现与运行验收尚未开始 | [Web owner](../design/web.md)、[统一材料入口](../design/web-materials.md)、现有 SDK / 业务 API 与 Phase 00–13 基线 |
-| [15 MCP & Private Plugin](phases/15-mcp.md) | `ready` | 独立 TypeScript MCP、四个 Tool、QuickJS WASM/Worker 读写 SDK Sandbox、官方 Skill 与私人 Plugin；从技术可行性到真实客户端、packed 与六平台 CI 验收的单阶段交付，当前未实现 | [MCP owner](../design/mcp.md)、[D85–D88](../design/decisions.md#d85-mcp-programmable-ai-client)、现有 SDK / Runtime |
+| [15 MCP & Private Plugin](phases/15-mcp.md) | `in_progress` | 独立 TypeScript MCP、四个 Tool、QuickJS WASM/Worker SDK Sandbox、Linux amd64 Docker-only、官方 Skill 与私人 Plugin；Dev 实测、真实 ChatGPT、最终普通 CI 与 Review，正式镜像由 Release CI 独立发布 | [MCP owner](../design/mcp.md)、[D91](../design/decisions.md#d91-mcp-docker-only-delivery)、[D92](../design/decisions.md#d92-mcp-dev-acceptance-and-release-ci) |
 
 当前实现依赖顺序：
 
@@ -141,11 +141,11 @@ Go Engineering Foundation
   -> 后续独立安排的范围：
        Phase 14: Web [deferred]
          (connection / .kgos/web / independent frames / aggregate editing / versions / real acceptance)
-       Phase 15: MCP & Private Plugin [ready; independent of Web]
+       Phase 15: MCP & Private Plugin [in_progress; independent of Web]
          (QuickJS proof / MCP auth / four Tools / official Skill / private Plugin / real acceptance)
 ```
 
-Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 当前为 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 当前为 `ready`，仅设计与开发计划已就绪，QuickJS/Sandbox、MCP Server、官方 Skill / 私人 Plugin 及运行验收尚未实现，不借用旧阶段成功证据。
+Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 当前为 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 当前为 `in_progress`，已有本地未提交开发工作，尚未完成最新源码对应的 Dev 全部验收、最终普通 CI 和 Phase Review；正式 Docker 发布由获授权的 Release CI 另行完成。
 
 ## 6. Phase 通用完成标准
 

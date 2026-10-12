@@ -2,6 +2,8 @@
 
 本文说明当前 KG OS 工作树的安装、开发启动、调试、验证、构建和本地 npm 候选包流程。阶段状态与完成证据见[开发计划](../development/README.md)，产品与运行时合同以[设计入口](../design.md)为准。
 
+这里的 `pnpm dev` 是 **Mac 本机 Web + daemon** 的临时开发模式；长期集成测试使用独立 Linux Docker 环境 `/data/apps/KgosDev`，按[远程开发环境指南](dev-environment.md)的 `pnpm dev:mcp` 部署、只读验收、备份与回退。两者的 Workspace 和运行生命周期互不共享。
+
 ## 当前工程边界
 
 当前代码分层为：
@@ -37,7 +39,7 @@ CLI 按 `--root <workspace-root>` > 非空 `KGOS_ROOT` > error 选择 Workspace�
 
 | 工具 | 固定版本或要求 |
 | --- | --- |
-| Go | `1.27.1`；仓库任务通过 `GOTOOLCHAIN=go1.27.1` 执行 |
+| Go | `1.27.2`；仓库任务通过 `GOTOOLCHAIN=go1.27.2` 执行 |
 | C compiler | CGO 必需；macOS 使用 Apple Clang，Linux / Windows runner 使用 GCC 或经 CI 验证的目标编译器 |
 | Node.js | `24.15.0`，由 [`.node-version`](../../.node-version) 固定 |
 | pnpm | `10.34.5`，由根 `packageManager` / `engines` 固定 |
@@ -213,6 +215,8 @@ Go daemon 的生产启动依赖与 binary 同目录的 Runtime manifest/native a
 
 `coverage/`、`playwright-report/`、`test-results/`、`artifacts/` 都是生成物，不提交 Git。
 
+**安全审计例外（2026-10-12）：** `pnpm.auditConfig.ignoreCves` 仅列入 `CVE-2026-93687`（[GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)）；该告警来自开发工具 `markdownlint-cli2 → micromatch → braces@3.0.3`，上游尚无修复版，当前生产 MCP 镜像不包含 `braces`。`pnpm check:security` 先审计生产依赖，再审计全部依赖，均保留 `high` 阈值；其它 CVE 不在白名单中。上游发布已验证的修复版本时应升级依赖并移除此条例外；若受影响依赖进入生产包，应重新评审而非默认接受。不要使用 `--ignore-unfixable` 或放宽整体安全级别。
+
 ## Lithograph v0.3.0 fixture
 
 [`scripts/lithograph-artifacts.mjs`](../../scripts/lithograph-artifacts.mjs) 固定 macOS/Linux/Windows arm64/x64 的 Lithograph v0.3.0 release artifact 与 SHA-256。[`scripts/prepare-lithograph.mjs`](../../scripts/prepare-lithograph.mjs) 校验 archive entry、`VERSION`、Lithograph 与 OpenAI-compatible Provider library，再缓存到 `.cache/lithograph/`。
@@ -283,7 +287,7 @@ GitHub Actions 保留 Ubuntu 24.04 x64 的完整 `pnpm validate`，并运行六�
 - Windows arm64：`windows-11-vs2026-arm`
 - Windows x64：`windows-2025`
 
-各平台 job 真实执行 current-target build、`pnpm test:native` 与 `pnpm pack:release`，并上传 npm candidate。Windows job 是否通过以对应 CI run 为准；Phase 只有在要求的 pushed revision 对应远端 matrix真实成功后才能记为 `done`。
+各平台 job 真实执行 current-target build、`pnpm test:native` 与 `pnpm pack:release`，并上传 npm candidate。普通 CI 还可静态校验 Dev 脚本和 Compose 配置，但**不执行 `docker build`、MCP Docker runtime smoke 或 GHCR 推送**。MCP 的真实 Linux amd64 Docker 功能/写入/持久化测试须在 [Dev](dev-environment.md#发布前完整-mcp-验收) 完成；Windows job 是否通过以对应 CI run 为准。Phase 只有在其**各自明确要求**的 Dev、pushed revision 普通 CI 等验收均成功后才能记为 `done`，正式 Release 不作为默认前置。
 
 ## MVP Release Closure
 
@@ -306,7 +310,19 @@ git tag "v${KGOS_VERSION}"
 git push origin "v${KGOS_VERSION}"
 ```
 
-[`release.yml`](../../.github/workflows/release.yml) 监听 `v*` tag push；普通 pull request 与 `main` push 不会 publish。`workflow_dispatch` 要求一个**已经存在**的 release tag，不产生新的 version。workflow preflight 要求 tag 名等于 `v<package-version>`、tag revision 属于 `origin/main` 历史且 source clean。首次运行要完成六平台 candidate、聚合与 native hash/integrity 校验，然后按 Runtime → SDK → CLI 顺序发布、验证八包 exact-version 与 `latest`、运行六平台 public-registry `npx` smoke，最后创建 GitHub Release。
+[`release.yml`](../../.github/workflows/release.yml) 监听 `v*` tag push；普通 pull request 与 `main` push 不会 publish。`workflow_dispatch` 要求一个**已经存在**的 release tag，不产生新的 version。workflow preflight 要求 tag 名等于 `v<package-version>`、tag revision 属于 `origin/main` 历史且 source clean。首次运行要完成六平台 candidate、聚合与 native hash/integrity 校验，然后按 Runtime → SDK → CLI 顺序发布、验证八包 exact-version 与 `latest`、运行六平台 public-registry `npx` smoke，再发布下述 MCP Docker 镜像，**全部成功后**创建 GitHub Release。
+
+**正式 Release 的前提是已经完成对应源码的开发/Dev 验收、代码 Review 和获授权的提交推送**。Release CI 负责从确定 Tag revision 构建、核验并发布正式产物；不在普通 PR/main CI 或临时 Mac→Dev Docker 调用里提前构建正式镜像，也不使用 Release CI 替代 Linux Dev 的完整功能验收。两种验收分别留存证据。
+
+### MCP Docker 镜像发布
+
+MCP Server **只交付 Linux amd64 Docker 镜像**，不提供独立 MCP npm 包或 arm64 镜像；现有 CLI / SDK / Runtime 八个 npm 包继续沿用上述 Release 流程。Docker 使用同一 `v<package-version>` Release Tag，镜像地址为 `ghcr.io/byiyli/kgos-mcp:v<version>`（owner 由工作流转换成小写）。**这个地址是待正式发布的目标，不代表当前版本已经存在**。
+
+- 在六平台 public-registry smoke 成功后，Release 的 `docker-mcp` job 从**同一 commit**构建 `linux/amd64`，为镜像标注 source、version、revision。镜像构建需要的 Linux x64 native 扩展从已发布 Runtime npm 包取得；仓库内部临时 npm tarball 只是镜像构建材料，不作为用户安装入口。
+- Docker Smoke 对**同一待发布镜像**创建临时 Volume，验证容器 `init`、四个 Tool、31/31 SDK 方法、鉴权、写入回读及重启持久化，测试后删除测试容器/Volume但保留待发布镜像；失败立即阻止 GHCR 发布。
+- 成功后使用 GitHub Actions 自动签发的 `GITHUB_TOKEN`（仅 Docker job 启用 `packages:write`）推送 GHCR，再重新拉取检验平台、源 revision 和 digest。GitHub Release 记录带版本的镜像和 digest 引用；**CI 成功不能替代已授权的生产部署**。
+- GHCR 新 package 可能默认是 **private**。若要让外部用户无需登录就能拉取，首次发布后在 GitHub Packages 中核对该 package 与本仓库的关联、配置 Public visibility，并从未登录的客户端真实拉取验证。私有镜像则需消费者自己的授权；无需向 CI 添加 Docker Hub Token 或长期 PAT。该权限动作与镜像发布分开验收。
+- 打包完成或 workflow 文件存在**不等于已发布**。普通 `main` / Pull Request CI **不构建或测试 MCP Docker 镜像**，也不具有 `packages:write`；Release CI 才构建正式镜像、做发布前产物 Smoke 并推送 GHCR。正式发布之前仍须完成 Dev 验收，并另行授权提交、推送、确认版本及发布 tag。
 
 若某次 Release 已经发布部分 package，恢复时传入该次**已结束**且聚合成功的 run ID，复用它的 `release-set`。恢复工作流会核对来源 workflow、tag revision、version 与每个 tarball 的完整性，再继续缺失的 package。native 构建产物在不同 run 间可能有不同哈希，部分发布后不能用重新构建的候选替代已发布产物。
 

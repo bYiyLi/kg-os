@@ -350,3 +350,25 @@ describe("KG OS SDK validation", () => {
     await expect(consume()).rejects.toBeInstanceOf(KGOSTransportError);
   });
 });
+
+describe("SDK incremental HTTP cancellation", () => {
+  it("cancels an unfinished response stream on early consumer exit", async () => {
+    const cancelled = vi.fn();
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"type":"columns","columns":["x"]}\n'));
+      },
+      cancel: cancelled
+    });
+    const client = new KGOSClient({
+      endpoint: "http://127.0.0.1:5000",
+      token: "temporary-test-token",
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response(source))
+    });
+    for await (const event of client.graph.streamQuery({ at: "branch/main", cypher: "RETURN 1" })) {
+      expect(event.type).toBe("columns");
+      break;
+    }
+    expect(cancelled).toHaveBeenCalledOnce();
+  });
+});

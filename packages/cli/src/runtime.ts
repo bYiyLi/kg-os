@@ -296,14 +296,15 @@ export async function endpointReachable(endpoint: string): Promise<boolean> {
 
 export async function ensureClient(
   root: string,
-  nativeRuntime?: NativeRuntime
+  nativeRuntime?: NativeRuntime,
+  startupTimeoutMs = START_TIMEOUT_MS
 ): Promise<KGOSClient> {
   if (!(await isInitializationComplete(root))) {
     throw localIOError("KG OS Instance initialization is incomplete; run kg init", {
       instance: resolveWorkspacePaths(root).instanceRoot
     });
   }
-  return await connectOrStartClient(root, nativeRuntime);
+  return await connectOrStartClient(root, nativeRuntime, startupTimeoutMs);
 }
 
 export async function initializeClient(
@@ -317,7 +318,8 @@ export async function initializeClient(
 
 async function connectOrStartClient(
   root: string,
-  nativeRuntime?: NativeRuntime
+  nativeRuntime?: NativeRuntime,
+  startupTimeoutMs = START_TIMEOUT_MS
 ): Promise<KGOSClient> {
   const existing = await usableLocator(root);
   if (existing !== undefined) {
@@ -328,7 +330,7 @@ async function connectOrStartClient(
     throw runtimeError("native Runtime version does not match CLI version");
   }
   await spawnRuntime(root, runtime);
-  const locator = await waitForLocator(root);
+  const locator = await waitForLocator(root, startupTimeoutMs);
   return await clientForLocator(root, locator);
 }
 
@@ -379,8 +381,8 @@ async function spawnRuntime(root: string, runtime: NativeRuntime): Promise<void>
   }
 }
 
-async function waitForLocator(root: string): Promise<RuntimeLocator> {
-  const deadline = Date.now() + START_TIMEOUT_MS;
+async function waitForLocator(root: string, startupTimeoutMs: number): Promise<RuntimeLocator> {
+  const deadline = Date.now() + startupTimeoutMs;
   while (Date.now() < deadline) {
     const locator = await readLocator(root).catch(() => undefined);
     if (locator?.endpoint !== undefined && (await endpointReachable(locator.endpoint))) {

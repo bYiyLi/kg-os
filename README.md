@@ -35,6 +35,8 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 ## 当前状态
 
+**Phase 15 MCP & Private Plugin 当前为 `in_progress`。** 只计划交付 **Linux amd64 Docker 镜像**，不发布独立 MCP npm 包或 Linux arm64 镜像；原有 CLI / SDK / Runtime npm 产品与六平台发布范围不变。发布前功能与容器验收在独立 Linux Dev 完成，普通 PR/main CI 做工程质量与既有 Runtime 回归，**只有正式获授权的 `v*` Release CI 才构建、核验并发布 `ghcr.io/byiyli/kgos-mcp:v<version>`**。四个 MCP Tool、QuickJS SDK Sandbox、ChatGPT 私人 OAuth 连接已有真实验证，但 Dev 最新源码全部验收、最终普通 CI 与 Review 尚未闭合；正式 GHCR 镜像也未发布。详见 [Phase 15](docs/development/phases/15-mcp.md) 与 [Dev Runbook](docs/guide/dev-environment.md)。
+
 **Phase 00–13 均已完成；当前公开版本为 v0.2.1。** 发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` Validate + 六平台 native/package matrix 全绿，`v0.2.1` tag 精确指向该 revision。首次 Release Run `36510797281` 在六平台 immutable candidate / aggregate 成功后因 npm registry propagation timeout 停在部分发布；Recovery Run `36514243605` 复用同一 verified `release-set`，完成缺失 SDK/CLI、八包 exact-version/`latest=0.2.1` verification、六平台 public-registry `npx` smoke 与 GitHub Release `KG OS v0.2.1`。
 
 **Phase 13 当前为 `done`，并已随后作为 v0.2.1 正式发布。** 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`；主工作树完整 validation、独立 fresh-source、packed no-key smoke、macOS arm64 中英文 repo-out TTY first-run，以及 CI Run `36505717058` 的 Validate + darwin/linux/win32 arm64/x64 六平台 native/package matrix 全部成功。阶段关闭时发布不属于其完成条件；后续独立 release 授权将版本提升至 `0.2.1`，发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 与 Recovery Release Run `36514243605` 已完成正式公开发布。完整范围与证据见[Phase 13](docs/development/phases/13-init-wizard-credential-boundary.md)。
@@ -69,6 +71,10 @@ KG OS v1 的目标语言边界是：`kgosd`、Kernel 与 SQLite / Lithograph Hos
 
 相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go Runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、D67–D74，以及 [D75 TypeScript Client](docs/design/decisions.md#d75-typescript-client)、[D76 npm distribution](docs/design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](docs/design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](docs/design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](docs/design/decisions.md#d79-stale-daemon-recovery) 与 [D80 official Jieba](docs/design/decisions.md#d80-official-jieba)、[D81 Workspace Root](docs/design/decisions.md#d81-workspace-root)、[D82 Init readiness](docs/design/decisions.md#d82-init-readiness)、[D83 CLI progressive disclosure](docs/design/decisions.md#d83-cli-progressive-disclosure)。D81–D83 supersede D77 的 root-is-Instance / lazy init 行为，但不追溯改写 v0.1.1 的已发布事实。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
 
+## 开发环境
+
+源码真源在 Mac `/Users/yi/Code/KGOS`；长期 Linux Docker 集成 Dev 环境通过 `ssh openclaw` 连接，独立部署于 `/data/apps/KgosDev`，MCP 宿主监听 `0.0.0.0:3777`，开发机地址为 `http://10.168.155.123:3777/mcp`（普通 HTTP 不提供 Token 传输加密）。日常使用 `pnpm dev:mcp deploy` 更新、`pnpm dev:mcp check` 验证、`pnpm dev:mcp status` 查看状态。源码镜像、配置、Token、持久化数据库、备份均有独立职责；部署失败保留数据并可回退运行镜像。完整规范见 [远程开发环境](docs/guide/dev-environment.md)。这是开发环境，不代表 MCP 已公开发布或 Phase 15 全部验收完成。
+
 ## License
 
 KG OS 采用双许可模式：
@@ -101,4 +107,5 @@ KG OS 采用双许可模式：
 - [Phase 12 计划](docs/development/phases/12-first-run-cli-productization.md)：Workspace Root / `.kgos`、`KGOS_ROOT`、完整 init readiness、extension setup、分层高信息密度 help 与 fresh-user 验收。
 - [Phase 13 计划](docs/development/phases/13-init-wizard-credential-boundary.md)：Init Wizard UX、custom SQLite extension 输入恢复、late-bound Embedding credential 与 doctor non-blocking 诊断的范围和验收。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
+- [远程 Dev 环境](docs/guide/dev-environment.md)：固定 Linux Docker 开发部署、`dev:mcp` 管理命令、备份与回退边界。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

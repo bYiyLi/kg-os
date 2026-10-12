@@ -889,3 +889,51 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 依据：AI 需要最少 Tool 和最简 API 完成完整读写 SDK 的异步组合，同时避免跨调用状态、第二套知识 API、单独部署服务或隐藏的事务承诺。
 - 备选：Node VM / vm2、额外独立 Gateway / Deno Runtime、为每个方法创建 MCP Tool、在脚本层自动包事务或回滚。它们分别无法独立承担隔离保证、增加部署和维护成本，或改变已确认的 SDK / 数据库语义。
 - 当前合同：[MCP JavaScript SDK 执行](mcp.md#javascript-sdk-执行)、[Client SDK](client.md)、[Graph](graph.md)、[Evolution](evolution.md)。
+
+<a id="d89-mcp-delivery-and-deployment"></a>
+
+### D89 MCP npm / Docker 等价部署与可配置运行合同（2026-10-12）
+
+> 历史决定：**交付形态与平台范围已由 [D91](#d91-mcp-docker-only-delivery) 取代**；单 Instance、运行参数、认证与网络责任等未被 D91 修改的合同继续有效，当前行为以 [MCP owner](mcp.md#部署交付与运行合同) 为准。
+
+- 交付：KG OS 官方提供 npm `@kgos/mcp` 和独立可运行的 Docker / OCI 镜像两种形态；两者都包含 MCP 与所需 CLI、SDK、native `kgosd` Runtime 和官方扩展。MCP 与 `kgosd` 可以是两个内部进程，但用户只部署一个 MCP 单元；Docker 不需要宿主机 `kgosd`、host networking 或共享 daemon lock。初始化复用现有 `kg init`，Docker 内可初始化并使用持久卷保留 Workspace；不在 MCP 建立第二套数据库初始化合同。
+- 运行：统一 `kgos-mcp serve` / `doctor` 与 `--help` / `--version`；显式 `--root` 或 `KGOS_ROOT` 选定唯一 Instance。MCP 支持可配置 host、动态或固定端口、HTTP path、外部 Token 的环境变量名或 Secret 文件、可选服务端 TLS、运行时限、HTTP 并发与请求预算、Sandbox 资源、Preview 缓存预算和日志级别 / 格式。CLI > 对应环境变量 > 内部默认值；凭证不接受明文 CLI 参数。MCP 与 `kgosd` 保持两个独立的认证边界，内部 daemon 继续动态 loopback，无需为其暴露第二个公网端口。
+- 网络：用户自行决定 Tunnel、反向代理、直接 HTTPS 地址或其他目标客户端支持的接入方式；KG OS 不选定或内置网络提供商。Docker 和 npm 使用同一 `/mcp` 协议及四个 Tool。`serve` 成功仅证明实际本地绑定；`doctor` 只读检查本地就绪，不代替目标客户端实际完成 HTTPS / 安全通道、认证、工具发现和调用。公网访问的安全传输与认证必须真实生效。
+- 依据：部署应具备完整的配置能力且两种交付方式平等，不能要求用户自行解决 Docker → 宿主机 `kgosd` 的网络连接，也不能由产品代替用户选择公网接入通道。
+- 取舍：保持已确认的 MCP / Kernel / SQLite 职责分离，代价是同一部署单元需妥善管理内部两个进程、镜像 Runtime、动态端口、Secret、持久化与优雅关闭；这些属于真实交付验收，而不是新 Gateway、数据库接口或特定 Tunnel 依赖。
+- 当前合同：[MCP 部署交付与运行](mcp.md#部署交付与运行合同)、[Runtime 单 Instance](runtime.md#workspace-root-与-instance-directory)、[Phase 15](../development/phases/15-mcp.md)。
+
+<a id="d90-mcp-single-admin-oauth"></a>
+
+### D90 MCP 提供单管理员 ChatGPT OAuth，保留原静态 Bearer（2026-10-12）
+
+- 决定：KG OS MCP 默认保留独立静态 Bearer Token；用户显式配置已有公网 HTTPS origin 后，**同一进程**启用支持 ChatGPT 的 OAuth 2.1 Authorization Code + PKCE S256。浏览器管理员授权页验证现有 MCP Token，随后签发短效的不透明 Access/Refresh Token；ChatGPT 只持有 OAuth Token，不接触原管理员 Token。两种外部认证都不得暴露 `kgosd` 内部凭证。
+- 客户端：只支持官方 ChatGPT Client ID Metadata Documents（CIMD），从可信 HTTPS 地址验证真实客户端 identity 和 redirect URI，令 `resource`、issuer、scope、client、code 与 Token 绑定；不实现匿名、开放 DCR、用户名密码账户体系、外部 OAuth Provider 配置或第二个认证进程。Token/Code/授权票据为有界、短期、进程内状态；MCP 重启需要重新授权。OAuth 复用 MCP 部署参数合同；网络可达、TLS/Tunnel/Proxy 仍由用户自行完成。
+- 依据：ChatGPT 的自定义 MCP 连接要求兼容 OAuth 客户端认证，不能把 MCP 本机的静态 Bearer 等价成 ChatGPT 一定可接收的自定义 API Key。用户希望只有一个简单管理员 Token、无需用户体系，并且普通标准 MCP Client 的现有认证方式不回归。
+- 取舍：同进程实现必要的 OAuth metadata、授权、PKCE、短期 Token 与轮换等标准机制，降低外部 IdP 与多用户管理复杂度；但发布前仍须验证真实 ChatGPT Web/Desktop、HTTPS 外部入口及安全生命周期，模拟 OAuth Client 测试不等于外部验收。
+- 当前合同：[MCP 单管理员 OAuth](mcp.md#单管理员-chatgpt-oauth-认证)、[Phase 15](../development/phases/15-mcp.md)。
+
+<a id="d91-mcp-docker-only-delivery"></a>
+
+### D91 MCP 只交付 Linux amd64 Docker 镜像（2026-10-12）
+
+> D91 的官方交付平台与 GHCR 版本规则保留；其中「Phase 15 必须通过最终 Docker CI 才能完成」的阶段门槛已由 [D92](#d92-mcp-dev-acceptance-and-release-ci) 调整。Docker 镜像的正式构建、运行验收和发布属于后续获授权的 Release。
+
+- 决定：**取代 D89 的 npm/Docker 双交付与 Linux 双架构镜像范围**。Phase 15 官方 MCP Server 仅交付完整的 **Linux amd64 Docker / OCI 镜像**，不发布 `@kgos/mcp` npm 包，也不支持 Linux arm64 Docker。继续提供官方 Skill、ChatGPT 私人 Plugin 与四个 MCP Tool；不改变现有 `@kgos/cli`、`@kgos/sdk` 和六平台 native Runtime npm 产品及其独立发布/CI。
+- 工程边界：`packages/mcp/` 仍是内部 private 源码模块；镜像构建可用临时本地 npm tarball、现有 CLI/SDK 和已发布 Runtime 依赖安装到容器，但这些中间物不对外发布。对用户只提供容器初始化、`serve`/`doctor`、持久卷、Secret 与受保护 MCP HTTP 入口，内部 `kgosd` 仍为 loopback。原 D89 的完整配置、认证、OAuth 与用户自选 HTTPS/通道规则继续生效。
+- 验收：Phase 15 保留完整本地质量门禁、Linux amd64 **真实 Docker** 的 clean build / initialize / four tools / 31 SDK 方法 / 安全 / 重启持久化 / 运行期验收、真实 ChatGPT Plugin 连接，以及**最终 revision 上的 Ubuntu Validate 与 Linux amd64 Docker CI**；取消 MCP npm 六平台测试、仓库外公开 MCP npm 发布验证、Linux arm64 Docker 验收。六平台已有 CLI / Runtime CI 继续按照其自身产品要求运行，不作为 MCP Docker 的额外兼容承诺。
+- 依据与取舍：聚焦当前已验证的容器部署方式，减少两个 MCP 分发产品和额外镜像架构的发布/测试成本；代价是不向无 Docker 或非 amd64 环境提供官方 MCP Server 运行产物。内部 npm 构建是实现细节，不反向恢复对外 npm 产品合同。
+- 当前合同：[MCP Docker-only 交付](mcp.md#部署交付与运行合同)、[Phase 15](../development/phases/15-mcp.md)。
+
+**D91 发布方式补充（2026-10-12）**：MCP 镜像使用 `ghcr.io/<owner 小写>/kgos-mcp:v<版本>`，复用仓库 `v*` Release Tag，不创建第二套 MCP 版本号；现有八个 npm 包只属于 CLI / SDK / Runtime，依旧按原合同发布。GHCR 发布在这些包的同版本发布与六平台 registry smoke 后进行，以保障镜像内的官方 Linux x64 扩展已经存在。CI 在相同 Release Commit 上构建并验收**将被推送的同一镜像**，再以 `GITHUB_TOKEN`、`packages:write` 推送并验证 digest；GitHub Release 必须等该验收成功才完成。若目标 GHCR package 的可见性默认私有，需按实际授权设置公开拉取；不要将“推送成功”冒充“任何用户均可匿名拉取”。原有 D91 对单一 Docker 交付的范围不变。
+
+<a id="d92-mcp-dev-acceptance-and-release-ci"></a>
+
+### D92 发布前 Dev 完整验收与正式 Release CI 分工（2026-10-12）
+
+- 决定：**Mac 是源码真源，Linux amd64 Dev 负责 MCP 的真实 Docker 功能与集成验收，普通 PR/main CI 只做代码质量和现有 CLI/SDK/Runtime 六平台 native/package 回归，Release CI 才构建、运行最小正式产物 Smoke 并发布 Linux amd64 MCP 镜像到 GHCR**。不在普通 CI 中重复构建 MCP Docker，不为了满足 Phase 15 完成条件提前执行正式镜像发布。
+- Dev 证据：沿用 `pnpm dev:mcp deploy/check` 的受控 Dev 流程，且在**隔离的临时 Docker Volume/Instance** 中执行 31/31 SDK 方法、写入、重启与持久化 Smoke；长期 Dev 的只读 `check` 不能代替这些写入测试。真实 ChatGPT HTTPS/OAuth 接入与代码质量检查分别取证，失败按各自环境处理；来自 Mac 的临时远端 Docker 构建不是约定验收入口。
+- Release 证据：获准的 `v*` Tag 触发正式发布，沿用 D91 的版本与 GHCR 规则；仅在 Release runner 从该 Tag revision 构建镜像，并对待发布的同一镜像运行必要 Smoke、推送并验证 digest。Release CI 的产物检查不替代发布前 Dev 的完整功能验收；正式发布/生产部署依旧分别授权。
+- 完成边界：Phase 15 的 `done` 需要当前实现相符的 **Dev 全功能验收、项目本地质量门禁、其完成条件所需的普通远端 CI 和最终 Review**，**不以前置执行 Release CI、Git Tag、GHCR 发布或生产部署为要求**。这替代 D91 早期提出的「最终 Docker CI 是 Phase 15 完成门槛」；保留现有 CLI/SDK/Runtime npm 产品与其 CI/发布责任。
+- 依据与取舍：Dev 已拥有持续集成部署、可回退实例和真实 MCP 客户端；重复在普通 CI 构建 MCP 镜像既增加下载与构建成本，也没有新增正式交付价值。将完整集成测试放在隔离 Dev，将正式镜像构建和最终产物校验放在 Release，可避免两者职责混淆，同时保持发布前的真实质量证据。
+- 当前合同：[MCP 镜像交付](mcp.md#部署交付与运行合同)、[Phase 15](../development/phases/15-mcp.md)、[项目执行规范](../../AGENTS.md#开发ci-与-release-分工)、[Dev Runbook](../guide/dev-environment.md)。
