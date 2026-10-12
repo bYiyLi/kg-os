@@ -121,7 +121,7 @@ P16-01 可先在独立试验路径验证，不把未验证依赖提前引入正�
 ### A16-07 统一 Docker
 
 1. Linux amd64 **干净构建**的实际容器为**一个 `kgosd` 主服务进程与一个 HTTP listener**；`/mcp`、`/api/v1/*`、`/` 在同一端口正常工作，镜像不需要 Node.js Runtime、宿主 daemon、宿主网络或容器启动下载/编译。WASM/native/Web 产物来源、版本、license 与摘要可复核。
-2. 隔离临时 Workspace/Volume 做显式初始化、31/31、四 Tool、Web/API 回归、重启/持久化、非 root 权限、SIGTERM、错误凭证、TLS / 代理终止、端口/路径冲突与安全网络验收。不能拿运行中的旧长期 Dev Instance 执行破坏性测试，也不能把旧双进程 Docker Smoke 当新证据。
+2. 使用**只有新 Go Runtime、没有 Node.js CLI/宿主 Node.js**的最终镜像，在干净 Volume 中根据用户显式提供的完整现有 `config.toml` 执行首次初始化；验证原有扩展、Credential、Knowledge Base bootstrap、`initialized.json` completion receipt、真实 daemon readiness 与失败后可恢复，不能仅把目录/数据库文件存在当作 `init` 成功。通过后执行 31/31、四 Tool、Web/API 回归、重启/持久化、非 root 权限、SIGTERM、错误凭证、TLS / 代理终止、端口/路径冲突与安全网络验收。不能拿运行中的旧长期 Dev Instance 执行破坏性测试，也不能把旧双进程 Docker Smoke 当新证据。
 
 ### A16-08 私人 Plugin
 
