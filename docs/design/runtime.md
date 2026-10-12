@@ -1,10 +1,10 @@
 # 本地运行时
 
-本文件是 KG OS v1 **Go `kgosd` 本地服务、Workspace Root / `.kgos` Instance Directory、内置 Web、动态 loopback endpoint、单 Token 认证、native Runtime package、Embedding Provider startup config/cache mapping 与 daemon lifecycle** 的设计真源。Kernel 能力由 [Object](object.md)、[Graph](graph.md) 与 [Evolution](evolution.md) 负责；TypeScript Client / npm 分发见 [Client](client.md)，CLI 命令见 [CLI](cli.md)。
+本文件是 KG OS v1 **Go `kgosd`、统一 HTTP 监听与 Web/MCP hosting、Workspace Root / `.kgos` Instance Directory、动态 loopback endpoint、Instance Token、native Runtime package、Embedding Provider startup config/cache mapping 与 daemon lifecycle** 的设计真源。Kernel 能力由 [Object](object.md)、[Graph](graph.md) 与 [Evolution](evolution.md) 负责；MCP 协议、外部认证与沙箱见 [MCP](mcp.md)，TypeScript Client / npm 分发见 [Client](client.md)，CLI 命令见 [CLI](cli.md)。
 
 ## 本地服务模型
 
-KG OS v1 采用 Go 实现的本地 `kgosd` daemon，作为 API 与内置 Web 的统一运行时入口。Kernel 与数据库调用编排在该服务内执行：
+KG OS v1 采用 Go 实现的 `kgosd` daemon，作为 API 与内置 Web 的统一运行时入口；**Phase 16 目标**是把 MCP 接入同一服务进程、同一 HTTP listener，Kernel 与数据库调用编排仍在该服务内执行：
 
 ```text
 @kgos/cli / @kgos/sdk ── API HTTP ────────────┐
@@ -17,7 +17,7 @@ Browser ───────── 页面 / API HTTP ────────�
                                       └── KG OS Kernel → database/sql → Lithograph
 ```
 
-`kgosd` 同时承载 API 与 Human-facing Web，因此 CLI、SDK 与 Web 使用同一个 KG OS Kernel 和同一组 Object / Graph / Evolution logical contract。部署和启动只需要这个 daemon，不单独安装、部署或启动 Web 服务；Web 与 API 共用进程、配置端口和 lifecycle。v1 不为 CLI 再建立 Unix socket / Named Pipe / gRPC 私有协议。
+`kgosd` 当前已承载 API 与 Human-facing Web；目标增加 MCP 与 OAuth HTTP endpoints，而不是再启动一个 MCP Server。CLI、SDK、Web 与 MCP 共享同一个 KG OS Kernel 和 Object / Graph / Evolution 业务合同；Web 静态代码仍只在浏览器运行。v1 不为 CLI 再建立 Unix socket / Named Pipe / gRPC 私有协议。
 
 ## HTTP bind 与 active endpoint
 
@@ -31,7 +31,7 @@ CLI-managed v1 Runtime 只使用 IPv4 loopback HTTP。每个 Instance daemon 启
 
 CLI 不从 `config.toml` 推测 endpoint，只使用当前 Instance Directory 的 active lock locator。v1 的 CLI-managed Runtime 不提供 LAN / wildcard bind；如果未来需要远程或多机访问，必须单独设计 TLS、endpoint discovery 与 deployment/security contract，不能把本地 single-token loopback 模型直接外推到不可信网络。
 
-后续 [MCP 远程接入设计](mcp.md#部署与责任划分)由**单独的 MCP Server**提供受保护的 HTTPS / 隧道入口，并在本机按同一 Instance locator / credential 使用 SDK；它不授权 `kgosd` 自身改绑公网，也不改变本节本地单 Token 合同。
+Phase 16 [统一 MCP 接入设计](mcp.md#部署与责任划分)将在 `kgosd` **现有同一 HTTP handler** 中注册 `/mcp`、OAuth 与发现路由。现有 CLI 自动启动路径仍保持 `127.0.0.1:0`，不因安装 MCP 就自动开启公网监听；只有显式网络配置才可扩大监听范围。MCP 外部 Token / OAuth 与原有 API 的 Instance Token 分离，不能把 MCP OAuth 凭证直接作为 `/api/*` 的认证旁路。
 
 普通 API request / response 使用 HTTP + JSON。Phase 02 已有的 Ontology editable-body adapter 继续可以通过 `Accept: application/yaml | application/json` 返回单 Object body；D73 新增的**通用 Object batch read**则通过 JSON `ObjectReadResult` 一次传输整批 logical Object Value，canonical YAML / raw JSON batch body属于 client presentation，不要求 daemon 再逐 Object做 representation negotiation。Graph streaming 使用 HTTP streaming + NDJSON。具体 HTTP method / route / metadata carrier 仍属于 HTTP adapter mapping，但不得改变 logical contract。
 
@@ -66,6 +66,24 @@ Web 与 CLI / SDK 在逻辑上都是公共 API 的客户端。`kgosd` / Kernel �
 前后端代码分属 Go 与 TypeScript workspace，但这不产生第二个**产品部署服务**。Phase 00 开发环境可以使用 Vite dev server + proxy/HMR 作为开发工具，不要求把 Vite middleware嵌进 Go `net/http`；生产/本地正式运行的 Web构建产物仍由 `kgosd` 同端口直接提供，运行时不依赖 Vite。具体开发端口属于工程配置，不进入公开 endpoint contract。
 
 Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemon 的数据库就绪条件，不新增跳过初始化或认证的公共运行模式。开发脚本不得把尚未接入 Knowledge Base 的壳层标成正式 `running`；完整启动仍须通过下文的能力检查与 bootstrap。
+
+## 统一 HTTP / MCP hosting（Phase 16 目标）
+
+```text
+同一个 kgosd Go 进程、同一个 HTTP listener
+  /                浏览器 Web 静态资源
+  /api/v1/*        现有 Instance Bearer API
+  /mcp             外部 Bearer / OAuth 认证的 MCP Streamable HTTP
+  /.well-known/*   MCP OAuth 发现（启用 OAuth 时）
+  /oauth/*         MCP OAuth 授权与 Token（启用 OAuth 时）
+                 → 同一个 Kernel → Lithograph
+```
+
+- **默认不变**：`kgosd --root <workspace>` 按原有 CLI-managed 生命周期监听 `127.0.0.1:0`；`kgosd.lock` 继续记录实际 active endpoint，single-instance OS lock / readiness / `auth.json` 规则不变。MCP 不产生第二份 Instance、不单独启动子 daemon、不使用 SDK 经 HTTP 回调自身。
+- **显式统一监听**：目标支持 `kgosd --root <workspace> [--host <address>] [--port <0..65535>] [--tls-cert <path> --tls-key <path>]`；网络选项可由 `KGOSD_HOST` / `KGOSD_PORT` / `KGOSD_TLS_CERT` / `KGOSD_TLS_KEY` 提供，命令行优先、未指定时保持现有默认。TLS 证书与私钥必须成对。端口 0 仍发布真实绑定端口；不增加独立 MCP 监听地址 / 端口。
+- **安全入口**：监听 `0.0.0.0` 只是网络暴露，不代表已提供 TLS。远程使用必须有真实 HTTPS 或可信的加密代理 / 通道，且路由保护生效；用户自行选择代理或隧道。即使一个 listener 对外，`/api/v1/*` 仍只接受 Instance Bearer，`/mcp` 仍只接受独立 MCP 静态 Bearer 或 OAuth Access Token；Web 静态资源可匿名读取，但 Web 调用业务 API 不可绕过认证。外部 MCP 调用方永不取得 `auth.json` Token。
+- **启用规则**：只有显式配置有效 MCP 管理员 Token 来源时才注册可调用的 MCP Tool / 认证入口；未启用 MCP 不改变现有 CLI、API、Web 的启动就绪及本机使用。OAuth 额外要求显式 issuer。MCP 的路径、Token/OAuth、预算和安全规范由 [MCP owner](mcp.md#部署交付与运行合同) 定义，不在本文件复制第二套配置。
+- **部署模型**：单进程不等于必须对所有路由公开放行；用户可在同一个 HTTPS 入口上对代理路由设置自己的限制，但 KG OS 不新增网络 Gateway。正式 Docker 仅交付一个运行 `kgosd` 的容器，Web 资源与 QuickJS WASM 编译进产品产物，运行时不依赖 Node.js MCP Server。该目标尚未实现，原本独立的 `packages/mcp` 与 Dockerfile 当前仍属于迁移前实现，不能当作目标验收证据。
 
 ### Web 交互设计状态
 

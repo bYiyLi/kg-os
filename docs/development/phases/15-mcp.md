@@ -4,7 +4,7 @@
 
 ## 目标与状态
 
-`in_progress`（2026-10-12，本地工作区已有未提交 MCP 实现工作，**尚未达到交付验收**）。本阶段在现有 KG OS Instance 和 `@kgos/sdk` 之上交付独立 MCP Server、四个 Tool、统一 JavaScript Sandbox、**完整可运行的 Linux amd64 Docker / OCI 镜像**，以及官方 Skill / 用户私人 Plugin 接入方式。按 [D91](../../design/decisions.md#d91-mcp-docker-only-delivery) 取消 MCP npm 与 Linux arm64 Docker 交付；按 [D92](../../design/decisions.md#d92-mcp-dev-acceptance-and-release-ci) 在 Linux Dev 完成发布前 Docker 集成验收，正式镜像由独立 Release CI 构建发布，不改变现有 CLI/SDK/Runtime npm 产品。**不依赖 [Phase 14 Web](14-web.md)**；Web 当前仍为 `deferred`。
+`done`（2026-10-12，**已交付并完成阶段验收**）。Phase 15 按 D91/D92 的最终范围实现独立 TypeScript MCP Server、四个 Tool、QuickJS/Worker Sandbox、Linux amd64 Docker-only、官方 Skill 文件及用户私人 MCP Plugin 连接。Linux Dev 集成与 31/31 SDK 方法、真实 ChatGPT OAuth/四 Tool、Mac `pnpm validate` 和最终 GitHub CI Run #65 均取得成功证据；实现提交 `ea37ddfca8c69bc701de0bb41d10d465f92c6b64` 已推送到 `main`。正式 GHCR Release 没有在本 Phase 执行。新的 `kgosd` Go 原生统一 MCP 方案归 [Phase 16](16-kgosd-unified-mcp.md)/[D93](../../design/decisions.md#d93-kgosd-unified-mcp)，不追溯阻塞已完成的 Phase 15。**Phase 14 Web 仍为 `deferred`。**
 
 完成后的主流程：
 
@@ -137,7 +137,7 @@ P15-01 是**阻断依赖 Sandbox 的实施门禁**：不能以模拟 `Promise.al
 
 1. 官方 Skill 教 AI 优先使用 Preview 理解 Branch/完整 Ontology、按需 Ancestry，复杂操作使用四个无前缀顶层 SDK namespace；覆盖 State pin、Patch、Merge、流式/错误、不可重试写入、建议性 Commit Message；不把 Skill 误当强制客户端自动调用机制。
 2. `plugins/kgos/` 模板 / `INSTALL.md` 明确区分用户本地 MCP Server、经保护的 HTTPS 入口、ChatGPT 手工注册 Connection、真实动态 App ID 与私人 Plugin 引用；不得写死本地路径、Token、私有 Connection ID，不将 MCP Server 打包进 Plugin，也不公开上架。
-3. 真实标准 MCP Client 测试不依赖官方 Plugin；用户允许的 ChatGPT Web / Desktop 安装/调用测试验证 Tool discovery、Skill 的实际可见性、只读与读写区分和连接认证。客户端功能受账号与版本影响时以实际证据报告；没有真实验证不能把静态模板标记为完成。
+3. 真实标准 MCP Client 测试不依赖官方 Plugin；实际 ChatGPT 私人 **MCP-only Plugin** 验证 Tool discovery、OAuth、只读与读写区分。官方 Skill 文件和 AI 安装手册须存在且可读取，但**当前已安装私人 Plugin 没有启用随包 Skill**；用户明确把客户端 Skill 激活完善交由 [Phase 16 P16-08](16-kgosd-unified-mcp.md#a16-08-私人-plugin) 后续验收，不宣称本阶段已激活。
 
 ### A15-09 端到端与交付
 
@@ -232,8 +232,16 @@ P15-01 是**阻断依赖 Sandbox 的实施门禁**：不能以模拟 `Promise.al
 
 **D92 Dev / 普通 CI / Release 职责纠正（2026-10-12，当前范围）：** 用户确认先在 Linux Dev 通过完整 MCP 功能与隔离 Docker Smoke，再提交/推送并检查普通 CI；仅正式发布时让 Release CI 从 Release revision 构建、Smoke 和推送 GHCR 镜像。依据 [D92](../../design/decisions.md#d92-mcp-dev-acceptance-and-release-ci) 更新本计划，已从普通 CI Linux x64 matrix 移除 MCP Docker 构建步骤，同时保留 Ubuntu `pnpm validate` 和六平台 CLI/SDK/Runtime native/package 代码回归。Release CI 的现有 GHCR 发布 job 不变；Dev 的标准部署/只读检查及隔离 31-method Smoke 由 [Dev Runbook](../../guide/dev-environment.md#发布前完整-mcp-验收) 负责。上一段提到的临时跨机 Docker 构建错误是历史诊断，**不是当前规范要求的 Dev Acceptance 运行，也不能冒充 GitHub Release CI 故障**。本轮只是调整代码/设计/文档，尚未触发新的 Dev 部署、普通远端 CI 或正式镜像发布；实际验收证据继续累积后才可关闭 Phase。
 
+## 阶段完成记录（2026-10-12）
+
+- **范围与决定**：用户确认旧独立 TypeScript MCP / Private Plugin 基础连接的 Phase 15 按 D91/D92 现有交付范围关闭，后续单进程 `kgosd` / Go MCP / QuickJS-NG+wazero、Skill 客户端激活改进归 [Phase 16](16-kgosd-unified-mcp.md) 和 [D93](../../design/decisions.md#d93-kgosd-unified-mcp)，不重写旧实现的历史验收。
+- **已实现与提交**：四个 MCP Tool、受控 SDK 31-method、单管理员 OAuth、Preview/Ancestry、官方 Skill 源文件和私人 Plugin 模板，Linux amd64 Docker-only；提交 [`ea37ddf`](https://github.com/bYiyLi/kg-os/commit/ea37ddfca8c69bc701de0bb41d10d465f92c6b64) 已推送到 `main`，不包含 Go 原生 MCP。
+- **已验证 Dev / 客户端**：Linux amd64 独立 Docker/Volume 的非 root 初始化、四 Tool、31/31 SDK 方法与重启持久化实测通过；长期 Dev 的 `pnpm dev:mcp check` 再次通过 OAuth discovery、daemon/Runtime readiness 与四 Tool 只读验收。真实 ChatGPT 私人 MCP Connection 的 OAuth、四 Tool 读写、Branch/Commit 回读及 `kgos_read` 禁写此前通过；2026-10-12 再次以 `kgos_read` 成功读取当前 State。
+- **本地与远端质量**：Mac `pnpm validate` 于实现提交前退出 0（Go Race/覆盖率、195 个 TypeScript 测试、Playwright、native Lithograph、包、许可证及安全检查）；安全扫描继续保留此前明确获准的单项开发工具 CVE 忽略，不把忽略当修复。最终实现 SHA [`ea37ddf`](https://github.com/bYiyLi/kg-os/commit/ea37ddfca8c69bc701de0bb41d10d465f92c6b64) 的 [GitHub Actions CI Run #65](https://github.com/bYiyLi/kg-os/actions/runs/38261156640) 结论 `success`，**Ubuntu Validate + macOS/Linux/Windows arm64/x64 六平台 Native Runtime = 7/7 Jobs 全绿**。普通 CI 按 D92 不构建或发布 Docker 镜像。
+- **边界**：当前实际安装的私人 Plugin 是 **MCP-only**，不能据此声称官方 Skill 已被客户端加载；该增强按用户决定由 Phase 16 验收。GHCR 正式镜像、Tag、公开发布和生产部署均未执行，也不属于此阶段 `done` 的前置条件。历史逐轮失败和修复证据已在上文按发生顺序保留。
+
 ## 完成条件
 
-只有 P15-01–09 全部实现、A15-01–09 **按 D91/D92 收敛后的**真实 Dev 验收与[通用完成标准](../README.md#6-phase-通用完成标准)全部满足、相关设计/指南/README/vlog 同步、final review 无剩余本阶段 finding，并取得**Linux amd64 Dev 真实 Docker 功能/隔离集成验收、最终提交 revision 的普通 CI（Ubuntu Validate + 既有六平台 Runtime matrix）及要求的真实客户端证据**，Phase 15 才能标记为 `done`。**正式 Release CI 构建/发布镜像、Tag 和生产部署均不属于 Phase 完成条件**，需另行授权。
+本阶段旧架构 P15-01–09 的**确认收敛范围**已实现并按上述 Dev、客户端、本地门禁、最终提交 SHA 的 7/7 远端普通 CI 与最终 Review 证据验收；用户明确授权标记 Phase 15 为 `done`。新版 `kgosd` 单进程 MCP、Go/WASM 沙箱及私人 Skill 客户端激活属于 [Phase 16](16-kgosd-unified-mcp.md)，其可行性和未完成项不冒充 Phase 15 的验收。
 
-阶段状态 `in_progress` 仅表示本地实际开发正在进行；它**不表示** QuickJS 的全部安全隔离、Private Plugin / Skill、最终 Docker 交付或运行验收已成功。若必需的外部手动授权/客户端测试尚未完成，继续保持 `in_progress` 或有证据的 `blocked`；不得降级验收或伪造通过。镜像正式发布与部署是单独授权动作，不因 Phase 完成自动执行。
+正式 Release CI/GHCR、Git Tag 与生产部署分别授权，不因本阶段状态变化而自动执行。

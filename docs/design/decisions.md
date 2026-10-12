@@ -937,3 +937,15 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - 完成边界：Phase 15 的 `done` 需要当前实现相符的 **Dev 全功能验收、项目本地质量门禁、其完成条件所需的普通远端 CI 和最终 Review**，**不以前置执行 Release CI、Git Tag、GHCR 发布或生产部署为要求**。这替代 D91 早期提出的「最终 Docker CI 是 Phase 15 完成门槛」；保留现有 CLI/SDK/Runtime npm 产品与其 CI/发布责任。
 - 依据与取舍：Dev 已拥有持续集成部署、可回退实例和真实 MCP 客户端；重复在普通 CI 构建 MCP 镜像既增加下载与构建成本，也没有新增正式交付价值。将完整集成测试放在隔离 Dev，将正式镜像构建和最终产物校验放在 Release，可避免两者职责混淆，同时保持发布前的真实质量证据。
 - 当前合同：[MCP 镜像交付](mcp.md#部署交付与运行合同)、[Phase 15](../development/phases/15-mcp.md)、[项目执行规范](../../AGENTS.md#开发ci-与-release-分工)、[Dev Runbook](../guide/dev-environment.md)。
+
+<a id="d93-kgosd-unified-mcp"></a>
+
+### D93 `kgosd` 统一承载 Web、HTTP API 与 Go 原生 MCP（2026-10-12）
+
+- **决定**：KG OS 的完整服务端只有一个 Go `kgosd` 进程、一个 Instance、一个 HTTP listener，直接提供内置 Web、现有 `/api/v1/*` 和 MCP `/mcp`（包括授权与发现）。MCP Tool 直接调用同进程 Kernel 已有的应用能力，不经 `@kgos/sdk`、本机 HTTP 或单独的 SDK Gateway；`@kgos/sdk` 继续负责 TypeScript CLI、浏览器和外部 TypeScript Client。保留四个 Tool、原有公共调用语义及私人 Plugin / Skill；Web Phase 14 继续 `deferred`，本决定不宣称 Web 业务页面已实现。
+- **JavaScript 目标**：`kgos_read` / `kgos_run` 保留无前缀的 `ontology/object/graph/evolution`、异步、并发、增量 Stream 和 15 Read + 16 Write 方法。优先验证 QuickJS-NG WASI reactor + Go wazero；每次 Invocation 单独 WASM Module / Context，宿主 Go Bridge 强制权限白名单、JSON 边界、取消与资源预算，不向脚本开放文件/网络/Secret/Go 对象。**可行性先验证、再冻结依赖与实现**；已存在 Go/WASM 项目不等于本产品异步 Bridge、安全终止已验证，失败不得擅自换成弱隔离或回退独立 Node 服务。
+- **统一部署**：默认 CLI-managed `kgosd --root` 继续 `127.0.0.1:0`，显式的 `--host/--port` 和可选 TLS 才改变统一监听；远程要求实际 HTTPS 或可信加密通道。MCP 只在配置有效独立管理员 Token 后可用，可选同进程单管理员 OAuth；`/api/v1/*` 继续只用原 Instance Bearer，OAuth Access Token 不可越界使用，Web 数据访问不绕过 API 认证。统一 listener 可能同时暴露静态 Web 与 API 路由，须实际验证网络/认证边界。
+- **交付迁移**：保留 Linux amd64 Docker-only，不发布独立 MCP npm 或 arm64 镜像；新的统一镜像目标名为 `ghcr.io/<owner 小写>/kgos:v<版本>`，替代旧未发布的 `kgos-mcp` 名称。镜像运行时无 Node.js，含内嵌 Web、Go MCP / Go Kernel、QuickJS WASM 与原生扩展；旧 `packages/mcp` / Node Worker / Docker 双进程先作测试对照，**新 Go 实现通过完整验收后**再清理。旧架构 Phase 15 已按用户决定关闭为 `done`；Go 原生迁移另列 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)，状态 `ready`。
+- **原决定关系**：D93 替代 D85 的独立 TypeScript MCP 进程、D88 的 Node.js Worker / SDK HTTP Bridge、D89 的 `kgos-mcp serve/doctor` 双进程配置、D91 的 `kgos-mcp` 镜像名称及旧发布构建依赖。D85–D88 的四 Tool、Preview/Ancestry、JS 可观察业务语义与安全目标继续有效；D90 的单管理员 OAuth 仍有效但迁入 `kgosd`；D91 的 Linux amd64 Docker-only 与 D92 的 Dev 完整功能验收 / 普通 CI / Release CI 职责划分继续有效。旧技术栈的真实 ChatGPT、Dev、31/31 SDK 历史结果保留为**迁移对照**，不得充当 Go 目标架构的验收。
+- **依据与取舍**：Web、HTTP API、MCP 都是 KG OS 同一 Kernel 的访问入口，双进程内部 SDK HTTP 回环与单独生命周期并未解决已存在的业务要求。统一后降低生产运行时、端口与服务部署复杂度，但 Go MCP Handler、OAuth 和 WASM 异步调度需要重新取得真实安全与兼容性证据；不能为了减少进程牺牲可终止性、流式语义、公共接口或访问隔离。
+- 当前合同：[Runtime 统一 HTTP hosting](runtime.md#统一-http--mcp-hostingphase-16-目标)、[MCP](mcp.md)、[Phase 16](../development/phases/16-kgosd-unified-mcp.md)。旧实现完成证据见 [Phase 15](../development/phases/15-mcp.md#阶段完成记录2026-10-12)。
