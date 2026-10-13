@@ -24,6 +24,9 @@ const taskCommands = {
     ["check:go"],
     ["typecheck"],
     ["lint"],
+    // Phase 16 daemon integration tests exercise the embedded Web homepage.
+    // Build the assets before running Go race/coverage on a clean CI checkout.
+    ["build"],
     ["test:go:race"],
     ["test:go:coverage"],
     ["check:go:security"],
@@ -33,7 +36,6 @@ const taskCommands = {
     ["check:unused"],
     ["check:versions"],
     ["check:dedupe"],
-    ["build"],
     ["check:exports"],
     ["exec", "playwright", "test", "--config", "config/test/playwright.config.ts"],
     ["test:native"],
