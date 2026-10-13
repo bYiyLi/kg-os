@@ -20,7 +20,7 @@ TS Application ┘
 - `@kgos/sdk` 是公共 HTTP Client 的唯一 TypeScript 实现，不拥有本地文件、daemon process 或 npm native artifact lifecycle。
 - `@kgos/cli` 是 Node.js CLI adapter；它负责本地 Instance / Runtime 管理，再通过 `@kgos/sdk` 调用同一 HTTP API。
 - 浏览器 Web 与第三方 TypeScript application 可以直接使用 `@kgos/sdk`，不得通过 CLI 子进程间接访问 KG OS。
-- [Phase 16 Go 原生 MCP 目标](mcp.md)由 `kgosd` 直接承载，与 Web、HTTP API 共用进程与监听端口；MCP Tool 直接映射 Kernel 的现有公共操作，不通过 `@kgos/sdk` 再发一次本机 HTTP。`@kgos/sdk` 仍是 TypeScript CLI / 浏览器 / 外部 TypeScript 调用方的 HTTP Client 合同，MCP 必须对齐其公开参数、结果和错误语义；不把 Node.js MCP 私有模块变成正式 npm 包。现有独立 `packages/mcp/` 属于已提交的 Phase 15 旧架构实现，不是已发布的第九个 npm package；Go 原生统一 MCP 属于 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)。
+- [Phase 16 Go 原生 MCP](mcp.md)由 `kgosd` 直接承载，与 Web、HTTP API 共用进程与监听端口；MCP Tool 直接映射 Kernel 的公共操作，不通过 `@kgos/sdk` 再发一次本机 HTTP。`@kgos/sdk` 仍是 TypeScript CLI / 浏览器 / 外部 TypeScript 调用方的 HTTP Client 合同，MCP 必须对齐其公开参数、结果和错误语义。独立 TypeScript MCP 与 Node Worker 已随 Phase 16 迁移从现行工作树移除，历史实现保留在 [Phase 15 已提交 revision](https://github.com/bYiyLi/kg-os/tree/ea37ddfca8c69bc701de0bb41d10d465f92c6b64/packages/mcp)，并非已发布的第九个 npm 包；当前统一 Go MCP 的开发及验收状态见 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)。
 - Phase 00–07 的 Go `kg` CLI 是 Phase 08 的迁移行为基准；当前实现已经在 TypeScript parity 与 packed package smoke 通过后删除 Go CLI，只保留 `@kgos/cli` 这一套正式 Client。
 
 ## `@kgos/sdk`

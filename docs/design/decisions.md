@@ -1,5 +1,7 @@
 # 架构决策记录
 
+<!-- cspell:words Buildx -->
+
 本文件记录 KG OS 架构决策的**决定、依据、备选、取舍与被替换基线**。具体运行行为仍由对应职责设计文件拥有；本文件不建立第二份操作合同。
 
 当前运行架构由 [D65 Go runtime](#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](#d66-lithograph-v030-sql-only)、[D75 TypeScript Client](#d75-typescript-client)、[D76 npm distribution](#d76-npm-distribution)、[D77 explicit Instance Root](#d77-explicit-instance-root)，以及 2026-09-26 新增的 [D78 operation-scoped Branch](#d78-operation-scoped-branch)、[D79 stale daemon recovery](#d79-stale-daemon-recovery)、[D80 official Jieba](#d80-official-jieba) 共同定义：Go 保留 daemon / Kernel / Database Host，Client 统一 TypeScript，npm/npx 负责分发，Instance 由显式 root 定位；pooled connection不能泄漏 Branch状态，stale daemon由OS lock仲裁恢复，新Instance默认使用KG OS official Jieba全文分词。早期 D44/D45/D51/D54/D55/D63/D72 等被后续决定替换的部分只保留历史依据。
@@ -949,3 +951,13 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **原决定关系**：D93 替代 D85 的独立 TypeScript MCP 进程、D88 的 Node.js Worker / SDK HTTP Bridge、D89 的 `kgos-mcp serve/doctor` 双进程配置、D91 的 `kgos-mcp` 镜像名称及旧发布构建依赖。D85–D88 的四 Tool、Preview/Ancestry、JS 可观察业务语义与安全目标继续有效；D90 的单管理员 OAuth 仍有效但迁入 `kgosd`；D91 的 Linux amd64 Docker-only 与 D92 的 Dev 完整功能验收 / 普通 CI / Release CI 职责划分继续有效。旧技术栈的真实 ChatGPT、Dev、31/31 SDK 历史结果保留为**迁移对照**，不得充当 Go 目标架构的验收。
 - **依据与取舍**：Web、HTTP API、MCP 都是 KG OS 同一 Kernel 的访问入口，双进程内部 SDK HTTP 回环与单独生命周期并未解决已存在的业务要求。统一后降低生产运行时、端口与服务部署复杂度，但 Go MCP Handler、OAuth 和 WASM 异步调度需要重新取得真实安全与兼容性证据；不能为了减少进程牺牲可终止性、流式语义、公共接口或访问隔离。
 - 当前合同：[Runtime 统一 HTTP hosting](runtime.md#统一-http--mcp-hostingphase-16-目标)、[MCP](mcp.md)、[Phase 16](../development/phases/16-kgosd-unified-mcp.md)。旧实现完成证据见 [Phase 15](../development/phases/15-mcp.md#阶段完成记录2026-10-12)。
+
+<a id="d94-openclaw-docker-development-and-ci"></a>
+
+### D94 Mac 不跑 Docker；OpenClaw 开发测试，远程 CI 构建与验收 Docker（2026-10-13）
+
+- **本机**：KG OS 的源码真源仍是 Mac 工作树；Mac 仅执行源码编辑、非 Docker 的 Go/TypeScript/native 测试、`pnpm validate` 和 Review。**不在 Mac 运行 Docker/Compose/Buildx，也不要求连接任何 Mac Docker Engine 或远程 Docker Context**；Mac 缺少 Docker 不是阻塞项。
+- **开发环境**：所有开发阶段的 Docker/Compose/Buildx 构建与隔离集成测试都在现有 **OpenClaw Linux amd64** 主机执行，由 Mac 通过受控 SSH/Dev 命令触发；不修改长期 Dev Instance 来做破坏性写入测试。开发端 Docker 失败须修复，不用 Mac 临时构建代替。
+- **远程仓库 CI**：GitHub Actions PR/main CI 在 **Linux runner** 上真实构建 Linux amd64 Docker 镜像、验证镜像和在隔离容器/Volume 中执行初始化、Web/API/MCP 四 Tool、31/31 SDK、认证隔离、重启持久化等 Smoke。**Docker CI 是远程工程门禁**，与 Ubuntu `pnpm validate` 和既有 native/package matrix 并列；不能因为 Mac 不运行 Docker 而关闭远程 CI Docker 打包/测试。Mac 本地的 `pnpm validate` 本身不加入 Docker 命令。
+- **正式发布**：经单独授权的 `v*` Release CI 仍从确切 release revision 构建并 Smoke-test **待发布的同一镜像**，成功后推送 GHCR、核对 digest；完整发布流程以该镜像发布结果作为交付门禁。普通 CI 不推送 GHCR。构建测试成功不等于已发布或已部署。
+- **覆盖关系**：本决定在 D91/D92/D93 的 Linux amd64 镜像目标与单进程产品合同上，明确 **Mac / OpenClaw / GitHub Actions CI / Release CI** 四者分工；不改变 MCP、Tool/OAuth 或 Kernel 合同。执行规范见 [AGENTS](../../AGENTS.md#开发ci-与-release-分工)，OpenClaw 操作入口见 [Dev Runbook](../guide/dev-environment.md)。

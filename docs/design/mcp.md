@@ -58,7 +58,7 @@ ChatGPT / MCP Client      Browser       CLI / SDK
 - Docker 启动**一个已初始化**的 Workspace，由 `kgosd --root <workspace>` 同时提供三种接口。**首次初始化也必须能在这一镜像内完成，且不依赖宿主 Node.js 或镜像内的 TypeScript CLI**：使用明确提供的完整现有 `config.toml` 配置，由 Go Runtime 复用已有初始化、扩展安装、数据库 bootstrap 与 [D82](decisions.md#d82-init-readiness) 的完整 readiness / completion receipt 合同；不新造第二套配置格式、自动默认值或跳过 `initialized.json`。具体一次性容器入口与配置文件挂载编码由 Phase 16 实现时确定并写入操作指南，不将尚不存在的命令示例写成可用。重启/重建必须保留 `.kgos`、已提交的 State/Branch 与认证信息；未初始化且未提供明确配置时失败。
 - 构建时将已验证的 Go `kgosd`、Web 静态产物、固定并校验的 QuickJS-NG WASM 和匹配的 Linux amd64 native 扩展打成自包含镜像；Node.js 可用于构建浏览器资源，但不得成为镜像运行时依赖。镜像不在容器启动时下载依赖或重编 native 扩展，不依赖宿主 `kgosd` / `node_modules` / host network。
 - 镜像以非 root 用户运行，能够读取只读挂载的 Secret 与证书、写持久 Volume，并在 SIGTERM 时清理同一 `kgosd` 进程及资源。宿主仅映射统一的 HTTP 监听端口；镜像对外暴露的 Web、API、MCP 各自保留认证边界。
-- **验证 / 发布按照 [D92](decisions.md#d92-mcp-dev-acceptance-and-release-ci) 继续分工**：Linux amd64 Dev 实测完整镜像与独立临时 Volume 写入/重启；普通 PR/main CI 只做工程检查与现有平台回归，不构建、推送镜像；获得独立 Release 授权后，才从明确的 Release revision 构建**精确待发布镜像**、在隔离 Instance 中 Smoke、用 GHCR 核对版本/源码 revision/架构/digest 和实际拉取权限。既有 npm 发布流程的历史事实不构成本统一镜像的新增前置运行要求。正式发布与生产部署分别授权，当前没有新镜像已上传的证据。
+- **验证 / 发布按 [D94](decisions.md#d94-openclaw-docker-development-and-ci) 分工**：Mac 本地只进行非 Docker 源码验证；开发阶段的 Docker 构建、独立临时 Volume 写入/重启均在 OpenClaw Linux amd64 执行，不能破坏长期 Dev Instance；**GitHub Actions PR/main CI 必须在自己的 Linux amd64 runner 构建新镜像并执行隔离 Docker Smoke**，但不推送 GHCR；获得独立 Release 授权后，从明确的 Release revision 构建**精确待发布镜像**、在隔离 Instance 中 Smoke、用 GHCR 核对版本/源码 revision/架构/digest 和实际拉取权限。正式发布与生产部署分别授权，当前没有新镜像已上传的证据。
 
 ### MCP 命令与配置优先级
 
@@ -188,7 +188,7 @@ return { state, models: models.results, data: data.rows };
 - 每次 Invocation 创建隔离的 WASM Module / QuickJS runtime/context，脚本状态和 Promise 不跨请求持久化。仅向脚本暴露四个固定 namespace 的许可方法；WASI 不预开放宿主文件系统、环境变量、网络、任意模块加载或敏感日志能力，**不允许**脚本读取 Instance / MCP Token、直接持有 Go Kernel 句柄或调用任意 HTTP。Go Host Bridge 只接受 `method + JSON-compatible 参数`，返回 JSON-compatible 值/公共安全错误，执行前按 Invocation 身份、Method allowlist 和资源预算校验。
 - **异步调度**：Go 宿主可并发执行独立 Kernel 方法，但同一 Guest QuickJS/WASM 的 Promise resolve/reject、pending jobs 与状态操作必须由一个调度所有者**串行**驱动，不允许多个 Goroutine 并发重入 VM。`Promise.all()` 必须能等待实际同时在途的 Go 调用；`graph.streamQuery / streamExecute` 必须通过 `stream-open / stream-next / stream-return` 拉取真实事件，维护背压，支持 `for await...of`、提前退出、断线与取消，**不得预先将整个 Stream 聚合为数组**。
 - **资源隔离**：限制 Guest WASM linear memory pages / JS heap/stack、脚本大小、宿主调用/流并发、输出大小及墙钟时间；使用 wazero `WithCloseOnContextDone(true)`（需在目标版本证实）、Module close 与适用的 QuickJS CPU interrupt，在无限循环、深递归、内存耗尽、trap、取消、超时下结束该次 Invocation，且其他 `kgosd` 请求继续正常执行。超限明确返回 `RESOURCE_ERROR`，不能静默截断、继续交付已失效脚本的回执或伪造事务回滚；已发到 Kernel 的写入仍可能完成。
-- **P15-01 可行性门槛**先验证真实 `async/await`、`Promise.all()`、`for await...of`、宿主权限隔离、资源中断与并发取消；任一必需条件不满足时停止依赖沙箱的实现并回到本设计修订，**不自动退回 Node.js MCP、降低隔离保证或改变四 Tool 合同**。优先验证 Linux amd64（唯一官方 Docker 目标），跨平台 Go 构建门槛按既有 Runtime 范围回归；已有 Node.js Worker 历史验收不能替代 Go/WASM 新证据。
+- **P16-01 可行性门槛**先验证真实 `async/await`、`Promise.all()`、`for await...of`、宿主权限隔离、资源中断与并发取消；任一必需条件不满足时停止依赖沙箱的实现并回到本设计修订，**不自动退回 Node.js MCP、降低隔离保证或改变四 Tool 合同**。优先验证 Linux amd64（唯一官方 Docker 目标），跨平台 Go 构建门槛按既有 Runtime 范围回归；已有 Node.js Worker 历史验收不能替代 Go/WASM 新证据。
 - Sandbox 限制的是**脚本对宿主的直接访问**，不是修改数据库的 Cypher 能力：`graph.query / execute` 继续完全遵守 [Graph 原样执行合同](graph.md#graph)，MCP 不解析、拦截、改写或额外约束 Cypher，也不为文件 / 网络访问新增 Tool、参数或引导流程；底层依照 `kgosd` 当前实际运行权限执行。来自数据库的文本、Ontology、Commit Message 均只是数据，不能改变沙箱权限和工具行为。
 
 #### 写入、错误与部分成功

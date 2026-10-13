@@ -77,6 +77,42 @@ jobs:
             test-results
           retention-days: 7
 
+  docker-unified:
+    name: Unified Docker / Linux amd64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact source revision
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.34.5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          cache: pnpm
+          node-version-file: .node-version
+
+      - name: Install test client dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build Go-only Linux amd64 Docker image
+        env:
+          IMAGE: kgos-unified-ci:${{ github.sha }}
+        run: |
+          docker build --platform linux/amd64 -f Dockerfile.unified -t "$IMAGE" .
+
+      - name: Run real unified Docker integration smoke
+        env:
+          KGOS_UNIFIED_DOCKER_SMOKE_IMAGE: kgos-unified-ci:${{ github.sha }}
+        run: node scripts/mcp-unified-docker-smoke.mjs
+
   native-runtime:
     name: Native Runtime / ${{ matrix.target }}
     strategy:
@@ -173,6 +209,7 @@ jobs:
         run: |
           sh -n scripts/mcp-dev-remote.sh
           node --check scripts/mcp-dev.mjs
+          node --check scripts/mcp-dev-accept-unified.mjs
           node --check scripts/mcp-dev-accept.mjs
           docker compose -f compose.dev.yaml config --quiet
 

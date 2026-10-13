@@ -287,7 +287,7 @@ GitHub Actions 保留 Ubuntu 24.04 x64 的完整 `pnpm validate`，并运行六�
 - Windows arm64：`windows-11-vs2026-arm`
 - Windows x64：`windows-2025`
 
-各平台 job 真实执行 current-target build、`pnpm test:native` 与 `pnpm pack:release`，并上传 npm candidate。普通 CI 还可静态校验 Dev 脚本和 Compose 配置，但**不执行 `docker build`、MCP Docker runtime smoke 或 GHCR 推送**。MCP 的真实 Linux amd64 Docker 功能/写入/持久化测试须在 [Dev](dev-environment.md#发布前完整-mcp-验收) 完成；Windows job 是否通过以对应 CI run 为准。Phase 只有在其**各自明确要求**的 Dev、pushed revision 普通 CI 等验收均成功后才能记为 `done`，正式 Release 不作为默认前置。
+各平台 job 真实执行 current-target build、`pnpm test:native` 与 `pnpm pack:release`，并上传 npm candidate。按 [D94](../design/decisions.md#d94-openclaw-docker-development-and-ci)，**Mac 本地不跑 Docker**，开发阶段的镜像构建、隔离写入/持久化测试只在 [OpenClaw](dev-environment.md) 执行；**GitHub Actions PR/main CI 另有独立的 `Unified Docker / Linux amd64` job**，使用当前 revision 构建单进程镜像并运行初始化、Web/API/MCP 四 Tool、31/31 SDK、认证、重启持久化的隔离容器测试。普通 CI 不推送 GHCR。Phase 只有在自己要求的本地质量、OpenClaw Dev、最终 pushed revision 的 Ubuntu Validate / Runtime matrix / Docker CI 与真实客户端验收均完成后才能标为 `done`；正式 Release 不作为默认前置。
 
 ## MVP Release Closure
 
@@ -316,13 +316,13 @@ git push origin "v${KGOS_VERSION}"
 
 ### MCP Docker 镜像发布
 
-MCP Server **只交付 Linux amd64 Docker 镜像**，不提供独立 MCP npm 包或 arm64 镜像；现有 CLI / SDK / Runtime 八个 npm 包继续沿用上述 Release 流程。Docker 使用同一 `v<package-version>` Release Tag，镜像地址为 `ghcr.io/byiyli/kgos-mcp:v<version>`（owner 由工作流转换成小写）。**这个地址是待正式发布的目标，不代表当前版本已经存在**。
+KG OS 统一服务**只交付 Linux amd64 Docker 镜像**，不提供独立 MCP npm 包或 arm64 镜像；现有 CLI / SDK / Runtime 八个 npm 包继续沿用上述 Release 流程。Docker 使用同一 `v<package-version>` Release Tag，新的单进程镜像地址为 `ghcr.io/byiyli/kgos:v<version>`（owner 由工作流转换成小写）。**这个地址是待正式发布的目标，不代表当前版本已经存在**。
 
 - 在六平台 public-registry smoke 成功后，Release 的 `docker-mcp` job 从**同一 commit**构建 `linux/amd64`，为镜像标注 source、version、revision。镜像构建需要的 Linux x64 native 扩展从已发布 Runtime npm 包取得；仓库内部临时 npm tarball 只是镜像构建材料，不作为用户安装入口。
-- Docker Smoke 对**同一待发布镜像**创建临时 Volume，验证容器 `init`、四个 Tool、31/31 SDK 方法、鉴权、写入回读及重启持久化，测试后删除测试容器/Volume但保留待发布镜像；失败立即阻止 GHCR 发布。
+- Docker Smoke 在远程 CI 的 Linux runner 对**同一待发布镜像**创建临时 Volume，使用 `scripts/mcp-unified-docker-smoke.mjs` 验证容器 `init`、四 Tool、31/31 SDK、认证隔离、写入及持久化重启；失败阻止 GHCR 发布。**Mac 不运行这个脚本**，OpenClaw 开发测试也可独立运行它。
 - 成功后使用 GitHub Actions 自动签发的 `GITHUB_TOKEN`（仅 Docker job 启用 `packages:write`）推送 GHCR，再重新拉取检验平台、源 revision 和 digest。GitHub Release 记录带版本的镜像和 digest 引用；**CI 成功不能替代已授权的生产部署**。
 - GHCR 新 package 可能默认是 **private**。若要让外部用户无需登录就能拉取，首次发布后在 GitHub Packages 中核对该 package 与本仓库的关联、配置 Public visibility，并从未登录的客户端真实拉取验证。私有镜像则需消费者自己的授权；无需向 CI 添加 Docker Hub Token 或长期 PAT。该权限动作与镜像发布分开验收。
-- 打包完成或 workflow 文件存在**不等于已发布**。普通 `main` / Pull Request CI **不构建或测试 MCP Docker 镜像**，也不具有 `packages:write`；Release CI 才构建正式镜像、做发布前产物 Smoke 并推送 GHCR。正式发布之前仍须完成 Dev 验收，并另行授权提交、推送、确认版本及发布 tag。
+- 打包完成或 workflow 文件存在**不等于已发布**。普通 `main` / Pull Request **远程 CI 会构建并测试 Docker 镜像，但不推送 GHCR，也没有 `packages:write`**；Release CI 构建正式镜像、验收并推送 GHCR。正式发布前仍须完成 OpenClaw 开发验收，并另行授权提交、推送、确认版本及发布 tag；本地 Mac 不需要 Docker。
 
 若某次 Release 已经发布部分 package，恢复时传入该次**已结束**且聚合成功的 run ID，复用它的 `release-set`。恢复工作流会核对来源 workflow、tag revision、version 与每个 tarball 的完整性，再继续缺失的 package。native 构建产物在不同 run 间可能有不同哈希，部分发布后不能用重新构建的候选替代已发布产物。
 

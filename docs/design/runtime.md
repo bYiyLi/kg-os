@@ -83,7 +83,7 @@ Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemo
 - **显式统一监听**：目标支持 `kgosd --root <workspace> [--host <address>] [--port <0..65535>] [--tls-cert <path> --tls-key <path>]`；网络选项可由 `KGOSD_HOST` / `KGOSD_PORT` / `KGOSD_TLS_CERT` / `KGOSD_TLS_KEY` 提供，命令行优先、未指定时保持现有默认。TLS 证书与私钥必须成对。端口 0 仍发布真实绑定端口；不增加独立 MCP 监听地址 / 端口。
 - **安全入口**：监听 `0.0.0.0` 只是网络暴露，不代表已提供 TLS。远程使用必须有真实 HTTPS 或可信的加密代理 / 通道，且路由保护生效；用户自行选择代理或隧道。即使一个 listener 对外，`/api/v1/*` 仍只接受 Instance Bearer，`/mcp` 仍只接受独立 MCP 静态 Bearer 或 OAuth Access Token；Web 静态资源可匿名读取，但 Web 调用业务 API 不可绕过认证。外部 MCP 调用方永不取得 `auth.json` Token。
 - **启用规则**：只有显式配置有效 MCP 管理员 Token 来源时才注册可调用的 MCP Tool / 认证入口；未启用 MCP 不改变现有 CLI、API、Web 的启动就绪及本机使用。OAuth 额外要求显式 issuer。MCP 的路径、Token/OAuth、预算和安全规范由 [MCP owner](mcp.md#部署交付与运行合同) 定义，不在本文件复制第二套配置。
-- **部署模型**：单进程不等于必须对所有路由公开放行；用户可在同一个 HTTPS 入口上对代理路由设置自己的限制，但 KG OS 不新增网络 Gateway。正式 Docker 仅交付一个运行 `kgosd` 的容器，Web 资源与 QuickJS WASM 编译进产品产物，运行时不依赖 Node.js MCP Server。该目标尚未实现，原本独立的 `packages/mcp` 与 Dockerfile 当前仍属于迁移前实现，不能当作目标验收证据。
+- **部署模型**：单进程不等于必须对所有路由公开放行；用户可在同一个 HTTPS 入口上对代理路由设置自己的限制，但 KG OS 不新增网络 Gateway。正式 Docker 仅交付一个运行 `kgosd` 的容器，Web 资源与 QuickJS WASM 编译进产品产物，运行时不依赖 Node.js MCP Server。旧独立 Node MCP 和双进程 Docker 源码已从工作树清理，Git 历史保留为迁移证据；**当前实现、开发验收、CI 与发布状态统一由 [Phase 16](../development/phases/16-kgosd-unified-mcp.md) 维护**。
 
 ### Web 交互设计状态
 

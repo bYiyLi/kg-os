@@ -12,7 +12,7 @@ const allowed = new Set(
   ).split(";")
 );
 
-for (const name of ["cli", "web", "mcp"]) {
+for (const name of ["cli", "web"]) {
   const output = await runCapture(
     "pnpm",
     ["--filter", "@kgos/" + name, "licenses", "list", "--prod", "--json"],

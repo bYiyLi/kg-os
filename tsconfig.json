@@ -1,8 +1,4 @@
 {
   "files": [],
-  "references": [
-    { "path": "./packages/sdk" },
-    { "path": "./packages/cli" },
-    { "path": "./packages/mcp" }
-  ]
+  "references": [{ "path": "./packages/sdk" }, { "path": "./packages/cli" }]
 }

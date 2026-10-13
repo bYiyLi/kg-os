@@ -27,8 +27,6 @@
     "check:licenses:rust": "node scripts/check-rust-licenses.mjs",
     "check:licenses:npm": "node scripts/check-npm-licenses.mjs",
     "check:markdown": "markdownlint-cli2 --config config/quality/markdownlint-cli2.yaml",
-    "check:mcp:staging": "node scripts/pack-mcp.mjs --temporary",
-    "mcp:staging:smoke": "node scripts/mcp-packaged-smoke.mjs",
     "check:package": "node scripts/pack-release.mjs --temporary",
     "check:repo": "sherif --fail-on-warnings",
     "check:security": "pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org && pnpm audit --audit-level high --registry=https://registry.npmjs.org",
@@ -53,6 +51,7 @@
     "setup": "node scripts/setup.mjs",
     "test": "vitest run --config config/test/vitest.config.ts",
     "test:coverage": "vitest run --coverage --config config/test/vitest.config.ts",
+    "test:docker:unified": "node scripts/mcp-unified-docker-smoke.mjs",
     "test:e2e": "pnpm build && playwright test --config config/test/playwright.config.ts",
     "test:go": "node scripts/go-task.mjs test",
     "test:go:coverage": "node scripts/go-task.mjs coverage",
@@ -65,6 +64,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@eslint/js": "10.0.1",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "@playwright/test": "1.63.0",
     "@secretlint/secretlint-rule-preset-recommend": "13.0.5",
     "@types/node": "24.13.6",
@@ -88,7 +88,8 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0",
     "vite": "8.3.0",
-    "vitest": "5.0.1"
+    "vitest": "5.0.1",
+    "zod": "4.3.6"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

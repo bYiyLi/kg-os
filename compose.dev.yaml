@@ -1,4 +1,6 @@
 # cspell:words healthcheck
+# The historical Compose service name 'mcp' is kept for image-only rollback.
+# This container now runs ONE Go kgosd process for Web, API and MCP.
 name: kgos-dev
 
 services:
@@ -7,20 +9,26 @@ services:
     platform: linux/amd64
     build:
       context: .
-      dockerfile: Dockerfile.mcp
+      dockerfile: Dockerfile.unified
       args:
         NODE_IMAGE: ${KGOS_DEV_NODE_IMAGE:-node:24.15.0-bookworm-slim}
+        DEBIAN_IMAGE: ${KGOS_DEV_DEBIAN_IMAGE:-docker.y2l.top/debian:bookworm-slim}
         HTTP_PROXY: ${HTTP_PROXY:-}
         HTTPS_PROXY: ${HTTPS_PROXY:-}
         http_proxy: ${http_proxy:-}
         https_proxy: ${https_proxy:-}
     restart: unless-stopped
+    # The existing persistent Dev Workspace and administrator secret belong
+    # to UID 1000. Keep their ownership unchanged during the image migration.
+    # The distributed image itself still defaults to non-root UID 10001.
+    user: "1000:1000"
     environment:
       KGOS_ROOT: /workspace
       KGOS_MCP_HOST: 0.0.0.0
       KGOS_MCP_PORT: "3777"
       KGOS_MCP_TOKEN_FILE: /run/secrets/kgos-mcp-token
       KGOS_MCP_OAUTH_ISSUER: ${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}
+      # Old Node MCP env is temporarily retained for safe image-only rollback.
       NODE_USE_ENV_PROXY: "1"
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
@@ -38,9 +46,15 @@ services:
     healthcheck:
       test:
         - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:3777/mcp').then(r => process.exit(r.status === 401 ? 0 : 1)).catch(() => process.exit(1))"
+        - /usr/bin/timeout
+        - "4"
+        - /usr/bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/3777
+          printf 'GET /mcp HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          IFS=' ' read -r protocol status rest <&3
+          test "$$status" = 401
       interval: 10s
       timeout: 5s
       start_period: 20s

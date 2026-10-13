@@ -1,114 +1,125 @@
-# KG OS MCP 使用与私人 Plugin 接入
+# KG OS 统一 MCP 与私人 Plugin 接入
 
-<!-- cspell:words openclaw healthcheck -->
+<!-- cspell:words openclaw -->
 
-本指南描述通过 **Linux amd64 Docker 镜像**部署的 KG OS MCP 服务。MCP 不提供独立 npm 包或 Linux arm64 镜像；CLI / SDK / Runtime npm 产品继续独立维护。这里的镜像构建示例不是已发布的 OCI Registry 镜像。正式行为见 [MCP 设计](../design/mcp.md)。
+KG OS 的当前目标是**一个 Go `kgosd` 进程、一个 HTTP listener**，同时提供内嵌 Web、现有 `/api/v1/*` 与 `/mcp`。服务端 JavaScript 使用 QuickJS-NG WASM / Go Kernel Bridge，不依赖运行时 Node.js MCP 服务，也不需要宿主安装 `kgosd`。正式合同见 [MCP](../design/mcp.md)、[Runtime](../design/runtime.md)、[D93](../design/decisions.md#d93-kgosd-unified-mcp)。
 
-## 1. Docker 服务入口与配置
+**当前状态**：Phase 16 为 `in_progress`。Go 单进程 Linux amd64 镜像已在 OpenClaw 开发环境构建并部署、隔离 31/31 SDK Smoke 成功；现有 ChatGPT 私人连接已调用新版四 Tool，官方 Skill 已保存到私人 Plugin v1.0.1。**未完成最终推送 revision 的 GitHub CI、客户端新授权与 Skill 激活验收，亦未发布 GHCR**。旧 `Dockerfile.mcp` / `packages/mcp` 的源码已移除，历史仅保留 Git 记录，不再是服务端部署入口。
 
-前提：Docker Engine 支持 **Linux amd64** 容器，镜像已取得或从 KG OS 源码构建。镜像自带 Node.js、MCP、SDK/CLI、`kgosd` 与扩展，**宿主机不需要 Node.js、npm 或 `kgosd`**。初次使用须在容器内按现有 `kg init` 规则明确初始化 Workspace；已有 Workspace 则复用持久卷。
+## 1. 镜像与首次初始化
 
-镜像内 `KGOS_ROOT` 默认为 `/workspace`，只使用一个 Workspace / Instance。缺少初始化配置、daemon 不可用或缺少 MCP Token 时 `serve` 失败。镜像默认监听容器内 `0.0.0.0:3777/mcp`，宿主机监听范围由 Docker 端口映射决定；`--port 0` 支持容器内动态端口分配，宿主机映射须与实际端口匹配。内部 `kgosd.lock` 和 `auth.json` 的解析/连接/自动启动**复用正式 CLI**，不是第二套 Instance 配置。
-
-完整的部署入口：
-
-| 命令 | 用途 |
-| --- | --- |
-| `docker run ... <image> serve --help` | 查看 Instance、网络、认证、TLS、预算、日志完整参数 |
-| `docker run ... <image> doctor --json` | 只读诊断容器内配置/Instance/Runtime/认证，不自动启动 daemon |
-| `docker run ... <image> serve [options]` | 启动标准 Streamable HTTP 服务 |
-| `docker run ... <image> --version` | 查看镜像内 MCP 版本 |
-
-所有选项遵循**命令行 > 对应环境变量 > 默认值**。通用 MCP 命令要求显式 Root 来源，官方镜像已设置 `KGOS_ROOT=/workspace`；用户覆盖时仍须明确选定唯一 Root。MCP 支持 `--host`、`--port`、`--path`，可选成对的 `--tls-cert` / `--tls-key`，凭证通过 `--token-env` 或 `--token-file` 指定来源；`--oauth-issuer` 可启用 ChatGPT 单管理员 OAuth（默认关闭）。还提供请求超时/并发/大小限制、Sandbox 与 Preview 资源预算及日志级别/格式。对应环境变量以 `KGOS_MCP_` 为前缀，完整表及校验范围见 [部署合同](../design/mcp.md#部署交付与运行合同)。`doctor` 的本地就绪不代表远端 ChatGPT 已连通。
-
-## 2. Linux amd64 Docker 镜像部署
-
-已正式发布的版本可从 `ghcr.io/byiyli/kgos-mcp:v<version>` 取得（只有实际版本存在且镜像可见/授权时才能拉取）。**当前尚无本阶段新镜像的实际发布证据**；从本地 KG OS 源码构建可使用下列命令：
+镜像目标名称为 `ghcr.io/byiyli/kgos:v<version>`，只有在对应版本确实发布且可拉取时才可使用。Linux amd64 开发构建在 **OpenClaw**（`ssh openclaw`）执行，**不要在 Mac 上运行 Docker**。GitHub Actions CI 会独立构建与测试。若从已取得的 Phase 16 源码构建：
 
 ```sh
-docker build --platform linux/amd64 -f Dockerfile.mcp -t kgos-mcp:local .
-docker volume create kgos-mcp-workspace
+docker build --platform linux/amd64 -f Dockerfile.unified -t kgos-unified:local .
+docker volume create kgos-workspace
 ```
 
-首次初始化（以下为示例配置，Embedding endpoint、模型、维度必须替换为实际配置）：
+容器中的 Workspace Root 固定为 `/workspace`，Instance 目录为 `/workspace/.kgos`。第一次启动必须由用户**显式提供完整**的现有 `config.toml`；不要把示例配置自动用作生产配置。配置文件写入持久 Volume 的 `/workspace/.kgos/config.toml`，运行文件归容器 UID/GID **10001:10001**，敏感文件保持受保护的权限。仅用于隔离测试的配置结构示例：
+
+```toml
+[cache]
+path = "cache/openai-compatible.db"
+max_size_mb = 4096
+
+[fulltext]
+analyzer = "unicode61"
+
+[embedding]
+base_url = "https://example.invalid/v1"
+model = "replace-with-real-model"
+dimensions = 1536
+similarity = "cosine"
+api_key_env = "OPENAI_API_KEY"
+```
+
+`example.invalid` 不是可用的 Embedding Provider。只在配置文件准备完成后执行：
 
 ```sh
 docker run --rm --platform linux/amd64 \
-  -v kgos-mcp-workspace:/workspace kgos-mcp:local init \
-  --cache-path cache/openai-compatible.db --cache-max-size-mb 4096 \
-  --embedding-base-url https://example.invalid/v1 --embedding-model replace-me \
-  --embedding-dimensions 1536 --embedding-similarity cosine \
-  --embedding-api-key-env OPENAI_API_KEY --no-additional-extensions
+  -v kgos-workspace:/workspace \
+  kgos-unified:local init --root /workspace
 ```
 
-镜像的 `init` 仍要求完整显式配置，不会猜测参数；示例 URL 不可用于实际 Embedding。镜像中 MCP 与 `kgosd` 可以是不同进程，但**不需要宿主机安装 daemon**。
+`init` 是**同一 Go 二进制**的一次性入口：必须完成原生扩展、Knowledge Base bootstrap 和带 Instance Bearer 的 API readiness，成功后才写入 `.kgos/initialized.json`；再次执行会检查已完成的 Instance，不假装失败的初始化已经成功。重新创建容器时复用同一 Volume，以保留 `kgos.db`、`auth.json`、已提交的 State / Branch。
 
-在宿主机**仓库外**创建只有授权用户可读取的 `mcp.env`（如权限 `0600`），填入 `KGOS_MCP_TOKEN=<独立随机管理员凭证>`；如需 ChatGPT OAuth，再提供 `KGOS_MCP_OAUTH_ISSUER=<实际 HTTPS origin>`。MCP Token 与 `.kgos/auth.json` 的内部 Token 必须隔离。启动及只读诊断：
+## 2. 启动、配置与认证
+
+先在 Linux 宿主受保护的文件中保存独立 MCP 管理员凭证，例如 `/secure/path/mcp.env`（权限 `0600`），内容是 `KGOS_MCP_TOKEN=<高熵随机凭证>`。这与容器自己创建的 `.kgos/auth.json` **Instance Token** 是不同的秘密；不要把任何 Token 粘贴到聊天、URL 或公开文件。需要 ChatGPT 时可在相同受保护配置中加上 `KGOS_MCP_OAUTH_ISSUER=https://your-actual-domain.example`。
 
 ```sh
-docker run -d --name kgos-mcp --platform linux/amd64 \
+docker run -d --name kgos-unified --platform linux/amd64 \
   --env-file /secure/path/mcp.env \
-  -v kgos-mcp-workspace:/workspace \
-  -p 127.0.0.1:3777:3777 kgos-mcp:local serve
-docker exec kgos-mcp node /opt/kgos/node_modules/@kgos/mcp/dist/bin.js doctor --json
+  -v kgos-workspace:/workspace \
+  -p 127.0.0.1:3777:3777 \
+  kgos-unified:local
 ```
 
-重建容器须重新挂载同一个 Workspace volume，避免丢失 Instance；本机 `doctor` 的成功不代表远程可达。上述映射只向宿主机 loopback 开放端口，远程使用须由用户自行提供受保护的 HTTPS / Tunnel / 代理，**不要直接公开裸 HTTP**。镜像构建可使用内部临时 npm tarball 安装依赖，但这些中间物不会以 MCP npm 产品发布。
+镜像默认执行 `kgosd --root /workspace --host 0.0.0.0 --port 3777`。用户可以覆盖 ENTRYPOINT 的命令参数，但必须显式指定 Root。例如 `docker run ... kgos-unified:local --root /workspace --host 0.0.0.0 --port 3777 --mcp-path /mcp`。`kgosd --help` 显示当前全部参数；常用选项：
 
-正式发布后，应以 GitHub Release 提供的 `ghcr.io/byiyli/kgos-mcp@sha256:<digest>` 固定镜像，或使用对应的 `v<version>` tag；将上例中的本地 `kgos-mcp:local` 替换成真实可拉取的镜像引用。GHCR 首次推送的镜像可能默认私有；未经包所有者设置 Public visibility 时需要拥有 `read:packages` 权限的认证，不能把“镜像已上传”当作“用户已能匿名安装”。详情见 [Docker 镜像发布](development.md#mcp-docker-镜像发布)。
-
-### KG OS Linux 长期 Dev 环境
-
-KG OS 的固定远端开发环境使用 `ssh openclaw`、`/data/apps/KgosDev` 和独立的 `kgos-dev` Compose 项目。**该 Dev 环境单独将宿主 MCP 端口绑定 `0.0.0.0` 供其它设备访问**，与普通 MCP 默认只监听本地回环的行为不同；Bearer 认证保持生效，明文 HTTP 不适合在公网传输 Token。日常同步、部署、备份、回退、状态、日志与只读验收统一执行 `pnpm dev:mcp <action>`；**完整运维规范与全部命令只维护在 [远程开发环境指南](dev-environment.md)**，本 MCP 用户指南不复制第二份 Dev 流程。真实 Docker amd64 验收证据见 [Phase 15](../development/phases/15-mcp.md#当前实现与验收证据)。
-
-**两层认证彼此独立**：
-
-| 边界 | 凭证 | 谁持有 |
+| 类别 | CLI | 环境变量 |
 | --- | --- | --- |
-| 普通 MCP 客户端 → `@kgos/mcp` | `Authorization: Bearer <KGOS_MCP_TOKEN>`，独立的随机 Token | 用户配置的 MCP 客户端、MCP Server 进程 |
-| ChatGPT → `@kgos/mcp`（启用 OAuth） | 短效 OAuth Access Token；浏览器首次授权使用同一管理员 `KGOS_MCP_TOKEN`，**不交给 ChatGPT** | ChatGPT 持有 OAuth Access/Refresh Token，MCP 负责签发和校验 |
-| `@kgos/mcp` → `kgosd` | `.kgos/auth.json` 里的原始 Instance Bearer | 仅 KG OS 本地 CLI/MCP 进程 |
+| 统一监听 | `--host`, `--port` | `KGOSD_HOST`, `KGOSD_PORT` |
+| TLS | `--tls-cert`, `--tls-key`（须成对） | `KGOSD_TLS_CERT`, `KGOSD_TLS_KEY` |
+| MCP 路径 | `--mcp-path` | `KGOS_MCP_PATH` |
+| 管理员凭证来源 | `--mcp-token-env`（环境变量**名称**）、`--mcp-token-file` | `KGOS_MCP_TOKEN_ENV`, `KGOS_MCP_TOKEN_FILE` |
+| OAuth | `--mcp-oauth-issuer` | `KGOS_MCP_OAUTH_ISSUER` |
 
-客户端不能通过 JavaScript Sandbox 获取 Token、环境变量、文件路径或任意 HTTP。容器默认监听其内部网络，宿主机映射应优先限制在 loopback，不能直接用明文 HTTP 暴露在公网。**远程使用时**采用用户自行选择的受控 HTTPS 反向代理/隧道，完成 TLS、访问控制及正确的 `Authorization` 透传；不需要也不允许将 `kgosd` 自身公开监听。MCP Tool 调用仍采用受认证的服务端客户端边界。
+请求超时、并发、大小、Sandbox 时间/内存/调用量/流数量及 Preview 缓存预算的完整参数见 [MCP 运行配置](../design/mcp.md#部署交付与运行合同)。MCP Token 未配置时，`kgosd` 仍可提供 Web/API，但不会开放 MCP 工具；错误 Token、路径冲突或无效 OAuth 配置必须拒绝。服务本身不创建公网 URL、Tunnel、用户账户或外部身份系统。
 
-## 3. 验证 MCP
+同一个监听端口不代表三个入口有相同认证：`/api/v1/*` 只接受 Instance Bearer，`/mcp` 接受独立 MCP 静态 Bearer 或已启用的 OAuth Access Token，内嵌 Web 不因此获得绕过 API 认证的权限。
 
-使用支持 Streamable HTTP 和 Bearer 的标准 MCP Client 或 MCP Inspector 连接 `/mcp`。必须先完成认证；返回工具恰好如下：
+本地验证：
 
-| Tool | 用途 | 关键输入 |
-| --- | --- | --- |
-| `kgos_preview` | 全 Branch Head、完整 Ontology 的固定 Markdown 视图 | `offset`、`limit`（100–500，默认 300）、`viewRevision` |
-| `state_ancestry` | Commit 祖先 DAG 的分页 Markdown 和完整 Message 原文 | `root`、`limit`、`cursor` |
-| `kgos_read` | 隔离的 JS，只能调用现有 SDK 的只读方法 | `code` |
-| `kgos_run` | 同一 Sandbox，允许 SDK 读取及写入 | `code` |
+```sh
+curl -i http://127.0.0.1:3777/
+curl -i http://127.0.0.1:3777/mcp
+curl -i http://127.0.0.1:3777/api/v1/evolution/overview
+```
 
-每次 `kgos_preview` 首次调用按全部 Branch Head 固定一个视图并生成 `viewRevision`；继续读取传入原 revision，`offset` 是**完整文本的零基行号**。缓存只在进程内，默认 10 分钟、最多 8 份视图；重启/过期后需要重新读取。超预算、分页不完整或错误 State 会明确失败，不能把部分模型当成完整视图。
+未授权 MCP/API 请求必须被拒绝；真正的 MCP 工具发现和业务读写通过受认证的标准 Streamable HTTP 客户端进行。上述回环端口映射只用于 Linux Docker 宿主本机；远程连接需用户配置实际可信 HTTPS / Tunnel / 代理，保留原始 Path、HTTP Method 与 Authorization Header，**不可通过明文公网传输凭证**。
 
-`kgos_read` 示例：
+## 3. MCP Tool 和 JavaScript
+
+MCP 只暴露以下四个 Tool：
+
+| Tool | 输入与用途 |
+| --- | --- |
+| `kgos_preview` | `offset?`、`limit?`（默认 300、允许 100–500）、`viewRevision?`；读取全部分支与完整 pinned Ontology 的稳定 Markdown 行窗口 |
+| `state_ancestry` | `root`、`limit?`（默认 20、允许 1–1000）、`cursor?`；读取 Commit DAG 和完整原始 Message |
+| `kgos_read` | `code`；仅允许 15 个 SDK 只读方法 |
+| `kgos_run` | `code`；允许 15 Read + 16 Write SDK 方法 |
+
+在 `kgos_read` / `kgos_run` 的 `code` 中编写 **async JavaScript 函数体**，直接使用 `ontology`、`object`、`graph`、`evolution` 四个无前缀命名空间，无需创建 SDK Client 或 HTTP 连接；必须显式 `return` JSON-compatible 值：
 
 ```js
-const overview = await evolution.overview();
-const state = overview.state;
-const [ontologyResult, graphResult] = await Promise.all([
+const { state } = await evolution.overview();
+const [model, graphData] = await Promise.all([
   ontology.read({ at: state }),
   graph.query({ at: state, cypher: "MATCH (n) RETURN n LIMIT 10" })
 ]);
-return { state, ontologyResult, graphResult };
+return { state, model, graphData };
 ```
 
-它是在 Tool `code` 字段中提交的 **async 函数体**，不是 Node 模块；顶层对象直接叫 `ontology`、`object`、`graph`、`evolution`，没有 `kgos.` 前缀。脚本必须显式 `return` JSON 可表示值。支持真正的 `Promise.all()` 与 `for await...of`，Graph stream 会通过 SDK 的原生迭代接口按需读取，不在 MCP 主进程预读完整结果。
+支持 `async/await`、真正并发的 `Promise.all` 和逐条 `for await...of` Graph Stream；受控 Guest 不提供 Node.js、文件、网络、环境变量或任意宿主方法。脚本中的多次写入**不组成一个事务**：如果后续调用失败、超时或断线，之前的 State、Branch、Tag、Merge 变更可能已生效，先读回真实状态再决定是否继续，**不要盲目重试**。
 
-`kgos_run` 的每个 SDK mutation 使用原有独立 HTTP/事务语义。**一次 JS 脚本不等于跨方法原子事务**；前一个调用已完成、后一个抛错或网络中断时，先用 State/Branch/Tag/Merge 的现有读取核对实际结果，不自动重试。Commit `message` 可采用 `## 简介` / `## 改动` 两段完整 Markdown，消息本身不是数据库结构字段。
+Preview 的 `viewRevision` 属于进程内有界缓存；过期后返回 `VIEW_EXPIRED`，重新从 `offset=0` 获取新视图。索引中的 Offset/Lines 是整个 Markdown 文档的**绝对行号**，不是本页相对行号。详细 AI 使用方法见 [官方 KG OS Skill](../../plugins/kgos/skills/kgos/SKILL.md)。
 
-## 4. 接入 ChatGPT 私人 Plugin
+## 4. ChatGPT OAuth 与私人 Plugin
 
-见 [私人 Plugin 面向 AI 的安装 Runbook](../../plugins/kgos/INSTALL.md)。先把本机 Server 经**用户自行选定**的 HTTPS/Tunnel/反向代理暴露给 ChatGPT，取得其真实公共 origin（例如 `https://kgos.example.com`），在启动 MCP 时加上 `--oauth-issuer https://kgos.example.com` 或环境变量 `KGOS_MCP_OAUTH_ISSUER`。这个参数不创建公网连接；公网 TLS 可以在 MCP 或可信入口处终止。
+用户自行准备可从 ChatGPT 访问的 HTTPS 入口，例如 `https://kgos.example.com/mcp`，将 `KGOS_MCP_OAUTH_ISSUER` 设置为确切的 `https://kgos.example.com`，而**不是**完整的 `/mcp` URL。代理须原样转发 `/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/token`。
 
-1. 从目标网络确认 `https://kgos.example.com/.well-known/oauth-protected-resource` 与 `https://kgos.example.com/.well-known/oauth-authorization-server` 可读取，MCP 地址 `https://kgos.example.com/mcp` 在未授权时返回包含 `resource_metadata` 的 401。
-2. 在 ChatGPT 中 **Add custom MCP server**，输入完整 MCP URL，认证方式选择 **OAuth**（Client ID Metadata Documents/CIMD；不需要静态 Client Secret）。
-3. ChatGPT 打开 KG OS 自带的管理员授权页面。用户**只在该可信 HTTPS 页面**输入之前配置在 MCP Server 的管理员 Token，确认允许 ChatGPT 使用包含写入的四个 Tool。**授权页面的一次性 Ticket 只有 5 分钟有效期，MCP 服务重启也会让页面失效**；遇到 Ticket 失效提示应返回 ChatGPT 重新发起授权，不能在旧页面反复提交。ChatGPT 获取短期 OAuth Token，后续不需要直接保存管理员 Token。
-4. 验证工具发现和一次只读调用。服务端重启会使进程内签发的 Access/Refresh Token 失效，需要再次授权；默认 Access Token 1 小时、Refresh Token 30 天（期间正常轮换），不提供用户注册。
+ChatGPT 连接使用受限 CIMD 客户端与 OAuth Authorization Code + PKCE S256；管理员只在 KG OS 的可信授权网页输入 MCP 管理员 Token，ChatGPT 持有临时 OAuth Token 而不接触管理员凭证。授权 Ticket 5 分钟有效，重启后需重新授权；不要为了调试而关闭认证。
 
-禁止选择“无认证”绕过 KG OS 的认证边界；不要把管理员 Token 写入 Plugin 文件、MCP URL 或 ChatGPT 对话。**2026-10-12 已由真实 ChatGPT 私人连接验证 OAuth、四 Tool 与写入回读**；这不等于所有客户端版本、Plugin/Skill 激活或全部 SDK 31 方法均已由 ChatGPT 逐项验收。已注册 Connection 的实际动态 App ID 只有在按需创建私人引用包时才需要；基础 MCP-only 私人 Plugin 不要求重复创建。
+官方 [私人 Plugin AI 安装手册](../../plugins/kgos/INSTALL.md)说明 ChatGPT 连接、四 Tool 验证和私人 Plugin 安装。**旧 Phase 15 的实际 OAuth 成功不能代表新 Go MCP 已通过真实 ChatGPT 验收**。官方模板不携带用户 Token、Root 或动态 Connection ID。
 
-当前本地标准 MCP Client 测试不能替代真实 ChatGPT Web/Desktop 的账号授权、Tool 发现、Skill 触发和写入确认验证。后者及各平台 CI 结果需要有独立运行证据，见 [Phase 15 计划](../development/phases/15-mcp.md)。
+## 5. 开发验收与正式发布
+
+Mac 负责源码、Go/TypeScript 测试和 `pnpm validate`；**Docker 开发测试只在 OpenClaw Linux amd64 执行**，普通 GitHub Actions CI 会在 Linux runner 独立构建并测试；正式 Release CI 在获独立授权后构建、验证并推送精确版本的 GHCR 镜像。完整隔离 Docker Smoke：
+
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm test:docker:unified
+```
+
+该命令**只在 OpenClaw/CI Linux 主机运行**，临时创建并清理隔离测试镜像与 Volume；验证非 root / 无 Node、初始化、Web/API/MCP、四 Tool、31/31 方法以及重启持久化。不要对长期 Dev Instance 执行写入测试。实际环境运行见 [OpenClaw Dev Runbook](dev-environment.md)，完成证据归 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)。CI、测试脚本和本指南存在不代表当前镜像已经正式发布。

@@ -99,6 +99,22 @@ verify() {
   status=$(curl --noproxy '*' --silent --max-time 5 --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$port/mcp") || fail "MCP HTTP not reachable"
   [ "$status" = 401 ] || fail "MCP without a credential must return 401, got $status"
 
+  # Phase 16: the deployed image contains only Go kgosd. The external
+  # read-only client runs on OpenClaw and never enters the production image.
+  # Keep the legacy verifier ONLY so an unsuccessful migration can roll back
+  # to the previously verified Node MCP image without touching Instance data.
+  process=$(docker exec "$cid" /bin/cat /proc/1/comm | tr -d '\r\n')
+  if [ "$process" = kgosd ]; then
+    [ "$(docker exec "$cid" /usr/bin/id -u)" = 1000 ] || fail "Unified Dev must preserve existing Workspace UID 1000"
+    KGOS_DEV_ENDPOINT="http://127.0.0.1:$port" \
+      KGOS_DEV_TOKEN_FILE="$token_file" \
+      KGOS_DEV_AUTH_FILE="$workspace/.kgos/auth.json" \
+      KGOS_DEV_OAUTH_ISSUER="${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}" \
+      node "$source_dir/scripts/mcp-dev-accept-unified.mjs" ||
+        fail "Authenticated unified MCP read-only acceptance failed"
+    return 0
+  fi
+
   compose exec -T mcp node --input-type=module -e '
     const issuer = process.env.KGOS_MCP_OAUTH_ISSUER;
     if (!issuer) throw new Error("KG OS Dev OAuth issuer is missing");

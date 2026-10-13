@@ -19,7 +19,14 @@ import (
 
 const maxAPIRequestBytes = 16 << 20
 
-func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handler {
+// ExtraRoute mounts an additional endpoint on the same authenticated KG OS
+// HTTP listener without changing the existing API or Web fallback.
+type ExtraRoute struct {
+	Path    string
+	Handler http.Handler
+}
+
+func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler, extra ...ExtraRoute) http.Handler {
 	if fallback == nil {
 		fallback = http.NotFoundHandler()
 	}
@@ -214,6 +221,11 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler) http.Handle
 	mux.HandleFunc("/api/v1/evolution/merge/resolve", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeResolve))
 	mux.HandleFunc("/api/v1/evolution/merge/finalize", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeFinalize))
 	mux.HandleFunc("/api/v1/evolution/merge/abort", postJSONHandler(runtime.Credential.Token, runtime.Kernel.EvolutionMergeAbort))
+	for _, route := range extra {
+		if route.Path != "" && route.Handler != nil {
+			mux.Handle(route.Path, route.Handler)
+		}
+	}
 	mux.Handle("/", fallback)
 	return mux
 }

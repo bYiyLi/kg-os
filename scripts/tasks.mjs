@@ -38,7 +38,6 @@ const taskCommands = {
     ["exec", "playwright", "test", "--config", "config/test/playwright.config.ts"],
     ["test:native"],
     ["check:package"],
-    ["check:mcp:staging"],
     ["check:licenses"],
     ["check:security"],
     ["check:diff"]

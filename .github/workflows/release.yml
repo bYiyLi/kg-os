@@ -382,7 +382,7 @@ jobs:
           node scripts/release-registry-smoke.mjs --version "${{ needs.preflight.outputs.version }}"
 
   docker-mcp:
-    name: Publish Linux amd64 MCP image
+    name: Publish Linux amd64 unified image
     needs:
       - preflight
       - registry-smoke
@@ -423,7 +423,7 @@ jobs:
           VERSION: ${{ needs.preflight.outputs.version }}
         run: |
           OWNER=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/$OWNER/kgos-mcp:v$VERSION"
+          IMAGE="ghcr.io/$OWNER/kgos:v$VERSION"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Build exact Linux amd64 release image
@@ -432,7 +432,8 @@ jobs:
           REVISION: ${{ needs.preflight.outputs.revision }}
           VERSION: ${{ needs.preflight.outputs.version }}
         run: |
-          docker build --platform linux/amd64 -f Dockerfile.mcp \
+          docker build --platform linux/amd64 -f Dockerfile.unified \
+            --build-arg "RUNTIME_VERSION=$VERSION" \
             --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$REVISION" \
             --label "org.opencontainers.image.version=v$VERSION" \
@@ -440,8 +441,8 @@ jobs:
 
       - name: Smoke-test the exact image before publishing
         env:
-          KGOS_MCP_DOCKER_SMOKE_IMAGE: ${{ steps.image.outputs.image }}
-        run: node scripts/mcp-docker-smoke.mjs
+          KGOS_UNIFIED_DOCKER_SMOKE_IMAGE: ${{ steps.image.outputs.image }}
+        run: node scripts/mcp-unified-docker-smoke.mjs
 
       - name: Authenticate to GHCR
         env:
@@ -538,7 +539,7 @@ jobs:
 
           Supported native targets: macOS, Linux glibc, and Windows arm64/x64.
 
-          MCP Server Docker image (Linux amd64 only):
+          Unified KG OS Docker image (Linux amd64 only):
           - $MCP_IMAGE
           - Immutable digest reference: $MCP_DIGEST_REF
 

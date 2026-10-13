@@ -1,0 +1,71 @@
+# KG OS Phase 16: one Linux amd64 kgosd process serving Web, HTTP API and MCP.
+# Build stages may use Node.js to prepare browser assets and pinned native files.
+# The final image contains neither Node.js nor the old TypeScript MCP service.
+ARG NODE_IMAGE=node:24.15.0-bookworm-slim
+ARG DEBIAN_IMAGE=debian:bookworm-slim
+
+FROM ${NODE_IMAGE} AS web-builder
+WORKDIR /src
+RUN npm install --global --ignore-scripts --no-audit --no-fund pnpm@10.34.5
+COPY . .
+RUN pnpm install --frozen-lockfile --ignore-scripts \
+    && pnpm --filter @kgos/web build
+
+# Phase 16 reuses the already published, fixed v0.2.1 Linux native Runtime
+# files as *build artifacts*. This does not install or require Node.js in the
+# running container and does not publish a new npm distribution.
+FROM ${NODE_IMAGE} AS native-builder
+ARG RUNTIME_VERSION=0.2.1
+RUN npm install --prefix /tmp/native --omit=dev --ignore-scripts --no-audit --no-fund \
+    @kgos/runtime-linux-x64@${RUNTIME_VERSION}
+
+FROM ${NODE_IMAGE} AS daemon-builder
+ARG RUNTIME_VERSION=0.2.1
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ca-certificates curl gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl --fail --location --retry 5 --retry-all-errors --output /tmp/go.tar.gz \
+      https://go.dev/dl/go1.27.2.linux-amd64.tar.gz \
+    && printf '%s  /tmp/go.tar.gz\n' \
+      'ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5' \
+      | sha256sum --check \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOTOOLCHAIN=local
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd ./cmd
+COPY internal ./internal
+COPY --from=web-builder /src/packages/web/dist ./internal/webui/dist
+RUN mkdir -p /out && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+    go build -tags=sqlite_fts5 -trimpath -o /out/kgosd ./cmd/kgosd
+
+COPY --from=native-builder /tmp/native/node_modules/@kgos/runtime-linux-x64/ /out/runtime/
+RUN RUNTIME_VERSION="${RUNTIME_VERSION}" node -e 'const fs=require("node:fs"),crypto=require("node:crypto"); const base="/out/runtime",p=base+"/manifest.json"; const m=JSON.parse(fs.readFileSync(p,"utf8")); if(m.platform!=="linux"||m.arch!=="x64"||m.version!==process.env.RUNTIME_VERSION)throw Error("Native Runtime mismatch"); const daemon=m.files.find(item=>item.file==="kgosd"); if(!daemon)throw Error("Missing kgosd"); fs.copyFileSync("/out/kgosd",base+"/kgosd"); fs.chmodSync(base+"/kgosd",0o755); daemon.sha256=crypto.createHash("sha256").update(fs.readFileSync(base+"/kgosd")).digest("hex"); fs.writeFileSync(p,JSON.stringify(m,null,2)+"\n");'
+RUN set -eu; \
+    modules="$(go env GOPATH)/pkg/mod"; \
+    mkdir -p /out/notices; \
+    cp "$modules/github.com/aperturerobotics/go-quickjs-wasi-reactor@v0.15.1/LICENSE" /out/notices/QuickJS-NG-WASI-MIT.txt; \
+    cp "$modules/github.com/modelcontextprotocol/go-sdk@v1.8.0/LICENSE" /out/notices/MCP-Go-SDK-Apache-MIT.txt; \
+    cp "$modules/github.com/tetratelabs/wazero@v1.12.0/LICENSE" /out/notices/wazero-Apache-2.0.txt; \
+    cp "$modules/github.com/tetratelabs/wazero@v1.12.0/NOTICE" /out/notices/wazero-NOTICE.txt
+
+FROM ${DEBIAN_IMAGE}
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 kgos \
+    && useradd --uid 10001 --gid 10001 --create-home kgos \
+    && mkdir -p /workspace \
+    && chown 10001:10001 /workspace
+WORKDIR /opt/kgos
+COPY --from=daemon-builder --chown=10001:10001 /out/runtime/ /opt/kgos/
+COPY --from=daemon-builder /out/notices/ /opt/kgos/third-party-notices/
+USER 10001:10001
+ENV KGOS_ROOT=/workspace
+VOLUME ["/workspace"]
+EXPOSE 3777
+ENTRYPOINT ["/opt/kgos/kgosd"]
+CMD ["--root", "/workspace", "--host", "0.0.0.0", "--port", "3777"]

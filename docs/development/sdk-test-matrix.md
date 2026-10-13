@@ -1,22 +1,23 @@
 # SDK 31 个方法：真实验收矩阵
 
-本页是 **KG OS SDK / MCP 的工程测试证据**，不是新的 API 或产品合同。公共方法定义以 [`packages/sdk/src/client.ts`](../../packages/sdk/src/client.ts) 为准；真实 SDK 桥接的封闭权限表在 [`sdk-dispatch.ts`](../../packages/mcp/src/sdk-dispatch.ts)；Phase 完成标准仍以 [Phase 15](phases/15-mcp.md) 为准。
+<!-- cspell:words mcpserver mcpsandbox -->
+
+本页是 **KG OS SDK / MCP 的工程测试证据**，不是新的 API 或产品合同。公共 HTTP 客户端方法以 [`packages/sdk/src/client.ts`](../../packages/sdk/src/client.ts) 为准；正式 Go MCP 的封闭权限表在 [`internal/mcpsandbox/engine.go`](../../internal/mcpsandbox/engine.go)，SDK → Kernel 适配在 [`internal/mcpserver/dispatch.go`](../../internal/mcpserver/dispatch.go)；当前验收以 [Phase 16](phases/16-kgosd-unified-mcp.md) 为准。2026-10-12 的旧 TypeScript MCP 测试细节作为 Phase 15 历史证据留在本页，不再是当前源码入口。
 
 ## 1. 验收层级
 
 | 层级 | 入口 | 实际验证 | 不能据此声称 |
 | --- | --- | --- | --- |
 | SDK HTTP 单元测试 | `packages/sdk/src/index.test.ts` | 请求构造、Bearer、Typed JSON、公共错误、Graph 增量流/取消 | 真实数据库中的方法行为 |
-| MCP 方法库存和权限 | `packages/mcp/src/sdk-dispatch.test.ts` | **动态枚举 SDK 所有公开方法**，与封闭白名单精确一致；31/31 路由及 Read 禁写；模拟 HTTP | 所有方法的真实写入/合并结果 |
-| MCP + 真实 daemon | `scripts/mcp-sdk-matrix.mjs` | 临时 Instance、真实 OAuth 之外的 Bearer MCP Client、QuickJS Worker、公开 SDK、Lithograph 原生存储；**31 个方法均成功** | 真实 ChatGPT 对每个方法的交互表现或跨平台兼容性 |
-| Docker 内部依赖 staging | `pnpm check:mcp:staging` | 以临时私有 npm tarball 验证镜像将安装的 SDK/CLI/MCP、全部 31 个方法及错误/读写/分页 | 公开 MCP npm 发布或独立 npm 产品支持 |
-| Linux amd64 Dev Docker | 在 [Dev](../guide/dev-environment.md#发布前完整-mcp-验收) 执行 `node scripts/mcp-docker-smoke.mjs` | 独立镜像与临时 Volume，非 root、init、31 个方法、重启及读回；不修改长期 Dev 数据 | 其他架构或正式 GHCR 镜像已发布 |
+| MCP 方法库存和权限 | `internal/mcpsandbox/engine.go`、`internal/mcpserver/sdk_matrix_integration_test.go`、`internal/mcpsandbox/bridge_boundary_test.go` | 封闭 **15 Read + 16 Write** 表、Read 禁写/未知方法拒绝、真实 Go Bridge 与原生数据库 | 每个用户的真实知识模型均兼容 |
+| MCP + 真实 daemon | `internal/mcpserver/sdk_matrix_integration_test.go` + `scripts/mcp-sdk-matrix.mjs` | 标准 MCP Client → **Go MCP → QuickJS-NG WASM → Kernel → Lithograph**；31/31 方法写入/合并/读回 | ChatGPT 对全部 31 方法的 UI 操作 |
+| Linux amd64 Dev Docker | 在 [Dev](../guide/dev-environment.md#发布前完整-mcp-验收) 执行 `scripts/mcp-unified-docker-smoke.mjs` | 单进程非 root、Node-free 镜像，独立 Volume 初始化、OAuth 发现、四 Tool、31/31、重启/持久化 | 其他架构、最终 GitHub CI 或正式 GHCR 镜像已发布 |
 | Go Kernel 原生回归 | `pnpm test:native` | 真实 Lithograph v0.3.0，Ontology、Knowledge、Graph、Evolution，合并一致性和错误分支 | ChatGPT、npm、Docker 的直接验收 |
-| 完整工程与阶段验收 | `pnpm validate` + Linux Dev 实测 + 最终 revision 的普通 CI | 本地质量、独立 Dev Docker/客户端及 Ubuntu Validate/既有六平台 Runtime CI；正式镜像构建、GHCR 属后续 Release | 未运行的 CI 或未发布的镜像被算作成功 |
+| 完整工程与阶段验收 | `pnpm validate` + Linux Dev 实测 + 最终 revision 的普通 CI | Mac 本地质量、独立 Dev Docker/客户端、最终 GitHub Ubuntu Validate/六平台 Runtime **与 Docker 构建/31-method Smoke**；GHCR 推送属另行授权的 Release | 未运行的 CI 或未发布的镜像被算作成功 |
 
 ## 2. 公开方法逐项覆盖
 
-下表的“实际场景”均由 `scripts/mcp-sdk-matrix.mjs` 自动执行；方法清单还由 `sdk-dispatch.test.ts` 对 SDK 实际运行时实例进行**双向对账**，未来增删方法必须更新并通过测试，不能静默漏测。
+下表的“实际场景”由 `scripts/mcp-sdk-matrix.mjs` 的标准 MCP Client 或 `internal/mcpserver/sdk_matrix_integration_test.go` 在真实 Go MCP 中执行；方法集合同时受 Go Bridge 的 allowlist 约束。未来公共方法增删必须同步更新矩阵并重新通过真实 Go / Docker 验收，不能静默漏测。
 
 | 方法 | 权限 | 真实 MCP / daemon 验收 |
 | --- | --- | --- |
@@ -56,7 +57,7 @@
 
 ## 3. 隔离和非成功路径
 
-- 私有 tarball staging 测试创建临时 Root，进程退出后清理；Docker Smoke 使用独立临时 Volume/容器/镜像。测试**不指向**长期 Dev 的 `/data/apps/KgosDev/data/workspace`，不触及现有 `main`。
+- 当前 Docker Smoke 使用独立临时 Volume/容器/镜像；真实 Go 集成测试使用 `t.TempDir()` 的隔离 Runtime。测试**不指向**长期 Dev 的 `/data/apps/KgosDev/data/workspace`，不触及现有 `main`。
 - 原生 Go 回归使用 `t.TempDir()`：空 Domain、Domain/Definition 已存在情况下的 Knowledge 冲突 Merge。这两个场景曾在真实执行中得到 `CONSISTENCY_ERROR`，必须验证对应 Kernel 修复。不能仅用调整 Smoke 的调用顺序代替修复。
 - HTTP/SDK 负面测试覆盖错误凭证、错误 Envelope、流缺失 Summary、Summary 后额外数据、取消及异常；MCP Sandbox 另有错误输出、越权、超时、恶意脚本、并发和桥接负面测试。
 - 本矩阵 **不等于** 对任意 Schema/Index/Constraint、百万级图、全部 Cypher 25、复杂多父 Merge 或真实用户 Token 生命周期的穷举。每类边界的正式 Acceptance 仍须按对应 Phase/设计逐项验证。
