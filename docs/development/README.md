@@ -86,7 +86,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 14 Web 当前为 `deferred`。** 保留原阶段范围与计划；2026-10-13 已提前实现纯静态页面外壳，正式业务 Feature 与动态验收仍未开展。不作为 MCP 的前置依赖，详见[Phase 14](phases/14-web.md)。
 
-**Phase 15 MCP & Private Plugin 已为 `done`。** 按 D91/D92 已实现独立 TypeScript MCP、四个 Tool、QuickJS/Worker 受控 SDK、Linux amd64 Docker-only、官方 Skill 源文件与 MCP-only 私人 Plugin 模板；Linux Dev 31/31 SDK 方法、持久化重启、真实 ChatGPT OAuth/四 Tool 已验收，提交 [`ea37ddf`](https://github.com/bYiyLi/kg-os/commit/ea37ddfca8c69bc701de0bb41d10d465f92c6b64) 的 [CI Run #65](https://github.com/bYiyLi/kg-os/actions/runs/38261156640) 为 **Ubuntu Validate + 六平台 Runtime 7/7 success**。当前私人 Plugin 未证明 Skill 自动激活；新 `kgosd` 单进程 Go MCP 迁移另列为 [Phase 16](phases/16-kgosd-unified-mcp.md) `in_progress`。按 [D94](../design/decisions.md#d94-openclaw-docker-development-and-ci)，Mac 不跑 Docker，OpenClaw 开发测试，GitHub Actions CI 必须构建并测试 Docker。旧 Phase 关闭不受影响；GHCR 正式发布和生产部署另行授权。
+**Phase 15 MCP & Private Plugin 已为 `done`。** 按 D91/D92 已实现独立 TypeScript MCP、四个 Tool、QuickJS/Worker 受控 SDK、Linux amd64 Docker-only、官方 Skill 源文件与 MCP-only 私人 Plugin 模板；Linux Dev 31/31 SDK 方法、持久化重启、真实 ChatGPT OAuth/四 Tool 已验收，提交 [`ea37ddf`](https://github.com/bYiyLi/kg-os/commit/ea37ddfca8c69bc701de0bb41d10d465f92c6b64) 的 [CI Run #65](https://github.com/bYiyLi/kg-os/actions/runs/38261156640) 为 **Ubuntu Validate + 六平台 Runtime 7/7 success**。Phase 15 的旧 MCP 验收保留为历史；新 `kgosd` 单进程 Go MCP 与私人 Skill 的真实客户端验收已作为 [Phase 16](phases/16-kgosd-unified-mcp.md) `done` 独立关闭。按 [D94](../design/decisions.md#d94-openclaw-docker-development-and-ci)，Mac 不跑 Docker，OpenClaw 开发测试，GitHub Actions CI 必须构建并测试 Docker。旧 Phase 关闭不受影响；GHCR 正式发布和生产部署另行授权。
 
 ## 5. 路线总览
 
@@ -108,7 +108,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [13 Init Wizard UX & Embedding Credential Boundary](phases/13-init-wizard-credential-boundary.md) | `done` | clear defaults/custom-extension prompts、TTY field retry、operation-time Embedding credential、doctor non-blocking diagnostic；main/fresh-source/packed/TTY + six-platform CI acceptance complete，后续 v0.2.1 八包/六平台正式发布完成 | [D84](../design/decisions.md#d84-late-bound-embedding-credential)、[CLI](../design/cli.md#init)、[Runtime Embedding](../design/runtime.md#embedding-配置与索引映射) |
 | [14 Web](phases/14-web.md) | `deferred` | 单一 Web Phase：连接与 `.kgos/web` 持久基础、独立查询帧、Knowledge / Ontology 编辑、版本演化及真实 Runtime / 打包 / 六平台验收；静态页面外壳已先行实现，业务与阶段验收仍未开始 | [Web owner](../design/web.md)、[统一材料入口](../design/web-materials.md)、现有 SDK / 业务 API 与 Phase 00–13 基线 |
 | [15 MCP & Private Plugin](phases/15-mcp.md) | `done` | 旧独立 TypeScript MCP、四 Tool、QuickJS/Worker、Linux amd64 Docker-only、官方 Skill 文件与 MCP-only 私人 Plugin；Linux Dev、真实 ChatGPT、最终 Ubuntu Validate + 六平台 CI 7/7 全部通过，未发布 GHCR | [完成证据](phases/15-mcp.md#阶段完成记录2026-10-12)、[D91](../design/decisions.md#d91-mcp-docker-only-delivery)、[D92](../design/decisions.md#d92-mcp-dev-acceptance-and-release-ci) |
-| [16 `kgosd` Unified MCP](phases/16-kgosd-unified-mcp.md) | `in_progress` | Go Kernel Bridge、QuickJS-NG/wazero、Web/API/MCP 与 OAuth 已实现并部署到 OpenClaw 长期 Dev；隔离 Docker 31/31 SDK、真实 ChatGPT 四 Tool、私有 Plugin v1.0.1 官方 Skill 包已验收保存；旧 TypeScript MCP/双进程 Docker 源码已清理。最终本地最新锁文件/清理后质量回归、最终远程 Docker CI、浏览器新 OAuth 授权和 Skill 会话激活仍待闭环 | [MCP owner](../design/mcp.md)、[Runtime](../design/runtime.md#统一-http--mcp-hostingphase-16-目标)、[D93](../design/decisions.md#d93-kgosd-unified-mcp)、[D94](../design/decisions.md#d94-openclaw-docker-development-and-ci) |
+| [16 `kgosd` Unified MCP](phases/16-kgosd-unified-mcp.md) | `done` | 单进程 Go `kgosd` Web/API/MCP、QuickJS-NG/wazero、OAuth、私人 Plugin/Skill 已实现并部署 Dev；隔离 Docker 31/31 SDK、ChatGPT OAuth 重连及测试 Branch 写入回读、Codex 新会话主动加载 Skill、旧 Node MCP 源码清理已验收；实现提交 `813bff4` 的 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) 全绿，正式 GHCR/生产部署未执行 | [完成证据](phases/16-kgosd-unified-mcp.md#当前实现与验收证据)、[MCP owner](../design/mcp.md)、[D93](../design/decisions.md#d93-kgosd-unified-mcp)、[D94](../design/decisions.md#d94-openclaw-docker-development-and-ci) |
 
 当前实现依赖顺序：
 
@@ -143,11 +143,11 @@ Go Engineering Foundation
        Phase 14: Web [deferred]
          (connection / .kgos/web / independent frames / aggregate editing / versions / real acceptance)
        Phase 15: MCP & Private Plugin [done; old TypeScript MCP / Plugin]
-       Phase 16: kgosd Unified MCP [in_progress; D93/D94]
+       Phase 16: kgosd Unified MCP [done; D93/D94]
          (Go/WASM feasibility → unified listener → Go MCP/OAuth → four Tools → Docker → Plugin → parity & cleanup)
 ```
 
-Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 保持 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 以 `ea37ddf` / CI 7/7 成功关闭为 `done`；[Phase 16 Go 原生 MCP](phases/16-kgosd-unified-mcp.md) 为 `in_progress`，新架构正在开发、尚未完成本地覆盖率及远程 Docker CI/ChatGPT 验收。Docker 正式 Release/部署另行授权。
+Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 保持 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 以 `ea37ddf` / CI 7/7 成功关闭为 `done`；[Phase 16 Go 原生 MCP](phases/16-kgosd-unified-mcp.md) 为 `done`，真实 ChatGPT OAuth/隔离写入及 Codex Skill 验收完成，最终实现提交 `813bff4` 的 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) 全部成功。Docker 正式 Release/部署另行授权。
 
 ## 6. Phase 通用完成标准
 

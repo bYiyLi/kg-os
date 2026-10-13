@@ -4,9 +4,9 @@
 
 ## 目标与状态
 
-`in_progress`（2026-10-13，Go 原生实现已部署 Dev，尚未完成全部验收）。**本 Phase 现行目标**：在一个 Go `kgosd` 进程和一个 HTTP listener 内直接提供 Web、HTTP API 与 MCP，使用 Go Kernel 操作和 QuickJS-NG + wazero 沙箱保留四个 Tool 与既有 JS 调用合同；交付 Linux amd64 单进程 Docker 镜像、官方 Skill、用户私人 Plugin。Phase 14 Web 业务 UI 继续 `deferred`，不作为 MCP 前置。
+`done`（2026-10-13，Go 原生实现、真实客户端读写与最终 CI 均通过）。**本 Phase 交付**：在一个 Go `kgosd` 进程和一个 HTTP listener 内直接提供 Web、HTTP API 与 MCP，使用 Go Kernel 操作和 QuickJS-NG + wazero 沙箱保留四个 Tool 与既有 JS 调用合同；Linux amd64 单进程 Docker 镜像源码与完整测试、官方 Skill、用户私人 Plugin。Phase 14 Web 业务 UI 继续 `deferred`，不属于本次验收。
 
-此前 [Phase 15](15-mcp.md) 的**独立 TypeScript MCP、Node Worker、通过 `@kgos/sdk` 访问容器内 daemon 的实现**已在旧版提交 `ea37ddf` 实现并完成 Linux Dev、真实 ChatGPT 和当时 CI 验收，但被 [D93](../../design/decisions.md#d93-kgosd-unified-mcp) 取代。**2026-10-13 现行源码已改为 Go 原生 MCP / WASM Bridge，长期 Dev 也已切换到单进程镜像**；旧 Node 服务端、Worker、双进程镜像及临时 npm tarball 构建已从当前源码移除，只保留历史 Git 记录、旧运行镜像与 Dev 回退验证脚本。最终 GitHub Actions CI 尚未执行，不能标 `done`。
+此前 [Phase 15](15-mcp.md) 的**独立 TypeScript MCP、Node Worker、通过 `@kgos/sdk` 访问容器内 daemon 的实现**已在旧版提交 `ea37ddf` 实现并完成 Linux Dev、真实 ChatGPT 和当时 CI 验收，但被 [D93](../../design/decisions.md#d93-kgosd-unified-mcp) 取代。**2026-10-13 现行源码已改为 Go 原生 MCP / WASM Bridge，长期 Dev 也已切换到单进程镜像**；旧 Node 服务端、Worker、双进程镜像及临时 npm tarball 构建已从当前源码移除，只保留历史 Git 记录、旧运行镜像与 Dev 回退验证脚本。最终实现提交 `813bff4` 的 [GitHub Actions CI](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) **8/8 success**，并已完成真实客户端隔离写入与回读验收。正式 GHCR 发布及生产部署没有包含在此阶段关闭授权内。
 
 目标主流程：
 
@@ -31,14 +31,14 @@
 
 ## 当前实现与依赖核对
 
-| 项目 | 2026-10-13 核对事实 / 目标缺口 |
+| 项目 | 2026-10-13 核对事实 / 验收结论 |
 | --- | --- |
 | 已发布基础 | Phase 00–13 `done`；Go `kgosd` / Kernel / SQLite Host / HTTP API / Web 静态 Shell 已实现，现有 TypeScript SDK/CLI 与平台 Runtime 仍在现行代码中 |
 | 当前 Web | `packages/web/src/app/app.tsx` 是 Shell；Phase 14 `deferred`，本 Phase 不建设任何 Web 业务页面 |
 | 旧独立 MCP | 作为历史保留在 Git `ea37ddf` / Phase 15 记录中；工作树**已移除**旧 `packages/mcp`、`Dockerfile.mcp`、Node Worker、`pack-mcp` 和双进程 Smoke；旧 Dev 镜像只供受控回退，不作为新交付入口 |
-| Go MCP / OAuth | 工作树已有 `internal/mcpserver/`、`cmd/kgosd` 统一 Handler 和 OAuth；长期 Dev 已上线；既有 ChatGPT 私人连接可在新镜像调用四 Tool，**新一次浏览器 OAuth 授权回合**仍需独立验收 |
+| Go MCP / OAuth | `internal/mcpserver/`、`cmd/kgosd` 统一 Handler 和 OAuth 已提交并部署长期 Dev；ChatGPT 四 Tool、OAuth 重新授权、隔离测试 Branch 写入与回读已真实通过 |
 | Go/WASM JS | `internal/mcpsandbox/`、wazero / QuickJS-NG、Go Bridge、Graph Stream、权限与资源限制已经有正反向测试，隔离 Go MCP SDK **31/31** 通过 |
-| Docker / CI | `Dockerfile.unified` 在 OpenClaw Linux amd64 通过干净构建与隔离 31/31 SDK、重启持久化；长期 Dev 已切换并通过只读/公开 HTTPS 验收；**最终提交 revision 的 GitHub Actions Docker CI 尚未执行**，GHCR 未发布 |
+| Docker / CI | `Dockerfile.unified` 在 OpenClaw Linux amd64 通过干净构建与隔离 31/31 SDK、重启持久化；长期 Dev 已切换；实现提交 `813bff4` 的 [GitHub Actions Ubuntu Validate + 六平台 Runtime + Docker CI](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) **8/8 success**，GHCR 未发布 |
 
 设计的边界已明确；技术可行性是 P16-01 的**阻断门槛**，不是任意修改公共 Tool/Script 合同的授权。如果发现必需 Go/WASM 约束无法实现，先在 MCP owner 记录具体失败与最小设计修订，再推进依赖项。
 
@@ -140,8 +140,8 @@ P16-01 可先在独立试验路径验证，不把未验证依赖提前引入正�
 
 - 技术顺序：P16-01 先取得 Go/WASM PoC 的真实输出，再引入正式 Go 依赖 / WASM 产物 / API surface；按 Feature 的目标与失败路径做 targeted tests，必要时增量扩展到业务回归。不要为了“兼容旧模块”增加第二套 Go/TS SDK Gateway。
 - 对照原则：保留旧 TS MCP 的四 Tool 与 31/31 SDK 矩阵作为**输入与预期**，执行者必须是新 Go MCP；两版输出对照发现真实语义分歧后按 owner 修复，不盲目 copy 旧 bug。
-- 验收责任：Mac 源码、非 Docker 定向测试、完整 `pnpm validate`；OpenClaw 负责开发阶段干净镜像、隔离读写、非 root、重启、真实 Client；**GitHub Actions PR/main CI** 在 Linux amd64 runner 构建新 Docker 镜像并执行隔离 31-method/四 Tool/初始化/持久化 Smoke，同时运行 Ubuntu Validate 与既有 Runtime 平台矩阵；获独立授权的 `v*` Release CI 才构建/验收**精确发布镜像**并推送 GHCR。现有 [Dev Runbook](../../guide/dev-environment.md) 是**旧实现操作入口**，新部署脚本修好前不可把它的 success 当作新架构验收。
-- 证据原则：测试必须记录源码 revision + dirty/clean、WASM/native artifact version/hash、镜像 ID/digest、实际 Host/Port、工具与权限行为、执行时间、失败日志（脱敏）。长期 Dev 只做安全只读检查；任何写入通过隔离临时 Docker Volume 完成。
+- 验收责任：Mac 源码、非 Docker 定向测试、完整 `pnpm validate`；OpenClaw 负责开发阶段干净镜像、隔离读写、非 root、重启、真实 Client；**GitHub Actions PR/main CI** 在 Linux amd64 runner 构建新 Docker 镜像并执行隔离 31-method/四 Tool/初始化/持久化 Smoke，同时运行 Ubuntu Validate 与既有 Runtime 平台矩阵；获独立授权的 `v*` Release CI 才构建/验收**精确发布镜像**并推送 GHCR。现有 [Dev Runbook](../../guide/dev-environment.md) 已更新为新单进程 `kgosd` 部署与验收入口，旧运行镜像仅用于受控回退。
+- 证据原则：测试必须记录源码 revision + dirty/clean、WASM/native artifact version/hash、镜像 ID/digest、实际 Host/Port、工具与权限行为、执行时间、失败日志（脱敏）。自动化写入和故障恢复通过隔离临时 Docker Volume 完成；用户明确授权的**真实 ChatGPT 客户端写入验收**仅针对独立新建测试 Branch，不修改长期 Dev 的 main 或其他原有 Branch。
 - 安全和回归：负向覆盖 Token/OAuth/跨路径/跨 Instance、WASI 宿主权限、Go Bridge allowlist、资源关闭/竞态、流断连、未确认写入；不得将防护由真实行为降级成文档声明。
 
 ## Review Checklist
@@ -160,9 +160,9 @@ P16-01 可先在独立试验路径验证，不把未验证依赖提前引入正�
 
 ## 当前实现与验收证据
 
-Phase 16 当前为 `in_progress`。未提交的 Go MCP / OAuth / QuickJS-NG / wazero、统一 listener 与单进程 Docker 实现已存在；Mac 上通过真实 Lithograph Go MCP **31/31**、Graph Stream、OAuth 正负向、Preview 绝对行与固定缓存、Sandbox 越权/超限/取消、Go 初始化/HTTP 隔离等定向测试。完整 `pnpm validate` 已真实**退出码 0**，Go statement coverage **90.0%**，包括 Go race、Go 安全扫描、TypeScript、Web E2E、原生 Lithograph/Jieba、候选包、许可证、依赖审计及 diff 门禁。生产依赖审计无已知漏洞；全依赖审计提示 1 项 Low、1 项已忽略的 High，属于既有门禁结果，不等于零条风险。
+Phase 16 当前为 `done`。Go MCP / OAuth / QuickJS-NG / wazero、统一 listener 与单进程 Docker 已提交；Mac 上通过真实 Lithograph Go MCP **31/31**、Graph Stream、OAuth 正负向、Preview 绝对行与固定缓存、Sandbox 越权/超限/取消、Go 初始化/HTTP 隔离等定向测试。按 [`813bff4`](https://github.com/bYiyLi/kg-os/commit/813bff4ef9b70824d2b976b4e71a4241640088f5) 的最终构建顺序运行完整 `pnpm validate`，真实**退出码 0**，Go statement coverage **90.0%**，包括 Go race、Go 安全扫描、TypeScript、Web E2E、原生 Lithograph/Jieba、候选包、许可证、依赖审计及 diff 门禁；对应 [CI](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) Ubuntu Validate、六平台 Runtime 与统一 Linux amd64 Docker **8/8 success**。生产依赖审计无已知漏洞；全依赖审计提示 1 项 Low、1 项已忽略的 High，属于既有门禁结果，不等于零条风险。
 
-**OpenClaw 隔离开发实测（2026-10-13）**：通过 `ssh openclaw` 在 Linux x86_64、Docker 29.2.1 / Buildx v0.31.1 使用独立临时源码目录 `/tmp/kgos-phase16-source-DyC0sg`，从 Mac 的未提交工作树构建 `Dockerfile.unified`。隔离临时 Volume 的 `scripts/mcp-unified-docker-smoke.mjs` 已通过：非 root UID 10001、最终镜像无 Node.js、单一 `kgosd`、首次 `init` 和 completion receipt、Web/API/MCP 同监听、静态 Token/API 隔离、OAuth discovery/resource metadata、四 Tool、**31/31 SDK**、重启与持久化。此前实测镜像 `sha256:a154b32a0f1ef7dfdbfb19851e0d2637cc0eec6724176b849367dc083054ec88`；清理旧 TypeScript MCP 后的最终隔离镜像需要单独记录。
+**OpenClaw 隔离开发实测（2026-10-13）**：通过 `ssh openclaw` 在 Linux x86_64、Docker 29.2.1 / Buildx v0.31.1 使用独立临时源码目录 `/tmp/kgos-phase16-source-DyC0sg`，从当时的 Mac 工作树构建 `Dockerfile.unified`。隔离临时 Volume 的 `scripts/mcp-unified-docker-smoke.mjs` 已通过：非 root UID 10001、最终镜像无 Node.js、单一 `kgosd`、首次 `init` 和 completion receipt、Web/API/MCP 同监听、静态 Token/API 隔离、OAuth discovery/resource metadata、四 Tool、**31/31 SDK**、重启与持久化。早期隔离镜像 `sha256:a154b32a0f1ef7dfdbfb19851e0d2637cc0eec6724176b849367dc083054ec88`；清理旧 TypeScript MCP 后的隔离镜像及最终长期 Dev 镜像见下方复验记录。
 
 **长期 Dev 已部署（2026-10-13）**：先对现有 SQLite Instance 做一致性备份（`data/backups/20261013T025226Z-SEf7AL8s`，包含凭证、不得公开），再由 `pnpm dev:mcp deploy` 构建并替换 OpenClaw 的 `kgos-dev` Compose 容器，实际镜像 ID `sha256:1cf892e86ee21c8b02a0a1d635fdeded273fb667934ed7b22350cb371231717b`。原 Workspace UID 1000、管理员 Token、端口 3777、数据库及 Branch 均未更改；新 PID 1 为 `kgosd`，镜像无 Node.js，`pnpm dev:mcp check` 退出 0；公开 HTTPS 的 Web 200、MCP 未授权 401、两个 OAuth discovery 200。**直接对正在部署的镜像**使用全新隔离 Volume 再跑 31/31 SDK、初始化、读写、重启及持久化 Smoke，实际退出 0，没有对长期 Dev Instance 写入。
 
@@ -172,12 +172,19 @@ Phase 16 当前为 `in_progress`。未提交的 Go MCP / OAuth / QuickJS-NG / wa
 
 **旧代码清理后的新镜像复验（2026-10-13）**：Mac 完整移除旧 `packages/mcp` workspace/TS Server、Worker、旧 Dockerfile/Smoke、临时 `pack-mcp`，将标准 `@modelcontextprotocol/sdk@1.32.1` 与固定 `zod@4.3.6` 转为 Root 的**开发测试依赖**，更新冻结锁文件、Vitest/TS/License/CI 配置；不存在第九个 MCP 产品 npm 包。OpenClaw 使用干净隔离源目录构建 `kgos-phase16-local:pruned`，镜像 ID `sha256:efa494ef32294cfb208c3e23cdfc60d83eb85a635ab17f1bb34594c08abaddd4`；最终镜像 Linux amd64 / UID 10001，无 Node.js，隔离初始化、四 Tool、OAuth discovery、**31/31 SDK** 和重启持久化 Smoke 实际退出 0。Mac 后续 Web 高保真 Shell 同步更新后的 TypeScript 现行单测 **105/105**、全局 statements 覆盖率 **98.02%**（branches **94.93%**）通过；原 91 个旧 TypeScript MCP 测试与被删除代码同属历史，不再作为现行实现的覆盖率分母，Go MCP 专属安全/集成测试继续运行。
 
-**最终 Dev 镜像复验（2026-10-13）**：旧 TypeScript MCP 源码清理后，从当前未提交工作树重新构建并切换长期 Dev 到镜像 `sha256:2b3a1332f5ae31a447b94f75cf309291e6c1203ca8355e4571066a29aa878e1b`，`pnpm dev:mcp deploy` / `check` 均退出 0，完全保留 Workspace 与 Secret；使用**同一运行镜像**在隔离 Volume 运行 Docker Smoke，四 Tool、初始化、**31/31 SDK** 与重启持久化再次成功。切换后现有 ChatGPT 私人连接再次实测调用四个 Tool 全部成功（`kgos_run` 只执行只读脚本），但新浏览器 OAuth 登录与 Skill 自动激活仍无证据。
+**最终 Dev 镜像复验（2026-10-13）**：旧 TypeScript MCP 源码清理后，从当时的工作树重新构建并切换长期 Dev 到镜像 `sha256:2b3a1332f5ae31a447b94f75cf309291e6c1203ca8355e4571066a29aa878e1b`，`pnpm dev:mcp deploy` / `check` 均退出 0，完全保留 Workspace 与 Secret；使用**同一运行镜像**在隔离 Volume 运行 Docker Smoke，四 Tool、初始化、**31/31 SDK** 与重启持久化再次成功。切换后现有 ChatGPT 私人连接再次实测调用四个 Tool 成功（`kgos_run` 当时只运行只读脚本）；后续已单独完成 OAuth 重新授权及独立测试 Branch 的真实写入验收，见下方最终证据。
 
-**尚待关闭**：用户在真实 ChatGPT **重新登录 OAuth** 的完整授权回合、Private Skill 在新会话的实际激活验证；移除旧 Node MCP 后的最新源码 Mac `pnpm validate` 最终串行复验；最终**已提交并推送 revision** 的 GitHub Actions Ubuntu Validate + 六平台 Runtime + Docker CI 尚未执行。未完成项不能以本地或旧版历史验收代替。
+**最终真实客户端与写入验收（2026-10-13）**：
 
-旧版独立 TypeScript MCP 已作为 [Phase 15](15-mcp.md) 完成并提交 `ea37ddfca8c69bc701de0bb41d10d465f92c6b64`，其 [CI Run #65](https://github.com/bYiyLi/kg-os/actions/runs/38261156640) 为 7/7 success；Linux amd64 Dev 的 31/31 SDK 方法、重启持久化和真实 ChatGPT 四 Tool/OAuth 证据仅用于本 Phase 迁移对照，**不构成新 Go 目标架构的验收结果**。旧版 Skill 文件已提供，但私人 Plugin 中 Skill 是否激活需在 P16-08 单独核实。
+1. **ChatGPT Web OAuth**：用户明确确认断开旧连接、对现有 `kgos-dev` 完成新版 HTTPS OAuth 重新授权；在新会话实际读取四个 Branch 的 Ontology、Graph 与可达 Commit 历史，且未修改数据。以用户真实认证交互与客户端查询结果为证据，不将服务端 OAuth 单测冒充浏览器授权。
+2. **私人 Skill**：Plugin Creator 查询确认现有私人 Plugin `v1.0.1` 内存在 `skills/kgos/SKILL.md`。用户提供的 Codex 新会话记录显示，在**没有显式 `@kgos-dev`** 的自然语言查询下，Codex 主动声明使用 `kgos` Skill、读取 Skill 文件，随后通过 `kgos_preview`、`kgos_read` 和 `state_ancestry` 读取数据，报告已消费完整 **214 行 Preview** 并核对五个可达 Commit。ChatGPT Web 不显示内部 Skill 加载情况，**不假称它自动加载过 Skill**；A16-08 不要求所有客户端都显示此内部事件。
+3. **真实 ChatGPT 隔离写入**：用户在 ChatGPT Web 的 `kgos-dev` 上经 `kgos_run` 成功创建独立 `phase16-chatgpt-acceptance-20261013-7c92b6` Branch（来源 `commit/818980aa5312c9cd993febabf29f72d91eeb98ac0909dcdf7ec150962edb7dda`），再经 `graph.execute` 创建 1 个 `Phase16Acceptance` 节点、2 个属性，生成新 Commit `commit/47450d6986fb36dc8412300cd5256cd775d9d0005b2bb14852e9ed8a5167bf39`。用户验收报告中的创建、回读、main 不变 14/14 均成功；**本阶段收口时重新通过独立 MCP `kgos_read` 核对**：五个 Branch、测试 Branch Head 与 Commit 父版本、`testId=phase16-20261013-7c92b6` / `date=2026-10-13`、`consistency=valid`、main Head 未变化，结果一致。测试 Branch 原样保留，不合并/删除。
+4. **安全与工程门禁**：Go `kgos_read` 禁写、MCP 权限/资源限额、OAuth 正反向和 31 方法矩阵由既有测试覆盖；Dev 只读 `pnpm dev:mcp check` 本轮再次返回成功。实现提交 `df782b2`、Windows 文件权限测试修正 `3d5fb34`、干净 CI Web 产物顺序修正 `813bff4` 均已推送；[最终 CI #38353358947](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) **8/8 success**。Mac 与 OpenClaw 的测试结果分别记录，不用真实 Dev 用户 Branch 做破坏性故障测试。
+
+**阶段结论**：P16-01–09 / A16-01–09 所要求的代码、隔离 Docker、Client/Plugin/Skill、真实 OAuth、隔离写入回读、遗留源码清理与最终 Review/CI 均有验收证据，**Phase 16 = `done`**。仍未执行的是另行授权的正式 Release Tag、GHCR 镜像发布和生产部署；不因本阶段 `done` 推断它们已完成。
+
+旧版独立 TypeScript MCP 已作为 [Phase 15](15-mcp.md) 完成并提交 `ea37ddfca8c69bc701de0bb41d10d465f92c6b64`，其 [CI Run #65](https://github.com/bYiyLi/kg-os/actions/runs/38261156640) 为 7/7 success；Linux amd64 Dev 的 31/31 SDK 方法、重启持久化和真实 ChatGPT 四 Tool/OAuth 证据仅用于本 Phase 迁移对照，**不构成新 Go 目标架构的验收结果**。本 Phase 已另行取得新版私人 Plugin 官方 Skill 的安装、Codex 实际加载与 ChatGPT 写入证据。
 
 ## 完成条件
 
-只有新 P16-01–09 的 A16-01–09 全部真实通过、Go MCP / WASM Bridge / 单进程镜像按 [D93](../../design/decisions.md#d93-kgosd-unified-mcp) 实现、OpenClaw Linux amd64 Dev 隔离镜像与真实 ChatGPT 客户端验收成功，且**最终提交 revision 的 GitHub Actions Ubuntu Validate + Runtime 矩阵 + 新 Docker 镜像构建/Smoke CI** 与最终 Review/文档同步完成，才能将 Phase 16 标记为 `done`。**Mac 不运行 Docker**。正式 Release / GHCR 发布和生产部署分别授权，不作为本 Phase 的提前完成条件。
+新 P16-01–09 的 A16-01–09 全部真实通过、Go MCP / WASM Bridge / 单进程镜像按 [D93](../../design/decisions.md#d93-kgosd-unified-mcp) 实现、OpenClaw Linux amd64 Dev 隔离镜像与真实 ChatGPT 客户端验收成功，且**最终实现提交 revision 的 GitHub Actions Ubuntu Validate + Runtime 矩阵 + 新 Docker 镜像构建/Smoke CI** 与最终 Review/文档同步完成，Phase 16 标记为 `done`；证据见上方完成记录。**Mac 不运行 Docker**。正式 Release / GHCR 发布和生产部署分别授权，不作为本 Phase 的提前完成条件。

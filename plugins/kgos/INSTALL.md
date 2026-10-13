@@ -4,7 +4,7 @@
 
 本文件面向**帮助用户安装 KG OS 私人 ChatGPT Plugin 的 AI**，是一次性安装 Runbook，不是日常知识库操作 Skill。目标是让用户通过自己已部署的 KG OS MCP 连接，安装并验证一个**私人** Plugin。官方 MCP 只交付 Linux amd64 Docker；不要替用户选择 Tunnel / 反向代理 / 自有 HTTPS、Workspace、认证供应商或安装到个人 / Workspace 的目标位置。
 
-**状态**：`plugins/kgos/` 是可复用模板，**不是预先绑定用户 MCP 的成品**。Phase 16 新版只有一个 `kgosd` 进程承载 Web/API/MCP；已在隔离测试验证 Go MCP，但尚无新版真实 ChatGPT OAuth / 私人 Plugin 安装证据，也未正式发布新 Linux amd64 镜像。2026-10-12 用户的真实 ChatGPT OAuth / 四 Tool 测试属于旧 Phase 15，不等于新版验收。当前公开的 KG OS `v0.2.1` 也不包含新服务端镜像。
+**状态**：`plugins/kgos/` 是可复用模板，**不是预先绑定用户 MCP 的成品**。Phase 16 新版只有一个 `kgosd` 进程承载 Web/API/MCP；已在隔离 Docker 和真实 ChatGPT Dev 验证 Go MCP、OAuth 重新授权、四 Tool 与测试 Branch 写入回读；私人 Plugin v1.0.1 含官方 Skill，Codex 新会话已实际读取 Skill 并调用工具。Phase 16 开发验收已 `done`，但尚未正式发布 GHCR 镜像。当前公开的 KG OS `v0.2.1` 也不包含新服务端镜像。
 
 ## 0. 权限与完成条件
 

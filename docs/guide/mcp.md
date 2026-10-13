@@ -4,7 +4,7 @@
 
 KG OS 的当前目标是**一个 Go `kgosd` 进程、一个 HTTP listener**，同时提供内嵌 Web、现有 `/api/v1/*` 与 `/mcp`。服务端 JavaScript 使用 QuickJS-NG WASM / Go Kernel Bridge，不依赖运行时 Node.js MCP 服务，也不需要宿主安装 `kgosd`。正式合同见 [MCP](../design/mcp.md)、[Runtime](../design/runtime.md)、[D93](../design/decisions.md#d93-kgosd-unified-mcp)。
 
-**当前状态**：Phase 16 为 `in_progress`。Go 单进程 Linux amd64 镜像已在 OpenClaw 开发环境构建并部署、隔离 31/31 SDK Smoke 成功；现有 ChatGPT 私人连接已调用新版四 Tool，官方 Skill 已保存到私人 Plugin v1.0.1。**未完成最终推送 revision 的 GitHub CI、客户端新授权与 Skill 激活验收，亦未发布 GHCR**。旧 `Dockerfile.mcp` / `packages/mcp` 的源码已移除，历史仅保留 Git 记录，不再是服务端部署入口。
+**当前状态**：Phase 16 为 `done`。Go 单进程 Linux amd64 镜像已在 OpenClaw 开发环境构建并部署、隔离 31/31 SDK Smoke 成功；现有 ChatGPT 私人连接已调用新版四 Tool，官方 Skill 已保存到私人 Plugin v1.0.1。**最终实现提交 `813bff4` 的 GitHub CI 8/8、真实 ChatGPT OAuth/隔离写入以及 Codex Skill 新会话加载均已通过；尚未正式发布 GHCR**。旧 `Dockerfile.mcp` / `packages/mcp` 的源码已移除，历史仅保留 Git 记录，不再是服务端部署入口。
 
 ## 1. 镜像与首次初始化
 
