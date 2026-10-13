@@ -3,6 +3,7 @@ package runtimeprofile
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -36,7 +37,8 @@ func TestInitializationReceiptStrictFormatAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0600 {
+	// Windows file permission bits do not represent NTFS ACLs.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("receipt permission is not private: %v", info.Mode().Perm())
 	}
 
