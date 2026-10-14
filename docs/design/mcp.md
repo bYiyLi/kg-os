@@ -1,12 +1,12 @@
 # MCP 与私人 OpenAI Plugin
 
-<!-- cspell:words Streamable Asyncify -->
+<!-- cspell:words Streamable Asyncify mcpserver -->
 
 本文件是 KG OS **Go 原生 MCP、受控 JavaScript 执行、私人 OpenAI Plugin / Skill 与 Markdown Preview / Ancestry** 的设计真源。KG OS 业务语义不由 MCP 定义：Ontology、Object / Patch、Graph / Cypher、Evolution 分别由其设计 owner 负责；统一监听与 Instance 生命周期见 [Runtime](runtime.md)，公开 TypeScript SDK 的逻辑合同见 [Client](client.md)。
 
 **2026-10-12 调整后的目标架构**：`kgosd` 同一 Go 进程同时提供 Web / HTTP API / MCP，不再运行独立 TypeScript MCP Server。已提交的 [Phase 15](../development/phases/15-mcp.md) `packages/mcp/` / Node.js Worker 实现及其真实 Dev / ChatGPT 测试是迁移参考，**不是** Go 原生 MCP 已完成的证据。公开 v0.2.1 尚无正式 MCP；私人 Plugin 可选，标准 MCP Client 可直接连接 `kgosd`，两者都不是 Lithograph 模块。
 
-**2026-10-14 MCP 认证目标调整（[D95](decisions.md#d95-unified-mcp-web-authorization)、[Phase 17](../development/phases/17-mcp-web-authorization.md) `done`（用户验收例外））**：MCP 不再拥有独立管理员 Token，使用同一个 Instance 认证真源；ChatGPT 的 OAuth 授权转入现有 KG OS Web，通过其登录状态及连接授权弹窗完成。**当前未提交工作树的 Go OAuth 路由、Web 授权弹窗和真实 Web Session 集成已通过本地测试；2026-10-14 新版 Dev 已完成正式 Docker 构建部署，用户确认 ChatGPT 重新授权测试成功。远端 GitHub CI / 最新完整隔离矩阵未执行，用户批准 Phase 17 带例外关闭，不代表 CI 通过**；Phase 16 已提交代码保留旧认证历史，当前长期 Dev 已使用 Phase 17 新认证。Web 登录状态由其所属模块负责，本文件只定义 MCP 的对接与安全合同。
+**2026-10-14 MCP 认证目标调整（[D95](decisions.md#d95-unified-mcp-web-authorization)、[Phase 17](../development/phases/17-mcp-web-authorization.md) `done`（用户验收例外））**：MCP 不再拥有独立管理员 Token，使用同一个 Instance 认证真源；ChatGPT 的 OAuth 授权转入现有 KG OS Web，通过其登录状态及连接授权弹窗完成。**Go OAuth 路由、Web 授权弹窗和持久 Web Session 已实现并经过本地测试，相关代码现已进入 `main@8e7bf56`；2026-10-14 新版 Dev 曾完成正式 Docker 构建部署，用户确认 ChatGPT 重新授权测试成功。Phase 17 关闭时远端 GitHub CI / 最新完整隔离矩阵未执行，用户批准带例外关闭，不代表 CI 通过**。Web 登录状态由 Web/Runtime owner 负责，本文件只定义 MCP 的对接与安全合同。
 
 ## 目标与边界
 
@@ -154,6 +154,23 @@ kgosd --root <workspace-root> --host <address> --port <port>
 3. 用户**自行**配置远程 HTTPS 地址、隧道或其它客户端支持的安全接入通道。服务本地 `listening` / `kg doctor` Ready 仅表明本地就绪；**远程部署完成**要求目标 MCP Client 经真实地址/通道完成认证、四 Tool 发现和真实调用，并证明暴露的 API/Web 路由没有新增认证旁路。
 4. Linux amd64 Docker 镜像必须通过干净构建、唯一进程 / listener、真实初始化/连接、持久数据/重启、固定/动态端口、TLS 两种终止位置、三类入口认证隔离、不同 Instance、Sandbox 安全与流式/取消等验收；验证无需 Node.js 运行时、宿主 `kgosd` 或 host networking，并通过非 root / SIGTERM 测试。Dev 成功不等于 OCI Registry / Plugin 已正式发布。
 
+## ChatGPT MCP Apps UI 合同
+
+**目标；UI Tool/Resource 已实现，用户已在真实 ChatGPT 中验收两种入口**：在现有单进程 Go MCP Server 中增加一个只负责打开工作区的 UI 入口 Tool 与一个 MCP Apps UI Resource。React 页面/双入口复用由 [Web owner](web.md#chatgpt-内嵌-webmcp-apps) 维护，静态产物交付归 [Runtime](runtime.md#web-hosting)。这不是新的 Knowledge 业务 Tool，不增加 Kernel / Lithograph / SDK 的业务语义。
+
+**入口及资源**：
+
+- 初版资源 URI 为 `ui://kgos/workspace/v1`，`resources/read` 返回 `text/html;profile=mcp-app` 的自包含 HTML（含从 `packages/web` 构建的脚本与样式）。改变不兼容 UI 内容时更新 URI 版本以避免旧缓存误用。
+- 一个专用 `kgos_workspace` Tool 的入参必须允许空对象 `{}`；`_meta.ui.resourceUri` 指向上述资源，`_meta["openai/ui"].entrypoints` 同时声明 `{"type":"global"}` 与 `{"type":"thread"}`。用户从左侧主导航或会话内容标签打开的都是同一 UI，实现上分别创建自己的宿主实例；不能承诺宿主固定采用左右分屏。Tool 具备可读 Title、合规单色图标和真实只读注解。
+- `kgos_workspace` 的 `_meta.ui.visibility=["app"]` 限制它只服务应用入口；OpenAI MCP Extensions 规定入口触发时不受通常的模型可见性限制。`tools/list` 物理上可以有五项，但**AI-facing 业务 Tool 仍只有原四个**：`kgos_preview`、`state_ancestry`、`kgos_read` 和 `kgos_run`。四者的入参、权限、错误、预算与默认无 UI 使用方式都不改变。未识别 OpenAI 扩展的 MCP Client 仍可使用这些业务工具。
+
+**接入与安全**：
+
+- 使用仓库已有 `github.com/modelcontextprotocol/go-sdk`：`Server.AddResource`、`Tool.Meta`、`ResourceContents.Meta` 可以承载资源、UI 元数据与 CSP。Go `internal/mcpserver` 在当前 `/mcp` 内注册 Resource、入口 Tool 和 Handler；不新增 Node/TypeScript MCP Server、HTTP Listener、插件代理或知识网关。TypeScript 仅负责前端内的 Bridge。
+- MCP Apps iframe 优先使用标准 `ui/initialize`、`ui/notifications/initialized`、`ui/notifications/tool-result`、`tools/call`；首屏消费已有入口 Tool 返回结果，不重复调用入口工具。验证真实数据时经宿主的 Bridge 调用 `kgos_read`，执行固定只读代码访问 `evolution.overview()`。Host 负责转发已授权 MCP 调用，Go 每次均验证身份，前端**不接收、不保存** Instance Token、临时 Web Bearer、OAuth Code/Access/Refresh Token。后续写入 UI 必须由用户明确触发并遵守原有 `kgos_run` 权限、宿主确认、取消及未知写入结果规则。
+- 初版资源不以 iframe 嵌套 KG OS 普通 Web URL，不申请 `frameDomains`、外部脚本 CDN 或跨站 `/api/v1/*` fetch；按实际需求提供最小 `_meta.ui.csp`。静态资源可装载不意味着业务数据免认证；`resources/read`、`tools/call` 均走现有受保护 `/mcp`。ChatGPT MCP OAuth 仍由 [D95](decisions.md#d95-unified-mcp-web-authorization) 的普通浏览器 Web 完成登录及明确连接同意；OAuth Token 不可调用普通 API。连接失效、取消授权、断网或 daemon 重启时停止请求，提供安全的重连/刷新提示，不重试结果不明的写入。
+- OpenAI 规范提供 `global` 与 `thread`，但不能据此声称所有 ChatGPT 客户端/账号均可使用；当前平台说明区分 ChatGPT Work Web 与 classic ChatGPT。必须在实际支持入口的客户端验收，未支持的客户端保持四个 MCP Tool 和普通 Web。官方证据见 [OpenAI MCP Apps 研究](../research/chatgpt-mcp-apps.md)，实现与验收归 [Phase 18](../development/phases/18-chatgpt-embedded-web.md)。
+
 ## MCP 工具边界
 
 | Tool | 输入 | 职责 |
@@ -163,7 +180,7 @@ kgosd --root <workspace-root> --host <address> --port <port>
 | `kgos_read` | `code: string` | 在隔离 JavaScript 中执行只读 SDK 方法与计算 |
 | `kgos_run` | `code: string` | 在隔离 JavaScript 中执行完整公共 SDK 方法与计算，包括写入 |
 
-首版 MCP Tool 收敛为上述**四个工具**：两个直接读取入口与两个 JavaScript 入口。`kgos_preview` / `state_ancestry` 的输入、输出和 Markdown 合同见下文；`kgos_read` / `kgos_run` 的统一执行合同见下一节。独立 `ontology_read`、`state_get`、`evolution_overview`、`branch_list` 均已决定不提供，相关信息分别由 Preview / Ancestry 或 JavaScript SDK 获取。首版不额外建立 MCP Resources、Prompts 或专用 Search Tool。
+首版 **AI-facing 业务 MCP Tool** 收敛为上述**四个工具**：两个直接读取入口与两个 JavaScript 入口。`kgos_preview` / `state_ancestry` 的输入、输出和 Markdown 合同见下文；`kgos_read` / `kgos_run` 的统一执行合同见下一节。独立 `ontology_read`、`state_get`、`evolution_overview`、`branch_list` 均已决定不提供，相关信息分别由 Preview / Ancestry 或 JavaScript SDK 获取。除上文计划的 app-only 工作区 UI Resource 和 Tool 外，不另建业务 MCP Resources、Prompts 或专用 Search Tool。
 
 ### JavaScript SDK 执行
 

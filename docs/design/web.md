@@ -78,6 +78,26 @@ src/
 
 设计变量集中于 `tokens.css`，`global.css` 只负责页面基础规则，`layout.css` 拥有顶层容器、间距、响应式及窄屏版本抽屉样式。新外壳无独立顶栏；浏览器在 100% 缩放下使用紧凑布局；桌面侧栏默认 240px，可在 240–420px 间拖动调整或通过方向键按 16px 微调，收起时宽度为 0；右侧独立点阵画布保留细边框与圆角，收起后画布四边距均为 12px。画布左边框中置的连续轮廓由 `SidebarHandle` 绘制，展开时向左凸出、收起时向右凹入，并局部覆盖原直线边框；不是分离按钮，且不被画布裁剪。桌面明暗主题位于侧栏底部，窄屏主题位于版本抽屉底部；窄屏画布内保留版本入口及原生 Dialog 的 Esc、关闭按钮和遮罩退出。查询、真实版本记录、连接、本体与业务 Feature 仍按 Phase 14 实现，不用静态预览替代业务验收。
 
+### ChatGPT 内嵌 Web（MCP Apps）
+
+**设计目标；共享 Shell 与双入口已实现，用户已在真实 ChatGPT 中验收两种入口**：同一 `packages/web` 面向普通浏览器和支持 MCP Apps 的 ChatGPT 宿主提供两种入口，使用相同的 React UI、设计变量、国际化资源与业务 Feature，而不是复制管理后台。Sidebar App（`global`）与 Conversation Panel（`thread`）使用同一个 MCP App UI Resource；二者是宿主内的独立 UI 实例，并非两个新服务。Go MCP Tool / Resource 元数据与认证归 [MCP owner](mcp.md#chatgpt-mcp-apps-ui-合同)；交付边界归 [Runtime](runtime.md#web-hosting)。
+
+`packages/web/src/main.tsx` 保留浏览器入口，增加 `mcp-main.tsx` 作为 MCP Apps HTML 启动入口；`app/` 抽取复用的工作区 Shell，`features/` 保留领域功能，`shared/` 保留无 KG OS 业务语义的 UI。浏览器入口组合现有 Web Session、强制登录弹窗和 HTTP SDK；MCP Apps 入口组合宿主 Bridge、连接状态和同一 Shell，**不挂载 Web 根 Token 登录、Web Cookie 恢复或 MCP OAuth 连接授权弹窗**。不新建 `packages`、第二套业务组件、独立 Web Router 或新的服务端。
+
+```text
+packages/web
+  ├── main.tsx          -> Browser App -> Web Session -> @kgos/sdk HTTP
+  ├── mcp-main.tsx      -> MCP App     -> MCP Apps Bridge -> /mcp tools
+  └── app / features / core / shared（共用 UI / 业务组件）
+                                      -> 同一个 kgosd / Kernel / Instance
+```
+
+**数据与认证隔离**：ChatGPT iframe 不假设能携带原站 `SameSite=Strict` Session Cookie，也不从 `localStorage`、URL、页面 DOM、宿主对象读取 Instance Token、Web Bearer 或 MCP OAuth Token。嵌入页面经标准 `ui/initialize` / `tools/call` Bridge 请宿主代发已授权 MCP 请求，由服务端逐次认证；`window.openai` 仅作有能力检测的 ChatGPT 专属扩展。独立 Web 的 `@kgos/sdk` 仍为 HTTP 合同真源；内嵌 UI 不直接请求 `/api/v1/*` 作为认证捷径，不将 OAuth Token 变成普通 API Token。
+
+**第一阶段最小真实数据**：Phase 18 仅经 Bridge 调用现有 `kgos_read`，用固定安全脚本读取 `evolution.overview()` 并显示真实连接 / 版本状态；尚未接入的版本树占位数据必须标明预览，不能伪装成业务数据。其余查询、图谱、Ontology/Knowledge 编辑、History、Diff、Merge 等业务能力仍由 [Phase 14](../development/phases/14-web.md) 开发、验收，之后再逐 Feature 接入内嵌运行环境。不得预建全部 HTTP API → JavaScript 字符串的通用网关或重复 Graph/Object/Evolution 语义；到实际 Feature 再按输入、typed 结果、流式、取消及写入语义选择最小适配。宿主不支持某能力时显示不可用，而非绕过认证。
+
+**布局、状态与降级**：复用响应式 Shell，遵守宿主实际视口，主题、English/简体中文均可用，但不假定 iframe 存储与独立站点共享；支持时读取宿主提供的 theme/locale，缺失时沿用 Web 已有选择与回退规则。`global` 与每个 `thread` 有各自的选择、暂存输入和当前页面状态，**不保证实时同步**；同一 Instance 的实际知识由服务端共享。外部 AI 修改 Branch 时不自动切换 pinned State，用户明确刷新再读取。宿主没有入口或不支持 MCP Apps 时，原有四个业务 MCP Tool 和独立 Web 保持可用；不退回直接嵌套整站 iframe 或跨站 Cookie。官方规范对 classic ChatGPT 网页端和 Work/桌面端支持范围有区别，真实验收见 [Phase 18](../development/phases/18-chatgpt-embedded-web.md)。
+
 ### 国际化与语言偏好
 
 Web 作为浏览器中的人类界面，首版统一支持 **English (`en`)** 与**简体中文 (`zh-CN`)**；未指定时默认 English，与 [CLI 国际化](cli.md#国际化)的语言范围及英文回退方向一致，但 Web **不读取 CLI 的 `LC_*` / `LANG`**，也不共享 CLI 的文案或 locale 解析实现。当前已将原先中英文混用的 Shell、认证及 MCP 授权组件接入统一资源，`index.html` 默认 `lang="en"`，启动后按实际语言更新；后续业务 Feature 仍须遵守本节国际化合同。

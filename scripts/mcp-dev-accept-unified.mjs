@@ -119,16 +119,53 @@ const hello = await rpc("initialize", {
 });
 assert.equal(hello.serverInfo?.name, "kgos");
 const tools = (await rpc("tools/list")).tools;
-assert.deepEqual(tools.map((tool) => tool.name).sort(), [
-  "kgos_preview",
-  "kgos_read",
-  "kgos_run",
-  "state_ancestry"
-]);
+const businessTools = ["kgos_preview", "kgos_read", "kgos_run", "state_ancestry"];
+const names = tools.map((tool) => tool.name).sort();
+const withWorkspace = [...businessTools, "kgos_workspace"].sort();
+const hasWorkspace = names.includes("kgos_workspace");
+if (process.env.KGOS_DEV_REQUIRE_UI === "1") {
+  assert.deepEqual(
+    names,
+    withWorkspace,
+    "Phase 18 Dev must expose all four business Tools and the app-only workspace Tool"
+  );
+} else {
+  assert.deepEqual(
+    names,
+    hasWorkspace ? withWorkspace : businessTools,
+    "Unexpected MCP Tool inventory"
+  );
+}
 for (const name of ["kgos_preview", "kgos_read", "state_ancestry"]) {
   assert.equal(tools.find((tool) => tool.name === name)?.annotations?.readOnlyHint, true);
 }
 assert.equal(tools.find((tool) => tool.name === "kgos_run")?.annotations?.readOnlyHint, false);
+if (hasWorkspace) {
+  const workspaceURI = "ui://kgos/workspace/v1";
+  const workspace = tools.find((tool) => tool.name === "kgos_workspace");
+  assert.equal(workspace.annotations?.readOnlyHint, true);
+  assert.equal(workspace._meta?.ui?.resourceUri, workspaceURI);
+  assert.deepEqual(workspace._meta?.ui?.visibility, ["app"]);
+  assert.deepEqual(workspace._meta?.["openai/ui"]?.entrypoints, [
+    { type: "global" },
+    { type: "thread" }
+  ]);
+  const resources = (await rpc("resources/list")).resources;
+  assert.equal(
+    resources.find((resource) => resource.uri === workspaceURI)?.mimeType,
+    "text/html;profile=mcp-app"
+  );
+  const result = await rpc("resources/read", { uri: workspaceURI });
+  assert.equal(result.contents?.length, 1);
+  const contents = result.contents[0];
+  assert.equal(contents.uri, workspaceURI);
+  assert.equal(contents.mimeType, "text/html;profile=mcp-app");
+  assert.match(contents.text, /<script type="module">/);
+  assert.match(contents.text, /<style>/);
+  assert.doesNotMatch(contents.text, /(?:src|href)="\/assets\//);
+  assert.deepEqual(contents._meta?.ui?.csp?.connectDomains, []);
+  await (await probe("/mcp-app.html", 404)).body?.cancel();
+}
 
 const readTool = async (name, args) =>
   toolValue(await rpc("tools/call", { name, arguments: args }));
@@ -149,5 +186,9 @@ assert.ok(Array.isArray(branches) && branches.length > 0);
 const ancestry = await readTool("state_ancestry", { root: state });
 assert.ok(Number.isInteger(ancestry.count) && ancestry.count > 0);
 process.stdout.write(
-  "KG OS Dev verified: unified Web/API/MCP, Instance Bearer, OAuth discovery, 4 Tools, Preview, State, ancestry (read-only)\n"
+  "KG OS Dev verified: unified Web/API/MCP, Instance Bearer, OAuth discovery, " +
+    (hasWorkspace
+      ? "4 business Tools + workspace UI Resource"
+      : "4 business Tools (previous image)") +
+    ", Preview, State, ancestry (read-only)\n"
 );

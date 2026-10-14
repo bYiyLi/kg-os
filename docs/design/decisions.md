@@ -974,3 +974,14 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **替代关系**：取代 [D90](#d90-mcp-single-admin-oauth) 的独立 MCP Token / 专用 Go 授权页面，以及 [D93](#d93-kgosd-unified-mcp) 中「MCP 必须单独配置管理员 Token」的认证门禁；**不**取代 D93 的单进程、单 Listener、工具与 Kernel 边界，也不回溯改变 Phase 15/16 真实完成证据。已提交 Phase 16 继续保留旧认证历史；当前长期 Dev 已运行新版统一认证，用户确认 ChatGPT OAuth 重新授权成功。[Phase 17](../development/phases/17-mcp-web-authorization.md) 已按用户明确批准的 CI / 完整隔离矩阵例外关闭为 `done`，未声称远端 CI 通过；Web 登录状态由另一开发任务提供，本次不负责实现。
 - **依据与取舍**：单个自托管 KG OS Instance 不应同时维护两个管理员身份秘密，也不应让 OAuth 授权页背离现有 Web。复用登录和显式同意降低重复输入与页面维护，但需要真实、可被 OAuth 浏览器跳转复用的 Web 已登录上下文，以及服务端 CSRF/同源保护；在该依赖具备之前不能宣称新认证方案已经生效。
 - 当前合同：[MCP Web 集成认证](mcp.md#统一-instance-认证与-web-内的-mcp-连接授权phase-17-目标)、[Runtime 单 Token](runtime.md#单-token-实例认证)、[Phase 17](../development/phases/17-mcp-web-authorization.md)。
+
+<a id="d96-chatgpt-mcp-apps-web"></a>
+
+### D96 ChatGPT MCP Apps 复用现有 Web，提供双入口（2026-10-14）
+
+- **决定**：不建设独立 ChatGPT 前端产品。在 `packages/web` 保留普通 Web 入口并增设 MCP Apps 入口，共用 React Shell、Feature、Design Tokens 与国际化。一个 `ui://kgos/workspace/v1` Resource 由新增 app-only `kgos_workspace` Tool 引用，使用 OpenAI 扩展 `global`（Sidebar App）与 `thread`（Conversation Panel）两种入口；宿主实际布局、开放平台和可见性依官方能力而定。
+- **调用与权限**：普通 Web 沿用当前 Cookie/Web Bearer + HTTP SDK，MCP App 通过标准宿主 Bridge 调用现有受 OAuth 保护的 MCP Tool，不能通过第三方 iframe 复用 `SameSite=Strict` Cookie 或取得 Instance/OAuth Token。`kgos_workspace` 仅负责 UI 打开，原有四个 AI-facing 业务 MCP Tool 与 Kernel 逻辑完全不变；不能以 UI 资源内容可加载推断 API 匿名可读。
+- **首阶段交付边界**：先打通同源代码的双入口、自包含 UI Resource、宿主初始化和通过已有 `kgos_read` 读取真实 `evolution.overview()`。Phase 14 原有 Graph、Ontology、Object、Version、持久草稿等业务实现与验收范围保持 `deferred`，后续共享组件可渐进适配；不为尚不存在的业务 Feature 新增通用 API-to-MCP 网关、全量 SDK 镜像或自动同步机制。
+- **部署与验证**：`kgosd` 仍是一个 Go 进程与一个 HTTPS/HTTP listener，容器内仍无 Node.js 运行时。官方协议支持 `global` / `thread`，但不同 ChatGPT 客户端并不保证都已开放；必须在真实支持对应能力的客户端验收，无法验证不能宣布 Phase 完成。不支持时继续使用普通 Web + 四个文本 MCP Tool。发布、部署与代码提交分别授权。
+- **依据/取舍**：UI 真正差异是启动、认证和通信宿主，不是知识业务语义；复用同一 Web 代码减少双维护。基于 MCP Apps 标准 UI/Bridge 加 OpenAI Entrypoint Extension，而非套原站 iframe，避免跨站 Cookie、重复登录和 CSP 放宽；代价是首次需接入新的前端入口与 Go UI 资源声明。
+- 当前合同：[Web 内嵌适配](web.md#chatgpt-内嵌-webmcp-apps)、[MCP UI 协议](mcp.md#chatgpt-mcp-apps-ui-合同)、[Runtime Web 交付](runtime.md#web-hosting)、[Phase 18](../development/phases/18-chatgpt-embedded-web.md)。外部证据见 [OpenAI MCP Apps 调研](../research/chatgpt-mcp-apps.md)。

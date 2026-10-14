@@ -211,6 +211,7 @@ func toolResult(value any, err error) (*mcp.CallToolResult, error) {
 }
 func (s *Server) toolServer() *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "kgos", Version: buildinfo.Version}, nil)
+	s.registerWorkspace(server)
 	closed := false
 	yes := true
 	preview := mcp.AddTool[PreviewInput, any]

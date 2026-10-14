@@ -20,6 +20,7 @@ export default defineConfig({
         "**/src/dev.ts",
         "**/src/types.ts",
         "packages/web/src/main.tsx",
+        "packages/web/src/mcp-main.tsx",
         "**/dist/**"
       ],
       include: ["packages/{sdk,web}/src/**/*.{ts,tsx}"],

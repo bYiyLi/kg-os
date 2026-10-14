@@ -69,6 +69,7 @@ container_id() {
 }
 
 verify() {
+  require_ui=${1:-0}
   count=0
   while [ "$count" -lt 90 ]; do
     cid=$(container_id)
@@ -108,6 +109,7 @@ verify() {
       KGOS_DEV_AUTH_FILE="$workspace/.kgos/auth.json" \
       KGOS_DEV_LEGACY_MCP_TOKEN_FILE="$legacy_file" \
       KGOS_DEV_OAUTH_ISSUER="${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}" \
+      KGOS_DEV_REQUIRE_UI="$require_ui" \
       node "$source_dir/scripts/mcp-dev-accept-unified.mjs" ||
         fail "Authenticated unified MCP read-only acceptance failed"
     return 0
@@ -231,7 +233,7 @@ deploy() {
   # A failed online backup must stop deployment before the image or container changes.
   backup
   compose build mcp
-  if compose up -d --no-build --force-recreate mcp && (verify); then
+  if compose up -d --no-build --force-recreate mcp && (verify 1); then
     record "$revision" "$source_state"
     return 0
   fi

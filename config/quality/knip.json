@@ -23,6 +23,7 @@
       "project": ["src/**/*.ts"]
     },
     "packages/web": {
+      "entry": ["src/mcp-main.tsx"],
       "project": ["src/**/*.{ts,tsx}"]
     }
   }

@@ -61,6 +61,14 @@ export const en = {
     zoom: "Zoom (coming soon)",
     pendingCanvas: "Canvas content coming soon"
   },
+  embedded: {
+    title: "Current knowledge version",
+    refresh: "Refresh",
+    loading: "Reading KG OS...",
+    unavailable: "KG OS is unavailable. Check your connection and refresh.",
+    branch: "Default branch",
+    commit: "Commit"
+  },
   mcp: {
     title: "Authorize Connection",
     description: "ChatGPT wants to connect to your KG OS instance.",

@@ -4,6 +4,8 @@
 
 `deferred`（2026-10-11 决定暂缓业务功能实施）。本阶段原定把已确认的 [Web 设计](../../design/web.md)接入现有 Runtime、SDK 与业务 API，交付可以真实浏览、查询、编辑和管理版本的内置 Web 工作区。2026-10-13 已另行提前实现静态页面外壳；2026-10-14 先行实现强制 Token 认证弹窗、`web.data.info`、daemon boot guard 与 Web 连接失效 / 显式重连，通过 SDK 对受保护业务 API 发起请求；已增加服务器持久 Web Session、Cookie 无感刷新恢复及退出撤销，不依赖后续 Web UI store。Web 数据存储、查询、编辑及其它业务 Feature 尚未实现或验收。2026-10-14 **P14-00 Web 国际化基础已实现并通过定向测试**；正式打包与整体 Phase 验收仍未完成，原 P14-01–11 的 Acceptance 不因本次国际化开发而改变。
 
+**职责补充（2026-10-14）**：[Phase 18](18-chatgpt-embedded-web.md) 负责 ChatGPT MCP Apps 的双入口、同一 React Shell 复用及宿主通信验收；本阶段仍独占真实 Web 查询、图谱、Ontology/Knowledge 编辑、版本/草稿等业务 Feature。Phase 18 的入口联通不替代本阶段 A14 业务验收，后续每个已实现 Feature 再按需复用到内嵌 UI。
+
 完成后的主流程：
 
 ```text

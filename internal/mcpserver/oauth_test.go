@@ -280,7 +280,7 @@ func TestGoOAuthAuthorizationAndRefresh(t *testing.T) {
 		t.Fatalf("refresh reused: %d", reused.StatusCode)
 	}
 	reused.Body.Close()
-	// An authenticated Go SDK client must negotiate and discover exactly four Tools.
+	// OAuth sees four business tools and the app-only UI entrypoint.
 	client := mcp.NewClient(&mcp.Implementation{Name: "oauth-integration-test", Version: "1"}, nil)
 	session, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{
 		Endpoint: fixture.server.URL + "/mcp", DisableStandaloneSSE: true,
@@ -291,10 +291,19 @@ func TestGoOAuthAuthorizationAndRefresh(t *testing.T) {
 	}
 	defer session.Close()
 	tools, err := session.ListTools(context.Background(), nil)
-	if err != nil || len(tools.Tools) != 4 {
+	if err != nil || len(tools.Tools) != 5 {
 		t.Fatalf("OAuth tool discovery: %#v %v", tools, err)
 	}
-	t.Logf("OAuth authorization, 4 tools, refresh rotation and replay protection verified")
+	names := make(map[string]bool)
+	for _, tool := range tools.Tools {
+		names[tool.Name] = true
+	}
+	for _, name := range []string{"kgos_preview", "state_ancestry", "kgos_read", "kgos_run", "kgos_workspace"} {
+		if !names[name] {
+			t.Fatalf("missing authenticated tool: %s", name)
+		}
+	}
+	t.Logf("OAuth authorization, 4 business tools + UI, refresh rotation and replay protection verified")
 }
 
 func TestGoOAuthRejectsUntrustedAndWrongGrants(t *testing.T) {

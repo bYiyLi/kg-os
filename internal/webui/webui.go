@@ -27,6 +27,11 @@ func EmbeddedHandler() (http.Handler, error) {
 	return NewHandler(files), nil
 }
 
+// EmbeddedMCPApp is only served as an authenticated MCP resource.
+func EmbeddedMCPApp() ([]byte, error) {
+	return fs.ReadFile(embedded, "dist/mcp-app.html")
+}
+
 func NewHandler(files fs.FS) http.Handler {
 	return &Shell{files: files}
 }
@@ -102,7 +107,7 @@ func hasHiddenSegment(name string) bool {
 
 func isReserved(requestPath string) bool {
 	cleaned := path.Clean("/" + requestPath)
-	return cleaned == "/api" || strings.HasPrefix(cleaned, "/api/")
+	return cleaned == "/api" || strings.HasPrefix(cleaned, "/api/") || cleaned == "/mcp-app.html"
 }
 
 func writeText(response http.ResponseWriter, status int, text string) {

@@ -5,11 +5,14 @@ import { defineConfig } from "vite";
 
 const devEndpoint = process.env["KGOS_DEV_ENDPOINT"];
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   build: {
     emptyOutDir: true,
-    outDir: "dist",
-    sourcemap: true
+    outDir: mode === "mcp" ? "dist-mcp" : "dist",
+    sourcemap: true,
+    ...(mode === "mcp"
+      ? { rollupOptions: { input: fileURLToPath(new URL("./mcp.html", import.meta.url)) } }
+      : {})
   },
   plugins: [react()],
   resolve: {
@@ -29,4 +32,4 @@ export default defineConfig({
           }
         })
   }
-});
+}));

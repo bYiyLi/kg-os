@@ -6,12 +6,13 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "check": "pnpm exec tsc -p tsconfig.json --pretty false && pnpm exec eslint src --max-warnings 0 && pnpm exec prettier --check src index.html --ignore-unknown && pnpm exec vitest run --config ../../config/test/vitest.config.ts packages/web/src",
+    "build": "vite build && vite build --mode mcp && node ../../scripts/inline-mcp-ui.mjs",
+    "check": "pnpm exec tsc -p tsconfig.json --pretty false && pnpm exec eslint src --max-warnings 0 && pnpm exec prettier --check src index.html mcp.html --ignore-unknown && pnpm exec vitest run --config ../../config/test/vitest.config.ts packages/web/src",
     "dev": "vite --host 127.0.0.1 --port 5174 --strictPort"
   },
   "dependencies": {
     "@kgos/sdk": "workspace:*",
+    "@modelcontextprotocol/ext-apps": "2.0.3",
     "i18next": "26.4.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",

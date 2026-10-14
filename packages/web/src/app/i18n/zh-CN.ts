@@ -67,6 +67,14 @@ export const zhCN = {
     zoom: "缩放（待实现）",
     pendingCanvas: "画布内容待实现"
   },
+  embedded: {
+    title: "当前知识版本",
+    refresh: "刷新",
+    loading: "正在读取 KG OS…",
+    unavailable: "无法连接 KG OS，请检查连接后刷新。",
+    branch: "默认分支",
+    commit: "提交"
+  },
   mcp: {
     title: "授权连接",
     description: "ChatGPT 希望连接到您的 KG OS 实例。",

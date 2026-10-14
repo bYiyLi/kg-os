@@ -10,7 +10,8 @@ const paths = [
   "test-results",
   "packages/cli/dist",
   "packages/sdk/dist",
-  "packages/web/dist"
+  "packages/web/dist",
+  "packages/web/dist-mcp"
 ];
 
 for (const path of paths) {

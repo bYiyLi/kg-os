@@ -175,8 +175,36 @@ async function connect(base) {
   mcpClient = new Client({ name: "unified-docker-smoke", version: "1.0.0" });
   await mcpClient.connect(transport);
   session = transport;
-  const names = (await mcpClient.listTools()).tools.map((tool) => tool.name).sort();
-  assert.deepEqual(names, ["kgos_preview", "kgos_read", "kgos_run", "state_ancestry"]);
+  const tools = (await mcpClient.listTools()).tools;
+  const names = tools.map((tool) => tool.name).sort();
+  assert.deepEqual(names, [
+    "kgos_preview",
+    "kgos_read",
+    "kgos_run",
+    "kgos_workspace",
+    "state_ancestry"
+  ]);
+  const workspaceURI = "ui://kgos/workspace/v1";
+  const workspace = tools.find((tool) => tool.name === "kgos_workspace");
+  assert.equal(workspace?.annotations?.readOnlyHint, true);
+  assert.equal(workspace?._meta?.ui?.resourceUri, workspaceURI);
+  assert.deepEqual(workspace?._meta?.ui?.visibility, ["app"]);
+  assert.deepEqual(workspace?._meta?.["openai/ui"]?.entrypoints, [
+    { type: "global" },
+    { type: "thread" }
+  ]);
+  const resources = (await mcpClient.listResources()).resources;
+  assert.equal(
+    resources.find((resource) => resource.uri === workspaceURI)?.mimeType,
+    "text/html;profile=mcp-app"
+  );
+  const contents = (await mcpClient.readResource({ uri: workspaceURI })).contents;
+  assert.equal(contents.length, 1);
+  assert.equal(contents[0].uri, workspaceURI);
+  assert.equal(contents[0].mimeType, "text/html;profile=mcp-app");
+  assert.match(contents[0].text, /<script type="module">/);
+  assert.match(contents[0].text, /<style>/);
+  assert.doesNotMatch(contents[0].text, /(?:src|href)="\/assets\//);
 }
 
 async function verifyHTTP(base) {

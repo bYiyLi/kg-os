@@ -61,6 +61,8 @@ same origin                    → KG OS API / streaming
 
 Web 构建产物随 `kgosd` native Runtime package 一起交付，由 `kgosd` 的 HTTP server直接提供页面和资源；本地业务 CLI 在需要时自动确保该 Workspace Instance 的 daemon 已运行，同一个 active endpoint即可访问 Web 与 API。没有独立 Web 启动命令、第二个服务端口或单独部署步骤。
 
+ChatGPT MCP Apps 仍共享 `packages/web` 源码和 `kgosd` 内嵌构建链：普通 Web 由 HTTP `/` 分发，额外的自包含 MCP App HTML 由同进程受认证 `/mcp` 上的 `resources/read` 返回。两种产物的宿主入口不同，但复用 React 业务界面；不增加第二个 Web 域名、Node 运行服务或监听端口。UI Resource / Tool 协议见 [MCP](mcp.md#chatgpt-mcp-apps-ui-合同)，组件复用见 [Web](web.md#chatgpt-内嵌-webmcp-apps)。
+
 Web 与 CLI / SDK 在逻辑上都是公共 API 的客户端。`kgosd` / Kernel 使用 Go；CLI / SDK / Web 使用 TypeScript。Web 构建出的浏览器代码经 `kgosd` HTTP 下载后在浏览器执行；这里的“同进程”只表示页面 / 资源服务与 API 服务由同一个 daemon承载，不表示浏览器代码在 Go 进程内执行。
 
 前后端代码分属 Go 与 TypeScript workspace，但这不产生第二个**产品部署服务**。Phase 00 开发环境可以使用 Vite dev server + proxy/HMR 作为开发工具，不要求把 Vite middleware嵌进 Go `net/http`；生产/本地正式运行的 Web构建产物仍由 `kgosd` 同端口直接提供，运行时不依赖 Vite。具体开发端口属于工程配置，不进入公开 endpoint contract。
@@ -81,8 +83,8 @@ Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemo
 
 - **默认不变**：`kgosd --root <workspace>` 按原有 CLI-managed 生命周期监听 `127.0.0.1:0`；`kgosd.lock` 继续记录实际 active endpoint，single-instance OS lock / readiness / `auth.json` 规则不变。MCP 不产生第二份 Instance、不单独启动子 daemon、不使用 SDK 经 HTTP 回调自身。
 - **显式统一监听**：目标支持 `kgosd --root <workspace> [--host <address>] [--port <0..65535>] [--tls-cert <path> --tls-key <path>]`；网络选项可由 `KGOSD_HOST` / `KGOSD_PORT` / `KGOSD_TLS_CERT` / `KGOSD_TLS_KEY` 提供，命令行优先、未指定时保持现有默认。TLS 证书与私钥必须成对。端口 0 仍发布真实绑定端口；不增加独立 MCP 监听地址 / 端口。
-- **安全入口**：监听 `0.0.0.0` 只是网络暴露，不代表已提供 TLS。远程使用必须有真实 HTTPS 或可信的加密代理 / 通道，且路由保护生效；用户自行选择代理或隧道。即使一个 listener 对外，`/api/v1/*` 仍只接受 Instance Bearer，`/mcp` 仍只接受独立 MCP 静态 Bearer 或 OAuth Access Token；Web 静态资源可匿名读取，但 Web 调用业务 API 不可绕过认证。外部 MCP 调用方永不取得 `auth.json` Token。
-- **启用规则**：只有显式配置有效 MCP 管理员 Token 来源时才注册可调用的 MCP Tool / 认证入口；未启用 MCP 不改变现有 CLI、API、Web 的启动就绪及本机使用。OAuth 额外要求显式 issuer。MCP 的路径、Token/OAuth、预算和安全规范由 [MCP owner](mcp.md#部署交付与运行合同) 定义，不在本文件复制第二套配置。
+- **安全入口**：监听 `0.0.0.0` 只是网络暴露，不代表已提供 TLS。远程使用必须有真实 HTTPS 或可信的加密代理 / 通道，且路由保护生效；用户自行选择代理或隧道。即使一个 listener 对外，`/api/v1/*` 仍使用既有 Instance Bearer / 受控临时 Web Bearer，`/mcp` 采用 Phase 17 的 Instance Bearer（可信客户端）或 MCP OAuth Access Token；Web 静态资源可匿名读取，但 Web 调用业务 API 不可绕过认证。外部 OAuth MCP 调用方永不取得 `auth.json` Token。
+- **启用规则**：MCP 与已经就绪的当前 Instance 共用根认证，不再要求第二个管理员 Token；OAuth discovery/授权仍需显式 issuer。MCP 路径、OAuth、预算和安全规范由 [MCP owner](mcp.md#部署交付与运行合同) 定义。此规则按 [D95](decisions.md#d95-unified-mcp-web-authorization) 替代旧 Phase 16 / D93 的独立管理员 Token 记述。
 - **部署模型**：单进程不等于必须对所有路由公开放行；用户可在同一个 HTTPS 入口上对代理路由设置自己的限制，但 KG OS 不新增网络 Gateway。正式 Docker 仅交付一个运行 `kgosd` 的容器，Web 资源与 QuickJS WASM 编译进产品产物，运行时不依赖 Node.js MCP Server。旧独立 Node MCP 和双进程 Docker 源码已从工作树清理，Git 历史保留为迁移证据；**当前实现、开发验收、CI 与发布状态统一由 [Phase 16](../development/phases/16-kgosd-unified-mcp.md) 维护**。
 
 ### Web 交互设计状态

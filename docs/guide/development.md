@@ -231,6 +231,8 @@ Go daemon 的生产启动依赖与 binary 同目录的 Runtime manifest/native a
 
 `coverage/`、`playwright-report/`、`test-results/`、`artifacts/` 都是生成物，不提交 Git。
 
+Web 或 MCP App 源码有改动时，优先运行 **`pnpm test:e2e`**：它会先完整构建当前 Web/`kgosd`，再执行 Playwright。直接运行 `pnpm exec playwright test` **不会重建 Runtime**，可能读到 `artifacts/npm/runtime-<target>/` 中的旧页面，造成源码与测试预期不一致；只有当前源码已完成 `pnpm build` 后，才直接运行 Playwright 定向用例。`pnpm validate` 已在 E2E 前执行构建，无需额外重复。
+
 **安全审计例外（2026-10-12）：** `pnpm.auditConfig.ignoreCves` 仅列入 `CVE-2026-93687`（[GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)）；该告警来自开发工具 `markdownlint-cli2 → micromatch → braces@3.0.3`，上游尚无修复版，当前生产 MCP 镜像不包含 `braces`。`pnpm check:security` 先审计生产依赖，再审计全部依赖，均保留 `high` 阈值；其它 CVE 不在白名单中。上游发布已验证的修复版本时应升级依赖并移除此条例外；若受影响依赖进入生产包，应重新评审而非默认接受。不要使用 `--ignore-unfixable` 或放宽整体安全级别。
 
 ## Lithograph v0.3.0 fixture

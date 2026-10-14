@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "../../shared/ui/icon.js";
@@ -11,7 +12,13 @@ const pendingTools: readonly { name: IconName; label: "select" | "layout" | "fit
     { name: "map", label: "minimap" }
   ];
 
-export function Workspace({ onOpenVersions }: { onOpenVersions: () => void }) {
+export function Workspace({
+  onOpenVersions,
+  children
+}: {
+  onOpenVersions: () => void;
+  children?: ReactNode;
+}) {
   const { t } = useTranslation();
   return (
     <main className="workspace-main" aria-label={t("workspace.label")}>
@@ -44,6 +51,7 @@ export function Workspace({ onOpenVersions }: { onOpenVersions: () => void }) {
           </button>
         </div>
         <span className="sr-only">{t("workspace.pendingCanvas")}</span>
+        {children}
       </section>
     </main>
   );

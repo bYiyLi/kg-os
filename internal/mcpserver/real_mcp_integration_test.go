@@ -115,7 +115,7 @@ func TestRealKernelMCPToolsAndAuthentication(t *testing.T) {
 			t.Fatalf("Tool %s absent: %#v", name, names)
 		}
 	}
-	if len(names) != 4 {
+	if len(names) != 5 {
 		t.Fatalf("wrong tool inventory %#v", names)
 	}
 	call := func(name string, args map[string]any) *mcp.CallToolResult {

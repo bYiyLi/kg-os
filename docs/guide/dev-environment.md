@@ -8,6 +8,8 @@
 
 **2026-10-14 Phase 17 Dev 部署成功**：使用 Mac 当前 `dirty` 工作树通过正式 `Dockerfile.unified` 在 OpenClaw 构建并切换镜像；`kgos-dev-mcp-1` 已 `healthy`，`pnpm dev:mcp check` 通过统一 Instance Bearer、OAuth Discovery 与四个 Tool 的只读请求。镜像 ID 为 `sha256:81216e09a1f64ac8ed67db3b30ea4e31c400a209135eaf339eccf7018c2e8951`；部署前受保护的 SQLite 一致性快照位于 `/data/apps/KgosDev/data/backups/20261014T070920Z-qwRPyKkr`。公网 HTTPS 首页及 OAuth 资源/授权元数据已返回 200，无凭证 MCP/请求详情返回 401；用户已确认新版 ChatGPT 重新授权成功，GitHub CI / 完整新版隔离矩阵未验收。历史独立 MCP Token 文件保留用于旧镜像回退，不由新版认证使用。2026-10-14 主题适配后的最新 Dev 镜像为 `sha256:6c67e96e381f97fa1764fc5e994cd488498d018ae3b361d2d46da6f1e4c6f6c3`，正式 Docker 构建、健康检查、只读 MCP 自动验收及公网主题 CSS 验证通过；Phase 17 按用户批准的未完成 CI 例外标记 `done`。
 
+**2026-10-14 Phase 18 Dev 部署成功**：使用当前 `main@8e7bf56` 的 `dirty` 工作树经 `pnpm dev:mcp deploy` 同步至 OpenClaw，构建并切换 Linux amd64 单进程镜像 `sha256:60fcac91fb95532ba40aead7757d076113c6c8bd300957d9c3eee9757ca87193`；`kgos-dev-mcp-1` 为 `healthy`，UTC 部署记录为 `2026-10-14T11:49:37Z`。部署前创建 SQLite 一致性备份 `/data/apps/KgosDev/data/backups/`（2026-10-14T11:47:26Z）（含私有凭证，禁止公开）。自动验收及 `pnpm dev:mcp check` 通过四业务 Tool + `kgos_workspace` 的双入口元数据、受认证 `resources/list/read`、自包含 HTML/CSP、OAuth 与 Web/API 安全隔离；公网 HTTPS `/` 200、`/mcp` 匿名 401、OAuth metadata 200、`/mcp-app.html` 404。使用本次镜像在**隔离临时 Volume** 完成 31/31 SDK、重启持久化、单进程、非 root、无 Node.js 运行时 Smoke，不写长期 Dev 知识数据；部署时还未进行真实 ChatGPT 入口验收；随后用户实际打开 Sidebar App 和 Conversation Panel 并确认刷新/主题/语言/分支筛选正常（见 [Phase 18 关闭记录](../development/phases/18-chatgpt-embedded-web.md#阶段关闭记录2026-10-14用户批准例外)）；远端 GitHub CI 尚未运行。
+
 ## 1. 固定环境与职责
 
 | 项目 | 值 |
@@ -79,7 +81,7 @@ docker compose --env-file /data/apps/KgosDev/config/compose.env -f compose.dev.y
 3. Idempotent `setup` 检查目录权限和 Compose 配置；不重置 Instance Token 或 DB。只有先前已初始化的 Instance 可以部署 MCP。
 4. 把**当前运行容器的真实镜像 ID**保存为 `kgos-dev-mcp:previous`，并在构建前创建**SQLite 在线一致性备份**；备份失败直接停止，旧容器仍运行。
 5. `docker compose build mcp` 在原服务仍运行时编译当前 Web、Go `kgosd` 并校验固定版本原生扩展和 Runtime manifest；成功后 `up -d --no-build --force-recreate mcp` 只替换 `kgos-dev` 服务。
-6. 验收容器 `healthy`，确认新镜像 PID 1 为单一 `kgosd`、Dev 身份为 UID 1000、HTTP 3777 无凭证 MCP 返回 **401** 且声明 OAuth metadata。在 **OpenClaw 宿主**的只读客户端上，从当前 Instance 私有 `.kgos/auth.json` 读取唯一认证凭证，验证 Web/API/MCP 路由、OAuth metadata、认证隔离、四 Tool、Preview、State 和 Ancestry；**不把 Node.js 安装进最终镜像，也不做长期 Dev 写入测试**。此前 Phase 15 的 Node `doctor` 仅作为旧镜像回退验收。
+6. 验收容器 `healthy`，确认新镜像 PID 1 为单一 `kgosd`、Dev 身份为 UID 1000、HTTP 3777 无凭证 MCP 返回 **401** 且声明 OAuth metadata。在 **OpenClaw 宿主**的只读客户端上，从当前 Instance 私有 `.kgos/auth.json` 读取唯一认证凭证，验证 Web/API/MCP 路由、OAuth metadata、认证隔离、四个业务 Tool（Phase 18 新镜像还必须验证 UI Tool/Resource）、Preview、State 和 Ancestry；**不把 Node.js 安装进最终镜像，也不做长期 Dev 写入测试**。此前 Phase 15 的 Node `doctor` 仅作为旧镜像回退验收。
 7. 全部通过后追加 `config/deployments.tsv`（UTC、revision、dirty/clean、镜像 ID）；新镜像验收失败时恢复 `previous` 并复验，仍以失败退出，不将失败发布伪装成成功。
 
 **镜像回退不等于数据库回退。** `rollback` 只改变运行镜像，不会偷偷把新版本可能写入的数据库恢复为旧状态；数据恢复必须在停止服务后，由操作者明确选择已检查过的备份执行。仅在根本不存在先前镜像时，首次部署失败会保持未部署状态。
@@ -133,6 +135,6 @@ KGOS_UNIFIED_DOCKER_SMOKE_IMAGE=kgos-dev-mcp:local \
   node scripts/mcp-unified-docker-smoke.mjs
 ```
 
-脚本使用当前镜像创建并清理**临时 Volume**，在真实 MCP → Go QuickJS/WASM → Kernel → Lithograph 链路验收四 Tool、31/31 方法和持久化重启。它与长期 Dev 的只读 `check` **分别验收**。构建失败先检查 OpenClaw 的基础镜像、代理、Go 和冻结依赖，不通过 Mac Docker 或旧 Node 双进程测试替代。
+脚本使用当前镜像创建并清理**临时 Volume**，在真实 MCP → Go QuickJS/WASM → Kernel → Lithograph 链路验收四个业务 Tool + Phase 18 UI Tool/Resource、31/31 方法和持久化重启。它与长期 Dev 的只读 `check` **分别验收**。构建失败先检查 OpenClaw 的基础镜像、代理、Go 和冻结依赖，不通过 Mac Docker 或旧 Node 双进程测试替代。
 
 准备关闭 Phase 16 时记录源码 Revision/dirty 状态、Dev 部署镜像 ID、只读 `check`、隔离 31-method Smoke、HTTPS/真实 ChatGPT 调用、`pnpm validate` 和 Review 的**实际结果**。最终 Git Commit/Push 的普通 CI 验收、真实私人 Plugin/Skill 安装与旧版清理也须符合 [Phase 16 完成条件](../development/phases/16-kgosd-unified-mcp.md#完成条件)。正式 Release Tag、GHCR 和生产部署继续独立授权；**仅 Dev 已部署不代表 Phase 自动成为 `done`**。

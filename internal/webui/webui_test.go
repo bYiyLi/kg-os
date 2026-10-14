@@ -36,6 +36,7 @@ func TestShellServesAssetsAndRoutes(t *testing.T) {
 		{name: "head", method: http.MethodHead, target: "/", status: 200},
 		{name: "missing asset", method: http.MethodGet, target: "/missing.js", status: 404},
 		{name: "api", method: http.MethodGet, target: "/api/status", status: 404},
+		{name: "mcp app is private", method: http.MethodGet, target: "/mcp-app.html", status: 404},
 		{name: "hidden", method: http.MethodGet, target: "/.gitkeep", status: 404},
 		{name: "post", method: http.MethodPost, target: "/", status: 405},
 	} {
