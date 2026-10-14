@@ -76,7 +76,7 @@ Ontology read / batch edit 与 aggregate Patch 使用相同错误 envelope。Ont
 
 ## Web 持久数据错误方案
 
-以下是 [Web 工作区数据](web.md#web-工作区数据)的新增工程映射，**当前 code / route 尚未实现**；它们使用相同 `code/message/details` envelope，不更改现有 Knowledge API 分类。
+以下是 [Web 工作区数据](web.md#web-工作区数据)的工程映射：`WEB_CONNECTION_CHANGED` / 409 与 `web.data.info` 已实现，记录、缓存等其它 code / route 尚未实现。它们使用相同 `code/message/details` envelope，不更改现有 Knowledge API 分类。
 
 | 类别 | 拟用 code 与 HTTP status |
 | --- | --- |

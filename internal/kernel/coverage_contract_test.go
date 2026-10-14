@@ -79,6 +79,7 @@ func TestPublicErrorMappingCoverage(t *testing.T) {
 
 	statuses := map[ErrorCode]int{
 		CodeAuthenticationFailed: http.StatusUnauthorized,
+		CodeWebConnectionChanged: http.StatusConflict,
 		CodeObjectNotFound:       http.StatusNotFound,
 		CodeStateNotFound:        http.StatusNotFound,
 		CodeBranchNotFound:       http.StatusNotFound,

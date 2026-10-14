@@ -17,8 +17,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Options are scoped to one already-open KG OS Instance. The MCP credential
-// is separate from the Instance Bearer used by the private HTTP API.
+// Options are scoped to one already-open KG OS Instance. Token is the existing
+// Instance credential, never a separately configured MCP administrator secret.
 type Options struct {
 	Token               string
 	Path                string
@@ -53,7 +53,7 @@ func New(k *kernel.Service, settings Options) (*Server, error) {
 		return nil, errors.New("kernel is required")
 	}
 	if settings.Token == "" || len(settings.Token) > 4096 {
-		return nil, errors.New("MCP administrator token is required")
+		return nil, errors.New("instance token is required for MCP")
 	}
 	if settings.Path == "" {
 		settings.Path = "/mcp"

@@ -6,6 +6,8 @@
 
 **环境职责（D94）**：Mac 只做源码与非 Docker 验证；OpenClaw Linux amd64 负责 Dev Docker，GitHub Actions PR/main CI 独立构建/测试同一单进程镜像。**2026-10-13 已将长期 Dev 切换到 `Dockerfile.unified` 与单个 Go `kgosd` 进程**，保留原 Workspace、凭证、端口和 `pnpm dev:mcp` 管理入口；旧 Node MCP 的镜像仅作为迁移回退候选。
 
+**2026-10-14 Phase 17 Dev 部署成功**：使用 Mac 当前 `dirty` 工作树通过正式 `Dockerfile.unified` 在 OpenClaw 构建并切换镜像；`kgos-dev-mcp-1` 已 `healthy`，`pnpm dev:mcp check` 通过统一 Instance Bearer、OAuth Discovery 与四个 Tool 的只读请求。镜像 ID 为 `sha256:81216e09a1f64ac8ed67db3b30ea4e31c400a209135eaf339eccf7018c2e8951`；部署前受保护的 SQLite 一致性快照位于 `/data/apps/KgosDev/data/backups/20261014T070920Z-qwRPyKkr`。公网 HTTPS 首页及 OAuth 资源/授权元数据已返回 200，无凭证 MCP/请求详情返回 401；用户已确认新版 ChatGPT 重新授权成功，GitHub CI / 完整新版隔离矩阵未验收。历史独立 MCP Token 文件保留用于旧镜像回退，不由新版认证使用。2026-10-14 主题适配后的最新 Dev 镜像为 `sha256:6c67e96e381f97fa1764fc5e994cd488498d018ae3b361d2d46da6f1e4c6f6c3`，正式 Docker 构建、健康检查、只读 MCP 自动验收及公网主题 CSS 验证通过；Phase 17 按用户批准的未完成 CI 例外标记 `done`。
+
 ## 1. 固定环境与职责
 
 | 项目 | 值 |
@@ -28,12 +30,12 @@ Dev 多阶段构建生成 Web 静态资源、当前 Go `kgosd`（CGO + SQLite FT
 | `config/compose.env` | root 所有、`0600`；镜像来源和宿主端口等非凭证配置，脚本不会覆盖既有文件 |
 | `config/deployments.tsv` | 每次验收成功后追加 UTC 时间、源 Git revision、工作区 clean/dirty 与真实运行镜像 ID；不包含 Secret |
 | `data/workspace/` | UID 1000、`0700`；**唯一持久化 KG OS Instance**，映射到容器 `/workspace`；Dev 用 Compose `user: 1000:1000` 保持原权限 |
-| `data/secrets/mcp-token` | UID 1000、`0400`；外部 MCP 管理员 Token，容器只读挂载，**与 `.kgos/auth.json` 不同** |
+| `data/secrets/mcp-token` | 旧 Phase 16 私有 Secret，Phase 17 源码不再挂载/读取；不擅自删除既有 Dev 文件 |
 | `data/backups/` | root 私有目录，保存 SQLite 在线快照、配置、认证文件及已安装扩展；**包含凭证，禁止公开** |
 
 运行中的容器以非 root UID 1000 访问旧 Workspace，**不更改现有数据所有权**；正式镜像仍默认 UID 10001。统一 Go listener 在容器内监听 3777，宿主仍发布 `0.0.0.0:3777`；公开入口同时包含 Web、API 和 MCP，但它们保留独立认证。Dev 宿主的直接 HTTP 无传输加密，只用于可信受控网络；ChatGPT 通过原 HTTPS 代理访问。
 
-Dev Compose 已配置 `KGOS_MCP_OAUTH_ISSUER=${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}`，由同一个 `kgosd` 直接提供单管理员 OAuth。HTTPS 代理必须原样转发 `/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/token`，并保留 Authorization 等必要 Header。Go OAuth 的 CIMD 文档验证使用受控出站 HTTP 客户端；保留宿主现有 `HTTP_PROXY` / `HTTPS_PROXY` 配置，不依赖 Node.js 网络代理。
+Dev Compose 已配置 `KGOS_MCP_OAUTH_ISSUER=${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}`，由同一个 `kgosd` 直接提供Web 集成 OAuth。HTTPS 代理必须原样转发 `/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/token`、`/oauth/request`、`/oauth/decision` 以及同源 Web `/`、静态资源和 Web 登录入口，并保留 Authorization 等必要 Header。Go OAuth 的 CIMD 文档验证使用受控出站 HTTP 客户端；保留宿主现有 `HTTP_PROXY` / `HTTPS_PROXY` 配置，不依赖 Node.js 网络代理。
 
 ## 2. 统一管理入口
 
@@ -41,7 +43,7 @@ Dev Compose 已配置 `KGOS_MCP_OAUTH_ISSUER=${KGOS_DEV_OAUTH_ISSUER:-https://kg
 
 ```sh
 cd /Users/yi/Code/KGOS
-pnpm dev:mcp setup       # 一次性准备目录、配置和 Token，不初始化数据库
+pnpm dev:mcp setup       # 一次性准备目录和配置，不初始化数据库
 pnpm dev:mcp deploy      # 同步当前源码、备份、构建、切换、验收；异常尝试回退旧镜像
 pnpm dev:mcp check       # 只读验证，适合每次更新后重复运行
 pnpm dev:mcp status      # 容器状态、镜像 ID 与最后一次部署记录
@@ -57,7 +59,7 @@ pnpm dev:mcp stop        # 仅停止 KG OS Dev 容器，不删除 Workspace
 
 ### 首次初始化（仅新 Workspace）
 
-`setup` **只准备私有目录和随机 Token**；不猜测数据库初始化参数，不覆盖已有 Instance，不自动创建用户模型。新 Workspace 必须先写好完整的 `data/workspace/.kgos/config.toml`，再使用当前 Go 镜像执行 `kgosd init`；只有真实扩展和 Knowledge Base readiness 成功后才写入 `initialized.json`。下面是 OpenClaw 上的执行入口（需先按实际需求准备配置，不能复制测试 Provider 到生产）：
+`setup` **只准备私有目录与配置**；不猜测数据库初始化参数，不覆盖已有 Instance，不自动创建用户模型。新 Workspace 必须先写好完整的 `data/workspace/.kgos/config.toml`，再使用当前 Go 镜像执行 `kgosd init`；只有真实扩展和 Knowledge Base readiness 成功后才写入 `initialized.json`。下面是 OpenClaw 上的执行入口（需先按实际需求准备配置，不能复制测试 Provider 到生产）：
 
 ```sh
 ssh openclaw
@@ -74,10 +76,10 @@ docker compose --env-file /data/apps/KgosDev/config/compose.env -f compose.dev.y
 
 1. Mac 检查自己位于 KG OS Git 工作树，读取完整 HEAD 和 dirty 状态。**允许未提交源码迭代**，但在历史中明确标记 `dirty`；这与 Nexum 的 clean-source Registry release 是不同合同。
 2. 只将源码同步到固定的 `/data/apps/KgosDev/src/KGOS/`。同步保留 `cmd/`、`internal/`、全部 TypeScript 包与 Web 源码，但跳过 `.git`、`.kgos`、`.env`、`node_modules`、`native` 扩展原始源码、构建结果和缓存。`rsync --delete` 作用范围**严格限定于这个专用源码目录**，绝不用于 `KgosDev` 根或 `data/config`。
-3. Idempotent `setup` 检查已有 Secret、目录权限和 Compose 配置；不重置 Token 或 DB。只有先前已初始化的 Instance 可以部署 MCP。
+3. Idempotent `setup` 检查目录权限和 Compose 配置；不重置 Instance Token 或 DB。只有先前已初始化的 Instance 可以部署 MCP。
 4. 把**当前运行容器的真实镜像 ID**保存为 `kgos-dev-mcp:previous`，并在构建前创建**SQLite 在线一致性备份**；备份失败直接停止，旧容器仍运行。
 5. `docker compose build mcp` 在原服务仍运行时编译当前 Web、Go `kgosd` 并校验固定版本原生扩展和 Runtime manifest；成功后 `up -d --no-build --force-recreate mcp` 只替换 `kgos-dev` 服务。
-6. 验收容器 `healthy`，确认新镜像 PID 1 为单一 `kgosd`、Dev 身份为 UID 1000、HTTP 3777 无凭证 MCP 返回 **401** 且声明 OAuth metadata。在 **OpenClaw 宿主**的只读客户端上，从既有受保护文件读取 MCP Token 与 Instance Token，验证 Web/API/MCP 路由、OAuth metadata、认证隔离、四 Tool、Preview、State 和 Ancestry；**不把 Node.js 安装进最终镜像，也不做长期 Dev 写入测试**。此前 Phase 15 的 Node `doctor` 仅作为旧镜像回退验收。
+6. 验收容器 `healthy`，确认新镜像 PID 1 为单一 `kgosd`、Dev 身份为 UID 1000、HTTP 3777 无凭证 MCP 返回 **401** 且声明 OAuth metadata。在 **OpenClaw 宿主**的只读客户端上，从当前 Instance 私有 `.kgos/auth.json` 读取唯一认证凭证，验证 Web/API/MCP 路由、OAuth metadata、认证隔离、四 Tool、Preview、State 和 Ancestry；**不把 Node.js 安装进最终镜像，也不做长期 Dev 写入测试**。此前 Phase 15 的 Node `doctor` 仅作为旧镜像回退验收。
 7. 全部通过后追加 `config/deployments.tsv`（UTC、revision、dirty/clean、镜像 ID）；新镜像验收失败时恢复 `previous` 并复验，仍以失败退出，不将失败发布伪装成成功。
 
 **镜像回退不等于数据库回退。** `rollback` 只改变运行镜像，不会偷偷把新版本可能写入的数据库恢复为旧状态；数据恢复必须在停止服务后，由操作者明确选择已检查过的备份执行。仅在根本不存在先前镜像时，首次部署失败会保持未部署状态。
@@ -88,7 +90,7 @@ docker compose --env-file /data/apps/KgosDev/config/compose.env -f compose.dev.y
 
 ## 4. 常见排障与验收
 
-从 Mac 先运行 `pnpm dev:mcp status`、`pnpm dev:mcp check`、`pnpm dev:mcp logs`；失败时分别核对 SSH、Docker/Compose、构建阶段 Node / Go 工具链、镜像仓库代理、`config/compose.env`、持久化目录 UID/权限、管理员 Token 文件和单一 `kgosd` 的启动日志。构建阶段可使用 OpenClaw 已配置的镜像代理，不固化为 KG OS 产品依赖。
+从 Mac 先运行 `pnpm dev:mcp status`、`pnpm dev:mcp check`、`pnpm dev:mcp logs`；失败时分别核对 SSH、Docker/Compose、构建阶段 Node / Go 工具链、镜像仓库代理、`config/compose.env`、持久化目录 UID/权限、Instance `auth.json` 文件和单一 `kgosd` 的启动日志。构建阶段可使用 OpenClaw 已配置的镜像代理，不固化为 KG OS 产品依赖。
 
 其它设备可以通过 `http://10.168.155.123:3777/mcp` 访问 Dev MCP（若更改 `KGOS_DEV_PORT`，使用实际端口）；未提供 Token 时应收到 `401`。可先从 Mac 无凭证测试网络可达性：
 
@@ -104,7 +106,7 @@ curl -i https://kgos-dev.y2l.top/.well-known/oauth-protected-resource/mcp
 curl -i https://kgos-dev.y2l.top/.well-known/oauth-authorization-server
 ```
 
-授权页面使用 5 分钟有效的**一次性 Ticket**。如果打开页面后等待过久，或者 Dev 服务在其间重启，提交旧页面会被拒绝；**回到 ChatGPT 重新触发连接/授权，取得新的页面后再提交**。正确输入的 MCP 管理员 Token 不会修复已经过期的 Ticket，也不应该发送到聊天中。
+新的 Web 授权使用 5 分钟有效的**一次性请求**。若等待过久或 `kgosd` 重启，应返回 ChatGPT 重新发起连接；不再有独立 MCP 管理员 Token 输入页。Web 未登录时使用其已有认证，登录成功仍需明确批准该次连接。
 
 只有真实 ChatGPT 客户端最终登录和调用成功后，才能把该客户端标记为通过；开发容器的内部 discovery、401 或独立 OAuth 协议测试不能替代这个证据。
 

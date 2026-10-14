@@ -8,6 +8,13 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
+// The bootstrap endpoint remains available even when the optional UI store
+// cannot be opened. Store-specific metadata is supplied once it exists.
+export interface WebDataInfoResult {
+  daemonBootId: string;
+  storageStatus: "ready" | "unavailable" | "unsupported" | "mismatch";
+}
+
 export type ObjectKind =
   | "domain"
   | "node-definition"

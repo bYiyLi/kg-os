@@ -48,6 +48,46 @@ describe("KG OS SDK", () => {
     });
   });
 
+  it("retrieves authenticated Web bootstrap information without changing SDK credentials", async () => {
+    const info = {
+      daemonBootId: "e48245ac-51a4-4b6b-93ba-07bb4d0626a6",
+      storageStatus: "unsupported"
+    };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(info)));
+    const client = new KGOSClient({
+      endpoint: "http://127.0.0.1:5000",
+      token: "secret",
+      fetch: fetcher
+    });
+    await expect(client.web.data.info()).resolves.toEqual(info);
+    expect(fetcher.mock.calls[0]?.[0]).toBe("http://127.0.0.1:5000/api/v1/web/data/info");
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      headers: { Authorization: "Bearer secret", "Content-Type": "application/json" },
+      body: "{}"
+    });
+  });
+
+  it("binds the default browser fetch to its global receiver", async () => {
+    const nativeLikeFetch = vi.fn(function (this: unknown) {
+      if (this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+      return Promise.resolve(new Response(JSON.stringify({ defaultBranch: "main", state: "a" })));
+    });
+    vi.stubGlobal("fetch", nativeLikeFetch);
+    try {
+      const client = new KGOSClient({ endpoint: "http://127.0.0.1:5000", token: "secret" });
+      await expect(client.evolution.overview()).resolves.toEqual({
+        defaultBranch: "main",
+        state: "a"
+      });
+      expect(nativeLikeFetch).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("preserves daemon public errors without guessing from messages", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(

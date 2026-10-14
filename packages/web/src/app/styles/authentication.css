@@ -1,0 +1,412 @@
+/* The modal is a native, non-dismissible dialog: the rest of the app is inert. */
+.session-restoring {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #0b1225;
+  color: #bcc8e3;
+  font-size: 14px;
+}
+
+.session-logout-error {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10;
+  padding: 12px 18px;
+  border: 1px solid #b87272;
+  border-radius: 8px;
+  background: #283043;
+  color: #ffd4d4;
+}
+
+.authentication-dialog {
+  width: min(496px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 22px 26px 18px;
+  overflow: auto;
+  border: 1px solid #344765;
+  border-radius: 11px;
+  background:
+    radial-gradient(ellipse 85% 55% at 85% 40%, rgb(35 54 90 / 20%), transparent),
+    linear-gradient(140deg, #171f2c, #101928 79%);
+  box-shadow:
+    0 32px 110px rgb(0 0 0 / 50%),
+    inset 0 1px rgb(255 255 255 / 3%);
+  color: #eef2ff;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  scrollbar-width: thin;
+  scrollbar-color: #36466d transparent;
+}
+
+.authentication-dialog:not([open]) {
+  display: none;
+}
+
+.authentication-dialog::backdrop {
+  background: rgb(5 10 21 / 73%);
+  backdrop-filter: blur(13px) saturate(0.7);
+  -webkit-backdrop-filter: blur(13px) saturate(0.7);
+}
+
+/* Never show example graph/version data behind an unauthenticated screen. */
+.app-shell.is-auth-required > :not(.authentication-dialog) {
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+.app-shell.is-auth-required .version-tree,
+.app-shell.is-auth-required .canvas-toolbar {
+  visibility: hidden;
+}
+
+.authentication-topline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.authentication-topline .language-switcher {
+  width: auto;
+  flex: none;
+  border-color: #344765;
+  background: #202d40;
+  color: #adbad1;
+}
+
+.authentication-topline .language-option[aria-pressed="true"] {
+  background: #354765;
+  color: #f4f6ff;
+}
+
+.authentication-brand-name {
+  font-size: 23px;
+  font-weight: 660;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+}
+
+.authentication-brand-description {
+  margin-top: 6px;
+  color: #aab8d3;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  white-space: nowrap;
+}
+
+.authentication-introduction {
+  margin-top: 23px;
+  text-align: center;
+}
+
+.authentication-lock {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+  place-items: center;
+  border: 1px solid #344f9b;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #18294e, #1b2643);
+  box-shadow: 0 0 24px rgb(63 95 234 / 8%);
+  color: #5878ff;
+}
+
+.authentication-lock .icon {
+  width: 29px;
+  height: 29px;
+  stroke-width: 1.95;
+}
+
+.authentication-introduction h2 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.35;
+}
+
+.authentication-introduction p {
+  margin-top: 9px;
+  color: #b9c5da;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.authentication-introduction .authentication-reason {
+  margin-top: 12px;
+  color: #ffcb91;
+  font-size: 13px;
+}
+
+.authentication-form {
+  margin-top: 24px;
+}
+
+.authentication-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 550;
+}
+
+.authentication-label .icon {
+  width: 16px;
+  height: 16px;
+  color: #8498b8;
+}
+
+.authentication-token-field {
+  display: flex;
+  height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: 1px solid #3a4961;
+  border-radius: 8px;
+  background: linear-gradient(110deg, #212c3d, #252f43);
+  color: #cdd7e7;
+}
+
+.authentication-token-field:focus-within {
+  border-color: #6d85ff;
+  box-shadow: 0 0 0 3px rgb(78 105 255 / 16%);
+}
+
+.authentication-token-field > .icon {
+  width: 19px;
+  height: 19px;
+}
+
+.authentication-token-field input {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f5f6ff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.authentication-token-field input::placeholder {
+  color: #8997ac;
+}
+
+.authentication-reveal {
+  display: grid;
+  width: 32px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #b6c5de;
+}
+
+.authentication-reveal:hover {
+  background: rgb(255 255 255 / 6%);
+  color: #fff;
+}
+
+.authentication-reveal .icon {
+  width: 19px;
+  height: 19px;
+}
+
+.authentication-token-note {
+  margin-top: 6px;
+  color: #9caac1;
+  font-size: 12px;
+}
+
+.authentication-error {
+  margin-top: 9px;
+  color: #ffb7bd;
+  font-size: 13px;
+}
+
+.authentication-connect {
+  display: flex;
+  width: 100%;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 19px;
+  border: 1px solid #6c81ff;
+  border-radius: 8px;
+  background: linear-gradient(115deg, #5268ff, #4c64f7);
+  box-shadow: 0 5px 19px rgb(58 73 212 / 24%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 540;
+}
+
+.authentication-connect:hover:not(:disabled) {
+  background: linear-gradient(115deg, #6275ff, #526cfb);
+}
+
+.authentication-connect:disabled {
+  opacity: 0.58;
+}
+
+.authentication-connect .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.authentication-help {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #303b4f;
+}
+
+.authentication-help-icon .icon {
+  width: 21px;
+  height: 21px;
+}
+
+.authentication-help-text strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.authentication-help-text p {
+  margin-top: 2px;
+  color: #a9b7ce;
+  font-size: 13px;
+}
+
+.authentication-help-text code {
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 4px 8px;
+  overflow-wrap: anywhere;
+  border-radius: 5px;
+  background: #202c40;
+  color: #e4eaff;
+  font-family: var(--font-code);
+  font-size: 12px;
+}
+
+.authentication-help a {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 3px;
+  color: #7994ff;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.authentication-help a:hover {
+  text-decoration: underline;
+}
+
+.authentication-help a .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.authentication-footer {
+  margin-top: 20px;
+  color: #6f83a3;
+  font-size: 13px;
+  text-align: center;
+}
+
+.connection-disconnect {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.connection-disconnect:hover {
+  color: var(--color-text);
+}
+
+.connection-disconnect .icon {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 540px) {
+  .authentication-dialog {
+    padding: 20px 18px 18px;
+  }
+
+  .authentication-brand-name {
+    font-size: 23px;
+  }
+
+  .authentication-brand-description {
+    font-size: 8px;
+    letter-spacing: 0.15em;
+  }
+
+  .authentication-topline {
+    gap: 8px;
+  }
+
+  .authentication-introduction {
+    margin-top: 20px;
+  }
+
+  .authentication-lock {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 12px;
+  }
+
+  .authentication-introduction h2 {
+    font-size: 20px;
+  }
+
+  .authentication-introduction p {
+    font-size: 13px;
+  }
+
+  .authentication-form {
+    margin-top: 20px;
+  }
+
+  .authentication-help {
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .authentication-help a {
+    grid-column: 2;
+    padding-top: 0;
+  }
+
+  .authentication-footer {
+    margin-top: 20px;
+  }
+}

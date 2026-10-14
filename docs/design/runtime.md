@@ -91,7 +91,7 @@ Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemo
 
 ## 单 Token 实例认证
 
-KG OS v1 对 `kgosd` HTTP API surface 使用一个最小的 **single-token instance authentication**：一个 `<workspace-root>/.kgos` Instance 只有一个持久 access token；持有该 token 就拥有该实例全部 API 能力。v1 不建立 user、password、role、scope、refresh token、OAuth、session account 或多租户授权模型。
+KG OS v1 以一个 `<workspace-root>/.kgos` Instance Token 作为唯一根凭证；持有根凭证拥有全部 API 权限。不建立用户账号、密码、角色、Scope 或多租户。**浏览器 Web 认证是该根凭证派生的登录状态**：首次提交根 Token 后，daemon 创建独立、可撤销的持久 Web Session；Cookie 不包含根 Token；刷新页面只需验证 Session 并取得本次页面的临时 Web Bearer。MCP OAuth Code/Access/Refresh Token 是另一条仅限 MCP 的授权链，Web Cookie 不能直接调用 MCP。
 
 服务端 credential 的唯一真源是 `<workspace-root>/.kgos/auth.json`：
 
@@ -111,16 +111,30 @@ KG OS v1 对 `kgosd` HTTP API surface 使用一个最小的 **single-token insta
 Authorization: Bearer <token>
 ```
 
-不接受 query parameter、URL、request body 或 cookie 作为 token 的第二种 canonical carrier。缺失、空、malformed 或不匹配的 Bearer credential 都返回同一个 `AUTHENTICATION_FAILED`，HTTP adapter 使用 `401 Unauthorized`，不得通过错误差异泄露 credential validity。实现比较 token 时使用适合 secret 的 constant-time comparison。
+不接受 query parameter、URL、request body 或 cookie 作为普通业务 API 的 credential carrier。Bearer 为 Instance 根 Token，或仅在同源 Web 完成 Session 校验后发放的**进程内 Web Access Bearer**（不返回 Instance 根 Token）。二者都在服务端验证；Web Access Bearer 不可调用 `/mcp`、不能绕过 Boot Guard，daemon 重启后须用持久 Cookie 重新获取。没有 Bearer 的业务 API 仍返回 `AUTHENTICATION_FAILED` / 401；不因浏览器附带 Cookie 就开放普通 API。根 Token 保持常量时间比较。
 
 客户端 credential 继续通过 Bearer 进入 daemon：
 
 - `@kgos/cli` 的 credential resolution 固定为当前 Workspace Root 的 `.kgos/auth.json`；Workspace Root 只可来自 `--root` 或 `KGOS_ROOT`，不读取 `KG_TOKEN`、其它 root 或全局 credential fallback，也不把 token 写入 stdout/stderr；
 - SDK 必须由调用方显式提供 token，再统一发送 Bearer header；
-- Human-facing Web 不拥有 credential-free API 旁路；浏览器端必须先取得 token，再对所有 API request 发送同一 Bearer credential。exact browser credential entry/storage 属于 Web adapter 实现合同，但不得让 token 进入 URL 或 server-side session account；
+- Human-facing Web 没有免认证的业务 API 旁路；首次输入根 Token 并验证成功后，浏览器保存独立 Session Cookie，后续页面仅持有临时 Web Access Bearer。浏览器不保存根 Token，也不将其放在 URL、Cookie、Web 数据库或日志中；
 - `kgosd` 自身启动、首次创建 `auth.json` 与本地 CLI 为业务命令自动 spawn daemon 都不是 HTTP API request，因此不要求预先存在客户端 token；daemon ready 后，原始业务 request 仍必须按上述规则取得 token 并发送 Bearer header。
 
 固定 loopback bind 是当前安全边界的一部分。Bearer token 提供**认证**，错误 / stale endpoint 指向持有不同 token 的 Instance 时会拒绝请求；完整复制 `.kgos` 可保留相同 token，单靠 Bearer 不能证明物理目录归属，这一端口复用场景由下文拟新增的 [Web connection guard](#web-operational-数据目录)检测。现有无 guard 的 CLI / 第三方请求不因此新增物理 identity 保证。Bearer 不提供 transport confidentiality。v1 CLI-managed Runtime不暴露LAN bind，也不内置TLS；多用户、远程访问、细粒度授权或公网部署必须另行设计。
+
+### 持久 Web Session 与刷新恢复
+
+Web 登录使用单一根 Token，不引入账号或密码，也不把其凭证保存进 `.kgos/web/ui.db`（该 UI 存储目前尚未实现）。服务端独立管理 `<root>/.kgos/web-sessions.json`：0600 私有文件、0700 Instance 目录、原子写入、固定数量上限；仅存随机 Session ID 的 SHA-256 摘要、根 Token 指纹与到期时间，不存 Cookie 原值或根 Token。记录不属于知识版本历史。Cookie 名称使用本机 Instance 根目录路径的摘要命名空间，防止同一浏览器在不同端口打开多个 Workspace 时 Cookie 互相覆盖；复制另一目录的 Session 文件也不能凭原 Cookie 自动登录。登录、主动退出、过期及根 Token 更换使会话按记录撤销或失效；daemon 重启从独立文件恢复。Session 采用 30 天闲置有效期，每次成功恢复滚动延长；闲置超期必须重新提供根 Token，不暗中延长被登出的登录状态。
+
+同源 Web 认证入口独立于业务 API：
+
+| 接口 | 要求与返回 |
+| --- | --- |
+| `POST /api/v1/web/auth/login` | 必须携带根 `Authorization: Bearer`，以及符合当前同源 HTTPS / loopback HTTP 的 `Origin`。成功持久化 Session 后设置 `HttpOnly; SameSite=Strict; Path=/api/v1/web/auth` Cookie，HTTPS 附加 `Secure`；响应仅返回当前 daemon 的随机 Web Access Bearer（不包含根 Token） |
+| `POST /api/v1/web/auth/session` | 仅用于当前同源 Web 恢复；校验 `Origin`、Session Cookie、根 Token 指纹和有效期，滚动延长 Session，返回新的**本次进程** Web Access Bearer；失效返回 401 并清除 Cookie，不需根 Token |
+| `POST /api/v1/web/auth/logout` | 使用 Session Cookie 且必须满足严格同源 `Origin`，持久撤销 Session 及其派生 Web Access Bearer，清除 Cookie；重新访问或刷新不能自动登录 |
+
+登录、恢复、退出和错误响应一律 `Cache-Control: no-store`，无跨域 CORS，Cookie 不可由 JS 读取；Session Cookie **不允许直接认证** `/api/v1/ontology`、`/api/v1/graph`、`/mcp` 或 `/oauth/token`。浏览器业务 SDK 统一发送被进程内验证的临时 Web Access Bearer，并携带 `X-KGOS-Expected-Daemon-Boot`。Web Access Bearer 只在同一进程内有效，普通 CLI/SDK 的根 Bearer 不受影响；过期、撤销或 daemon 重启后旧值不能继续写入。已有 Web MCP 授权 `/oauth/request` 和 `/oauth/decision` 只可借此已验证的同源 Web 会话调用，不让 Cookie 直接调用 MCP 或签发 Grant；批准仍须服务端独立校验 OAuth request 与显式确认。对不安全方法验证精确同源 `Origin`，不得依赖 SameSite 防护替代 CSRF 校验。TLS 终止代理应由其明确提供 HTTPS 访问；不得信任任意客户端传入的 `X-Forwarded-Proto` 来放松 Cookie 或 Origin 检查。
 
 ## Native Runtime package
 
@@ -182,7 +196,7 @@ Workspace Root 可以包含任意调用方文件；KG OS 不在其顶层散落 I
 
 浏览器通过拟新增的已认证 daemon API 读写规定记录，不能指定 root / 文件路径或读取 `auth.json`。目录采用当前用户私有权限并拒绝路径重定向；UI 库在首次已认证 Web 请求时按需建立，其失败不阻断已有 Kernel API，也不成为 `init` / Runtime readiness 前置条件。当前 Runtime Paths、HTTP 与 SDK 均尚未实现此目录或接口；本段是工程设计，不是当前落盘事实。
 
-Web 方案另需一个待实现的 HTTP connection guard：daemon 每次 startup 生成非持久随机 `daemonBootId`，已认证 Web bootstrap info 可读取；API request 若带可选 `X-KGOS-Expected-Daemon-Boot`，在认证后、dispatch 前核对本次进程值，mismatch 返回 `WEB_CONNECTION_CHANGED`。它是连接生命周期前置条件，不是第二认证 credential 或全局物理 Instance identity；无该 header 的现有 CLI / 第三方请求不改变。Web 客户端的显式重连行为见 [连接、认证与恢复](web.md#连接认证与恢复)。
+HTTP connection guard 已实现：daemon 每次创建正式 HTTP handler 时生成非持久随机 v4 UUID `daemonBootId`，已认证 `POST /api/v1/web/data/info` 可读取；API request 若带可选 `X-KGOS-Expected-Daemon-Boot`，在 Bearer 认证后、dispatch 前核对本次进程值，不匹配返回 `WEB_CONNECTION_CHANGED` / 409。Web 的 `/oauth/request` 与 `/oauth/decision` 授权交互携带该 header 时也受保护；OAuth Token 交换及其他路径保持自己的认证合同。此 guard 不是第二 credential 或全局物理 Instance identity；无该 header 的现有 CLI / 第三方 API 行为不变。`info` 当前固定报告 `storageStatus=unsupported`（UI store 尚未实现），不依赖 UI 库就绪且不会伪造 ready。Web 显式重连行为见 [连接、认证与恢复](web.md#连接认证与恢复)。
 
 <a id="initialized-json"></a>
 

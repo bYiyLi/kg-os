@@ -1,0 +1,72 @@
+:root {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+
+  --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --sidebar-width: 240px;
+  --radius-small: 8px;
+  --radius-panel: 11px;
+  --motion-fast: 160ms;
+}
+
+.theme-dark {
+  color-scheme: dark;
+  --color-page: #080d22;
+  --color-sidebar: #111831;
+  --color-canvas: #0c1530;
+  --color-text: #f0f2ff;
+  --color-muted: #aab5d4;
+  --color-subtle: #8c9abd;
+  --color-primary: #9b82ff;
+  --color-primary-soft: rgb(94 69 209 / 21%);
+  --color-focus: #a69bff;
+  --color-border: rgb(134 151 236 / 24%);
+  --color-border-subtle: rgb(116 135 213 / 13%);
+  --color-selected: #271c6c;
+  --color-selected-text: #f6f3ff;
+  --color-control: #161e3d;
+  --color-control-hover: #242c54;
+  --color-dot: rgb(142 166 242 / 19%);
+  --color-violet-glow: rgb(104 45 211 / 16%);
+  --color-blue-glow: rgb(32 74 213 / 15%);
+  --color-track: #4c437f;
+  --color-commit-violet: #8e53ec;
+  --color-commit-blue: #3d94fa;
+  --color-commit-green: #29cc96;
+  --color-commit-orange: #ffa54c;
+}
+
+.theme-light {
+  color-scheme: light;
+  --color-page: #f6f8fc;
+  --color-sidebar: #ffffff;
+  --color-canvas: #f8fbff;
+  --color-text: #172554;
+  --color-muted: #52627a;
+  --color-subtle: #677990;
+  --color-primary: #5a45c7;
+  --color-primary-soft: #eae7fd;
+  --color-focus: #5449b9;
+  --color-border: #d7e2f2;
+  --color-border-subtle: #e8edf6;
+  --color-selected: #e9e7fb;
+  --color-selected-text: #31216a;
+  --color-control: #ffffff;
+  --color-control-hover: #f1f1fa;
+  --color-dot: rgb(116 133 181 / 22%);
+  --color-violet-glow: rgb(160 142 237 / 9%);
+  --color-blue-glow: rgb(120 159 232 / 11%);
+  --color-track: #c0b6e0;
+  --color-commit-violet: #8750db;
+  --color-commit-blue: #2687e4;
+  --color-commit-green: #14a87a;
+  --color-commit-orange: #e58b3e;
+}

@@ -5,22 +5,24 @@ import { readFileSync } from "node:fs";
 // runtime; this test client executes on the OpenClaw host, never in the image.
 // Secrets stay in the protected Dev data tree; never print them or responses.
 const base = process.env.KGOS_DEV_ENDPOINT;
-const tokenFile = process.env.KGOS_DEV_TOKEN_FILE;
 const authFile = process.env.KGOS_DEV_AUTH_FILE;
 const issuer = process.env.KGOS_DEV_OAUTH_ISSUER;
-if (!base || !tokenFile || !authFile || !issuer) {
-  throw new Error("KG OS Dev acceptance requires endpoint, token, auth file, and issuer");
+if (!base || !authFile || !issuer) {
+  throw new Error("KG OS Dev acceptance requires endpoint, Instance auth file, and issuer");
 }
-const token = readFileSync(tokenFile, "utf8").replace(/\r?\n$/, "");
 const instanceToken = JSON.parse(readFileSync(authFile, "utf8")).token;
-assert.ok(
-  token && instanceToken && token !== instanceToken,
-  "MCP and Instance credentials overlap"
-);
+assert.ok(instanceToken, "Instance credential missing");
+// This optional file is used ONLY when verifying a previously deployed Phase
+// 16 image during rollback. Phase 17 always uses the Instance credential.
+const legacyTokenFile = process.env.KGOS_DEV_LEGACY_MCP_TOKEN_FILE;
+const mcpToken = legacyTokenFile
+  ? readFileSync(legacyTokenFile, "utf8").replace(/\r?\n$/, "")
+  : instanceToken;
+assert.ok(mcpToken, "MCP verification credential missing");
 
 const mcpURL = base + "/mcp";
 const headers = {
-  Authorization: "Bearer " + token,
+  Authorization: "Bearer " + mcpToken,
   Accept: "application/json, text/event-stream",
   "Content-Type": "application/json",
   "MCP-Protocol-Version": "2025-03-26"
@@ -93,8 +95,8 @@ const api = (credential) =>
     body: "{}",
     signal: AbortSignal.timeout(10000)
   });
-const rejected = await api(token);
-assert.equal(rejected.status, 401, "MCP bearer authorized Instance API");
+const rejected = await api("invalid-instance-bearer");
+assert.equal(rejected.status, 401, "Wrong Instance bearer authorized Instance API");
 await rejected.body?.cancel();
 const permitted = await api(instanceToken);
 assert.equal(permitted.status, 200, "Instance bearer cannot access original API");
@@ -103,7 +105,11 @@ const wrongMCP = await fetch(mcpURL, {
   headers: { Authorization: "Bearer " + instanceToken },
   signal: AbortSignal.timeout(10000)
 });
-assert.equal(wrongMCP.status, 401, "Instance bearer authorized external MCP");
+assert.equal(
+  wrongMCP.status,
+  legacyTokenFile ? 401 : 405,
+  "MCP authentication did not match the verified image's credential model"
+);
 await wrongMCP.body?.cancel();
 
 const hello = await rpc("initialize", {
@@ -143,5 +149,5 @@ assert.ok(Array.isArray(branches) && branches.length > 0);
 const ancestry = await readTool("state_ancestry", { root: state });
 assert.ok(Number.isInteger(ancestry.count) && ancestry.count > 0);
 process.stdout.write(
-  "KG OS Dev verified: unified Web/API/MCP, separate Bearers, OAuth discovery, 4 Tools, Preview, State, ancestry (read-only)\n"
+  "KG OS Dev verified: unified Web/API/MCP, Instance Bearer, OAuth discovery, 4 Tools, Preview, State, ancestry (read-only)\n"
 );

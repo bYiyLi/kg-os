@@ -23,7 +23,7 @@ if (suppliedImage !== undefined && suppliedImage.trim() === "") {
 const ownsImage = suppliedImage === undefined;
 const image = suppliedImage ?? "kgos-unified-smoke-" + identifier;
 const volume = "kgos-unified-test-" + identifier;
-const token = "phase16-disposable-integration-token-" + identifier;
+let token;
 // This fixture issuer only tests discovery, not an actual ChatGPT login.
 const oauthIssuer = "https://kgos-smoke.example.invalid";
 
@@ -138,8 +138,6 @@ async function start() {
     "-v",
     volume + ":/workspace",
     "-e",
-    "KGOS_MCP_TOKEN=" + token,
-    "-e",
     "KGOS_MCP_OAUTH_ISSUER=" + oauthIssuer,
     image
   );
@@ -147,6 +145,7 @@ async function start() {
   const port = binding.split("\n")[0]?.match(/:(\d+)$/)?.[1];
   if (port === undefined) throw new Error("Docker MCP port was not published");
   const base = "http://127.0.0.1:" + port;
+  token = JSON.parse(await docker("exec", container, "cat", "/workspace/.kgos/auth.json")).token;
   for (let attempt = 0; attempt < 90; attempt++) {
     try {
       const response = await fetch(base + "/mcp");
@@ -217,13 +216,10 @@ async function verifyHTTP(base) {
       headers: { Authorization: "Bearer " + bearer, "Content-Type": "application/json" },
       body: "{}"
     });
-  const rejected = await request(token);
-  assert.equal(rejected.status, 401, "MCP administrator token must not access the Instance API");
+  const rejected = await request("invalid-instance-bearer");
+  assert.equal(rejected.status, 401, "Wrong Instance bearer must be rejected");
   await rejected.body?.cancel();
-  const authJSON = await docker("exec", container, "cat", "/workspace/.kgos/auth.json");
-  const instanceToken = JSON.parse(authJSON).token;
-  assert.ok(instanceToken && instanceToken !== token);
-  const authorized = await request(instanceToken);
+  const authorized = await request(token);
   assert.equal(authorized.status, 200, "Instance credential must still authorize the API");
   assert.equal(typeof (await authorized.json()).state, "string");
 }

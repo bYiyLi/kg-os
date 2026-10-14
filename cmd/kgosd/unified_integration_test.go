@@ -20,7 +20,6 @@ func TestPhase16UnifiedKGOSDHTTPAuthAndOAuthRoutes(t *testing.T) {
 	prepareKGOSDTestRuntimePackage(t)
 	root := t.TempDir()
 	writeKGOSDIntegrationConfig(t, root)
-	t.Setenv("KGOS_MCP_TOKEN", "isolated-external-admin-secret")
 	t.Setenv("KGOS_MCP_OAUTH_ISSUER", "https://kgos-dev.y2l.top")
 	ctx, cancel := context.WithCancel(context.Background())
 	client := &http.Client{Timeout: 6 * time.Second}
@@ -82,20 +81,16 @@ func TestPhase16UnifiedKGOSDHTTPAuthAndOAuthRoutes(t *testing.T) {
 	}
 	_, _ = io.Copy(io.Discard, home.Body)
 	home.Body.Close()
-	adminToken := "isolated-external-admin-secret"
 	instance, err := runtimeprofile.LoadCredential(paths)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if instance.Token == adminToken {
-		t.Fatal("Instance and MCP credentials are not distinct")
 	}
 	for _, check := range []struct {
 		method, path, token string
 		want                int
 	}{
-		{"GET", "/mcp", "", 401}, {"GET", "/mcp", instance.Token, 401},
-		{"POST", "/api/v1/evolution/overview", adminToken, 401},
+		{"GET", "/mcp", "", 401}, {"GET", "/mcp", instance.Token, 405},
+		{"POST", "/api/v1/evolution/overview", "wrong", 401},
 		{"POST", "/api/v1/evolution/overview", instance.Token, 200},
 		{"GET", "/.well-known/oauth-authorization-server", "", 200},
 		{"GET", "/.well-known/oauth-protected-resource/mcp", "", 200},
@@ -116,28 +111,5 @@ func TestPhase16UnifiedKGOSDHTTPAuthAndOAuthRoutes(t *testing.T) {
 	meta.Body.Close()
 	if err != nil || !strings.Contains(string(data), "https://kgos-dev.y2l.top") {
 		t.Fatalf("unified listener OAuth metadata missing: %s %v", data, err)
-	}
-}
-
-func TestPhase16UnifiedKGOSDRejectsReusedInstanceToken(t *testing.T) {
-	prepareKGOSDTestRuntimePackage(t)
-	root := t.TempDir()
-	writeKGOSDIntegrationConfig(t, root)
-	rt, err := runtimeprofile.ResolvePaths(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	original, err := runtimeprofile.LoadOrCreateCredential(rt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("KGOS_MCP_TOKEN", original.Token)
-	var stderr bytes.Buffer
-	result := run(context.Background(), []string{"--root", root}, io.Discard, &stderr)
-	if result != 1 || !strings.Contains(stderr.String(), "MCP token must differ from Instance token") {
-		t.Fatalf("reused credential did not fail closed: code=%d stderr=%s", result, stderr.String())
-	}
-	if strings.Contains(stderr.String(), original.Token) {
-		t.Fatal("sensitive Instance bearer leaked in diagnostic")
 	}
 }

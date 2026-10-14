@@ -1,0 +1,92 @@
+export const en = {
+  meta: { title: "KG OS", description: "KG OS knowledge graph workspace" },
+  language: { label: "Interface language", english: "English", chinese: "简体中文" },
+  auth: {
+    restoring: "Restoring your KG OS session...",
+    logoutFailed: "Could not end your session. Please try again.",
+    brandDescription: "KNOWLEDGE GRAPH OPERATING SYSTEM",
+    title: "Authentication Required",
+    descriptionFirst: "Enter your access token to connect to this KG OS instance.",
+    descriptionSecond: "All data is protected and requires authentication.",
+    accessToken: "Access Token",
+    placeholder: "Paste your access token here...",
+    showToken: "Show access token",
+    hideToken: "Hide access token",
+    tokenNote: "Your token is only stored in memory and never saved to disk.",
+    connect: "Connect",
+    connecting: "Connecting...",
+    helpTitle: "Need help?",
+    helpDescription: "You can find your access token in:",
+    viewDocs: "View Documentation",
+    footer: "Same data. Deeper understanding.",
+    error: {
+      required: "Enter your access token to continue.",
+      invalid: "Invalid access token. Check your token and try again.",
+      transport: "Cannot reach the KG OS instance. Please try again.",
+      unknown: "Unable to connect to KG OS. Please try again."
+    },
+    loss: {
+      changed: "The KG OS service has changed. Reconnect to continue safely.",
+      expired: "Your access token is no longer valid. Reconnect to continue.",
+      offline: "The KG OS service is offline. Reconnect when it is available."
+    }
+  },
+  versions: {
+    navigation: "Version navigation",
+    mobileNavigation: "Mobile version navigation",
+    closeNavigation: "Close version navigation",
+    expandSidebar: "Expand sidebar",
+    collapseSidebar: "Collapse sidebar",
+    collapseHint: "Click to collapse · Drag or use arrow keys to resize",
+    example: "Design preview · No live data",
+    history: "Example commit history",
+    tree: "Version tree (preview)",
+    branches: "Branches",
+    ahead: "{{count}} ahead",
+    behind: "{{count}} behind",
+    disconnect: "Disconnect",
+    appearance: "Appearance theme",
+    light: "Light theme",
+    dark: "Dark theme"
+  },
+  workspace: {
+    label: "Visual workspace",
+    canvas: "Graph canvas",
+    pendingTools: "Canvas tools (coming soon)",
+    pendingAction: "{{name}} (coming soon)",
+    select: "Select tool",
+    layout: "Graph layout",
+    fit: "Fit canvas",
+    minimap: "Canvas overview",
+    zoom: "Zoom (coming soon)",
+    pendingCanvas: "Canvas content coming soon"
+  },
+  mcp: {
+    title: "Authorize Connection",
+    description: "ChatGPT wants to connect to your KG OS instance.",
+    cancelConnection: "Cancel connection",
+    externalAssistant: "External AI Assistant",
+    yourGraph: "Your Knowledge Graph",
+    loading: "Loading connection request...",
+    permissionsTitle: "This application will be able to:",
+    readName: "Read knowledge",
+    readDescription: "Access your nodes, relationships, and graph data",
+    writeName: "Modify knowledge",
+    writeDescription: "Create, update, and delete graph data",
+    branchesName: "Manage branches",
+    branchesDescription: "Create, change, and delete branches",
+    executeName: "Execute operations",
+    executeDescription: "Run queries and knowledge graph operations",
+    requested: "Requested",
+    writeNotice: "This connection includes write access.",
+    trustNotice: "Only authorize applications you trust. Your Instance credential is never shared.",
+    cancel: "Cancel",
+    authorize: "Authorize Connection",
+    authorizing: "Authorizing...",
+    footnote: "By continuing, you trust ChatGPT to access this KG OS instance.",
+    error: {
+      unavailable: "This connection request is unavailable. Start again from ChatGPT.",
+      failed: "Could not complete authorization. Start again from ChatGPT."
+    }
+  }
+} as const;

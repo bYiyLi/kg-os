@@ -909,6 +909,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D90 MCP 提供单管理员 ChatGPT OAuth，保留原静态 Bearer（2026-10-12）
 
+> **历史认证决定**：独立 MCP 管理员 Token、服务器内置 Token 输入 HTML 及对应启用规则已由 [D95](#d95-unified-mcp-web-authorization) 取代。以下保留 Phase 15/16 已实现旧方案的选择与证据；新目标以 [MCP 认证 owner](mcp.md#统一-instance-认证与-web-内的-mcp-连接授权phase-17-目标) 为准。
+
 - 决定：KG OS MCP 默认保留独立静态 Bearer Token；用户显式配置已有公网 HTTPS origin 后，**同一进程**启用支持 ChatGPT 的 OAuth 2.1 Authorization Code + PKCE S256。浏览器管理员授权页验证现有 MCP Token，随后签发短效的不透明 Access/Refresh Token；ChatGPT 只持有 OAuth Token，不接触原管理员 Token。两种外部认证都不得暴露 `kgosd` 内部凭证。
 - 客户端：只支持官方 ChatGPT Client ID Metadata Documents（CIMD），从可信 HTTPS 地址验证真实客户端 identity 和 redirect URI，令 `resource`、issuer、scope、client、code 与 Token 绑定；不实现匿名、开放 DCR、用户名密码账户体系、外部 OAuth Provider 配置或第二个认证进程。Token/Code/授权票据为有界、短期、进程内状态；MCP 重启需要重新授权。OAuth 复用 MCP 部署参数合同；网络可达、TLS/Tunnel/Proxy 仍由用户自行完成。
 - 依据：ChatGPT 的自定义 MCP 连接要求兼容 OAuth 客户端认证，不能把 MCP 本机的静态 Bearer 等价成 ChatGPT 一定可接收的自定义 API Key。用户希望只有一个简单管理员 Token、无需用户体系，并且普通标准 MCP Client 的现有认证方式不回归。
@@ -961,3 +963,14 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **远程仓库 CI**：GitHub Actions PR/main CI 在 **Linux runner** 上真实构建 Linux amd64 Docker 镜像、验证镜像和在隔离容器/Volume 中执行初始化、Web/API/MCP 四 Tool、31/31 SDK、认证隔离、重启持久化等 Smoke。**Docker CI 是远程工程门禁**，与 Ubuntu `pnpm validate` 和既有 native/package matrix 并列；不能因为 Mac 不运行 Docker 而关闭远程 CI Docker 打包/测试。Mac 本地的 `pnpm validate` 本身不加入 Docker 命令。
 - **正式发布**：经单独授权的 `v*` Release CI 仍从确切 release revision 构建并 Smoke-test **待发布的同一镜像**，成功后推送 GHCR、核对 digest；完整发布流程以该镜像发布结果作为交付门禁。普通 CI 不推送 GHCR。构建测试成功不等于已发布或已部署。
 - **覆盖关系**：本决定在 D91/D92/D93 的 Linux amd64 镜像目标与单进程产品合同上，明确 **Mac / OpenClaw / GitHub Actions CI / Release CI** 四者分工；不改变 MCP、Tool/OAuth 或 Kernel 合同。执行规范见 [AGENTS](../../AGENTS.md#开发ci-与-release-分工)，OpenClaw 操作入口见 [Dev Runbook](../guide/dev-environment.md)。
+
+<a id="d95-unified-mcp-web-authorization"></a>
+
+### D95 MCP 复用 Instance 认证，由现有 Web 完成连接授权（2026-10-14）
+
+- **决定**：MCP 取消独立管理员 Token，复用现有 `<workspace>/.kgos/auth.json` 作为唯一根身份凭证；可信自管 MCP 客户端可直接使用 Instance Bearer，ChatGPT 等外部 OAuth Client 只能通过**现有 Web 登录状态 + 用户明确确认的授权弹窗**取得 MCP 专用 Access Token。`kgosd` 继续签发与管理 OAuth Code/Access/Refresh；不会把根凭证交给第三方，也不会让 OAuth Token 成为通用 HTTP API Token。
+- **交互**：ChatGPT OAuth 引导浏览器跳到同一 KG OS Web 应用；已登录直接弹出连接授权，未登录先走 Web 既有认证并继续弹窗，**不重复索取专用 MCP Token**。登录不等于自动同意，确认/拒绝后由服务端引导返回已验证的 ChatGPT 回调。连接授权只展示经服务器校验的客户端、目标 Instance 及完整读写权限；Go 不再渲染另一套授权 HTML。
+- **边界**：Instance Token 生命周期与 Web 登录/Session/CSRF 由各自 Runtime/Web owner 管理；**MCP owner 只负责 OAuth 协议、待授权请求、显式同意、Token 隔离和最小 Web 对接 API**，不能另建通用认证、账号、Session 或 UI 框架。CIMD、PKCE S256、HTTPS、短效不透明 OAuth Token、一次性 Code/Refresh rotation 继续沿用已验证的协议安全目标。已有四个 MCP Tool 和授权后可读写能力不变。
+- **替代关系**：取代 [D90](#d90-mcp-single-admin-oauth) 的独立 MCP Token / 专用 Go 授权页面，以及 [D93](#d93-kgosd-unified-mcp) 中「MCP 必须单独配置管理员 Token」的认证门禁；**不**取代 D93 的单进程、单 Listener、工具与 Kernel 边界，也不回溯改变 Phase 15/16 真实完成证据。已提交 Phase 16 继续保留旧认证历史；当前长期 Dev 已运行新版统一认证，用户确认 ChatGPT OAuth 重新授权成功。[Phase 17](../development/phases/17-mcp-web-authorization.md) 已按用户明确批准的 CI / 完整隔离矩阵例外关闭为 `done`，未声称远端 CI 通过；Web 登录状态由另一开发任务提供，本次不负责实现。
+- **依据与取舍**：单个自托管 KG OS Instance 不应同时维护两个管理员身份秘密，也不应让 OAuth 授权页背离现有 Web。复用登录和显式同意降低重复输入与页面维护，但需要真实、可被 OAuth 浏览器跳转复用的 Web 已登录上下文，以及服务端 CSRF/同源保护；在该依赖具备之前不能宣称新认证方案已经生效。
+- 当前合同：[MCP Web 集成认证](mcp.md#统一-instance-认证与-web-内的-mcp-连接授权phase-17-目标)、[Runtime 单 Token](runtime.md#单-token-实例认证)、[Phase 17](../development/phases/17-mcp-web-authorization.md)。

@@ -6,6 +6,8 @@
 
 **状态**：`plugins/kgos/` 是可复用模板，**不是预先绑定用户 MCP 的成品**。Phase 16 新版只有一个 `kgosd` 进程承载 Web/API/MCP；已在隔离 Docker 和真实 ChatGPT Dev 验证 Go MCP、OAuth 重新授权、四 Tool 与测试 Branch 写入回读；私人 Plugin v1.0.1 含官方 Skill，Codex 新会话已实际读取 Skill 并调用工具。Phase 16 开发验收已 `done`，但尚未正式发布 GHCR 镜像。当前公开的 KG OS `v0.2.1` 也不包含新服务端镜像。
 
+**Phase 17 Dev 现状（2026-10-14）**：已在 Dev 正式 Docker 构建部署复用 Instance 身份和现有 Web 授权弹窗的新 Go MCP，Web Session 跨页面登录在本地集成及浏览器 E2E 中通过，Dev 的四 Tool 和 OAuth metadata 只读验收也通过。**用户已在新版 Dev 重新完成真实 ChatGPT OAuth 授权并确认测试正常；GitHub CI / 完整新版隔离矩阵未执行，Phase 17 按用户明确批准的例外关闭为 `done`**。此证据属于新方案用户验收，不套用 Phase 16 旧 OAuth 成功记录。
+
 ## 0. 权限与完成条件
 
 - 只在用户明确授权的 Workspace、ChatGPT 账户和安装目标内操作。AI 能通过已授权的文件/命令工具或 Plugin Creator 完成的步骤可以代办；无法访问的 ChatGPT 页面、组织授权、Tunnel 控制台、认证交互与服务部署，给用户**当前一步**的明确操作，不假装已经完成。
@@ -33,9 +35,9 @@ AI 在继续前确认：用户所选 Instance 已初始化、MCP 服务实际监
 
 **此阶段验证 OAuth 认证，不把本地协议模拟等同于真实 ChatGPT 联通。**
 
-1. Go `kgosd` 的 MCP 要求独立的 `KGOS_MCP_TOKEN`（或 Token 文件）；它与 `.kgos/auth.json` 不同。为了连接 ChatGPT，用户在 `kgosd` 启动参数中额外提供 **`--mcp-oauth-issuer <public-HTTPS-origin>`**，或设置 `KGOS_MCP_OAUTH_ISSUER`。例如公共 MCP URL 是 `https://kgos.example.com/mcp`，issuer 就是 `https://kgos.example.com`（不是完整 `/mcp` URL）；必须与用户实际 HTTPS 入口一致。未配置 OAuth 时仅支持独立的静态 Bearer。
-2. 核对用户的公网 HTTPS 入口确实能转发原路径、POST 与 Authorization header；分别检查 `/.well-known/oauth-protected-resource`、`/.well-known/oauth-authorization-server`、`/oauth/authorize` 与 `/oauth/token` 的行为，以及 MCP 未授权 401 中的 resource metadata challenge。OAuth 采用 ChatGPT CIMD + PKCE S256 + `none` public-client 模式，不要求用户创建 Client Secret，也不需要额外 OAuth 服务。
-3. 在 ChatGPT 连接配置中选择 **OAuth**。真正发生登录时，向用户展示 KG OS 的可信 HTTPS 管理员页面，在页面内输入 MCP 管理员 Token（**不是在对话、Plugin Manifest 或 ChatGPT API Key 栏位粘贴**），授权后 ChatGPT 保存短效 OAuth Token。现有普通 MCP 客户端仍可使用固定 Bearer。
+1. MCP 直接使用当前 Instance 的 `.kgos/auth.json` 根凭证，不再要求 `KGOS_MCP_TOKEN`。为了让 ChatGPT 连接，在 `kgosd` 启动参数提供 **`--mcp-oauth-issuer <public-HTTPS-origin>`** 或设置 `KGOS_MCP_OAUTH_ISSUER`。例如公共 MCP URL 为 `https://kgos.example.com/mcp`，issuer 应为 `https://kgos.example.com`（不是完整 `/mcp` URL），且与实际 HTTPS 入口相同。
+2. 公网 HTTPS 入口不仅需要代理 `/mcp`、OAuth discovery、`/oauth/authorize` 和 `/oauth/token`，还必须保留同源 **Web `/`、静态资源、Web 登录入口、`/oauth/request` 和 `/oauth/decision`**、原始 POST 与 Authorization header。OAuth 使用 ChatGPT CIMD + PKCE S256 + `none` public-client，不要求额外 Client Secret 或外部 OAuth 服务。
+3. 在 ChatGPT 中选择 **OAuth**，浏览器跳到**已有 KG OS Web**，复用 Web 登录后显示 ChatGPT 连接授权弹窗；用户明确同意或拒绝，Go 后台签发 OAuth Token，ChatGPT **不获得 Instance Token**。当前 Web 跨标签复用登录状态仍待其他开发任务验收；不应要求用户填写第二套 MCP 管理员 Token。普通可信 MCP 客户端可直接使用 Instance Bearer。
 4. 网络与 TLS / Tunnel / 反向代理由用户自行决定和配置；MCP OAuth 只解决身份认证，不自动使本地端口可公网访问。此前本地自动化 OAuth 验证不是 ChatGPT Web/Desktop 真实联通证据。无法完成真实 OAuth 授权时记录 `BLOCKED_AUTH_COMPATIBILITY` 或具体网络/代理错误，禁止通过“无认证”绕过安全边界。
 5. MCP 工具应当**恰好**为 `kgos_preview`、`state_ancestry`、`kgos_read`、`kgos_run`。如果工具缺失、显示其他 Instance、认证失败、证书失败、协议不兼容或连接来源不可信，先停止注册并修复对应层，不能用伪造示例替代结果。
 

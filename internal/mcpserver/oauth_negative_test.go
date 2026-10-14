@@ -108,96 +108,121 @@ func TestOAuthRejectsInvalidMetadataAndCapacity(t *testing.T) {
 	capped.Body.Close()
 }
 
-func TestOAuthAuthorizationPageAndInvalidForms(t *testing.T) {
+func TestOAuthWebAuthorizationIsProtectedAndSingleUse(t *testing.T) {
 	f := newOAuthFixture(t)
-	for _, path := range []string{"/oauth/token", "/oauth/authorize", "/.well-known/oauth-protected-resource",
-		"/.well-known/oauth-authorization-server"} {
-		switch path {
-		case "/oauth/token":
-			res := f.get(path)
-			if res.StatusCode != 405 {
-				t.Errorf("token GET accepted %d", res.StatusCode)
-			}
-			res.Body.Close()
-		case "/oauth/authorize":
-			req, _ := http.NewRequest("PUT", f.server.URL+path, nil)
-			res, err := f.client.Do(req)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if res.StatusCode != 405 {
-				t.Errorf("authorize PUT accepted %d", res.StatusCode)
-			}
-			res.Body.Close()
-		default:
-			res := f.postForm(path, url.Values{"arbitrary": {"data"}}, "")
-			if res.StatusCode != 405 {
-				t.Errorf("metadata POST accepted %d", res.StatusCode)
-			}
-			res.Body.Close()
-		}
-	}
-	ticket, page := f.begin(nil)
-	if page.StatusCode != 200 || page.Header.Get("Referrer-Policy") != "strict-origin" ||
-		!strings.Contains(page.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
-		t.Fatalf("unsafe authorization page headers: %d", page.StatusCode)
-	}
-	page.Body.Close()
-	for _, bad := range []struct {
-		contentType, body string
-		origin            string
-		status            int
-	}{
-		{"text/plain", "ticket=" + ticket, f.server.URL, 400},
-		{"application/x-www-form-urlencoded", "ticket=" + ticket, "https://evil.example", 403},
-		{"application/x-www-form-urlencoded", "ticket=" + ticket, "", 403},
-		{"application/x-www-form-urlencoded", strings.Repeat("x", 8193), f.server.URL, 400},
-		{"application/x-www-form-urlencoded", "ticket=" + ticket + "&decision=approve&decision=deny", f.server.URL, 400},
-		{"application/x-www-form-urlencoded", "ticket=not-a-ticket&decision=approve", f.server.URL, 400},
-		{"application/x-www-form-urlencoded", "ticket=" + ticket + "&decision=maybe", f.server.URL, 400},
-	} {
-		req, _ := http.NewRequest("POST", f.server.URL+"/oauth/authorize", strings.NewReader(bad.body))
-		req.Header.Set("Content-Type", bad.contentType)
-		if bad.origin != "" {
-			req.Header.Set("Origin", bad.origin)
-		}
+	for _, path := range []string{"/oauth/token", "/oauth/authorize", "/oauth/request",
+		"/oauth/decision", "/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"} {
+		req, _ := http.NewRequest(http.MethodPut, f.server.URL+path, nil)
 		res, err := f.client.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if res.StatusCode != bad.status {
-			t.Errorf("bad form %s %q: %d", bad.contentType, bad.body[:min(len(bad.body), 30)], res.StatusCode)
+		if res.StatusCode != 405 {
+			t.Errorf("invalid method on %s accepted: %d", path, res.StatusCode)
 		}
 		res.Body.Close()
 	}
-	denied := f.postForm("/oauth/authorize", url.Values{"ticket": {ticket}, "decision": {"deny"}}, f.server.URL)
-	if denied.StatusCode != 302 || !strings.Contains(denied.Header.Get("Location"), "access_denied") {
-		t.Fatalf("authorization denial not redirected: %d", denied.StatusCode)
+	ticket, response := f.begin(nil)
+	if response.StatusCode != 303 || response.Header.Get("Referrer-Policy") != "no-referrer" || ticket == "" {
+		t.Fatalf("OAuth must redirect to Web, not serve a login form: %d", response.StatusCode)
 	}
-	denied.Body.Close()
-	reuse := f.approve(ticket, oauthTestAdmin, f.server.URL)
-	if reuse.StatusCode != 400 {
-		t.Fatalf("denied ticket replay: %d", reuse.StatusCode)
+	response.Body.Close()
+	anonymous := f.getDetails(ticket, "")
+	if anonymous.StatusCode != 401 {
+		t.Fatalf("anonymous request details visible: %d", anonymous.StatusCode)
 	}
-	reuse.Body.Close()
-	expiredTicket, page := f.begin(nil)
-	page.Body.Close()
+	anonymous.Body.Close()
+	wrong := f.getDetails(ticket, "not-valid")
+	if wrong.StatusCode != 401 {
+		t.Fatalf("wrong credential can view request: %d", wrong.StatusCode)
+	}
+	wrong.Body.Close()
+	authenticated := f.getDetails(ticket, oauthTestAdmin)
+	details := parseOAuthJSON(t, authenticated)
+	if details["client_name"] != "ChatGPT" || details["scope"] != oauthScope || details["canWrite"] != true || details["resource"] != f.server.URL {
+		t.Fatalf("incorrect verified client/permission details: %#v", details)
+	}
+	for _, tc := range []struct {
+		credential, origin, decision string
+		status                       int
+	}{
+		{"", f.server.URL, "approve", 401},
+		{"wrong", f.server.URL, "approve", 401},
+		{oauthTestAdmin, "https://evil.example", "approve", 403},
+		{oauthTestAdmin, "", "approve", 403},
+		{oauthTestAdmin, f.server.URL, "malformed", 400},
+	} {
+		res := f.postDecision(ticket, tc.credential, tc.origin, tc.decision)
+		if res.StatusCode != tc.status {
+			t.Fatalf("invalid approval %q %q %q: got %d expected %d", tc.credential, tc.origin, tc.decision, res.StatusCode, tc.status)
+		}
+		res.Body.Close()
+	}
+	denied := f.postDecision(ticket, oauthTestAdmin, f.server.URL, "deny")
+	if denied.StatusCode != 200 {
+		t.Fatalf("deny failed: %d", denied.StatusCode)
+	}
+	target, err := url.Parse(parseOAuthJSON(t, denied)["redirect_url"].(string))
+	if err != nil || target.Query().Get("error") != "access_denied" || target.Query().Get("code") != "" {
+		t.Fatalf("denial leaked grant: %v %s", err, target)
+	}
+	replay := f.approve(ticket, oauthTestAdmin, f.server.URL)
+	if replay.StatusCode != 410 {
+		t.Fatalf("denial request replayed: %d", replay.StatusCode)
+	}
+	replay.Body.Close()
+
+	id, response := f.begin(nil)
+	response.Body.Close()
 	now := time.Now()
 	f.broker.now = func() time.Time { return now.Add(ticketLifetime + time.Second) }
-	req, _ := http.NewRequest("POST", f.server.URL+"/oauth/authorize",
-		strings.NewReader(url.Values{"ticket": {expiredTicket}, "decision": {"approve"}, "token": {oauthTestAdmin}}.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "text/html")
-	req.Header.Set("Origin", f.server.URL)
-	res, err := f.client.Do(req)
-	if err != nil {
-		t.Fatal(err)
+	expired := f.getDetails(id, oauthTestAdmin)
+	if expired.StatusCode != 410 {
+		t.Fatalf("expired request available: %d", expired.StatusCode)
 	}
-	data, _ := io.ReadAll(res.Body)
-	res.Body.Close()
-	if res.StatusCode != 400 || !strings.Contains(string(data), "Return to ChatGPT") {
-		t.Fatal("browser expired ticket error not explained")
+	expired.Body.Close()
+}
+
+func TestOAuthDecisionRejectsInvalidJSONWithoutConsumingRequest(t *testing.T) {
+	f := newOAuthFixture(t)
+	ticket, result := f.begin(nil)
+	result.Body.Close()
+	for _, tc := range []struct {
+		name, contentType, body string
+		chunked                 bool
+	}{
+		{"unknown-field", "application/json", `{"request_id":"` + ticket + `","decision":"approve","scope":"kgos:access"}`, false},
+		{"trailing-object", "application/json", `{"request_id":"` + ticket + `","decision":"approve"}{}`, false},
+		{"invalid-decision", "application/json", `{"request_id":"` + ticket + `","decision":"allow"}`, false},
+		{"oversize", "application/json", `{"request_id":"` + ticket + `","decision":"approve"}` + strings.Repeat(" ", 1400), true},
+		{"urlencoded", "application/x-www-form-urlencoded", "request_id=" + ticket + "&decision=approve", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, f.server.URL+"/oauth/decision", strings.NewReader(tc.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Content-Type", tc.contentType)
+			req.Header.Set("Authorization", "Bearer "+oauthTestAdmin)
+			req.Header.Set("Origin", f.server.URL)
+			if tc.chunked {
+				req.ContentLength = -1
+			}
+			response, err := f.client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response.Body.Close()
+			if response.StatusCode != http.StatusBadRequest {
+				t.Fatalf("invalid JSON accepted: %d", response.StatusCode)
+			}
+		})
 	}
+	response := f.approve(ticket, oauthTestAdmin, f.server.URL)
+	if response.StatusCode != 200 {
+		t.Fatalf("invalid requests consumed the valid pending approval: %d", response.StatusCode)
+	}
+	response.Body.Close()
 }
 
 func TestOAuthRejectsForgedTokenGrantsAndRotation(t *testing.T) {

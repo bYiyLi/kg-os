@@ -27,9 +27,9 @@ TS Application ┘
 
 `@kgos/sdk` 映射 KG OS 已确认的公共 HTTP logical contract，按 `ontology / object / graph / evolution` 暴露对应 namespace。各 namespace 只适配对应 owner 已定义的 request/result/error，不重新发明第二套产品模型。
 
-[Web 工作区数据](web.md#受控-api-与多窗口保存)另提出 `web.data / web.cache` namespace，对应同 daemon、同 Bearer 的受控记录 / 缓存 API；当前 SDK / HTTP 尚无这些能力。后续 adapter 沿用浏览器 Web Platform 边界和共享错误 envelope，下载使用 Blob，不加入本地文件系统访问、root discovery、Knowledge State 或自动 mutation retry。
+[Web 工作区数据](web.md#受控-api-与多窗口保存)的 `web.data.info({})` 已作为认证后连接启动信息入口实现，返回 `daemonBootId` 和 `storageStatus`；其余 `web.data / web.cache` 记录、缓存和导出 API 仍待实现。后续 adapter 沿用浏览器 Web Platform 边界和共享错误 envelope，下载使用 Blob，不加入本地文件系统访问、root discovery、Knowledge State 或自动 mutation retry。
 
-Web 的[连接生命周期校验](web.md#连接认证与恢复)使用当前已有 `KGOSClientOptions.fetch` 注入点，为显式连接后的请求追加拟新增的可选 expected-boot header；服务器映射尚未实现。SDK 不自动发现 / 更新 guard，普通 SDK / CLI 不因此要求新参数，也不自动重新发送旧 mutation。
+Web 的[连接生命周期校验](web.md#连接认证与恢复)使用现有 `KGOSClientOptions.fetch` 注入点，为显式连接后的请求追加可选 expected-boot header；daemon 已校验并拒绝不匹配的请求。公共 SDK 仍由调用方显式提供 Bearer，不自动处理 Cookie、发现 / 更新 guard 或重试 mutation。浏览器 Web 的 `core/client` 在首次根 Token 认证后建立服务端 Web Session，刷新时依 HttpOnly Cookie 恢复当前进程的临时 Web Bearer 并重新绑定新的 boot ID；这不改变普通 SDK/CLI 的根 Token 合同。旧页面遇到 Boot Guard 失效时仍不能无提示地升级连接并重发操作。
 
 同一 Web fetch adapter 按[接收与显示预算](web.md#接收与显示预算)在 SDK JSON / NDJSON 解码前限制响应字节并分块；这项 Web 实现尚不存在，不是当前 SDK 已保证内存上限。它继续复用 SDK 的唯一协议解析和每请求 AbortSignal，不复制另一套 transport / value 语义。
 

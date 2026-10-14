@@ -8,7 +8,6 @@ source_dir=$base/src/KGOS
 env_file=$base/config/compose.env
 compose_file=$source_dir/compose.dev.yaml
 workspace=$base/data/workspace
-token_file=$base/data/secrets/mcp-token
 history=$base/config/deployments.tsv
 image=kgos-dev-mcp:local
 previous=kgos-dev-mcp:previous
@@ -43,11 +42,8 @@ preflight() {
   command -v curl >/dev/null 2>&1 || fail "curl is required"
   command -v node >/dev/null 2>&1 || fail "Node.js is required for the acceptance check"
   [ -f "$env_file" ] || fail "Missing $env_file; run setup first"
-  [ -f "$token_file" ] || fail "Missing MCP credential; run setup first"
   [ -f "$workspace/.kgos/initialized.json" ] || fail "Instance not initialized; run explicit 'init' once"
   [ "$(readlink -f "$workspace")" = "$workspace" ] || fail "Workspace must not be a symlink"
-  [ "$(readlink -f "$token_file")" = "$token_file" ] || fail "Secret must not be a symlink"
-  [ "$(stat -c '%u:%a' "$token_file")" = "1000:400" ] || fail "Secret must be owned by UID 1000 and mode 0400"
   [ "$(stat -c '%u:%a' "$workspace" )" = "1000:700" ] || fail "Workspace must be owned by UID 1000 and mode 0700"
   [ "$(stat -c '%u:%a' "$env_file")" = "0:600" ] || fail "Dev config must be owned by root and mode 0600"
   compose config --quiet || fail "Invalid KG OS Dev Compose configuration"
@@ -55,23 +51,17 @@ preflight() {
 
 setup() {
   assert_source
-  command -v openssl >/dev/null 2>&1 || fail "OpenSSL is required"
-  for path in "$base" "$base/data" "$base/config" "$workspace" "$base/data/secrets" "$token_file" "$env_file"; do
+  for path in "$base" "$base/data" "$base/config" "$workspace" "$base/data/secrets" "$env_file"; do
     [ ! -L "$path" ] || fail "Dev paths must not be symlinks: $path"
   done
   mkdir -p "$base/config" "$base/data"
   chmod 700 "$base/config"
   install -d -o 1000 -g 1000 -m 0700 "$workspace" "$base/data/secrets"
-  if [ ! -e "$token_file" ]; then
-    openssl rand -hex 32 > "$token_file"
-    chown 1000:1000 "$token_file"
-    chmod 0400 "$token_file"
-  fi
   if [ ! -e "$env_file" ]; then
     printf '%s\n' 'KGOS_DEV_NODE_IMAGE=node:24.15.0-bookworm-slim' 'KGOS_DEV_PORT=3777' > "$env_file"
     chmod 0600 "$env_file"
   fi
-  printf '%s\n' 'KG OS Dev directories and credential ready (existing values preserved).'
+  printf '%s\n' 'KG OS Dev directories ready (existing values preserved).'
 }
 
 container_id() {
@@ -106,9 +96,17 @@ verify() {
   process=$(docker exec "$cid" /bin/cat /proc/1/comm | tr -d '\r\n')
   if [ "$process" = kgosd ]; then
     [ "$(docker exec "$cid" /usr/bin/id -u)" = 1000 ] || fail "Unified Dev must preserve existing Workspace UID 1000"
+    legacy_file=
+    if docker exec "$cid" /opt/kgos/kgosd --help 2>/dev/null | grep -q -- '--mcp-token-file'; then
+      legacy_file="$base/data/secrets/mcp-token"
+      [ -f "$legacy_file" ] && [ ! -L "$legacy_file" ] ||
+        fail "Legacy MCP verifier needs its preserved Secret file"
+      [ "$(stat -c '%u:%a' "$legacy_file")" = "1000:400" ] ||
+        fail "Legacy MCP Secret must be owned by UID 1000 and mode 0400"
+    fi
     KGOS_DEV_ENDPOINT="http://127.0.0.1:$port" \
-      KGOS_DEV_TOKEN_FILE="$token_file" \
       KGOS_DEV_AUTH_FILE="$workspace/.kgos/auth.json" \
+      KGOS_DEV_LEGACY_MCP_TOKEN_FILE="$legacy_file" \
       KGOS_DEV_OAUTH_ISSUER="${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}" \
       node "$source_dir/scripts/mcp-dev-accept-unified.mjs" ||
         fail "Authenticated unified MCP read-only acceptance failed"
@@ -178,6 +176,36 @@ record() {
 rollback_image() {
   docker image inspect "$previous" >/dev/null 2>&1 || fail "No previous verified image; data was not changed"
   docker image tag "$previous" "$image"
+  # A Phase 16 Go image needs the legacy MCP administrator Secret, whereas
+  # Phase 17 rejects that configuration. Supply it ONLY to the rollback image.
+  if docker run --rm --entrypoint /opt/kgos/kgosd "$previous" --help 2>/dev/null | grep -q -- '--mcp-token-file'; then
+    legacy_secret="$base/data/secrets/mcp-token"
+    [ -f "$legacy_secret" ] && [ ! -L "$legacy_secret" ] ||
+      fail "Legacy rollback needs its preserved MCP Secret file"
+    [ "$(stat -c '%u:%a' "$legacy_secret")" = "1000:400" ] ||
+      fail "Legacy rollback Secret must have UID 1000 and mode 0400"
+    override=$(mktemp "$base/config/legacy-rollback.XXXXXXXX.yaml") ||
+      fail "Cannot prepare legacy rollback override"
+    cat > "$override" <<'YAML'
+services:
+  mcp:
+    environment:
+      KGOS_MCP_TOKEN_FILE: /run/secrets/kgos-mcp-token
+    volumes:
+      - type: bind
+        source: /data/apps/KgosDev/data/secrets/mcp-token
+        target: /run/secrets/kgos-mcp-token
+        read_only: true
+YAML
+    if docker compose --env-file "$env_file" -f "$compose_file" -f "$override" up -d --no-build --force-recreate mcp; then
+      rm -f "$override"
+    else
+      rm -f "$override"
+      fail "Legacy rollback container could not start"
+    fi
+    verify
+    return
+  fi
   compose up -d --no-build --force-recreate mcp
   verify
 }

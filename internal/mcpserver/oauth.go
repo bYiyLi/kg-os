@@ -38,7 +38,6 @@ var (
 type oauthAuthorization struct {
 	clientID, redirectURI, resource, state, challenge string
 	expires                                           time.Time
-	failures                                          int
 }
 type oauthGrant struct {
 	clientID, issuer, resource, scope string
@@ -50,11 +49,11 @@ type cachedOAuthDocument struct {
 }
 
 // oauthBroker is process-local. Every restart invalidates codes and issued
-// credentials, while retaining the externally configured administrator token.
+// credentials. Authorization uses the existing Instance identity.
 // Only hashes of bearer credentials are stored.
 type oauthBroker struct {
 	issuer, resource, path string
-	adminDigest            [32]byte
+	instanceDigest         [32]byte
 	client                 *http.Client
 	now                    func() time.Time
 	mu                     sync.Mutex
@@ -66,7 +65,7 @@ type oauthBroker struct {
 	metadataRequests       int
 }
 
-func newOAuthBroker(issuer, path, adminToken string, client *http.Client) (*oauthBroker, error) {
+func newOAuthBroker(issuer, path, instanceToken string, client *http.Client) (*oauthBroker, error) {
 	parsed, err := url.Parse(issuer)
 	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
 		(parsed.Path != "" && parsed.Path != "/") || parsed.Opaque != "" ||
@@ -87,7 +86,7 @@ func newOAuthBroker(issuer, path, adminToken string, client *http.Client) (*oaut
 	}
 	copyClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	return &oauthBroker{
-		issuer: normalized, resource: normalized, path: path, adminDigest: sha256.Sum256([]byte(adminToken)),
+		issuer: normalized, resource: normalized, path: path, instanceDigest: sha256.Sum256([]byte(instanceToken)),
 		client: &copyClient, now: time.Now,
 		tickets: make(map[[32]byte]oauthAuthorization), codes: make(map[[32]byte]oauthAuthorization),
 		access: make(map[[32]byte]oauthGrant), refresh: make(map[[32]byte]oauthGrant),
@@ -168,8 +167,8 @@ func (o *oauthBroker) principal(token string) (string, bool) {
 	if !ok || grant.issuer != o.issuer || grant.resource != o.resource || grant.scope != oauthScope || !grant.expires.After(o.now()) {
 		return "", false
 	}
-	// Single administrator owns both static and OAuth connections.
-	return fmt.Sprintf("%x", o.adminDigest), true
+	// A grant represents the same Instance identity, but is valid for MCP only.
+	return fmt.Sprintf("%x", o.instanceDigest), true
 }
 
 func validOAuthClientID(raw string) bool {
@@ -264,7 +263,8 @@ func (o *oauthBroker) resourceMetadataPath() string {
 func (o *oauthBroker) resourceMetadataURL() string { return o.issuer + o.resourceMetadataPath() }
 func (o *oauthBroker) routes() map[string]http.Handler {
 	paths := []string{"/.well-known/oauth-protected-resource", o.resourceMetadataPath(),
-		"/.well-known/oauth-authorization-server", "/oauth/authorize", "/oauth/token"}
+		"/.well-known/oauth-authorization-server", "/oauth/authorize", "/oauth/request",
+		"/oauth/decision", "/oauth/token"}
 	routes := make(map[string]http.Handler, len(paths))
 	for _, path := range paths {
 		routes[path] = http.HandlerFunc(o.serveHTTP)
@@ -299,11 +299,19 @@ func (o *oauthBroker) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			o.beginAuthorization(w, r)
 			return
 		}
-		if r.Method == http.MethodPost {
-			o.finishAuthorization(w, r)
+		oauthFailure(w, 405, "invalid_request")
+	case "/oauth/request":
+		if r.Method != http.MethodGet {
+			oauthFailure(w, 405, "invalid_request")
 			return
 		}
-		oauthFailure(w, 405, "invalid_request")
+		o.authorizationDetails(w, r)
+	case "/oauth/decision":
+		if r.Method != http.MethodPost {
+			oauthFailure(w, 405, "invalid_request")
+			return
+		}
+		o.finishAuthorization(w, r)
 	case "/oauth/token":
 		if r.Method != http.MethodPost {
 			oauthFailure(w, 405, "invalid_request")

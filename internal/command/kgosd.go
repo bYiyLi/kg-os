@@ -9,13 +9,13 @@ import (
 const kgosdHelp = "KG OS daemon\n\n" +
 	"Usage: kgosd --root <absolute-workspace-root> [--host <address>] [--port <0..65535>]\n" +
 	"       [--tls-cert <path> --tls-key <path>]\n" +
-	"       [--mcp-token-env <name> | --mcp-token-file <path>] [MCP options]\n" +
+	"       [--mcp-oauth-issuer <origin>] [MCP options]\n" +
 	"       kgosd init --root <absolute-workspace-root>\n" +
 	"       kgosd [--help] [--version]\n\n" +
 	"Options:\n" +
 	"      --root     Absolute KG OS Workspace Root\n" +
 	"      --host, --port, --tls-cert, --tls-key\n" +
-	"      --mcp-path, --mcp-token-env, --mcp-token-file, --mcp-oauth-issuer\n" +
+	"      --mcp-path, --mcp-oauth-issuer (Instance token authenticates MCP)\n" +
 	"      --mcp-request-timeout-ms, --mcp-max-concurrency, --mcp-max-request-bytes\n" +
 	"      --mcp-script-timeout-ms, --mcp-script-memory-mb, --mcp-script-max-code-bytes\n" +
 	"      --mcp-script-max-calls, --mcp-script-max-streams, --mcp-script-max-output-bytes\n" +

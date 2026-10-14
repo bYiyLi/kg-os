@@ -6,6 +6,8 @@
 
 **2026-10-12 调整后的目标架构**：`kgosd` 同一 Go 进程同时提供 Web / HTTP API / MCP，不再运行独立 TypeScript MCP Server。已提交的 [Phase 15](../development/phases/15-mcp.md) `packages/mcp/` / Node.js Worker 实现及其真实 Dev / ChatGPT 测试是迁移参考，**不是** Go 原生 MCP 已完成的证据。公开 v0.2.1 尚无正式 MCP；私人 Plugin 可选，标准 MCP Client 可直接连接 `kgosd`，两者都不是 Lithograph 模块。
 
+**2026-10-14 MCP 认证目标调整（[D95](decisions.md#d95-unified-mcp-web-authorization)、[Phase 17](../development/phases/17-mcp-web-authorization.md) `done`（用户验收例外））**：MCP 不再拥有独立管理员 Token，使用同一个 Instance 认证真源；ChatGPT 的 OAuth 授权转入现有 KG OS Web，通过其登录状态及连接授权弹窗完成。**当前未提交工作树的 Go OAuth 路由、Web 授权弹窗和真实 Web Session 集成已通过本地测试；2026-10-14 新版 Dev 已完成正式 Docker 构建部署，用户确认 ChatGPT 重新授权测试成功。远端 GitHub CI / 最新完整隔离矩阵未执行，用户批准 Phase 17 带例外关闭，不代表 CI 通过**；Phase 16 已提交代码保留旧认证历史，当前长期 Dev 已使用 Phase 17 新认证。Web 登录状态由其所属模块负责，本文件只定义 MCP 的对接与安全合同。
+
 ## 目标与边界
 
 - AI 使用 KG OS 时应先了解真实的 Branch / Commit / Ontology，然后按需读取和操作 Knowledge；避免每次为了取得版本及模型结构都先编写一段 JavaScript。
@@ -41,7 +43,7 @@ ChatGPT / MCP Client      Browser       CLI / SDK
 
 - MCP 是 `kgosd` 内的 Go Handler，使用官方 [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) 的 Streamable HTTP 能力；MCP 直接调用同进程 Kernel 已有的业务方法，**不经 `@kgos/sdk` 再做一次本机 HTTP 请求**，也不读取 SQLite 内表或复制 Cypher/Ontology/Version Engine。Go SDK 提供协议与 Bearer 校验基础，不能视作自动提供本产品的 ChatGPT OAuth 授权服务器。
 - 每个 `kgosd` 仍只绑定一个显式 Workspace Root；MCP Tool 不接受其他 Instance Root。Node.js TypeScript MCP Server、Worker 与连接侧 SDK 属于已完成的 Phase 15 旧架构实现，Phase 16 完成验收后再清理，不能作为另一套正式服务保留。
-- 统一监听地址由 [Runtime](runtime.md#统一-http--mcp-hostingphase-16-目标) 负责：默认 `127.0.0.1:0` 不变；显式配置可对外监听，并同时服务 Web、API 与 MCP。远程必须有 HTTPS / 可信安全通道，用户自行选择代理或 Tunnel；**同一 listener 不等于同一权限**：`/api/v1/*` 仍用 Instance Token，`/mcp` 使用独立 MCP Bearer / OAuth，外部调用不能取得 Instance Token。静态 Web 不提供免认证业务 API。
+- 统一监听地址由 [Runtime](runtime.md#统一-http--mcp-hostingphase-16-目标) 负责：默认 `127.0.0.1:0` 不变；显式配置可对外监听，并同时服务 Web、API 与 MCP。远程必须有 HTTPS / 可信安全通道，用户自行选择代理或 Tunnel；**同一 listener 不等于同一权限**：`/api/v1/*` 继续采用 Runtime 的 Instance 认证；`/mcp` 接受同一 Instance 凭证的直接 Bearer（仅供可信调用方）或基于 Web 明确授权签发的 MCP OAuth Access Token。OAuth Access Token 不得访问普通 API，外部 OAuth 客户端不得取得 Instance Token；静态 Web 不提供免认证业务 API。
 - Go Sandbox 使用 QuickJS-NG WASI reactor 与 wazero；Go Bridge 对每次方法调用强制权限与参数校验，直接执行 Kernel，保持 SDK 的公开语义。Sandbox 选型为待验证目标，不以外部 WASM 示例等价于实际安全验收。
 - `plugins/kgos/` 继续存放官方 Skill、Plugin 模板和面向 AI 的安装说明，**不包含运行服务端**；Skill 只指导调用者，不改变 MCP 协议的直接可用性。
 
@@ -66,14 +68,13 @@ ChatGPT / MCP Client      Browser       CLI / SDK
 kgosd --root <workspace-root>                  既有本地 daemon（127.0.0.1:0）
 kgosd --root <workspace-root> --host <address> --port <port>
       [--tls-cert <path> --tls-key <path>]
-      [--mcp-token-env <name> | --mcp-token-file <path>]
       [--mcp-oauth-issuer <url>] [--mcp-path <path>] [MCP budgets...]
 ```
 
 - **只有一个 daemon 入口**：`kgosd --root <workspace-root>` 仍按 [Runtime](runtime.md#http-bind-与-active-endpoint) 要求显式 Root，不从 `cwd`、父目录或环境猜库。容器入口可以把 `KGOS_ROOT` 翻译成实际的 `--root` 参数，不能把它变成 `kgosd` 的第二套 Root 解析合同。网络统一由 `KGOSD_*` 配置；MCP 独有选项使用 `KGOS_MCP_*`。
 - **配置来源**：CLI > 对应环境变量 > 明确默认值。空值、未知参数、无效整数或互斥值应报错；`kgosd` 统一输出真实绑定 host / port / protocol，`--port 0` 只作为 bind 输入。原 `kgos-mcp serve / doctor` 不再是目标产品命令，不保留单独进程级启动/关闭/日志选项；现有 `kg doctor` 继续诊断本地 Runtime，MCP 的远程实际可用性由真实客户端验收，不能靠本地 ready 自证。
 
-下表是完整的**公共部署参数面**。`mb` 表示 MiB（`1024 × 1024` bytes），所有长度/时间参数必须为有界正整数；详细取值范围在首次实现时以实际资源/协议能力验证并同时固定到 CLI `--help` 与安装指南，不增加第二套配置文件或兼容别名。
+下表是 **Phase 17 当前统一认证方案的公共部署参数面**；已提交的旧 Phase 16 历史代码仍保留旧 Token 参数，但不能视为当前 Dev 合同。`mb` 表示 MiB（`1024 × 1024` bytes），所有长度/时间参数必须为有界正整数；详细取值范围以实际资源/协议能力验证并与 CLI `--help`、安装指南保持一致，不增加第二套配置文件或兼容别名。
 
 | 分组 | CLI option | 环境变量 | 含义 / 默认值 |
 | --- | --- | --- | --- |
@@ -82,8 +83,6 @@ kgosd --root <workspace-root> --host <address> --port <port>
 | 统一网络 | `--port <0..65535>` | `KGOSD_PORT` | 默认 `0`，由 OS 动态分配；Docker 可指定固定端口 |
 | 统一 TLS | `--tls-cert <path>` / `--tls-key <path>` | `KGOSD_TLS_CERT` / `KGOSD_TLS_KEY` | 同一 HTTP listener 的 HTTPS；成对配置 |
 | MCP | `--mcp-path <path>` | `KGOS_MCP_PATH` | 默认 `/mcp`；与 API/Web/OAuth 路径无冲突 |
-| MCP 认证 | `--mcp-token-env <name>` | `KGOS_MCP_TOKEN_ENV` | Token 环境变量的**名称**；默认读取 `KGOS_MCP_TOKEN` |
-| MCP 认证 | `--mcp-token-file <path>` | `KGOS_MCP_TOKEN_FILE` | 受保护 Secret 文件；默认无 |
 | MCP OAuth | `--mcp-oauth-issuer <url>` | `KGOS_MCP_OAUTH_ISSUER` | 可选，外部 HTTPS origin（开发本机 loopback HTTP 例外） |
 | MCP 请求 | `--mcp-request-timeout-ms <n>` | `KGOS_MCP_REQUEST_TIMEOUT_MS` | 单次完整 MCP 请求墙钟上限；默认 `30000` |
 | MCP 请求 | `--mcp-max-concurrency <n>` | `KGOS_MCP_MAX_CONCURRENCY` | MCP 并发上限；默认 `16` |
@@ -100,25 +99,58 @@ kgosd --root <workspace-root> --host <address> --port <port>
 
 #### 参数语义与安全约束
 
-- MCP 认证凭证只接受上述**两种 Token 来源**，不提供明文 `--token`、匿名模式或镜像内预置凭证。`--mcp-token-env` 与 `--mcp-token-file` 在同一显式配置层互斥；有效值默认来自 `KGOS_MCP_TOKEN`。文件仅允许去除一个终止换行，不擅自裁剪其它内容。**未配置 MCP 时普通 `kgosd` 继续启动 Web / API，`/mcp` 不开放工具；显式启用 MCP 却缺少/无法读取合法 Token 必须 fail closed**，不能降级为匿名。MCP Token 与 `<root>/.kgos/auth.json` Instance Token 必须隔离，任何 Token 不出现在 URL、日志或诊断消息。
+- Phase 17 完成后，`/mcp` 随已就绪的 `kgosd` 和已有 Instance 认证正常提供，不再以另一份 MCP Secret 作为开关；未完成初始化、Instance 凭证无效或不可读取时仍按 Runtime 规则 fail closed，绝不降级匿名。`--mcp-token-env`、`--mcp-token-file`、`KGOS_MCP_TOKEN`、`KGOS_MCP_TOKEN_ENV`、`KGOS_MCP_TOKEN_FILE` 从新的 MCP 配置合同删除；显式提供已废弃 CLI/环境配置应报错，不得悄悄继续使用第二份管理员凭证。只提供 MCP OAuth issuer 才启用 OAuth discovery/authorization；无 issuer 的本机可信 MCP Client 可直接使用已有 Instance Bearer。任何凭证都不进入 URL、日志或诊断消息。
 - `--tls-cert` 与 `--tls-key` 为**整个 `kgosd` HTTP listener**成对配置；未提供时使用 HTTP，仅适用于可信本机或可信的 TLS 终止代理 / Tunnel。`--host 0.0.0.0` 会将 **Web、API、MCP** 一起绑定到外部接口，不是“只公开 MCP”；代理可以限制允许转发的路由，但 `kgosd` 不内建网络 Gateway。API 继续要求 Instance Bearer，OAuth Access Token 不能调用 `/api/v1/*`，静态 Web 不提供免认证的数据旁路。
 - 总 `--mcp-request-timeout-ms` 覆盖服务端收到 MCP 请求到最终响应的时间；`--mcp-script-timeout-ms` 覆盖 JavaScript 与等待 Kernel 调用，先触及者终止相应执行。大小 / 并发限制在排队前有界生效；单 Invocation WASM memory pages、QuickJS heap/stack、CPU 中断、模块关闭与内部 Bridge 数据预算也必须有界。失效或取消的脚本不得继续接收回执和调用新的方法；已发送到 Kernel 的写入仍可能已生效，不能承诺自动回滚。
 - Preview 资源预算与 `kgos_preview` 的**固定行窗口合同**独立：配置改变的是容量和缓存寿命，不改变 `offset/limit/viewRevision`、完整 Ontology 或不截断原文的保证。缓存依旧按认证调用者和 Instance 隔离，驱逐后的 revision 返回 `VIEW_EXPIRED`。
 - 复用原有 `kg doctor` / `kgosd` 就绪诊断，不保留独立 `kgos-mcp doctor` 运行时；本地 Ready 不代表远程地址、OAuth 或真实 ChatGPT 已连通。结构化错误和日志不回显 Secret、JavaScript 宿主堆栈或本地令牌。
 
-#### 单管理员 ChatGPT OAuth 认证
+<a id="单管理员-chatgpt-oauth-认证"></a>
 
-- 默认保留独立 MCP 静态 Bearer；设置 `--mcp-oauth-issuer` / `KGOS_MCP_OAUTH_ISSUER` 后，由**同一 `kgosd` Go 进程**额外提供单管理员 ChatGPT OAuth Authorization Code + PKCE（S256）。地址为用户已部署的公网 HTTPS origin（含 scheme/host/可选 port，不含 path/query/fragment/userinfo），仅本机 loopback 允许开发用 HTTP。issuer 只定义外部公开 URL，不自动创建域名、证书、Tunnel；MCP Tool endpoint 仍为 `issuer + --mcp-path`。Go MCP SDK 的 Bearer middleware 不替代本产品的 OAuth Authorization Server、CIMD、Token 轮换实现与真实客户端验证。
-- MCP 资源服务器匿名提供 `/.well-known/oauth-protected-resource` 和按实际 MCP path 定位的 `/.well-known/oauth-protected-resource<mcp-path>`（默认 `/.well-known/oauth-protected-resource/mcp`），两者返回一致 metadata；OAuth 授权服务器匿名提供 `/.well-known/oauth-authorization-server`。对未授权 MCP 请求返回 HTTP 401 + `WWW-Authenticate: Bearer resource_metadata=...`，指向按 path 定位的资源 metadata，兼容 OAuth 自动发现。metadata 中的 canonical `resource` 和 `issuer` 为配置的 issuer origin，授权与 Token 请求必须携带并匹配该 `resource`；`kgos:access` 是单管理员四 Tool 的最小独立 Scope。OAuth endpoints 为 `/oauth/authorize` 和 `/oauth/token`，不额外新建网络进程。
-- ChatGPT 客户端使用 **Client ID Metadata Documents（CIMD）**：仅接受实际来自 `https://chatgpt.com/oauth/client.json` 或回调 ID 专用的 `https://chatgpt.com/oauth/<id>/client.json`，从该固定可信来源通过 HTTPS 获取 metadata，校验文档 `client_id` 与 URL 精确相等、所请求的 `redirect_uri` 在 `redirect_uris` 中、声明兼容 public client `none`；不接受任意客户端传入的 metadata URL 或未校验回调。Authorization Server metadata 只声明真正实现的 `client_id_metadata_document_supported: true`、`token_endpoint_auth_methods_supported: ["none"]` 和 `code_challenge_methods_supported: ["S256"]`，**不**虚报 DCR / private_key_jwt。未来其它 OAuth 客户端兼容另行设计；现有普通 MCP Client 保留静态 Bearer。
-- 浏览器首次授权只展示本服务器提供的受保护 Token 表单；用户输入**现有 MCP 管理员 Token**，服务端以恒时摘要校验，通过后向已校验 ChatGPT 回调发送一次性短效 authorization code、客户端 `state` 和 issuer `iss`，不向客户端泄露管理员 Token。授权表单使用限时一次性 ticket（POST）、明确的拒绝操作、禁止缓存/第三方资源、必要的来源校验及尝试次数限制。**授权 HTML** 使用 `Referrer-Policy: strict-origin`：保障浏览器同源 POST 携带可校验的 `Origin`，但 Referer 只透露公开 origin、不包含 OAuth query；**其余 OAuth 响应**保留 `no-referrer`。凭证、code、access/refresh Token 均不得进入 URL 日志或普通诊断，只有一次性 code 出现在 TLS 保护的 OAuth 回调 URL。
-- `/oauth/token` 对 authorization_code 严格校验一次性 code、`client_id`、完全相同的 `redirect_uri`、`resource` 与 RFC 7636 `code_verifier` S256，成功后签发随机高熵**不透明** Bearer access/refresh Token。服务器存储 Token 摘要与 issuer/resource/client/scope/有效期关联，MCP 每次调用验证存续期、Audience 和 Scope；Refresh Token 限时、一次性轮换，服务重启失效后重新授权。Token / Code / Ticket 状态均有过期、容量上限、无凭证日志；不引入用户表、数据库或独立认证服务。默认 Access Token 1 小时、Refresh Token 30 天、Code 1 分钟、授权 ticket 5 分钟，凭证变更重启后原授权自然失效。
-- 浏览器授权仅授予 MCP 四 Tool 的单管理员权限，不假装实现多账户、多 Scope 或 `/api/v1/*` 的 OAuth 权限。认证与 HTTPS 两者缺一不可；OAuth 与静态 Bearer 都不得向外部客户端暴露 `kgosd` 的 Instance Token。旧 TypeScript MCP 的真实 ChatGPT 成功是迁移参考，Go 原生版本必须独立重新验收。
+#### 统一 Instance 认证与 Web 内的 MCP 连接授权（Phase 17 目标）
+
+##### 身份与能力边界
+
+- **唯一根凭证**：继续使用 Runtime 已有的 `<workspace>/.kgos/auth.json` Instance Token，不创建 MCP 管理员 Token、用户表、密码、独立身份供应商或第二份认证配置。Web 登录状态由 Web/Runtime 的既有认证 owner 提供，MCP **只消费服务端已验证的 Web 登录上下文**；不定义 Web Session 的创建、Cookie 方案、持久化、跨标签同步或登录 UI。
+- **两种协议凭证、一套根身份**：`/mcp` 可识别现有 Instance Bearer（仅供用户自己管理的可信客户端）及经 Web 明确批准签发的 MCP OAuth Access Token。二者映射到同一个 Instance 的完整 MCP 能力，但 OAuth Token **仅可用于 MCP**；OAuth Client 永不收到 Instance Token，也不能使用 Web 登录态/Cookie、OAuth Token 调用 `/api/v1/*`。直接向不可信第三方提供 Instance Token 也会授予其普通 API 全权限，**ChatGPT 必须使用 OAuth 路径**，不得用直接 Bearer 替代浏览器授权。
+- **启动与部署**：MCP 随已认证可用的 `kgosd` 提供，不因未配置独立 MCP Token 而关闭。`--mcp-oauth-issuer` / `KGOS_MCP_OAUTH_ISSUER` 为外部 HTTPS origin（含可选端口，不含 path/query/fragment/userinfo；仅本机 loopback 可使用 HTTP）；没有此配置时不公开 OAuth discovery/授权路由，但现有 Instance Bearer 可以连接本机 MCP。issuer 不创建公网接入、证书或 Tunnel；MCP endpoint 仍是 `issuer + --mcp-path`。
+- **公开 Web 入口要求**：OAuth 的浏览器跳转依赖同一 HTTPS origin 的 **Web `/`、Web 静态资源与 Web 认证入口**均真实可达；只代理 `/mcp` 和 `/oauth/*` 而不转发 Web 不能完成授权。HTTPS 代理还须正确保留 OAuth discovery 路径、请求方法和必要认证头；不得用静态文件匿名可读推断可绕过 Web 业务认证。
+- **权限呈现**：当前 `kgos:access` 代表四 Tool 的**完整读写能力**（包括 `kgos_run` 修改或删除知识），连接授权弹窗必须明确展示；本期不引入细粒度 Scope、按 Branch/Model 的角色权限或自动批准。Web 登录成功只证明身份，**不等于授权外部 Client**。
+
+##### 从 ChatGPT 跳转到现有 Web
+
+1. ChatGPT 访问 `/mcp` 时可收到 HTTP 401 + `WWW-Authenticate: Bearer resource_metadata=...`；启用 issuer 后，`/.well-known/oauth-protected-resource` 与 `/.well-known/oauth-protected-resource<mcp-path>` 返回一致的资源 metadata，`/.well-known/oauth-authorization-server` 暴露真正实现的 Authorization Code、PKCE S256、`none` public-client 与 CIMD 能力。`resource`、`issuer` 与 `kgos:access` 一致绑定。授权与交换仍使用 `/oauth/authorize`、`/oauth/token`，由**同一 `kgosd` Go 进程**提供。
+2. `GET /oauth/authorize` 先完整校验 `response_type=code`、`client_id`、`redirect_uri`、`state`、`resource`、`scope`、`code_challenge` 与 `code_challenge_method=S256`；仅允许从 `https://chatgpt.com/oauth/client.json` 或 `https://chatgpt.com/oauth/<id>/client.json` 读取可信 CIMD，验证精确的 `client_id`、`redirect_uris` 和 `none` 声明，不接受任意 URL、开放 DCR 或未验证的回调。先验证后创建有界、短效、随机不可猜的**待授权请求**，其中保存验证过的 OAuth 参数，不生成 code。
+3. Go 返回 `303` 跳转到**已有 KG OS Web 应用**的同源入口 `/?mcp_authorization=<request_id>`；此 URL 只携带授权请求引用，不包含 Instance Token、OAuth code、`state`、PKCE verifier 或任意回调地址。Web 使用原有应用框架、主题及现有认证组件，在工作区上方显示**连接授权弹窗**，不得再由 Go 输出独立授权 HTML/第二个登录页。
+4. Web **已经登录**时直接显示授权弹窗；**尚未登录**时先使用 Web 自己的认证交互，成功后仍在同一个待授权请求中显示弹窗。无需第二次输入管理员 Token。MCP 不负责决定 Web 如何跨页面保存登录状态；如尚不能在此次跳转中复用登录状态，属于 Web 登录模块未满足集成前置，不允许 MCP 私自创建备用 Session 或要求再输入一个 MCP Token。
+5. 弹窗至少显示经过验证的客户端名称（无法取得可信名称时显示已验证 `client_id`）、当前 Instance/资源地址及**可读、可写**权限，并提供明确的「授权连接 / 拒绝」。不能由任意请求参数伪造客户端名称或权限，不能因登录成功、刷新或已授权过同名客户端而自动同意。
+6. 用户同意后，Go 消耗一次性请求并签发短效 authorization code；Web 将浏览器导向**预先验证的** ChatGPT `redirect_uri`，附带原样 `state` 和 `iss`。用户拒绝时返回该回调的 `error=access_denied`（保留 `state/iss`），不签发 code/token。两条路径均回到 ChatGPT；过期、重复提交或验证失败不授权，Web 解释失败并让用户重新从 ChatGPT 发起连接。
+
+##### MCP 与 Web 的最小接口合同
+
+| 接口 / 入口 | MCP 责任与返回 | 安全要求 |
+| --- | --- | --- |
+| `GET /oauth/authorize` | 校验 OAuth 请求，保存待授权上下文，`303` 到 `/?mcp_authorization=<request_id>` | 未校验 Client/redirect/resource 不建单；请求 ID 本身**不是授权凭证** |
+| `GET /oauth/request?request_id=...` | 返回已验证的 `client_id`、可展示名称、`resource`、固定 `scope`、`canWrite=true` 与 `expires_at` | **必须通过 Web owner 的已登录校验**；未登录返回 401；失效/未知同类失败；不返回原始凭证、`state`、code 或任意客户端回调 |
+| `POST /oauth/decision` | Web 传 `{request_id, decision: "approve" \| "deny"}`，成功返回 `{redirect_url}`，由 Web 执行顶层导航 | **必须通过相同 Web 登录校验与其 CSRF/同源写入防护**；校验本次 Instance、一次性、未过期；Client/redirect/scope 只能从 Go 保存的请求取得，不能由 Web 提交覆盖 |
+| `POST /oauth/token` | 处理 `authorization_code` 与 `refresh_token` 的标准 OAuth 交换/轮换 | 验证 client/resource/redirect/PKCE、一用即销、有效期和 Scope；不接受 Web Session 替代 OAuth Client 凭证 |
+| `/mcp` | 使用现有 Instance Bearer 或有效 OAuth Access Token 调用四 Tool | 同一 Instance、MCP audience/scope/expiry；浏览器登录 Cookie 不能直接调用工具，OAuth Token 不能访问普通 API |
+
+接口返回只包含页面呈现和跳转所需字段；`redirect_url` **只能**由服务端依据先前验证的 Client 回调生成，Web 不拼接或接收任意跳转目标。授权数据响应使用 `Cache-Control: no-store` 与 `Referrer-Policy: no-referrer`，不加载第三方资源；在未登录的 Web 中，Go 不能泄露授权详情，也不能在前端缓存请求以绕过校验。授权操作只由服务端基于**当前有效的** Web 登录上下文判断，读取授权详情不授予批准权限。浏览器登录校验与 CSRF 接口的具体实现由 Web 认证 owner 确定，MCP 不创建第二套 Session 存储或 CSRF 机制。
+
+##### OAuth Token 生命周期与恢复
+
+- Go 继续使用随机高熵、**不透明**的 Access/Refresh Token，服务端仅持有摘要及 client/issuer/resource/scope/有效期关联；`/oauth/token` 必须检查单次 code、同一个 `client_id`、完全相同的 `redirect_uri`、`resource` 和 RFC 7636 `code_verifier` S256。Refresh Token 限时且轮换后旧值立即失效；Access Token 只接受指定 MCP audience/Scope。
+- 保留目前的有界进程内 OAuth 授权状态，不新增 OAuth 数据库、用户表或 Token 持久化：授权请求 5 分钟、Code 1 分钟、Access Token 1 小时、Refresh Token 30 天；`kgosd` 重启后旧 OAuth Token 失效，需要客户端重新走 OAuth，**Web 已登录的用户只需再次确认授权**。Instance 根凭证的生命周期仍由 Runtime 负责，OAuth 不主动修改 `auth.json`。
+- Web 退出登录仅终止 Web 自己的登录状态，**不自动撤销此前已经批准的 MCP OAuth Grant**；现有授权仍受 Token 到期、Refresh 轮换及 `kgosd` 重启失效约束。本 Phase 不扩展为连接管理/撤销页面或单独的 Grant 持久化系统。
+- 所有授权查询/决定、Token 交换必须有体积/数量/时间限制；禁用跨源调用、缓存、开放跳转、重放和重复同意。`request_id` 即使被复制或泄露，也只能定位待授权请求，**不能绕过有效 Web 登录及显式同意**。除了经 TLS 保护的授权 code 回调，不把任何 Token/code 放进 Web URL、日志、错误或持久 UI 状态。MCP 未认证拒绝与 OAuth 错误保持最小且无秘密差异。
+
+本节**只拥有 MCP 授权请求、OAuth 协议、凭证隔离及与 Web 的接口合同**。Web 登录/Session、通用认证弹窗实现和前端登录生命周期属于 Web/Runtime owner；MCP 只消费其已认证状态并提供连接授权所需数据与动作。Phase 17 MCP 认证代码已通过本地 Web Session Handler 集成与浏览器模拟验收，Dev 正式 Docker 构建及只读自动验收通过，用户也确认真实 ChatGPT 重新授权成功；未执行的 GitHub CI / 完整隔离矩阵不能记为通过。Phase 17 `done` 是用户明确批准的关闭例外，不等于正式发布或生产就绪。
 
 ### 首次使用与验收边界
 
 1. 用户通过 Linux amd64 Docker 镜像取得**完整可运行**的 MCP 部署单元。全新 Workspace 先在容器内按已有 `kg init` 明确提供初始化配置，现有 Workspace 直接复用；两种情况均使用持久化 Instance，不需要宿主机安装 daemon。
-2. 运行**唯一 `kgosd` 服务**，其同一端口直接提供 `/mcp`、`/api/v1/*` 和 Web；启动时使用 MCP Token 来源与可选统一 TLS，动态端口打印实际地址。不再提供独立的 `kgos-mcp serve/doctor` 或第二个内部 daemon。
+2. 运行**唯一 `kgosd` 服务**，其同一端口直接提供 `/mcp`、`/api/v1/*` 和 Web；目标认证使用已有 Instance 凭证与可选 OAuth issuer、统一 TLS，动态端口打印实际地址。不再提供独立的 `kgos-mcp serve/doctor` 或第二个内部 daemon。
 3. 用户**自行**配置远程 HTTPS 地址、隧道或其它客户端支持的安全接入通道。服务本地 `listening` / `kg doctor` Ready 仅表明本地就绪；**远程部署完成**要求目标 MCP Client 经真实地址/通道完成认证、四 Tool 发现和真实调用，并证明暴露的 API/Web 路由没有新增认证旁路。
 4. Linux amd64 Docker 镜像必须通过干净构建、唯一进程 / listener、真实初始化/连接、持久数据/重启、固定/动态端口、TLS 两种终止位置、三类入口认证隔离、不同 Instance、Sandbox 安全与流式/取消等验收；验证无需 Node.js 运行时、宿主 `kgosd` 或 host networking，并通过非 root / SIGTERM 测试。Dev 成功不等于 OCI Registry / Plugin 已正式发布。
 
@@ -185,7 +217,7 @@ return { state, models: models.results, data: data.rows };
 #### Sandbox 选型、执行与资源边界
 
 - **首选技术方案，必须先验证**：将 [QuickJS-NG WASI reactor](https://github.com/quickjs-ng/quickjs) 作为可控 `.wasm` 引擎，通过 Go 的 [wazero](https://github.com/tetratelabs/wazero) 嵌入 `kgosd`，不使用 Node.js Worker、`node:vm` / `vm2`、CGO JS 插件或独立 SDK Gateway。参考 [go-quickjs-wasi-reactor](https://github.com/aperturerobotics/go-quickjs-wasi-reactor) 仅证明 Go/WASM 存在可用入口，**不能据此宣称 Promise Bridge、增量 Graph Stream 或不可信脚本隔离已得到验证**。具体 WASM 源、依赖版本及校验摘要在 P15-01 真正运行测试后固定，未经验证不提前新增正式依赖。
-- 每次 Invocation 创建隔离的 WASM Module / QuickJS runtime/context，脚本状态和 Promise 不跨请求持久化。仅向脚本暴露四个固定 namespace 的许可方法；WASI 不预开放宿主文件系统、环境变量、网络、任意模块加载或敏感日志能力，**不允许**脚本读取 Instance / MCP Token、直接持有 Go Kernel 句柄或调用任意 HTTP。Go Host Bridge 只接受 `method + JSON-compatible 参数`，返回 JSON-compatible 值/公共安全错误，执行前按 Invocation 身份、Method allowlist 和资源预算校验。
+- 每次 Invocation 创建隔离的 WASM Module / QuickJS runtime/context，脚本状态和 Promise 不跨请求持久化。仅向脚本暴露四个固定 namespace 的许可方法；WASI 不预开放宿主文件系统、环境变量、网络、任意模块加载或敏感日志能力，**不允许**脚本读取 Instance / OAuth Token、直接持有 Go Kernel 句柄或调用任意 HTTP。Go Host Bridge 只接受 `method + JSON-compatible 参数`，返回 JSON-compatible 值/公共安全错误，执行前按 Invocation 身份、Method allowlist 和资源预算校验。
 - **异步调度**：Go 宿主可并发执行独立 Kernel 方法，但同一 Guest QuickJS/WASM 的 Promise resolve/reject、pending jobs 与状态操作必须由一个调度所有者**串行**驱动，不允许多个 Goroutine 并发重入 VM。`Promise.all()` 必须能等待实际同时在途的 Go 调用；`graph.streamQuery / streamExecute` 必须通过 `stream-open / stream-next / stream-return` 拉取真实事件，维护背压，支持 `for await...of`、提前退出、断线与取消，**不得预先将整个 Stream 聚合为数组**。
 - **资源隔离**：限制 Guest WASM linear memory pages / JS heap/stack、脚本大小、宿主调用/流并发、输出大小及墙钟时间；使用 wazero `WithCloseOnContextDone(true)`（需在目标版本证实）、Module close 与适用的 QuickJS CPU interrupt，在无限循环、深递归、内存耗尽、trap、取消、超时下结束该次 Invocation，且其他 `kgosd` 请求继续正常执行。超限明确返回 `RESOURCE_ERROR`，不能静默截断、继续交付已失效脚本的回执或伪造事务回滚；已发到 Kernel 的写入仍可能完成。
 - **P16-01 可行性门槛**先验证真实 `async/await`、`Promise.all()`、`for await...of`、宿主权限隔离、资源中断与并发取消；任一必需条件不满足时停止依赖沙箱的实现并回到本设计修订，**不自动退回 Node.js MCP、降低隔离保证或改变四 Tool 合同**。优先验证 Linux amd64（唯一官方 Docker 目标），跨平台 Go 构建门槛按既有 Runtime 范围回归；已有 Node.js Worker 历史验收不能替代 Go/WASM 新证据。
@@ -519,7 +551,7 @@ KG OS 官方 Skill 教 AI 正确使用 `kgos_preview` / `state_ancestry` / `kgos
 
 私人安装流程目标：
 
-1. 用户在自己的电脑或受控主机初始化 KG OS，运行统一 `kgosd` 并显式启用 MCP；用户自行配置受保护的 HTTPS MCP 入口或安全通道，无需部署独立 MCP Server。
+1. 用户在自己的电脑或受控主机初始化 KG OS，运行统一 `kgosd`；目标方案中 MCP 由现有 Instance 凭证保护，用户自行配置受保护的 HTTPS MCP 入口与可选 OAuth issuer，无需独立 MCP Server 或管理员 Token。
 2. 用户在 ChatGPT 侧手工添加**自己的**自定义 MCP Connection，验证工具真实可调用并取得连接自身的注册 ID。
 3. 根据官方 `plugins/kgos/` 模板与 AI-facing `INSTALL.md`，由 ChatGPT / Plugin Creator 优先生成**用户私有** Plugin；模板中的连接映射引用该用户真实注册的 MCP App ID，打包官方 `skills/kgos/SKILL.md`。没有 Creator 时，可在符合当时客户端合同的前提下手工生成兼容包并私有安装。
 4. 在 ChatGPT Web / Desktop 分别验证 Plugin 的工具发现、Skill 激活、受保护连接、只读/写入区分及真实 `kgos_preview` 和 JS 组合操作；账户与 Workspace 功能可用性以实际连接测试为准。

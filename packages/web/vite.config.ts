@@ -20,6 +20,13 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 5173,
-    ...(devEndpoint === undefined ? {} : { proxy: { "/api": devEndpoint } })
+    ...(devEndpoint === undefined
+      ? {}
+      : {
+          proxy: {
+            // Preserve the browser-facing Host: Web Session enforces Origin === Host.
+            "/api": { target: devEndpoint, changeOrigin: false }
+          }
+        })
   }
 });

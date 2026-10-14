@@ -3,10 +3,8 @@ package command
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -19,8 +17,6 @@ type DaemonSettings struct {
 	MCP     DaemonMCPSettings
 }
 type DaemonMCPSettings struct {
-	Enabled              bool
-	Token                string
 	Path                 string
 	OAuthIssuer          string
 	RequestTimeoutMS     int
@@ -48,8 +44,6 @@ var daemonFields = map[string]daemonField{
 	"tls-cert":                    {env: "KGOSD_TLS_CERT"},
 	"tls-key":                     {env: "KGOSD_TLS_KEY"},
 	"mcp-path":                    {env: "KGOS_MCP_PATH", def: "/mcp"},
-	"mcp-token-env":               {env: "KGOS_MCP_TOKEN_ENV"},
-	"mcp-token-file":              {env: "KGOS_MCP_TOKEN_FILE"},
 	"mcp-oauth-issuer":            {env: "KGOS_MCP_OAUTH_ISSUER"},
 	"mcp-request-timeout-ms":      {env: "KGOS_MCP_REQUEST_TIMEOUT_MS", def: "30000", min: 100, max: 120000},
 	"mcp-max-concurrency":         {env: "KGOS_MCP_MAX_CONCURRENCY", def: "16", min: 1, max: 1024},
@@ -66,6 +60,11 @@ var daemonFields = map[string]daemonField{
 }
 
 func parseDaemonSettings(args []string, lookup func(string) (string, bool)) (DaemonSettings, string, error) {
+	for _, key := range []string{"KGOS_MCP_TOKEN", "KGOS_MCP_TOKEN_ENV", "KGOS_MCP_TOKEN_FILE"} {
+		if _, present := lookup(key); present {
+			return DaemonSettings{}, "", fmt.Errorf("obsolete MCP credential setting %s: use the Instance credential", key)
+		}
+	}
 	fields := make(map[string]string)
 	for i := 0; i < len(args); i++ {
 		name := args[i]
@@ -192,96 +191,12 @@ func parseDaemonSettings(args []string, lookup func(string) (string, bool)) (Dae
 		return DaemonSettings{}, "", err
 	}
 
-	// A CLI-selected token source outranks both environment-selected sources.
-	name, file := fields["mcp-token-env"], fields["mcp-token-file"]
-	if name != "" && file != "" {
-		return DaemonSettings{}, "", errors.New("choose one MCP token source")
-	}
-	explicit := name != "" || file != ""
-	if !explicit {
-		var nameSet, fileSet bool
-		name, nameSet = lookup("KGOS_MCP_TOKEN_ENV")
-		file, fileSet = lookup("KGOS_MCP_TOKEN_FILE")
-		if nameSet && fileSet {
-			return DaemonSettings{}, "", errors.New("choose one MCP token source")
-		}
-		explicit = nameSet || fileSet
-	}
-	if file != "" {
-		m.Token, err = readMCPTokenFile(file)
-		if err != nil {
-			return DaemonSettings{}, "", err
-		}
-		m.Enabled = true
-	} else {
-		if name == "" {
-			name = "KGOS_MCP_TOKEN"
-		}
-		if !validMCPTokenEnvName(name) {
-			return DaemonSettings{}, "", errors.New("invalid MCP token environment name")
-		}
-		token, ok := lookup(name)
-		if ok {
-			m.Token = token
-			m.Enabled = true
-		}
-		if explicit && !ok {
-			return DaemonSettings{}, "", errors.New("MCP token environment variable is unavailable")
-		}
-	}
-	if m.Enabled {
-		if m.Token == "" || len(m.Token) > 4096 || strings.ContainsAny(m.Token, "\r\n\x00") {
-			return DaemonSettings{}, "", errors.New("MCP token is invalid")
-		}
-	} else if m.OAuthIssuer != "" {
-		return DaemonSettings{}, "", errors.New("MCP OAuth requires administrator token")
-	}
 	if m.OAuthIssuer != "" {
 		if err := validOAuthIssuerOrigin(m.OAuthIssuer); err != nil {
 			return DaemonSettings{}, "", err
 		}
 	}
 	return settings, root, nil
-}
-func validMCPTokenEnvName(name string) bool {
-	if len(name) < 1 || len(name) > 128 {
-		return false
-	}
-	for idx, c := range name {
-		if c == '_' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
-			continue
-		}
-		if idx > 0 && c >= '0' && c <= '9' {
-			continue
-		}
-		return false
-	}
-	return true
-}
-func readMCPTokenFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", errors.New("cannot open MCP secret file")
-	}
-	defer f.Close()
-	stat, err := f.Stat()
-	if err != nil || !stat.Mode().IsRegular() {
-		return "", errors.New("invalid MCP secret file")
-	}
-	bytes, err := io.ReadAll(io.LimitReader(f, 4098))
-	if err != nil {
-		return "", errors.New("cannot read MCP secret file")
-	}
-	if len(bytes) > 4096 {
-		return "", errors.New("MCP token is too long")
-	}
-	text := string(bytes)
-	if strings.HasSuffix(text, "\r\n") {
-		text = strings.TrimSuffix(text, "\r\n")
-	} else {
-		text = strings.TrimSuffix(text, "\n")
-	}
-	return text, nil
 }
 func validOAuthIssuerOrigin(raw string) error {
 	u, err := url.Parse(raw)

@@ -21,6 +21,7 @@ const (
 	CodeStateNotFound        ErrorCode = "STATE_NOT_FOUND"
 	CodeReservedIdentifier   ErrorCode = "RESERVED_IDENTIFIER"
 	CodeAuthenticationFailed ErrorCode = "AUTHENTICATION_FAILED"
+	CodeWebConnectionChanged ErrorCode = "WEB_CONNECTION_CHANGED"
 	CodeInvalidArgument      ErrorCode = "INVALID_ARGUMENT"
 	CodeParse                ErrorCode = "PARSE_ERROR"
 	CodeSemantic             ErrorCode = "SEMANTIC_ERROR"
@@ -141,7 +142,7 @@ func HTTPStatus(err error) int {
 		CodeMergeSessionNotFound:
 		return http.StatusNotFound
 	case CodeObjectConflict, CodePatchBaseMismatch, CodeStaleBaseState, CodeConstraint,
-		CodeBranchHeadMoved, CodeMergeConflict, CodeMergeSessionChanged:
+		CodeBranchHeadMoved, CodeMergeConflict, CodeMergeSessionChanged, CodeWebConnectionChanged:
 		return http.StatusConflict
 	case CodeInvalidArgument, CodeParse, CodeSemantic, CodeType, CodeReservedIdentifier,
 		CodeUnsupportedOperation, CodeSchema, CodeReadOnlySnapshot:

@@ -1,11 +1,12 @@
 package mcpserver
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
-	"html"
 	"io"
 	"mime"
 	"net/http"
@@ -40,41 +41,26 @@ func readOAuthForm(w http.ResponseWriter, r *http.Request) (url.Values, bool) {
 	}
 	return form, true
 }
-func (o *oauthBroker) authorizationPage(w http.ResponseWriter, ticket string, invalid bool) {
-	oauthHeaders(w)
-	// Chromium's same-origin form POST supplies a usable Origin under
-	// strict-origin, without leaking authorization query parameters.
-	w.Header().Set("Referrer-Policy", "strict-origin")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	status := http.StatusOK
-	text := ""
-	if invalid {
-		status = http.StatusUnauthorized
-		text = "<p>Invalid administrator token.</p>"
+
+// OAuth delegates UI and login to the existing KG OS Web. A request ID alone
+// can neither display a request nor grant permission without Web authentication.
+func (o *oauthBroker) validWebBearer(header string) bool {
+	if !strings.HasPrefix(header, "Bearer ") || len(header) > 4103 {
+		return false
 	}
-	w.WriteHeader(status)
-	_, _ = io.WriteString(w, `<!doctype html><html lang="en"><meta charset="utf-8"><title>KG OS authorization</title>`+
-		`<h1>Authorize ChatGPT to access KG OS</h1>`+
-		`<p>This grants access to all four MCP tools, including writes.</p>`+
-		`<p>This authorization page expires after five minutes. If it expires, restart authorization from ChatGPT.</p>`+
-		text+`<form method="POST" action="/oauth/authorize">`+
-		`<input type="hidden" name="ticket" value="`+html.EscapeString(ticket)+`">`+
-		`<label>KG OS MCP administrator token <input name="token" type="password" autocomplete="off" required></label>`+
-		`<button name="decision" value="approve">Authorize</button>`+
-		`<button name="decision" value="deny" formnovalidate>Cancel</button></form></html>`)
+	token := strings.TrimPrefix(header, "Bearer ")
+	hash := sha256.Sum256([]byte(token))
+	return token != "" && subtle.ConstantTimeCompare(hash[:], o.instanceDigest[:]) == 1
 }
-func (o *oauthBroker) expiredPage(w http.ResponseWriter, r *http.Request) {
-	if !strings.Contains(r.Header.Get("Accept"), "text/html") {
-		oauthFailure(w, 400, "invalid_request")
-		return
+
+func (o *oauthBroker) authenticatedWeb(w http.ResponseWriter, r *http.Request) bool {
+	// Reuse the current Web/Runtime Instance authentication contract. Future
+	// cross-tab login-state handling belongs to the Web authentication owner.
+	if !o.validWebBearer(r.Header.Get("Authorization")) {
+		oauthFailure(w, http.StatusUnauthorized, "authentication_required")
+		return false
 	}
-	oauthHeaders(w)
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; base-uri 'none'; frame-ancestors 'none'")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusBadRequest)
-	_, _ = io.WriteString(w, `<!doctype html><html lang="en"><meta charset="utf-8"><title>KG OS authorization expired</title>`+
-		`<h1>Authorization request expired</h1><p>This authorization page is no longer valid. Return to ChatGPT and start the connection authorization again.</p></html>`)
+	return true
 }
 
 func (o *oauthBroker) beginAuthorization(w http.ResponseWriter, r *http.Request) {
@@ -129,14 +115,39 @@ func (o *oauthBroker) beginAuthorization(w http.ResponseWriter, r *http.Request)
 		challenge: challenge, expires: o.now().Add(ticketLifetime),
 	}
 	o.mu.Unlock()
-	o.authorizationPage(w, ticket, false)
+	oauthHeaders(w)
+	w.Header().Set("Location", o.issuer+"/?mcp_authorization="+url.QueryEscape(ticket))
+	w.WriteHeader(http.StatusSeeOther)
 }
 
-func (o *oauthBroker) redirectAuthorization(w http.ResponseWriter, authorization oauthAuthorization, values url.Values) {
+func (o *oauthBroker) authorizationDetails(w http.ResponseWriter, r *http.Request) {
+	if !o.authenticatedWeb(w, r) {
+		return
+	}
+	requestID := onlyOAuthValue(r.URL.Query(), "request_id")
+	if !oauthSecretPattern.MatchString(requestID) {
+		oauthFailure(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	o.mu.Lock()
+	o.pruneLocked()
+	pending, ok := o.tickets[oauthHash(requestID)]
+	o.mu.Unlock()
+	if !ok {
+		oauthFailure(w, http.StatusGone, "invalid_request")
+		return
+	}
+	oauthJSON(w, http.StatusOK, map[string]any{
+		"client_id": pending.clientID, "client_name": "ChatGPT",
+		"resource": pending.resource, "scope": oauthScope,
+		"canWrite": true, "expires_at": pending.expires.UTC().Format(time.RFC3339),
+	})
+}
+
+func (o *oauthBroker) authorizationRedirect(authorization oauthAuthorization, values url.Values) (string, error) {
 	redirect, err := url.Parse(authorization.redirectURI)
 	if err != nil {
-		oauthFailure(w, 400, "invalid_request")
-		return
+		return "", err
 	}
 	params := redirect.Query()
 	for key, group := range values {
@@ -145,57 +156,63 @@ func (o *oauthBroker) redirectAuthorization(w http.ResponseWriter, authorization
 	params.Set("state", authorization.state)
 	params.Set("iss", o.issuer)
 	redirect.RawQuery = params.Encode()
-	oauthHeaders(w)
-	w.Header().Set("Location", redirect.String())
-	w.WriteHeader(http.StatusFound)
+	return redirect.String(), nil
 }
+
 func (o *oauthBroker) finishAuthorization(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Origin") != o.issuer {
 		oauthFailure(w, http.StatusForbidden, "invalid_request")
 		return
 	}
-	form, ok := readOAuthForm(w, r)
-	if !ok {
+	if !o.authenticatedWeb(w, r) {
 		return
 	}
-	ticket := onlyOAuthValue(form, "ticket")
-	decision := onlyOAuthValue(form, "decision")
-	if !oauthSecretPattern.MatchString(ticket) || (decision != "approve" && decision != "deny") {
-		oauthFailure(w, 400, "invalid_request")
+	if r.Header.Get("Content-Type") != "application/json" || r.ContentLength > 1024 {
+		oauthFailure(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
-	key := oauthHash(ticket)
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1025))
+	if err != nil || len(body) > 1024 {
+		oauthFailure(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	var input struct {
+		RequestID string `json:"request_id"`
+		Decision  string `json:"decision"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		oauthFailure(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	var trailing any
+	if decoder.Decode(&trailing) != io.EOF ||
+		!oauthSecretPattern.MatchString(input.RequestID) ||
+		(input.Decision != "approve" && input.Decision != "deny") {
+		oauthFailure(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	key := oauthHash(input.RequestID)
 	o.mu.Lock()
 	o.pruneLocked()
 	pending, exists := o.tickets[key]
 	if !exists {
 		o.mu.Unlock()
-		o.expiredPage(w, r)
+		oauthFailure(w, http.StatusGone, "invalid_request")
 		return
 	}
-	if decision == "deny" {
+	if input.Decision == "deny" {
 		delete(o.tickets, key)
 		o.mu.Unlock()
-		o.redirectAuthorization(w, pending, url.Values{"error": {"access_denied"}})
-		return
-	}
-	supplied := onlyOAuthValue(form, "token")
-	candidate := oauthHash(supplied)
-	good := supplied != "" && len(supplied) <= 4096 && subtle.ConstantTimeCompare(candidate[:], o.adminDigest[:]) == 1
-	if !good {
-		pending.failures++
-		if pending.failures >= 5 {
-			delete(o.tickets, key)
-			o.mu.Unlock()
-			oauthFailure(w, 429, "access_denied")
+		target, err := o.authorizationRedirect(pending, url.Values{"error": {"access_denied"}})
+		if err != nil {
+			oauthFailure(w, 400, "invalid_request")
 			return
 		}
-		o.tickets[key] = pending
-		o.mu.Unlock()
-		o.authorizationPage(w, ticket, true)
+		oauthJSON(w, 200, map[string]string{"redirect_url": target})
 		return
 	}
-	delete(o.tickets, key)
 	if len(o.codes) >= maxPendingOAuth {
 		o.mu.Unlock()
 		oauthFailure(w, 503, "temporarily_unavailable")
@@ -207,10 +224,16 @@ func (o *oauthBroker) finishAuthorization(w http.ResponseWriter, r *http.Request
 		oauthFailure(w, 503, "temporarily_unavailable")
 		return
 	}
+	delete(o.tickets, key)
 	pending.expires = o.now().Add(codeLifetime)
 	o.codes[oauthHash(code)] = pending
 	o.mu.Unlock()
-	o.redirectAuthorization(w, pending, url.Values{"code": {code}})
+	target, err := o.authorizationRedirect(pending, url.Values{"code": {code}})
+	if err != nil {
+		oauthFailure(w, 400, "invalid_request")
+		return
+	}
+	oauthJSON(w, 200, map[string]string{"redirect_url": target})
 }
 
 func (o *oauthBroker) issueGrantLocked(grant oauthGrant) (map[string]any, error) {

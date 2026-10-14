@@ -27,10 +27,20 @@ type ExtraRoute struct {
 }
 
 func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler, extra ...ExtraRoute) http.Handler {
+	bootID := newDaemonBootID()
+	sessions := newWebSessionStore(runtime.Paths.Root, runtime.Credential.Token)
 	if fallback == nil {
 		fallback = http.NotFoundHandler()
 	}
 	mux := http.NewServeMux()
+	sessions.routes(mux, runtime.Credential.Token, bootID)
+	mux.HandleFunc("/api/v1/web/data/info", postJSONHandler(
+		runtime.Credential.Token,
+		func(_ context.Context, _ struct{}) (webDataInfo, error) {
+			// The UI store is not implemented yet. Do not report it as healthy.
+			return webDataInfo{DaemonBootID: bootID, StorageStatus: "unsupported"}, nil
+		},
+	))
 	mux.HandleFunc("/api/v1/graph/query", func(response http.ResponseWriter, request *http.Request) {
 		var input kernel.GraphQueryRequest
 		mediaType, ok := prepareGraphRequest(
@@ -227,7 +237,7 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler, extra ...Ex
 		}
 	}
 	mux.Handle("/", fallback)
-	return mux
+	return sessions.webBearer(webConnectionGuard(mux, runtime.Credential.Token, bootID), runtime.Credential.Token)
 }
 
 func postJSONHandler[Request any, Result any](

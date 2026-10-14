@@ -72,6 +72,22 @@ pnpm exec playwright install --with-deps --only-shell chromium
 
 ## 开发启动
 
+仅开发 **Web 外层布局、样式与静态交互** 时，可以不构建 `kgosd`：
+
+```sh
+pnpm --filter @kgos/web dev
+```
+
+纯前端预览地址为 `http://127.0.0.1:5174`。它仅提供 Vite 页面与热更新，**不启动 daemon、不代理 API、不证明真实业务功能可用**；若需连接后端，使用下面的一体化入口。前端局部质量检查可运行：
+
+```sh
+pnpm --filter @kgos/web check
+```
+
+该命令执行 Web TypeScript、ESLint、Prettier 和 Web Vitest 单测；阶段交付仍须使用仓库根目录的 `pnpm validate`，其中包含真实内嵌 Runtime 的 Playwright 验证。两种前端开发模式使用不同端口，避免相互占用。
+
+一体化开发（Web + 当前 Workspace 的真实 daemon）：
+
 ```sh
 pnpm dev
 ```
@@ -83,7 +99,7 @@ pnpm dev
 3. 从 `artifacts/npm/runtime-<target>/` 启动完整 packaged `kgosd --root <absolute-root>`；
 4. 等待 `.kgos-dev/.kgos/kgosd.lock` 发布 dynamic endpoint；
 5. 使用 daemon 生成的 `auth.json` 完成一次 authenticated Evolution overview，并在成功后写入开发 Instance 的 `initialized.json` completion receipt；
-6. 启动 Vite `http://127.0.0.1:5173`，把 `/api` 代理到该 endpoint。
+6. 启动 Vite `http://127.0.0.1:5173`，把 `/api` 代理到该 endpoint；代理保留浏览器 `Host`，以满足 Web Session 的严格同源校验（Vite `changeOrigin: false`）。
 
 daemon 实际 endpoint 每次由 OS 分配，并打印到终端；不要假设固定端口。Ctrl-C/SIGTERM 会联动停止 daemon 与 Vite。
 

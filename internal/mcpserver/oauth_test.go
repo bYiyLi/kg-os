@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -134,43 +133,73 @@ func parseOAuthJSON(t *testing.T, r *http.Response) map[string]any {
 func (f *oauthFixture) begin(modify url.Values) (string, *http.Response) {
 	f.t.Helper()
 	values := url.Values{
-		"client_id":             {oauthTestClient},
-		"redirect_uri":          {oauthTestRedirect},
-		"state":                 {"opaque-state"},
-		"response_type":         {"code"},
-		"code_challenge":        {f.challenge},
-		"code_challenge_method": {"S256"},
-		"resource":              {f.server.URL},
-		"scope":                 {oauthScope},
+		"client_id": {oauthTestClient}, "redirect_uri": {oauthTestRedirect},
+		"state": {"opaque-state"}, "response_type": {"code"},
+		"code_challenge": {f.challenge}, "code_challenge_method": {"S256"},
+		"resource": {f.server.URL}, "scope": {oauthScope},
 	}
 	for key, entries := range modify {
 		values[key] = entries
 	}
 	result := f.get("/oauth/authorize?" + values.Encode())
-	raw, _ := io.ReadAll(result.Body)
-	result.Body.Close()
-	found := regexp.MustCompile(`name="ticket" value="([^"]+)"`).FindSubmatch(raw)
-	ticket := ""
-	if len(found) == 2 {
-		ticket = string(found[1])
+	if result.StatusCode != http.StatusSeeOther {
+		return "", result
 	}
-	result.Body = io.NopCloser(strings.NewReader(string(raw)))
-	return ticket, result
+	destination, err := url.Parse(result.Header.Get("Location"))
+	if err != nil || destination.Path != "/" || destination.Host != "" && destination.Host != strings.TrimPrefix(f.server.URL, "http://") {
+		f.t.Fatalf("authorization did not redirect to Web: %v %s", err, result.Header.Get("Location"))
+	}
+	return destination.Query().Get("mcp_authorization"), result
 }
-func (f *oauthFixture) approve(ticket, credential, origin string) *http.Response {
+func (f *oauthFixture) postDecision(requestID, credential, origin, decision string) *http.Response {
 	f.t.Helper()
-	return f.postForm("/oauth/authorize", url.Values{
-		"ticket": {ticket}, "token": {credential}, "decision": {"approve"},
-	}, origin)
+	value, _ := json.Marshal(map[string]string{"request_id": requestID, "decision": decision})
+	request, err := http.NewRequest(http.MethodPost, f.server.URL+"/oauth/decision", strings.NewReader(string(value)))
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	if origin != "" {
+		request.Header.Set("Origin", origin)
+	}
+	if credential != "" {
+		request.Header.Set("Authorization", "Bearer "+credential)
+	}
+	result, err := f.client.Do(request)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return result
+}
+func (f *oauthFixture) getDetails(requestID, credential string) *http.Response {
+	f.t.Helper()
+	request, _ := http.NewRequest(http.MethodGet, f.server.URL+"/oauth/request?request_id="+url.QueryEscape(requestID), nil)
+	if credential != "" {
+		request.Header.Set("Authorization", "Bearer "+credential)
+	}
+	response, err := f.client.Do(request)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return response
+}
+func (f *oauthFixture) approve(requestID, credential, origin string) *http.Response {
+	return f.postDecision(requestID, credential, origin, "approve")
 }
 func (f *oauthFixture) code() *http.Response {
 	f.t.Helper()
-	ticket, response := f.begin(nil)
-	if response.StatusCode != 200 || ticket == "" {
-		f.t.Fatalf("begin: %d / %q", response.StatusCode, ticket)
+	requestID, response := f.begin(nil)
+	if response.StatusCode != 303 || requestID == "" {
+		f.t.Fatalf("begin: %d / %q", response.StatusCode, requestID)
 	}
 	response.Body.Close()
-	return f.approve(ticket, oauthTestAdmin, f.server.URL)
+	result := f.approve(requestID, oauthTestAdmin, f.server.URL)
+	if result.StatusCode != 200 {
+		f.t.Fatalf("approve: %d", result.StatusCode)
+	}
+	redirect := parseOAuthJSON(f.t, result)["redirect_url"].(string)
+	return &http.Response{StatusCode: 302, Header: http.Header{"Location": []string{redirect}},
+		Body: io.NopCloser(strings.NewReader(""))}
 }
 func (f *oauthFixture) exchange(code, verifier, clientID, resource string) *http.Response {
 	f.t.Helper()
@@ -289,7 +318,7 @@ func TestGoOAuthRejectsUntrustedAndWrongGrants(t *testing.T) {
 		res.Body.Close()
 	}
 	ticket, res := f.begin(nil)
-	if res.StatusCode != 200 {
+	if res.StatusCode != 303 {
 		t.Fatalf("valid authorization rejected")
 	}
 	res.Body.Close()
@@ -298,20 +327,24 @@ func TestGoOAuthRejectsUntrustedAndWrongGrants(t *testing.T) {
 		t.Fatalf("forged Origin accepted: %d", denied.StatusCode)
 	}
 	denied.Body.Close()
-	for attempts := 0; attempts < 5; attempts++ {
-		badToken := f.approve(ticket, "wrong", f.server.URL)
-		expected := 401
-		if attempts == 4 {
-			expected = 429
-		}
-		if badToken.StatusCode != expected {
-			t.Fatalf("bad credential attempt %d: %d", attempts, badToken.StatusCode)
-		}
-		badToken.Body.Close()
+	deniedNoAuth := f.approve(ticket, "", f.server.URL)
+	if deniedNoAuth.StatusCode != 401 {
+		t.Fatalf("unauthenticated approval accepted: %d", deniedNoAuth.StatusCode)
 	}
+	deniedNoAuth.Body.Close()
+	deniedWrongAuth := f.approve(ticket, "wrong", f.server.URL)
+	if deniedWrongAuth.StatusCode != 401 {
+		t.Fatalf("wrong credential accepted: %d", deniedWrongAuth.StatusCode)
+	}
+	deniedWrongAuth.Body.Close()
+	approved := f.approve(ticket, oauthTestAdmin, f.server.URL)
+	if approved.StatusCode != 200 {
+		t.Fatalf("valid Instance login rejected: %d", approved.StatusCode)
+	}
+	approved.Body.Close()
 	consumed := f.approve(ticket, oauthTestAdmin, f.server.URL)
-	if consumed.StatusCode != 400 {
-		t.Fatalf("exhausted ticket succeeded: %d", consumed.StatusCode)
+	if consumed.StatusCode != 410 {
+		t.Fatalf("replay succeeded: %d", consumed.StatusCode)
 	}
 	consumed.Body.Close()
 	codeRedirect := f.code()
@@ -348,7 +381,7 @@ func TestGoOAuthExpiryAndRestart(t *testing.T) {
 	page.Body.Close()
 	f.broker.now = func() time.Time { return base.Add(ticketLifetime + time.Millisecond) }
 	expired := f.approve(ticket, oauthTestAdmin, f.server.URL)
-	if expired.StatusCode != 400 {
+	if expired.StatusCode != 410 {
 		t.Fatalf("expired ticket accepted: %d", expired.StatusCode)
 	}
 	expired.Body.Close()

@@ -1,10 +1,7 @@
 package command
 
 import (
-	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 )
 
@@ -20,11 +17,11 @@ func TestDaemonOptionDefaultsAndCompleteOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	if root != testDaemonRoot || settings.Host != "127.0.0.1" || settings.Port != 0 ||
-		settings.MCP.Enabled || settings.MCP.Path != "/mcp" {
+		settings.MCP.Path != "/mcp" {
 		t.Fatalf("defaults %#v", settings)
 	}
 	env := map[string]string{
-		"KGOSD_HOST": "127.0.0.2", "KGOSD_PORT": "4488", "KGOS_MCP_TOKEN": "separate-mcp-secret",
+		"KGOSD_HOST": "127.0.0.2", "KGOSD_PORT": "4488",
 		"KGOS_MCP_OAUTH_ISSUER":     "https://example.com",
 		"KGOS_MCP_SCRIPT_MAX_CALLS": "503",
 	}
@@ -42,7 +39,7 @@ func TestDaemonOptionDefaultsAndCompleteOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := settings.MCP
-	if settings.Host != "0.0.0.0" || settings.Port != 4777 || !m.Enabled || m.Token != env["KGOS_MCP_TOKEN"] ||
+	if settings.Host != "0.0.0.0" || settings.Port != 4777 ||
 		m.Path != "/kgos-mcp" || m.OAuthIssuer != "https://example.com" ||
 		m.RequestTimeoutMS != 4300 || m.MaxConcurrency != 8 || m.MaxRequestBytes != 65536 ||
 		m.ScriptTimeoutMS != 2000 || m.ScriptMemoryMB != 96 || m.ScriptMaxCodeBytes != 8192 ||
@@ -53,7 +50,7 @@ func TestDaemonOptionDefaultsAndCompleteOverride(t *testing.T) {
 }
 
 func TestDaemonOptionIntegerBoundsAndEnvironmentValidation(t *testing.T) {
-	env := map[string]string{"KGOS_MCP_TOKEN": "token-for-isolated-unit-test"}
+	env := map[string]string{}
 	for name, field := range daemonFields {
 		if name == "root" || field.max <= field.min {
 			continue
@@ -73,7 +70,7 @@ func TestDaemonOptionIntegerBoundsAndEnvironmentValidation(t *testing.T) {
 				}
 			}
 			if field.env != "" {
-				badEnv := map[string]string{"KGOS_MCP_TOKEN": env["KGOS_MCP_TOKEN"], field.env: "NaN"}
+				badEnv := map[string]string{field.env: "NaN"}
 				if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(badEnv)); err == nil {
 					t.Fatalf("accepted invalid env %s", field.env)
 				}
@@ -83,7 +80,7 @@ func TestDaemonOptionIntegerBoundsAndEnvironmentValidation(t *testing.T) {
 }
 
 func TestDaemonOptionRejectsMalformedAndConflictingInput(t *testing.T) {
-	env := map[string]string{"KGOS_MCP_TOKEN": "private-token"}
+	env := map[string]string{}
 	cases := [][]string{
 		nil, {"relative-root"}, {"--bogus", "value", "--root", testDaemonRoot},
 		{"--root"}, {"--root", ""}, {"--root", testDaemonRoot, "stray"},
@@ -115,64 +112,12 @@ func TestDaemonOptionRejectsMalformedAndConflictingInput(t *testing.T) {
 			t.Errorf("invalid case %d accepted: %#v", index, args)
 		}
 	}
-	both := map[string]string{"KGOS_MCP_TOKEN_ENV": "A_TOKEN", "KGOS_MCP_TOKEN_FILE": "other"}
-	if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(both)); err == nil {
-		t.Fatal("accepted conflicting token environment/file")
-	}
-	if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot, "--mcp-token-env", "MISSING"}, optionLookup(env)); err == nil {
-		t.Fatal("accepted unavailable explicit token source")
-	}
-	for _, secret := range []string{"", strings.Repeat("x", 4097), "illegal\nline", "illegal\x00byte"} {
-		if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(map[string]string{"KGOS_MCP_TOKEN": secret})); err == nil {
-			t.Fatalf("accepted invalid administrator token")
+	for _, key := range []string{"KGOS_MCP_TOKEN", "KGOS_MCP_TOKEN_ENV", "KGOS_MCP_TOKEN_FILE"} {
+		if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(map[string]string{key: "not-allowed"})); err == nil {
+			t.Errorf("legacy MCP credential setting %s was not rejected", key)
 		}
 	}
-	if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(map[string]string{"KGOS_MCP_OAUTH_ISSUER": "https://example.com"})); err == nil {
-		t.Fatal("accepted OAuth issuer without administrator token")
-	}
-}
-
-func TestDaemonTokenFilePriorityAndSecretSafety(t *testing.T) {
-	root := t.TempDir()
-	secretFile := filepath.Join(root, "secret")
-	if err := os.WriteFile(secretFile, []byte("file-token\r\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	env := map[string]string{
-		"KGOS_MCP_TOKEN_ENV":  "OTHER_TOKEN",
-		"KGOS_MCP_TOKEN_FILE": "/missing",
-		"OTHER_TOKEN":         "environment-token",
-	}
-	// An explicitly selected CLI source takes precedence over both selectors
-	// in the environment, not just over their values.
-	m, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot, "--mcp-token-file", secretFile}, optionLookup(env))
-	if err != nil || m.MCP.Token != "file-token" {
-		t.Fatalf("CLI-selected credential was not used: %v", err)
-	}
-	env = map[string]string{"KGOS_MCP_TOKEN_FILE": secretFile}
-	m, _, err = parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(env))
-	if err != nil || m.MCP.Token != "file-token" {
-		t.Fatalf("environment secret-file resolution failed: %v", err)
-	}
-	if err := os.WriteFile(secretFile, []byte("x\ny"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(env)); err == nil {
-		t.Fatal("multiline credential accepted")
-	}
-	if err := os.WriteFile(secretFile, []byte(strings.Repeat("x", 4097)), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(env)); err == nil {
-		t.Fatal("oversized secret accepted")
-	}
-	if _, err := readMCPTokenFile(root); err == nil {
-		t.Fatal("directory secret accepted")
-	}
-	if _, err := readMCPTokenFile(filepath.Join(root, "absent")); err == nil {
-		t.Fatal("missing secret accepted")
-	}
-	if !validMCPTokenEnvName("_MCP_12") || validMCPTokenEnvName("12_MCP") || validMCPTokenEnvName("") || validMCPTokenEnvName(strings.Repeat("X", 129)) {
-		t.Fatal("secret variable name validation failed")
+	if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(map[string]string{"KGOS_MCP_OAUTH_ISSUER": "https://example.com"})); err != nil {
+		t.Fatalf("OAuth issuer unnecessarily requires second token: %v", err)
 	}
 }

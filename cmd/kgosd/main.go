@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/subtle"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -52,39 +49,30 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	var extra []daemon.ExtraRoute
 	mcpSettings := evaluation.Settings.MCP
-	if mcpSettings.Enabled {
-		instanceHash, mcpHash := sha256.Sum256([]byte(runtime.Credential.Token)), sha256.Sum256([]byte(mcpSettings.Token))
-		if subtle.ConstantTimeCompare(instanceHash[:], mcpHash[:]) == 1 {
-			_, _ = io.WriteString(stderr, "kgosd: MCP token must differ from Instance token\n")
-			return 1
-		}
-		mcpService, err := mcpserver.New(runtime.Kernel, mcpserver.Options{
-			Token: mcpSettings.Token, Path: mcpSettings.Path, OAuthIssuer: mcpSettings.OAuthIssuer,
-			MaxConcurrency:  mcpSettings.MaxConcurrency,
-			RequestTimeout:  time.Duration(mcpSettings.RequestTimeoutMS) * time.Millisecond,
-			MaxRequestBytes: int64(mcpSettings.MaxRequestBytes),
-			Sandbox: mcpsandbox.Limits{
-				Timeout:        time.Duration(mcpSettings.ScriptTimeoutMS) * time.Millisecond,
-				MemoryMiB:      uint32(mcpSettings.ScriptMemoryMB),
-				MaxCodeBytes:   mcpSettings.ScriptMaxCodeBytes,
-				MaxCalls:       mcpSettings.ScriptMaxCalls,
-				MaxStreams:     mcpSettings.ScriptMaxStreams,
-				MaxOutputBytes: mcpSettings.ScriptMaxOutputBytes,
-			},
-			PreviewMaxItems:     mcpSettings.PreviewMaxItems,
-			PreviewCacheEntries: mcpSettings.PreviewCacheEntries,
-			PreviewCacheTTL:     time.Duration(mcpSettings.PreviewCacheTTLMS) * time.Millisecond,
-		})
-		if err != nil {
-			_, _ = fmt.Fprintf(stderr, "kgosd: MCP configuration: %v\n", err)
-			return 1
-		}
-		extra = append(extra, daemon.ExtraRoute{Path: mcpSettings.Path, Handler: mcpService.Handler()})
-		for path, route := range mcpService.OAuthRoutes() {
-			extra = append(extra, daemon.ExtraRoute{Path: path, Handler: route})
-		}
-	} else {
-		extra = append(extra, daemon.ExtraRoute{Path: mcpSettings.Path, Handler: http.NotFoundHandler()})
+	mcpService, err := mcpserver.New(runtime.Kernel, mcpserver.Options{
+		Token: runtime.Credential.Token, Path: mcpSettings.Path, OAuthIssuer: mcpSettings.OAuthIssuer,
+		MaxConcurrency:  mcpSettings.MaxConcurrency,
+		RequestTimeout:  time.Duration(mcpSettings.RequestTimeoutMS) * time.Millisecond,
+		MaxRequestBytes: int64(mcpSettings.MaxRequestBytes),
+		Sandbox: mcpsandbox.Limits{
+			Timeout:        time.Duration(mcpSettings.ScriptTimeoutMS) * time.Millisecond,
+			MemoryMiB:      uint32(mcpSettings.ScriptMemoryMB),
+			MaxCodeBytes:   mcpSettings.ScriptMaxCodeBytes,
+			MaxCalls:       mcpSettings.ScriptMaxCalls,
+			MaxStreams:     mcpSettings.ScriptMaxStreams,
+			MaxOutputBytes: mcpSettings.ScriptMaxOutputBytes,
+		},
+		PreviewMaxItems:     mcpSettings.PreviewMaxItems,
+		PreviewCacheEntries: mcpSettings.PreviewCacheEntries,
+		PreviewCacheTTL:     time.Duration(mcpSettings.PreviewCacheTTLMS) * time.Millisecond,
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "kgosd: MCP configuration: %v\n", err)
+		return 1
+	}
+	extra = append(extra, daemon.ExtraRoute{Path: mcpSettings.Path, Handler: mcpService.Handler()})
+	for path, route := range mcpService.OAuthRoutes() {
+		extra = append(extra, daemon.ExtraRoute{Path: path, Handler: route})
 	}
 	if err := daemon.ServeWithOptions(ctx, runtime, daemon.NewHandler(runtime, handler, extra...), stdout, daemon.ListenOptions{
 		Host: evaluation.Settings.Host, Port: evaluation.Settings.Port,

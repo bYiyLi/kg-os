@@ -26,7 +26,6 @@ services:
       KGOS_ROOT: /workspace
       KGOS_MCP_HOST: 0.0.0.0
       KGOS_MCP_PORT: "3777"
-      KGOS_MCP_TOKEN_FILE: /run/secrets/kgos-mcp-token
       KGOS_MCP_OAUTH_ISSUER: ${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}
       # Old Node MCP env is temporarily retained for safe image-only rollback.
       NODE_USE_ENV_PROXY: "1"
@@ -39,10 +38,6 @@ services:
       - type: bind
         source: /data/apps/KgosDev/data/workspace
         target: /workspace
-      - type: bind
-        source: /data/apps/KgosDev/data/secrets/mcp-token
-        target: /run/secrets/kgos-mcp-token
-        read_only: true
     healthcheck:
       test:
         - CMD

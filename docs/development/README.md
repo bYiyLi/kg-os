@@ -84,9 +84,11 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 13 Init Wizard UX & Embedding Credential Boundary 当前为 `done`，并已随后作为 v0.2.1 正式发布。** D84 已实现：credential env-value 从 init / 普通 CLI / `kgosd` startup 前置条件移到实际 Semantic Provider operation，doctor 改为 current-CLI-process non-blocking 诊断，TTY wizard 改为清晰 defaults、custom-extension 语义与字段级 retry。主工作树完整 `pnpm validate`、独立 fresh-source `setup && validate`、packed no-key smoke 与 macOS arm64 中英文 repo-out TTY first-run 均通过；实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 与 CI Run `36505717058` 已闭环。后续独立 release revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，Recovery Release Run `36514243605` 完成八包 `0.2.1` / `latest`、六平台 public-registry smoke 与 GitHub Release。详见[Phase 13](phases/13-init-wizard-credential-boundary.md)。
 
-**Phase 14 Web 当前为 `deferred`。** 保留原阶段范围与计划；2026-10-13 已提前实现纯静态页面外壳，正式业务 Feature 与动态验收仍未开展。不作为 MCP 的前置依赖，详见[Phase 14](phases/14-web.md)。
+**Phase 14 Web 当前为 `deferred`。** 保留原阶段范围与计划；2026-10-13 已提前完善 App Shell 的独立布局组件、Design Tokens、响应式和纯前端开发 / 检查入口。2026-10-14 P14-00 Web 国际化（English / 简体中文、语言偏好、现有 Shell/认证及 MCP 授权弹窗双语化）**已在当前工作树实现并通过定向单元/浏览器测试**；真实内嵌交付与完整 A14/阶段验收未完成，原 P14-01–11 业务 Feature 保留。不作为 MCP 的前置依赖，详见[Phase 14](phases/14-web.md)与[Web 国际化设计](../design/web.md#国际化与语言偏好)。
 
 **Phase 15 MCP & Private Plugin 已为 `done`。** 按 D91/D92 已实现独立 TypeScript MCP、四个 Tool、QuickJS/Worker 受控 SDK、Linux amd64 Docker-only、官方 Skill 源文件与 MCP-only 私人 Plugin 模板；Linux Dev 31/31 SDK 方法、持久化重启、真实 ChatGPT OAuth/四 Tool 已验收，提交 [`ea37ddf`](https://github.com/bYiyLi/kg-os/commit/ea37ddfca8c69bc701de0bb41d10d465f92c6b64) 的 [CI Run #65](https://github.com/bYiyLi/kg-os/actions/runs/38261156640) 为 **Ubuntu Validate + 六平台 Runtime 7/7 success**。Phase 15 的旧 MCP 验收保留为历史；新 `kgosd` 单进程 Go MCP 与私人 Skill 的真实客户端验收已作为 [Phase 16](phases/16-kgosd-unified-mcp.md) `done` 独立关闭。按 [D94](../design/decisions.md#d94-openclaw-docker-development-and-ci)，Mac 不跑 Docker，OpenClaw 开发测试，GitHub Actions CI 必须构建并测试 Docker。旧 Phase 关闭不受影响；GHCR 正式发布和生产部署另行授权。
+
+**Phase 17 MCP Unified Auth & Web Authorization 按用户明确批准的验收例外关闭为 `done`（2026-10-14）。** [D95](../design/decisions.md#d95-unified-mcp-web-authorization) 规定 MCP 复用 Instance Token 作为唯一根身份、移除独立 MCP 管理员 Token，并使用现有 Web 登录状态和连接授权弹窗完成 ChatGPT OAuth；Go 仍负责 OAuth 协议与 Token 管理。**本 Phase 只负责 MCP 认证和与 Web 的最小对接，不开发 Web 登录/Session、页面架构或其它业务模块**；当前工作树已完成 Go Web Session 集成测试、MCP 浏览器 E2E 4/4、Web 53/53，以及隔离 Linux Docker 31/31 SDK Smoke。正式 Dockerfile 的 Linux amd64 Dev 构建与部署已通过（2026-10-14，最新主题镜像 `sha256:6c67e96e381f97fa1764fc5e994cd488498d018ae3b361d2d46da6f1e4c6f6c3`，只读自动验收及 HTTPS 主题资源检查通过）；用户报告新 ChatGPT OAuth 重新授权测试成功。**未执行推送后的 GitHub CI 及完整新版隔离 Docker 矩阵**：用户明确批准不等待这些门禁直接关闭本 Phase，未完成项作为例外保留，绝不记为 CI 通过。详见 [Phase 17](phases/17-mcp-web-authorization.md)。
 
 ## 5. 路线总览
 
@@ -106,9 +108,10 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [11 Windows Runtime CI 验收与六平台发布](phases/11-windows-runtime-acceptance.md) | `done` | 六平台 CI、`0.1.1` 八包、六平台 registry smoke、GitHub Release、Windows Trusted Publisher 与 credential cleanup 均完成 | [Client](../design/client.md#npm-package-topology)、[Runtime](../design/runtime.md#native-runtime-package) |
 | [12 First-Run & CLI Productization](phases/12-first-run-cli-productization.md) | `done` | Workspace Root / `.kgos`、`KGOS_ROOT`、complete init/readiness/recovery、extension setup、responsibility-scoped high-density help、fresh-user acceptance；本地/fresh-source/六平台 CI 验收与 v0.2.0 八包/六平台正式发布完成 | [D81](../design/decisions.md#d81-workspace-root)、[D82](../design/decisions.md#d82-init-readiness)、[D83](../design/decisions.md#d83-cli-progressive-disclosure) |
 | [13 Init Wizard UX & Embedding Credential Boundary](phases/13-init-wizard-credential-boundary.md) | `done` | clear defaults/custom-extension prompts、TTY field retry、operation-time Embedding credential、doctor non-blocking diagnostic；main/fresh-source/packed/TTY + six-platform CI acceptance complete，后续 v0.2.1 八包/六平台正式发布完成 | [D84](../design/decisions.md#d84-late-bound-embedding-credential)、[CLI](../design/cli.md#init)、[Runtime Embedding](../design/runtime.md#embedding-配置与索引映射) |
-| [14 Web](phases/14-web.md) | `deferred` | 单一 Web Phase：连接与 `.kgos/web` 持久基础、独立查询帧、Knowledge / Ontology 编辑、版本演化及真实 Runtime / 打包 / 六平台验收；静态页面外壳已先行实现，业务与阶段验收仍未开始 | [Web owner](../design/web.md)、[统一材料入口](../design/web-materials.md)、现有 SDK / 业务 API 与 Phase 00–13 基线 |
+| [14 Web](phases/14-web.md) | `deferred` | 单一 Web Phase：P14-00 本地双语资源、语言切换与现有 Shell/认证/MCP 授权界面国际化已实现并有定向测试证据；其余为连接与 `.kgos/web` 持久基础、独立查询帧、Knowledge / Ontology 编辑、版本演化及真实 Runtime / 打包 / 六平台验收。完整阶段验收尚未完成 | [Web 国际化](../design/web.md#国际化与语言偏好)、[Web owner](../design/web.md)、[统一材料入口](../design/web-materials.md)、现有 SDK / 业务 API 与 Phase 00–13 基线 |
 | [15 MCP & Private Plugin](phases/15-mcp.md) | `done` | 旧独立 TypeScript MCP、四 Tool、QuickJS/Worker、Linux amd64 Docker-only、官方 Skill 文件与 MCP-only 私人 Plugin；Linux Dev、真实 ChatGPT、最终 Ubuntu Validate + 六平台 CI 7/7 全部通过，未发布 GHCR | [完成证据](phases/15-mcp.md#阶段完成记录2026-10-12)、[D91](../design/decisions.md#d91-mcp-docker-only-delivery)、[D92](../design/decisions.md#d92-mcp-dev-acceptance-and-release-ci) |
 | [16 `kgosd` Unified MCP](phases/16-kgosd-unified-mcp.md) | `done` | 单进程 Go `kgosd` Web/API/MCP、QuickJS-NG/wazero、OAuth、私人 Plugin/Skill 已实现并部署 Dev；隔离 Docker 31/31 SDK、ChatGPT OAuth 重连及测试 Branch 写入回读、Codex 新会话主动加载 Skill、旧 Node MCP 源码清理已验收；实现提交 `813bff4` 的 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) 全绿，正式 GHCR/生产部署未执行 | [完成证据](phases/16-kgosd-unified-mcp.md#当前实现与验收证据)、[MCP owner](../design/mcp.md)、[D93](../design/decisions.md#d93-kgosd-unified-mcp)、[D94](../design/decisions.md#d94-openclaw-docker-development-and-ci) |
+| [17 MCP Unified Auth & Web Authorization](phases/17-mcp-web-authorization.md) | `done`（用户批准例外） | MCP 复用 Instance 认证，Web 弹窗与 OAuth 已部署 Dev 并经用户真实 ChatGPT 重新授权；本地质量和正式 Dev Docker 构建通过；GitHub CI / 全新版隔离矩阵未运行，用户明确批准不阻塞本 Phase 关闭 | [D95](../design/decisions.md#d95-unified-mcp-web-authorization)、[MCP 认证目标](../design/mcp.md#统一-instance-认证与-web-内的-mcp-连接授权phase-17-目标)、Web owner 的已登录上下文与安全提交接口 |
 
 当前实现依赖顺序：
 
@@ -141,13 +144,15 @@ Go Engineering Foundation
        (clear prompts / TTY retry / operation-time embedding credential / doctor non-blocking diagnostic)
   -> 后续独立安排的范围：
        Phase 14: Web [deferred]
-         (connection / .kgos/web / independent frames / aggregate editing / versions / real acceptance)
+         (i18n foundation / connection / .kgos/web / independent frames / aggregate editing / versions / real acceptance)
        Phase 15: MCP & Private Plugin [done; old TypeScript MCP / Plugin]
        Phase 16: kgosd Unified MCP [done; D93/D94]
          (Go/WASM feasibility → unified listener → Go MCP/OAuth → four Tools → Docker → Plugin → parity & cleanup)
+       Phase 17: MCP Unified Auth & Web Authorization [done; user-approved CI exception; D95]
+         (Instance credential reuse → OAuth Web handoff → authenticated consent API → real ChatGPT acceptance)
 ```
 
-Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 保持 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 以 `ea37ddf` / CI 7/7 成功关闭为 `done`；[Phase 16 Go 原生 MCP](phases/16-kgosd-unified-mcp.md) 为 `done`，真实 ChatGPT OAuth/隔离写入及 Codex Skill 验收完成，最终实现提交 `813bff4` 的 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) 全部成功。Docker 正式 Release/部署另行授权。
+Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 保持 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 以 `ea37ddf` / CI 7/7 成功关闭为 `done`；[Phase 16 Go 原生 MCP](phases/16-kgosd-unified-mcp.md) 为 `done`，真实 ChatGPT OAuth/隔离写入及 Codex Skill 验收完成，最终实现提交 `813bff4` 的 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) 全部成功；[Phase 17 MCP 统一认证](phases/17-mcp-web-authorization.md) 按用户批准例外关闭为 `done`，2026-10-14 的真实 ChatGPT 重新授权来自用户验收，不以 Phase 16 替代；本阶段未执行 GitHub CI / 全新版隔离矩阵，不得声称已通过。Docker 正式 Release/部署另行授权。
 
 ## 6. Phase 通用完成标准
 
@@ -182,5 +187,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 14：Web](phases/14-web.md)
 - [Phase 15：MCP & Private Plugin](phases/15-mcp.md)
 - [Phase 16：`kgosd` Unified MCP](phases/16-kgosd-unified-mcp.md)
+- [Phase 17：MCP Unified Auth & Web Authorization](phases/17-mcp-web-authorization.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

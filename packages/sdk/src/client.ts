@@ -49,7 +49,8 @@ import type {
   TagCreateRequest,
   TagDeleteRequest,
   TagMoveRequest,
-  TagMutationResult
+  TagMutationResult,
+  WebDataInfoResult
 } from "./types.js";
 
 export interface KGOSClientOptions {
@@ -240,6 +241,13 @@ async function* graphEvents(
 }
 
 export class KGOSClient {
+  readonly web = {
+    data: {
+      info: (options?: RequestOptions) =>
+        this.post<WebDataInfoResult>("/api/v1/web/data/info", {}, options)
+    }
+  };
+
   readonly ontology = {
     read: (request: OntologyReadRequest, options?: RequestOptions) =>
       this.post<OntologyReadResult>("/api/v1/ontology/read", request, options),
@@ -341,7 +349,13 @@ export class KGOSClient {
     }
     this.endpoint = endpoint.toString().replace(/\/$/, "");
     this.token = options.token;
-    this.fetchImplementation = options.fetch ?? globalThis.fetch;
+    // Native browser fetch requires its Window/Worker receiver. When kept as
+    // an instance method, an unbound reference can throw before any request.
+    this.fetchImplementation =
+      options.fetch ??
+      (typeof globalThis.fetch === "function"
+        ? globalThis.fetch.bind(globalThis)
+        : globalThis.fetch);
     if (typeof this.fetchImplementation !== "function") {
       throw new TypeError("KG OS client requires a Web-compatible fetch implementation");
     }

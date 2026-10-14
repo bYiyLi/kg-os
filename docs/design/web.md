@@ -2,17 +2,30 @@
 
 <!-- cspell:ignore libfile WCAG -->
 
-本文拥有 KG OS **面向人的 Web 信息架构、图形阅读、查询结果帧、版本导航、前端编辑与连接交互**。产品定义见 [README](../../README.md)，职责索引见 [设计入口](../design.md)。数据与写入规则继续由 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 拥有；交付与认证边界由 [Runtime](runtime.md#web-hosting) 拥有。
+本文拥有 KG OS **面向人的 Web 信息架构、图形阅读、查询结果帧、版本导航、前端编辑、国际化与连接交互**。产品定义见 [README](../../README.md)，职责索引见 [设计入口](../design.md)。数据与写入规则继续由 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 拥有；交付与认证边界由 [Runtime](runtime.md#web-hosting) 拥有。
 
 ## 依据与状态
 
-2026-10-04 核对基线：`main@181628b45c1600476514dfc129a5053c6d394b9e`，版本 `0.2.1`。当前 [Web app shell](../../packages/web/src/app/app.tsx) 仅提供 React / TypeScript / Vite 壳层；本文不是页面已交付或交互验收报告。后端依据是当前 [SDK](../../packages/sdk/src/client.ts)、[类型](../../packages/sdk/src/types.ts) 和 [HTTP adapter](../../internal/daemon/api.go)，而非截图按钮。
+2026-10-14 收起状态的卡片边界修正：侧栏完全隐藏时，**画布上下左右统一保留 12px 外边距**；控制柄轮廓以同一左边框为基准水平镜像，**向画布内部（右侧）凹入 14px**，填充页背景遮住凹入区域的原画布与竖线，箭头朝右。展开时仍向左凸出 14px、箭头朝左。两种状态保留 112px 曲线高度、连续边框、44px 透明点击区域和原来的拖动/键盘行为；此决定替换此前“收起后仍向左凸出、左边距 48px”的过时布局。
+
+2026-10-14 侧栏弧形边框视觉微调：保留边框向左凸出的连续轮廓，但把原约 24px 的凸出收敛至约 **14px**，同时延长上下过渡曲线（轮廓高度约 112px），在顶点保持连续切线，形成更柔和的浅弧。箭头随轮廓向边框靠拢；不使用独立按钮、额外边线或高亮底色。透明点击区保持至少 44px 宽，展开 / 收起、拖动、键盘、双主题和移动端规则不变。
+
+2026-10-14 **App Shell 侧栏边界交互基线**：桌面版取消侧栏底部的 Collapse 按钮与 72px 半收起状态。右侧画布卡片的**左边框在垂直正中连续形成箭头控制柄**，再平滑接回原边框；不是叠在边框上或画布内部的独立圆角按钮，不额外画一条竖线。展开时向卡片外（左侧）凸出、与画布同色；完全收起时向卡片内（右侧）凹入、用页背景遮盖凹入区域。边框保持同一低对比颜色，默认不发光；Hover / Focus 才局部增强边框与箭头。展开时箭头朝左表示收起，收起后箭头朝右表示展开。用局部遮盖原直线边框及单条连续轮廓实现视觉融合，不裁剪工作区。点击可完全隐藏侧栏（列宽为 0）或恢复；展开时保留水平拖动调宽（240–420px）、键盘左右方向键调整与先前宽度。交互与绘制层由画布外侧 Shell 管理，不受画布 `overflow: hidden` 裁剪；收起时卡片四边统一 12px。深浅主题、版本示例、右侧独立带边框空白画布均不变。窄屏仍使用原版本抽屉，不出现桌面拖拽控制柄。画布不引入欢迎文案、创建按钮或业务数据。
+
+2026-10-14 主题控件保留**横向填满侧栏内容宽度、居中对齐的双选项**，太阳与月亮各占一半，选中态与真实主题保持一致；重复点击当前选项不改变主题。窄屏抽屉使用同一双选项主题控件。此前侧栏底部 Collapse 按钮和半收起小主题按钮已由上述最新的画布边框控制柄方案替换。
+
+2026-10-14 **App Shell 深色视觉基线**：以用户选定的深海军蓝 / 低饱和紫蓝光感 Web 截图为基准，深色默认、浅色可切换。左侧 KG OS 品牌、版本树示意和 Branches 直接融入背景，**没有左侧大卡片，也不为当前 main 添加选中卡片**；原始底栏仅有明暗主题切换，现已在同一区域增加国际化语言入口。右侧**不设置独立头部**，但保留独立、有边框和圆角的空白点阵画布占位容器，其内部工具未接入时禁用。窄屏通过画布内版本入口打开抽屉，主题切换仍位于版本抽屉底部。不设 macOS 窗口按钮、Workspace 选择器、全局搜索、Branch / Clean 伪状态、用户头像、欢迎页或品牌口号。版本号、Commit hash 与 Branch 名称是**标记为示意的静态预览**，不代表真实数据。业务数据、查询编辑器、结果帧和 Graph 均等待 Phase 14；此前 Q1 / V1 材料继续作为未来业务交互结构依据，不决定当前外壳的默认视觉。
+
+2026-10-04 核对基线：`main@181628b45c1600476514dfc129a5053c6d394b9e`，版本 `0.2.1`。2026-10-13 已在 [Web app shell](../../packages/web/src/app/app.tsx) 落地静态工作台布局；2026-10-14 已增加强制认证弹窗、已认证 `web.data.info` 启动信息、boot guard 和连接失效 / 显式重连，认证后才可操作外壳。查询、图谱、编辑、持久草稿及版本业务仍未接入；目前只有连接安全基础与静态工作区，不代表 Phase 14 已完成。后端依据是当前 [SDK](../../packages/sdk/src/client.ts)、[类型](../../packages/sdk/src/types.ts) 和 [HTTP adapter](../../internal/daemon/api.go)，而非截图按钮。
 
 | 状态 | 本文处理 |
 | --- | --- |
-| 用户已认可 | 图谱优先；白 / 浅灰 / 蓝视觉；左侧紧凑版本列表与覆盖式纵向 DAG；顶部新查询编辑器；最新优先的独立结果帧；帧内图 / JSON 切换、概览与对象检查器；显式进入简单编辑；旧帧重跑原 State；Branch 前进提示刷新、不自动切换；Web 数据与草稿保存在 Workspace 的 `.kgos` 下并可恢复 |
+| 用户已认可 | 图谱优先；默认深色、克制紫蓝光感，浅色可切换；左侧紧凑版本列表与未来覆盖式纵向 DAG；后续业务阶段实现查询编辑器、独立结果帧、帧内 Graph / JSON、检查器及编辑；旧帧重跑原 State；Branch 前进提示刷新、不自动切换；Web 数据与草稿保存在 Workspace 的 `.kgos` 下并可恢复 |
 | 沿用现有产品合同 | 全世界 immutable State、同 State 读取、Definition 聚合、strict base Object Patch、Graph 原样执行与 Evolution 专用操作 |
-| 本次工程方案，尚未实现 | 帧状态、图投影、分页接入、表单到 Patch、局部校验、手动 token 输入与内存保存、错误反馈、键盘与窄屏规则；`.kgos/web/ui.db`、可丢弃结果缓存、受控 Web 数据 API 与按记录并发校验 |
+| 已落地静态外壳 | `packages/web/src/app/layout/` 实现左侧品牌 / 静态版本树预览、可折叠侧栏、右侧空白画布、主题切换及窄屏版本抽屉；`app/styles/` 管理深浅主题变量、基础样式和布局；画布工具尚未实现并禁用，不暗示有真实连接或知识数据 |
+| 已落地认证与刷新恢复 | `features/connection/` 的强制弹窗、Token 显隐、错误反馈；首次根 Token 登录创建服务端持久 Web Session，刷新从 HttpOnly Cookie 自动恢复并取得临时 Web Bearer；根 Token 不持久化在浏览器；`core/client/` 仍通过 SDK Bearer + Boot Guard 访问 API，主动退出由服务端撤销 Session；未认证时背景模糊且不可操作 |
+| 已实现的 Web 国际化基础 | `app/i18n/` 内置 English / 简体中文、浏览器语言解析与语言偏好；当前 Shell、强制认证与 MCP 授权弹窗均可切换，错误与相对时间随语言更新，定向浏览器/单测已通过；正式打包和阶段门禁仍按 [Phase 14 P14-00](../development/phases/14-web.md#a14-00-国际化基础与双语界面) 核对 |
+| 本次工程方案，尚未实现 | 查询帧状态、图投影、分页接入、表单到 Patch、完整业务上下文与持久草稿恢复、业务键盘与窄屏规则；`.kgos/web/ui.db`、可丢弃结果缓存、`info` 以外的 Web 数据 API 与按记录并发校验 |
 | 本轮决定更新 | 用户接受前两项默认，并追加“数据可以放到 kgos 下面，Web 临时数据也放里面”；按现有 Workspace→`.kgos` 合同理解，草稿不再默认随刷新丢失。随后明确“再简化点，不要过度设计”：首版只呈现常用工作流，保存 / 恢复在原编辑位置，缓存自动管理，普通错误就地短提示，真实冲突才打开比较。内部安全与持久化合同保留，均不代表已经实现 |
 
 ### 前端代码架构
@@ -51,6 +64,42 @@ shared   → browser / framework / generic third-party dependencies only
 `shared → app/core/features/sdk`、`core → app/features`、
 `features → app` 的反向依赖；现有 no-circular 规则继续禁止实际循环。
 
+当前 App Shell 工程落点为：
+
+```text
+src/
+├── main.tsx
+├── app/
+│   ├── app.tsx
+│   ├── layout/        # Header / VersionSidebar / SidebarHandle / Workspace / VersionDrawer
+│   └── styles/        # tokens.css / global.css / layout.css
+└── shared/ui/icon.tsx # 无领域语义的 SVG 图标
+```
+
+设计变量集中于 `tokens.css`，`global.css` 只负责页面基础规则，`layout.css` 拥有顶层容器、间距、响应式及窄屏版本抽屉样式。新外壳无独立顶栏；浏览器在 100% 缩放下使用紧凑布局；桌面侧栏默认 240px，可在 240–420px 间拖动调整或通过方向键按 16px 微调，收起时宽度为 0；右侧独立点阵画布保留细边框与圆角，收起后画布四边距均为 12px。画布左边框中置的连续轮廓由 `SidebarHandle` 绘制，展开时向左凸出、收起时向右凹入，并局部覆盖原直线边框；不是分离按钮，且不被画布裁剪。桌面明暗主题位于侧栏底部，窄屏主题位于版本抽屉底部；窄屏画布内保留版本入口及原生 Dialog 的 Esc、关闭按钮和遮罩退出。查询、真实版本记录、连接、本体与业务 Feature 仍按 Phase 14 实现，不用静态预览替代业务验收。
+
+### 国际化与语言偏好
+
+Web 作为浏览器中的人类界面，首版统一支持 **English (`en`)** 与**简体中文 (`zh-CN`)**；未指定时默认 English，与 [CLI 国际化](cli.md#国际化)的语言范围及英文回退方向一致，但 Web **不读取 CLI 的 `LC_*` / `LANG`**，也不共享 CLI 的文案或 locale 解析实现。当前已将原先中英文混用的 Shell、认证及 MCP 授权组件接入统一资源，`index.html` 默认 `lang="en"`，启动后按实际语言更新；后续业务 Feature 仍须遵守本节国际化合同。
+
+**语言确定与存储**：
+
+1. 优先读取当前浏览器 origin 的 `localStorage["kgos.web.locale"]`；只有值恰为 `en` 或 `zh-CN` 才生效，其它值按未设置处理。
+2. 无有效手动偏好时，按 `navigator.languages`（不可用时用 `navigator.language`）的顺序查找第一个受支持的语言：不区分大小写，`zh` 及 `zh-*` 映射 `zh-CN`，`en` 及 `en-*` 映射 `en`；没有匹配时使用 `en`。不因时区、IP 或服务器语言推断用户语言。
+3. 切换语言立即更新 React 文案，并尽力写入上述浏览器偏好；存储不可读、禁用、超额或写入失败时不阻断页面，仍允许本次会话切换，刷新时重新按可用来源解析。非浏览器渲染/测试中这些 API 缺失时安全使用 English，不使模块初始化抛错。语言选择不依赖是否已认证，不在 `.kgos/web/ui.db`、Knowledge、Cookie、URL、Token、SDK 或 OAuth 凭证中保存，也不提供新后端设置 API。
+
+**展示范围与切换入口**：
+
+- 所有 KG OS 自有可见文案统一翻译：App Shell、桌面侧栏与窄屏抽屉、强制认证弹窗及其帮助、未来连接授权弹窗、查询/编辑/版本流程、加载/空态/成功/失败、placeholder、tooltip、`title`、`aria-label` 与辅助说明。未认证时在现有认证弹窗上方提供可键盘访问的语言切换，不增加关闭/绕过认证入口；已认证时在侧栏底部主题选项附近提供切换，侧栏完全收起时可先展开，窄屏复用版本抽屉底部的显示偏好入口。不得为切换语言添加顶栏、独立页面或权限检查。
+- 语言切换仅影响展示，保持输入、认证状态、已连接 Instance、当前 State/Branch、草稿、结果帧、焦点及弹窗开关状态；网络请求与写入不应因为切换被重新触发。Phase 17 的 MCP Web 连接授权弹窗只复用同一个 Web 语言上下文，其 OAuth 协议、同意/拒绝及登录 Session 规则由 [MCP 认证 owner](mcp.md#统一-instance-认证与-web-内的-mcp-连接授权phase-17-目标)负责，不能在国际化任务中另建认证机制。
+- `document.documentElement.lang` 与当前选中语言同步，页面首次 React 交互前完成语言解析，静态 HTML 使用英文作为安全回退；浏览器标题和描述等 KG OS 自有文案按选中语言显示。保持布局弹性，英文长文案/中文换行均需满足 [响应式与键盘规则](#键盘与响应式)。
+
+**实现边界**：在 `packages/web/src/app/i18n/` 用 `i18next` + `react-i18next` 管理应用级初始化和本地 `en.ts` / `zh-CN.ts` 资源；React 组件通过翻译 Hook 读取有语义的稳定 Key，`features/` 和 `shared/` 不反向导入 `app/`。两个语言目录的 Key / 插值参数保持一致，English 为缺失文案的运行时回退；开发与测试应检查完整性，避免把原始 Key 作为正常可见文案。v1 只需一个资源命名空间，不引入 HTTP 翻译后端、语言检测插件、CDN、翻译管理服务、新持久层或通用配置框架。日期、时间、相对时间、数量及复数按当前语言使用浏览器原生 `Intl` / i18next 规则；静态示例的“2 hours ago”等也应由语义值格式化而不是当作不可翻译的固定英文。
+
+**数据与错误边界**：Branch/Tag/Ref、用户定义的 Schema 名称、节点 Property、Cypher、JSON/YAML、SDK 请求和响应、机器错误码、配置 Key 与 OAuth 参数不翻译，不改写其存储和 wire 值。UI 错误依据稳定的错误码、HTTP 状态或客户端传输错误类别映射到翻译 Key；未知错误给当前语言的简短通用提示，原始诊断可按既有设计查看。已出现的错误、按钮加载态和空态在切换语言后应立即改用新语言，不能把旧语言的完整错误字符串永久存入组件状态。翻译包含变量时仍由 React 安全转义，不把用户数据插入翻译 HTML。
+
+当前代码与定向验收证据见 [Phase 14 P14-00 / A14-00](../development/phases/14-web.md#a14-00-国际化基础与双语界面)。国际化基础已在当前 Web 可见组件中实现，不代表后续业务页面已实现、正式内嵌 Runtime/CI 或完整 Phase 14 已验收。
+
 ### 功能式设计材料
 
 视觉材料统一按 Q / E / O / V / R / A 功能组织，入口见 [Web 功能材料与覆盖矩阵](web-materials.md)。该索引管理十四张功能 / 任务示意、五张状态组件规范、来源与规则引用，不对应十四个产品页面；交互语义仍由本文拥有，数据与写入继续依所属 owner。PNG 已齐套，R1 / R2 已按本轮简化决定替换；本页嵌入两张入口图，不表示应用实现或动态验收完成。
@@ -65,7 +114,7 @@ shared   → browser / framework / generic third-party dependencies only
 
 ## 信息架构与当前上下文
 
-主界面有一条轻量顶部栏、左侧版本区域和右侧工作区。顶部显示 KG OS、当前 Instance 的本地连接、用户选择的 Branch / Tag / State 与完整 resolved State 的可展开标识；设置只承载连接和显示选项，帮助链接现有操作指南。没有账号头像、角色、权限分级或远程部署入口。
+当前 App Shell 没有独立顶部栏：左侧版本区域负责 KG OS 品牌、版本树及底部主题切换；右侧是独立占位画布卡片，画布内部右上方仅预留禁用工具。未来业务连接后，在对应上下文展示当前 Instance、用户选择的 Branch / Tag / State 与完整 resolved State 的可展开标识，而非在静态外壳中编造状态。设置只承载连接和显示选项，帮助链接现有操作指南。没有账号头像、角色、权限分级或远程部署入口。
 
 右侧的“知识图谱 / 本体图谱”是主导航。知识页由新查询编辑器与结果帧流组成；本体页直接展示 Domain / Definition 图与所属视图的检查器。版本详情、两 State 差异和 Merge 是从版本区域进入的任务视图，保持图与对象差异优先，不建立传统表格后台。
 
@@ -102,7 +151,7 @@ shared   → browser / framework / generic third-party dependencies only
 
 ### 覆盖式纵向 Git DAG
 
-展开为**不透明白色抽屉**，带阴影、淡背景遮罩和可见关闭按钮。抽屉叠在现有左侧与工作区之上；开关不改变底层工作区盒子尺寸、结果帧图尺寸或相机，不调用 fit-to-view、不重新计算知识图布局。展开状态锁住背景交互和页面滚动；查询可继续运行，返回数据不会触发背景自动缩放。
+展开为**匹配当前主题的不透明抽屉**，带阴影、淡背景遮罩和可见关闭按钮。抽屉叠在现有左侧与工作区之上；开关不改变底层工作区盒子尺寸、结果帧图尺寸或相机，不调用 fit-to-view、不重新计算知识图布局。展开状态锁住背景交互和页面滚动；查询可继续运行，返回数据不会触发背景自动缩放。
 
 抽屉内部是真正纵向 DAG：遵守 ancestry 的 reverse-topological 顺序，以 `parents[]` 连接 fork / merge，合并节点保留全部已知 parent 边，分叉占独立轨道。由新的 State 向更旧 parent 连接；箭头图例说明“parent”，不借截图方向推导业务关系。多 root 不默认合成全库 DAG；选择 Branch root 后只看其可达 ancestry，其他 Branch 可单独切换 root。
 
@@ -245,7 +294,7 @@ flowchart LR
 | 本地 / 后端校验失败 | 在原表单定位公开 Ref / 字段路径并给出短提示，保留输入；后端没返回具体对象或数量时不补造影响明细 |
 | 提交取消 / 超时 / 断连 | 标“结果未知”，先读 Branch、相关对象与历史核对；当前无 request idempotency / submission-status API，不盲目重发 |
 | 断连或 401 | 保留本窗口未确认保存的输入和 daemon 已保存版本；暂停服务器动作，重新连接后重新检查保存 revision、Branch / baseState |
-| 刷新 / 浏览器重开 / daemon 重启 | 重新认证后从当前 `.kgos` 恢复已保存草稿到原编辑位置；尚未确认保存的输入仍可能丢失，离开提示仅针对这部分，不通过恢复中心或导入 / 导出完成正常恢复 |
+| 刷新 / 浏览器重开 / daemon 重启 | 有效 Session 自动恢复登录（失效后才要求根 Token），再从当前 `.kgos` 恢复已保存草稿到原编辑位置；尚未确认保存的输入仍可能丢失，离开提示仅针对这部分，不通过恢复中心或导入 / 导出完成正常恢复 |
 | 恢复旧草稿 | 重读原 `baseState` canonical bodies，再检查 Branch head；陈旧、原 State 不存在或 base bytes 不符时保留文本，禁止直接提交，不自动 replay |
 
 导出 / 导入保留为补充维护资料合同，不属于首版用户恢复流程：文件保留格式版本、来源库绑定、原 Instance locator、baseState、Branch、精确 base bodies、编辑后内容与 Patch，不含 token。未来接入导入时只创建恢复副本，不执行或覆盖同 ID 草稿；先核对当前库、原 base 与 Branch，再允许预览。动态 endpoint 仅是 locator，不能证明库归属；新增 Web 数据方案使用 daemon 的实际库绑定，仍不提供浏览器跨端口发现或全局物理 Instance identity。
@@ -298,15 +347,15 @@ UI 库的 metadata 至少含独立 `formatVersion=1`、随机 `storeId` 和 daem
 
 Web 存储首次缺失可在已认证 Web 请求中创建空库，不能加入 `init` / Kernel readiness 的前置条件。首次创建由 daemon 内互斥串行化，在同目录私有临时 SQLite 完成 schema / metadata transaction、关闭并同步后原子发布；失败不把半建文件发布成 `ui.db`。已有库先核对格式 / 库绑定，再启用正常读写 / WAL 或明确迁移；现有文件损坏、库绑定不符或未来格式不支持时保留原文件并报告，不能静默重建空库。格式版本独立于 KG OS package / Lithograph storage format；只进行有明确迁移器、事务校验及可恢复原件的升级，失败保留旧数据，未知更高版本只读诊断 / 导出并返回 `UNSUPPORTED_OPERATION`。UI 子系统故障不阻断已有 Ontology / Object / Graph / Evolution API。
 
-刷新或浏览器重开先重新提供 Bearer，再读取当前 daemon 的 Web store 和持久记录；Browser storage 不作为恢复真源。恢复帧不自动跑查询；本窗口没有原请求的连接时显示“未连接原执行，结果待核对”，不把共享运行中记录写成中断 / 终态，因为另一窗口可能仍在接收流。实际持有请求的窗口根据 summary、失败或中断更新执行记录；恢复窗口可显式重读记录。原提交中草稿同样作为结果待核对恢复，不能推断请求失败。恢复 Object 草稿先在原 commit 读取 canonical bodies，核对精确 bytes 和目标 Branch head；原 base 不存在、与当前 renderer 不一致、Branch 不存在或 stale 时保留输入、禁止直接提交，用户可对照新 base 手动重建。视口 / 选中 Ref 在对应帧 State 重新加载后才恢复可用状态，不能用顶部新 Schema 解释旧选择。
+刷新或浏览器重开先验证服务器 Web Session Cookie，成功后取得本次进程的临时 Web Bearer，不再要求根 Token；失效才重新认证，然后读取当前 daemon 的 Web store 和持久记录（Web 持久记录功能尚未实现）；Browser storage 不作为恢复真源。恢复帧不自动跑查询；本窗口没有原请求的连接时显示“未连接原执行，结果待核对”，不把共享运行中记录写成中断 / 终态，因为另一窗口可能仍在接收流。实际持有请求的窗口根据 summary、失败或中断更新执行记录；恢复窗口可显式重读记录。原提交中草稿同样作为结果待核对恢复，不能推断请求失败。恢复 Object 草稿先在原 commit 读取 canonical bodies，核对精确 bytes 和目标 Branch head；原 base 不存在、与当前 renderer 不一致、Branch 不存在或 stale 时保留输入、禁止直接提交，用户可对照新 base 手动重建。视口 / 选中 Ref 在对应帧 State 重新加载后才恢复可用状态，不能用顶部新 Schema 解释旧选择。
 
 ### 受控 API 与多窗口保存
 
-本轮新增方案使用 SDK `web.data / web.cache` 和 POST `/api/v1/web/data/*`、`/api/v1/web/cache/*`，与当前业务 API 共用 Bearer 和错误 envelope。**当前代码没有这些 namespace / routes。** 请求继续受现有 16 MiB transport 上限约束；单条 8 MiB 预算避免全工作区 replacement，list 只返回轻量 headers，默认 100、1..1000、opaque cursor。UI list 是存储记录分页，不是全历史搜索或 Object discovery。
+本轮方案使用 SDK `web.data / web.cache` 和 POST `/api/v1/web/data/*`、`/api/v1/web/cache/*`，与当前业务 API 共用 Bearer 和错误 envelope。目前仅 `web.data.info({})` 已实现并用于连接保护；其余记录 / 缓存 / 导出接口尚未实现。请求继续受现有 16 MiB transport 上限约束；单条 8 MiB 预算避免全工作区 replacement，list 只返回轻量 headers，默认 100、1..1000、opaque cursor。UI list 是存储记录分页，不是全历史搜索或 Object discovery。
 
 | 拟新增调用 | 最小合同 |
 | --- | --- |
-| `web.data.info({})` | 已认证后总能返回本次进程的 daemonBootId 与 storageStatus（ready / unavailable / unsupported / mismatch）；可安全读取时才附 formatVersion、storeId、保存 / 当前 databaseId、bindingStatus 和用量，否则附共享错误诊断，不猜字段。库绑定不符时只开放恢复读取 / 导出。daemonBootId 用于下文连接失效校验，不依赖 UI 库成功打开 |
+| `web.data.info({})`（已实现基础连接信息） | 已认证后返回本次进程的 `daemonBootId` 与 `storageStatus=unsupported`；Web UI store 尚未实现，因此不返回格式、storeId 或数据库绑定字段。将来存储可安全读取时才附格式、库绑定及用量，异常时仍需返回 boot 与共享诊断。daemonBootId 用于下文连接失效校验，不依赖 UI 库成功打开 |
 | `web.data.list({storeId, kind, limit?, cursor?})` / `read({storeId, kind, id})` | list 返回 kind/id/revision/deleted 等 headers，read 返回单条完整 record；cursor 绑定 storeId/kind 与该分页快照，不复用到新一组读取 |
 | `web.data.save({storeId, kind, id, expectedRevision, mutationId, data})` | 新记录用新 UUID 和 `expectedRevision=null`；已有记录用最后观察 revision。daemon 在同一 SQLite transaction 比较并发布新 revision，只有 commit 确认后才返回“已保存” |
 | `web.data.delete({storeId, kind, id, expectedRevision, mutationId})` | 仅删除明确记录并清空正文，保留 deleted ID/revision 以拒绝旧窗口重新创建；重用已删除 ID 不视为新建。批量清理逐条显示实际成功 / 失败，不宣称跨条原子 |
@@ -389,13 +438,17 @@ resolve / finalize / abort 都携带最后观察到的 `expectedRevision`。reso
 
 沿用 [Runtime 单 Token 实例认证](runtime.md#单-token-实例认证)与 [SDK 显式 token](client.md#kgossdk)。正式 Web 与 API 使用当前 daemon 的同源动态 loopback endpoint；浏览器没有读取 `.kgos/kgosd.lock / auth.json` 的特权，不默认扫描端口、自动启动 daemon 或重新定位另一个 workspace。
 
-本次最小适配方案是：用户按本地 Runtime locator 打开当前 endpoint，在简短连接 dialog 手动提供当前 Instance 的完整 Bearer token；输入遮蔽，token 只存在当前页面内存，构造 SDK 后对 API 发 Bearer。顶部正常只显示简短连接状态，endpoint 可展开查看；boot ID、库 ID 与原始错误码不作为日常主显示。页面刷新或显式“断开并清除凭证”清除内存；不放 URL、cookie、localStorage、草稿、日志或设计示例。浏览器自动交接凭证、持久保存与跨端口恢复未被假定为现有能力。
+本机一体化开发的 Vite 5173 仅反向代理 `/api` 到动态 daemon endpoint，必须保留浏览器原始 `Host`（`changeOrigin: false`），使 Web Session 请求的 `Origin` 与后端收到的 `Host` 完全一致。禁止通过放宽后端的 Origin / Host / Sec-Fetch-Site 校验来适配开发代理；正式 daemon 直连不依赖此代理设置。
 
-对应材料见 [R1 显式连接](assets/web/R1-local-connection.png)、[R1 状态表](assets/web/R1-states.png)与 [R1 / R2 覆盖矩阵](web-materials.md#功能覆盖矩阵)；材料中的连接与持久化工程方案仍需实现。
+当前适配方案是：用户按本地 Runtime locator 打开当前 endpoint，在认证弹窗手动提交 Instance 根 Token；daemon 校验成功后在独立私有文件中保存可撤销 Web Session，将只包含随机会话 ID 的 HttpOnly、SameSite=Strict Cookie 交给浏览器，HTTPS 时附加 Secure。浏览器不持久保存根 Token；当前页面 SDK 只接收该进程中有效的临时 Web Bearer，并携带 Boot Guard。刷新、关闭再打开或 daemon 重启时，Web 优先验证 Cookie 并取得新页面的临时 Web Bearer，不需再次输入 Token；会话过期、根 Token 更换或服务端撤销时才展示强制认证弹窗。Session 有效期、Cookie、同源保护与撤销合同由 [Runtime 持久 Web Session](runtime.md#持久-web-session-与刷新恢复) 拥有。根 Token 不进入 URL、Cookie、localStorage、草稿或日志；显式退出必须由服务端成功撤销 Session 才算完成。端口变化仍需重新打开正确的 Instance locator，不扫描其它服务。
 
-Web 新增工程适配还需检测 daemon 生命周期：每次进程启动生成内存中的随机 UUID `daemonBootId`，首次显式连接通过 `web.data.info` 取得；之后 Web 借现有 SDK 的 `fetch` 注入点对全部 API request 携带 `X-KGOS-Expected-Daemon-Boot`。HTTP adapter 在 Bearer 认证后、执行操作前比较该可选 header，不符返回 `WEB_CONNECTION_CHANGED`，Web 暂停读取 / autosave / mutation、保留输入并要求显式重新连接，不能自动重新获取 boot 值接着发送。没有 header 的现有 CLI / 第三方 SDK 合同不变；Web bootstrap 的无 header info 仅发生在用户显式连接时，尚未取得 boot 值前不发其他操作。
+认证弹窗使用用户确认的深海军蓝高保真方向。认证之前它是唯一可操作区域：不显示静态数据，背景模糊且不可交互；弹窗无关闭或取消动作，Esc 与点击遮罩均不能退出，必须服务端凭证校验成功才显示工作区。当前已实现该 UI、Web Session 登录/自动恢复、`web.data.info` bootstrap 和带 boot guard 的 `evolution.overview` 认证读取；旧连接失效时回到不可关闭的认证弹窗，保留页面内未发送输入，页面重新加载则先尝试有效 Session。UI 持久草稿与完整业务 State 恢复仍待 P14-01–03，不能把登录恢复当作草稿恢复。
 
-此 guard 当前尚未实现，不是第二个 secret、账号权限或稳定物理 Instance identity。它解决完整复制 `.kgos` 保留 token / databaseId / storeId、另一个 daemon 复用旧端口时旧页面继续发送的情况；正常 daemon 重启也会失效，用户重新连接后再按原 store / 库绑定核对恢复。daemonBootId 不进 UI 持久记录或导出，不用 endpoint、PID 或持久 ID 冒充进程生命周期。
+原有设计材料见 [R1 显式连接](assets/web/R1-local-connection.png)、[R1 状态表](assets/web/R1-states.png)与 [R1 / R2 覆盖矩阵](web-materials.md#功能覆盖矩阵)；其中的 UI 记录存储、草稿持久化与业务视图恢复方案仍需实现。
+
+已实现的连接生命周期机制为：每次 daemon HTTP handler 启动生成内存中的随机 v4 UUID `daemonBootId`，首次显式连接经已认证 `web.data.info({})` 取得；之后 Web 借 SDK `fetch` 注入点对其 API request 携带 `X-KGOS-Expected-Daemon-Boot`。HTTP adapter 在 Bearer 认证后、执行操作前比较该可选 header，不符返回 `WEB_CONNECTION_CHANGED` / 409；浏览器侧同步失效旧会话、取消其它请求并要求显式重新认证，不能自动获取新 boot 值继续发送。使用已认证 Web 上下文的 `/oauth/request`、`/oauth/decision` 也随该 guard 拒绝旧进程请求。没有 header 的现有 CLI / 第三方 SDK 行为不变。Web 首次登录或 Session 恢复后均取得新进程的临时 Bearer 与 boot ID，尚未取得 boot 值前不发业务操作。
+
+此 guard 不是第二个 secret、账号权限或稳定物理 Instance identity。它解决完整复制 `.kgos` 保留 token / databaseId / storeId、另一个 daemon 复用旧端口时旧页面继续发送的情况；正常 daemon 重启也会使旧页面 guard 失效；新加载的页面可凭有效 Web Session 恢复登录。已连接且页面可见时 Web 约每 15 秒用受 guard 保护的 `info` 检查进程，页面重新可见或获得焦点时立即检查，隐藏时暂停轮询；网络异常、401 和 boot 变化均停止旧连接请求，不自动重新执行写入。旧页面不能自动把旧写入请求迁移到新 boot；新加载页面凭有效 Session 恢复登录后再核对原 store / 库绑定。`daemonBootId` 不进 UI 持久记录或导出，不用 endpoint、PID 或持久 ID 冒充进程生命周期。当前 `web.data.info` 仅可提供 boot 与 `storageStatus=unsupported`，不创建 UI store、不虚构格式、storeId 或数据库绑定。
 
 | 连接状态 | 页面行为 |
 | --- | --- |
@@ -407,22 +460,23 @@ Web 新增工程适配还需检测 daemon 生命周期：每次进程启动生�
 | SDK 协议 / NDJSON 解码失败 | 就地报告响应异常，不替换成空知识库；保留已完成帧 |
 | 恢复连接 | 显式重新连接、取得本次 boot / store 绑定，读取目标 Branch 与 State，重新检查草稿 base；查询重试可用，写入不自动重试 |
 
-daemon 重启可能改变端口但复用 token。旧页无法凭浏览器现有 API 自动发现新端口，用户重新打开当前 locator、再次提供 token，然后从同一 `.kgos/web/ui.db` 恢复已保存记录；未确认保存的输入在当前页保留，连接恢复后再核对并保存。此处不新增账号、role/scope、rotation API、LAN 或公网部署方案。
+daemon 重启可能改变端口但复用 token。旧页无法凭浏览器现有 API 自动发现新端口，用户重新打开当前 locator，由有效 Session 自动恢复登录（失效后才需根 Token），然后从同一 `.kgos/web/ui.db` 恢复已保存记录；未确认保存的输入在当前页保留，连接恢复后再核对并保存。此处不新增账号、role/scope、rotation API、LAN 或公网部署方案。
 
 ## 视觉与交互规格
 
-白色面板、浅灰 / 很浅蓝背景和蓝色主动作保留认可方向。彩色节点与轨道用于类型 / 拓扑辨认，配图例和标签；页面不采用 Neo4j 深色外观。下列数值是可调的前端初始规格，语义名称是 Web 样式参数，不改变数据合同。
+默认采用用户新确认的低饱和深色紫蓝开发工具视觉，浅色作为可切换主题；不堆积渐变卡片或霓虹装饰。彩色节点与版本轨道用于类型 / 拓扑辨认，配图例和标签。下列数值是可调的前端初始规格，语义名称是 Web 样式参数，不改变数据合同。
 
 | 用途 | 初始规格 |
 | --- | --- |
-| 页面 / 面板 / 图背景 | `#F6F8FC` / `#FFFFFF` / `#F8FBFF`；常规面板细边界，抽屉不透明 |
-| 主文本 / 次文本 | `#172554` / `#52627A`；不可用信息仍可读，不用过浅灰替代说明 |
-| 主动作 / 选中 / focus | `#005FCC` + 白字；选中背景 `#EAF2FF`，focus 独立可见，不仅更改背景 |
+| 默认深色页面 / 侧栏 / 画布 | `#080D22` / `#111831` / `#0C1530`；细边界、弱光感、低对比点阵；禁止大面积发光色块 |
+| 浅色页面 / 面板 / 图背景 | `#F6F8FC` / `#FFFFFF` / `#F8FBFF`；同一布局，只改变语义设计变量 |
+| 深色主文字 / 次文字 | `#F0F2FF` / `#AAB5D4`；浅色文字沿用 `#172554` / `#52627A` |
+| 主动作 / 选中 / focus | 深色默认克制紫蓝、独立可见 focus ring；浅色沿用蓝色动作与淡选中背景；不能仅靠背景传达状态 |
 | 错误 / 警示 / 成功 | `#B42318` / `#854D0E` / `#067647`，搭配图标和文字 |
 | 分隔 / 边界 | `#D7E2F2` 用于装饰；关键输入边界、图边与可交互对象需另测对比，不仅依赖浅色线 |
 | 字体 | 本机系统 sans-serif（含中文 fallback），代码 / hash 使用系统 monospace；不依赖外部字体请求 |
-| 字号 / 密度 | 正文 14–16px，辅助与代码不小于 12px，行高 1.5；4 / 8 / 12 / 16 / 24 / 32px 间距 |
-| 初始桌面尺寸 | 顶栏约 56px，版本列表 280–340px，帧检查器 280–320px；抽屉宽约 640–880px 且不超过 viewport |
+| 字号 / 密度 | 当前工作台小段正文约 13px，标题与操作按层级放大，代码和密集列表辅助信息约 11–12px；后续长篇业务内容阅读使用 14–16px，行高约 1.45–1.6；4 / 8 / 12 / 16 / 24 / 32px 间距 |
+| 初始桌面尺寸 | 无全局顶栏；侧栏默认 240px，可调 240–420px 或完全收起；右侧画布铺满剩余空间并留页面边距；未来帧检查器 280–320px，DAG 抽屉宽约 640–880px 且不超过 viewport |
 | 圆角 / 动效 | 常规面板 8–12px，节点按图形类型区分；反馈约 120–180ms，列表↔DAG 约 180–240ms，尊重减少动态效果 |
 
 Graph 数量始终写明当前返回 / 展开 / 已显示范围；没有后端总量就不写全库节点 / 关系数。按钮用明确动词，disabled 附原因；仅当当前对象适用时展示对应动作，不以静态按钮存在证明可执行。长 name/title/hash 可截短展示但完整值可复制；说明、错误、JSON/YAML 支持折行 / 内部滚动，typed value 不因显示格式丢精度。
@@ -460,7 +514,7 @@ Graph 数量始终写明当前返回 / 展开 / 已显示范围；没有后端�
 | 两 State 差异 | `evolution.diff` | 结构化 Change 图与字段对照、有界分页；不是提交 Patch 文本 |
 | Branch / Tag / State Data | SDK `evolution.branch / tag / state` → 对应 route | 原样接现有操作；Branch 无专用 move/rename，ref list 无 cursor |
 | Merge | SDK `evolution.merge` 的 start/list/get/conflicts/resolve/finalize/abort | 精确 revision 工作流与恢复；无公开共同基底字段或高层全局影响预览 |
-| 连接 | SDK 显式 `endpoint/token`、fetch 注入点与 401 公共错误 | 手动输入、页面内存 credential；拟新增 boot guard 尚未实现，无浏览器自动凭证交接、稳定 Instance identity 或跨端口发现 |
+| 连接 | SDK 显式 `endpoint/token`、`web.data.info`、fetch 注入点与 401 公共错误；Web 通过同源 info + 带 guard 的 `evolution.overview` 做首次 Bearer 校验 | 已实现强制 Token 输入、内存 credential、boot guard、401 / 409 / 离线失效、连接轮询与显式重连；Web 存储恢复、浏览器自动凭证交接、稳定 Instance identity 和跨端口发现仍未实现 |
 | Web 持久 UI / 草稿 / 结果缓存 | 当前无 SDK namespace / HTTP route / Web store | 按[本轮存储与 API 方案](#web-工作区数据)新增 daemon adapter 与 SDK；不借用 State Data、Knowledge Patch 或任意文件接口 |
 
 没有把剩余工作解释为 Object / Ontology 尚未设计；高层模型、身份与生命周期已经有 owner。缺口是 Web 工程接入、局部可视化、本轮新增的 UI 存储 / API 与真实动态验收；下列默认行为已按用户本轮决定更新。
@@ -473,10 +527,10 @@ Graph 数量始终写明当前返回 / 展开 / 已显示范围；没有后端�
 | --- | --- |
 | 只读历史帧重跑 | 主动作按原 State 另建帧，另提供“按当前 State 新跑”；两者清楚标 commit |
 | Branch 前进或本页写入成功 | 当前视图保持 pinned，仅提示刷新；成功后提供“查看新 State / 刷新当前分支”显式动作，旧帧保持原 State |
-| 跨刷新恢复 Web 数据与草稿 | 用户已认可数据放在 KG OS 目录；本轮在已有 `.kgos/` 下设计 `web/`，隔离持久 UI 与可淘汰缓存。已保存记录重新认证后恢复，草稿无自动 TTL；尚未确认保存才提醒可能丢失 |
+| 跨刷新恢复 Web 数据与草稿 | 用户已认可数据放在 KG OS 目录；本轮在已有 `.kgos/` 下设计 `web/`，隔离持久 UI 与可淘汰缓存。有效 Session 恢复登录后再读取已保存记录，草稿无自动 TTL；尚未确认保存才提醒可能丢失 |
 | 首版交互范围 | 用户已要求简化：保存 / 恢复留在原编辑位置，缓存后台自动管理，普通失败短提示，真实内容 / CAS 冲突才比较；不设恢复中心、缓存 / 容量管理页或常驻诊断卡，维护导入 / 导出 / 整份清理不进入首版常用流程 |
 
-token 的手动输入 / 内存保存、记录 CAS、格式与分页、预算 / 缓存 TTL、错误映射与组件尺寸属于本次工程方案，仍待实现和动态验证。自动交接 credential 或远程部署需另有明确需求和合同，当前不为它新增接口。
+首次根 Token 输入、服务器持久 Session、自动登录恢复、退出撤销和 Boot Guard 已实现并取得定向验收；记录 CAS、格式与分页、预算 / 缓存 TTL、未实现的存储错误映射及业务组件尺寸仍待实现和动态验证。自动交接 credential 或远程部署需另有明确需求和合同，当前不为它新增接口。
 
 ### 设计自查与后续动态验收边界
 

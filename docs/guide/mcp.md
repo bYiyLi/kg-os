@@ -4,7 +4,7 @@
 
 KG OS 的当前目标是**一个 Go `kgosd` 进程、一个 HTTP listener**，同时提供内嵌 Web、现有 `/api/v1/*` 与 `/mcp`。服务端 JavaScript 使用 QuickJS-NG WASM / Go Kernel Bridge，不依赖运行时 Node.js MCP 服务，也不需要宿主安装 `kgosd`。正式合同见 [MCP](../design/mcp.md)、[Runtime](../design/runtime.md)、[D93](../design/decisions.md#d93-kgosd-unified-mcp)。
 
-**当前状态**：Phase 16 为 `done`。Go 单进程 Linux amd64 镜像已在 OpenClaw 开发环境构建并部署、隔离 31/31 SDK Smoke 成功；现有 ChatGPT 私人连接已调用新版四 Tool，官方 Skill 已保存到私人 Plugin v1.0.1。**最终实现提交 `813bff4` 的 GitHub CI 8/8、真实 ChatGPT OAuth/隔离写入以及 Codex Skill 新会话加载均已通过；尚未正式发布 GHCR**。旧 `Dockerfile.mcp` / `packages/mcp` 的源码已移除，历史仅保留 Git 记录，不再是服务端部署入口。
+**当前状态**：Phase 16 为 `done`。2026-10-14 Phase 17 统一 Instance + Web 授权流程已通过正式 `Dockerfile.unified` 构建部署到 `https://kgos-dev.y2l.top` 的 Dev 实例，自动只读四 Tool / OAuth metadata 验收成功；用户已实际重新完成 ChatGPT OAuth 授权并确认测试正常；Phase 17 已按用户批准的 CI / 完整隔离矩阵例外关闭为 `done`，并不表示相关 CI 已运行。Go 单进程 Linux amd64 镜像已在 OpenClaw 开发环境构建并部署、隔离 31/31 SDK Smoke 成功；现有 ChatGPT 私人连接已调用新版四 Tool，官方 Skill 已保存到私人 Plugin v1.0.1。**最终实现提交 `813bff4` 的 GitHub CI 8/8、真实 ChatGPT OAuth/隔离写入以及 Codex Skill 新会话加载均已通过；尚未正式发布 GHCR**。旧 `Dockerfile.mcp` / `packages/mcp` 的源码已移除，历史仅保留 Git 记录，不再是服务端部署入口。
 
 ## 1. 镜像与首次初始化
 
@@ -45,11 +45,11 @@ docker run --rm --platform linux/amd64 \
 
 ## 2. 启动、配置与认证
 
-先在 Linux 宿主受保护的文件中保存独立 MCP 管理员凭证，例如 `/secure/path/mcp.env`（权限 `0600`），内容是 `KGOS_MCP_TOKEN=<高熵随机凭证>`。这与容器自己创建的 `.kgos/auth.json` **Instance Token** 是不同的秘密；不要把任何 Token 粘贴到聊天、URL 或公开文件。需要 ChatGPT 时可在相同受保护配置中加上 `KGOS_MCP_OAUTH_ISSUER=https://your-actual-domain.example`。
+Phase 17 目标使用现有 `.kgos/auth.json` Instance Token，不再要求独立的 MCP 管理员凭证。需要 ChatGPT 时，可在受保护的宿主环境文件（例如 `/secure/path/kgos.env`，权限 `0600`）配置 `KGOS_MCP_OAUTH_ISSUER=https://your-actual-domain.example`。不要把任何凭证写入聊天、URL 或公开配置。
 
 ```sh
 docker run -d --name kgos-unified --platform linux/amd64 \
-  --env-file /secure/path/mcp.env \
+  --env-file /secure/path/kgos.env \
   -v kgos-workspace:/workspace \
   -p 127.0.0.1:3777:3777 \
   kgos-unified:local
@@ -62,12 +62,11 @@ docker run -d --name kgos-unified --platform linux/amd64 \
 | 统一监听 | `--host`, `--port` | `KGOSD_HOST`, `KGOSD_PORT` |
 | TLS | `--tls-cert`, `--tls-key`（须成对） | `KGOSD_TLS_CERT`, `KGOSD_TLS_KEY` |
 | MCP 路径 | `--mcp-path` | `KGOS_MCP_PATH` |
-| 管理员凭证来源 | `--mcp-token-env`（环境变量**名称**）、`--mcp-token-file` | `KGOS_MCP_TOKEN_ENV`, `KGOS_MCP_TOKEN_FILE` |
 | OAuth | `--mcp-oauth-issuer` | `KGOS_MCP_OAUTH_ISSUER` |
 
-请求超时、并发、大小、Sandbox 时间/内存/调用量/流数量及 Preview 缓存预算的完整参数见 [MCP 运行配置](../design/mcp.md#部署交付与运行合同)。MCP Token 未配置时，`kgosd` 仍可提供 Web/API，但不会开放 MCP 工具；错误 Token、路径冲突或无效 OAuth 配置必须拒绝。服务本身不创建公网 URL、Tunnel、用户账户或外部身份系统。
+请求超时、并发、大小、Sandbox 时间/内存/调用量/流数量及 Preview 缓存预算的完整参数见 [MCP 运行配置](../design/mcp.md#部署交付与运行合同)。有效 Instance 会开放认证保护下的 MCP 工具；独立 MCP Token 的旧参数/环境变量不再接受，路径冲突和无效 OAuth 配置必须拒绝。服务本身不创建公网 URL、Tunnel、用户账户或外部身份系统。
 
-同一个监听端口不代表三个入口有相同认证：`/api/v1/*` 只接受 Instance Bearer，`/mcp` 接受独立 MCP 静态 Bearer 或已启用的 OAuth Access Token，内嵌 Web 不因此获得绕过 API 认证的权限。
+`/api/v1/*` 继续使用 Instance Bearer，`/mcp` 可接受同一 Instance Bearer（仅供可信自管客户端）或仅限 MCP 的 OAuth Access Token。ChatGPT 必须使用 OAuth，不能取得 Instance Token；Web 静态页面不提供任何业务认证旁路。
 
 本地验证：
 
@@ -107,9 +106,9 @@ Preview 的 `viewRevision` 属于进程内有界缓存；过期后返回 `VIEW_E
 
 ## 4. ChatGPT OAuth 与私人 Plugin
 
-用户自行准备可从 ChatGPT 访问的 HTTPS 入口，例如 `https://kgos.example.com/mcp`，将 `KGOS_MCP_OAUTH_ISSUER` 设置为确切的 `https://kgos.example.com`，而**不是**完整的 `/mcp` URL。代理须原样转发 `/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/token`。
+用户自行准备可从 ChatGPT 访问的 HTTPS 入口，例如 `https://kgos.example.com/mcp`，将 `KGOS_MCP_OAUTH_ISSUER` 设置为确切的 `https://kgos.example.com`，而**不是**完整的 `/mcp` URL。代理必须同时公开同源 Web `/` 与静态资源、Web 登录 API、`/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/request`、`/oauth/decision`、`/oauth/token`。
 
-ChatGPT 连接使用受限 CIMD 客户端与 OAuth Authorization Code + PKCE S256；管理员只在 KG OS 的可信授权网页输入 MCP 管理员 Token，ChatGPT 持有临时 OAuth Token 而不接触管理员凭证。授权 Ticket 5 分钟有效，重启后需重新授权；不要为了调试而关闭认证。
+ChatGPT 连接使用受限 CIMD 客户端与 OAuth Authorization Code + PKCE S256。Go 校验后将浏览器跳转到**现有 KG OS Web**；已登录直接显示连接授权弹窗，未登录先执行 Web 原有登录，随后明确允许或拒绝。OAuth Code/Access/Refresh 由 Go 管理，对用户透明。当前 Web 的跨页面登录状态尚由另一开发任务负责，不能借此声称无重复登录已验收。请求 5 分钟有效，重启后 OAuth 凭证失效；不能绕过认证。
 
 官方 [私人 Plugin AI 安装手册](../../plugins/kgos/INSTALL.md)说明 ChatGPT 连接、四 Tool 验证和私人 Plugin 安装。**旧 Phase 15 的实际 OAuth 成功不能代表新 Go MCP 已通过真实 ChatGPT 验收**。官方模板不携带用户 Token、Root 或动态 Connection ID。
 

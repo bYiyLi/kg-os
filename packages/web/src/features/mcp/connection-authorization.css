@@ -1,0 +1,353 @@
+.mcp-authorization-dialog {
+  width: min(536px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 22px 24px 20px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-sidebar);
+  box-shadow: 0 36px 110px rgb(0 0 0 / 35%);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-track) transparent;
+}
+
+.mcp-authorization-dialog:not([open]) {
+  display: none;
+}
+
+.mcp-authorization-dialog::backdrop {
+  background: rgb(15 25 48 / 63%);
+  backdrop-filter: blur(7px) saturate(0.76);
+  -webkit-backdrop-filter: blur(7px) saturate(0.76);
+}
+
+.theme-dark .mcp-authorization-dialog::backdrop {
+  background: rgb(3 7 22 / 73%);
+}
+
+.mcp-authorization-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 730;
+}
+
+.mcp-authorization-brand .language-switcher {
+  width: auto;
+  margin-left: auto;
+  border-color: var(--color-border);
+  background: var(--color-control);
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.mcp-authorization-brand .language-option[aria-pressed="true"] {
+  background: var(--color-control-hover);
+  color: var(--color-text);
+}
+
+.mcp-authorization-brand .mcp-authorization-close {
+  margin-left: 0;
+}
+
+.mcp-brand-mark,
+.mcp-authorization-kgos-mark {
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.mcp-brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.mcp-brand-mark svg {
+  width: 20px;
+  height: 20px;
+}
+
+.mcp-authorization-close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.mcp-authorization-close:hover:not(:disabled) {
+  background: var(--color-control-hover);
+  color: var(--color-text);
+}
+
+.mcp-authorization-heading {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.mcp-authorization-heading h2 {
+  color: var(--color-text);
+  font-size: 22px;
+  font-weight: 720;
+  letter-spacing: -0.035em;
+}
+
+.mcp-authorization-heading p {
+  margin-top: 5px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.mcp-authorization-parties {
+  display: grid;
+  grid-template-columns: 1fr 40px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 20px auto 19px;
+  text-align: center;
+}
+
+.mcp-authorization-parties > div {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+}
+
+.mcp-authorization-parties strong {
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+.mcp-authorization-parties small {
+  max-width: 230px;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-authorization-parties > .icon {
+  width: 25px;
+  height: 25px;
+  justify-self: center;
+  color: var(--color-subtle);
+}
+
+.mcp-authorization-app-mark,
+.mcp-authorization-kgos-mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 12px;
+}
+
+.mcp-authorization-app-mark {
+  background: #139d85;
+  color: #fff;
+  font-size: 40px;
+  line-height: 1;
+}
+
+.mcp-authorization-kgos-mark {
+  border: 1px solid var(--color-border);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.mcp-authorization-kgos-mark svg {
+  width: 30px;
+  height: 30px;
+}
+
+.mcp-authorization-app-mark svg {
+  width: 42px;
+  height: 42px;
+}
+
+.mcp-authorization-permissions {
+  padding: 14px 16px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-canvas);
+}
+
+.mcp-authorization-permissions h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 680;
+}
+
+.mcp-authorization-permission {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 12px;
+}
+
+.mcp-authorization-permission > .icon {
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  color: var(--color-text);
+}
+
+.mcp-authorization-permission > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.mcp-authorization-permission strong {
+  font-size: 13px;
+  font-weight: 670;
+}
+
+.mcp-authorization-permission small {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.mcp-authorization-allowed {
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 11px;
+}
+
+.mcp-authorization-loading {
+  padding: 22px 12px;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.mcp-authorization-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-primary-soft);
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mcp-authorization-notice .icon {
+  color: var(--color-primary);
+}
+
+.mcp-authorization-notice strong {
+  color: var(--color-primary);
+  font-size: 13px;
+}
+
+.mcp-authorization-error {
+  margin-top: 10px;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.theme-dark .mcp-authorization-error {
+  color: #ffb7bd;
+}
+
+.mcp-authorization-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.mcp-authorization-actions button {
+  min-height: 44px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 610;
+}
+
+.mcp-authorization-cancel {
+  border: 1px solid var(--color-border);
+  background: var(--color-control);
+  color: var(--color-text);
+}
+
+.mcp-authorization-cancel:hover:not(:disabled) {
+  background: var(--color-control-hover);
+}
+
+.mcp-authorization-approve {
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  box-shadow: 0 4px 14px rgb(41 33 104 / 13%);
+  color: var(--color-page);
+}
+
+.mcp-authorization-approve:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-primary) 84%, var(--color-text));
+}
+
+.mcp-authorization-actions button:disabled,
+.mcp-authorization-close:disabled {
+  opacity: 0.55;
+}
+
+.mcp-authorization-footnote {
+  margin-top: 10px;
+  color: var(--color-subtle);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (width <= 540px) {
+  .mcp-authorization-dialog {
+    padding: 18px 14px;
+  }
+
+  .mcp-authorization-parties {
+    gap: 4px;
+  }
+
+  .mcp-authorization-parties small {
+    max-width: 125px;
+  }
+
+  .mcp-authorization-permissions {
+    padding: 12px 12px;
+  }
+
+  .mcp-authorization-permission {
+    gap: 9px;
+  }
+
+  .mcp-authorization-permission > .icon {
+    margin-left: 0;
+  }
+
+  .mcp-authorization-allowed {
+    display: none;
+  }
+
+  .mcp-authorization-actions {
+    gap: 8px;
+  }
+}
