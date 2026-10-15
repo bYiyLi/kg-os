@@ -4,7 +4,7 @@
 
 ## 目标与状态
 
-**`in_progress`：核心代码已提交；Mac 全量质量、隔离 Docker 和长期 Dev 验收已通过，仍待对应推送 SHA 的 GitHub CI 验收。**
+**`done`（2026-10-15）：P19-01–05 的实现、Mac 全量质量、隔离 Docker、长期 Dev 和最终推送 SHA 的 GitHub CI 8/8 均已验收；不包含正式 Release/生产部署。**
 
 把当前单进程 `kgosd` 的启动/错误文本与 CLI append 日志升级为内建可观测性：统一 JSON Logs、可靠表达**关键业务操作真实结果**的 Business Events、跨 HTTP/MCP/Kernel 的 Request ID，以及进程内 Metrics 和受现有认证保护的只读诊断摘要。
 
@@ -81,9 +81,9 @@
 
 ## 完成条件与当前证据
 
-- **当前状态：`in_progress`（2026-10-15）**。P19-01–04 代码及定向/集成测试已写入当前工作树；真实 Lithograph Kernel 写入、MCP 多步部分成功、Web/SDK 诊断认证、Request ID、安全日志与轮转已完成针对性验收。包含最终 `CANCELLED` 修复的 Mac `pnpm validate` **完成且 exit 0**：Go 静态/竞态、statement coverage **90.0%**、TypeScript/Lint、Vitest **228/228**、Playwright **26/26**、Native、打包、依赖/许可证、安全和 diff 门禁通过；依赖审计输出仍含 **1 个已忽略 high** 与 1 个 low，不把忽略项误报为零漏洞。
+- **阶段状态：`done`（2026-10-15）**。P19-01–05 均已实现并完成相关 Acceptance；真实 Lithograph Kernel 写入、MCP 多步部分成功、Web/SDK 诊断认证、Request ID、安全日志、Sandbox 指标和轮转均通过针对性测试。包含最终 `CANCELLED` 修复的 Mac `pnpm validate` **exit 0**：Go 静态/竞态、statement coverage **90.0%**、TypeScript/Lint、Vitest **228/228**、Playwright **26/26**、Native、打包、依赖/许可证、安全和 diff 门禁通过；依赖审计仍报告 **1 个已忽略 high** 与 **1 个 low**，不把忽略项称为零漏洞。
 - **Review 修正（2026-10-15）**：`internal/observability/observer.go` 的 `Tool` 统计已把 `CANCELLED` 从 `tool_timeouts_total` 中剔除；取消仍计入 Tool errors，真正 `TIMEOUT` / `DEADLINE_EXCEEDED` 才计入超时。`internal/observability/extra_test.go` 覆盖资源失败、超时、取消的区分；定向测试和修复后的完整质量门禁均通过。
-- **隔离 Docker 证据**：OpenClaw 从本次**仅包含 Phase 19 变更的暂存 Git 树** `26be2b7fb266acc04cdfdd19b8cb1a20dc11a52f` 导出干净源码，Linux amd64 镜像 `kgos-phase19-staged:26be2b7fb2` 构建成功；`KGOS_UNIFIED_DOCKER_SMOKE_IMAGE=kgos-phase19-staged:26be2b7fb2 node scripts/mcp-unified-docker-smoke.mjs` 在随机临时 Volume 真实执行并以 **exit 0** 结束，验证非 root、Node-free、统一 Web/API/MCP、31/31 SDK 调用及重启持久化。此源码树包含 `CANCELLED` 修复，且不包含工作树里无关的 Web 未提交修改；后续只补充本段验收文档，未改 Docker 测试的可执行代码。长期 Dev 未部署；该结果不能代替对应提交的 GitHub CI、正式发布或生产部署。
+- **隔离 Docker 证据**：OpenClaw 从仅包含 Phase 19 变更的暂存 Git 树 `26be2b7fb266acc04cdfdd19b8cb1a20dc11a52f` 导出干净源码，Linux amd64 镜像 `kgos-phase19-staged:26be2b7fb2` 构建成功；`KGOS_UNIFIED_DOCKER_SMOKE_IMAGE=kgos-phase19-staged:26be2b7fb2 node scripts/mcp-unified-docker-smoke.mjs` 在随机临时 Volume **exit 0**，验证非 root、Node-free、统一 Web/API/MCP、31/31 SDK 调用及重启持久化。源码包含 `CANCELLED` 修复，不包含无关 Web 未提交修改；最终 GitHub CI 又从推送 SHA 独立构建并通过同一 Docker Smoke。
 - **长期 Dev（2026-10-15）**：按用户授权，从独立干净 Git worktree 的 `0bc47eeeba83091434d60d699c918b32a35ecda5`（`clean`）执行正式 `dev:mcp deploy`；部署前完成 SQLite 在线一致性备份，自动切换和只读统一 Web/API/MCP/OAuth/5 Tool 验收均成功。UTC 记录 `2026-10-15T06:19:26Z`、当前镜像 `sha256:9b409ec1090e4099cc236805a9057e4e651b6ecaa8500e6656438268fd24369a`，之后 `pnpm dev:mcp check` exit 0；带现有 Instance Bearer 的 `POST /api/v1/system/diagnostics` 返回 200，无认证返回 401，服务端 Request ID 格式及安全指标字段正确，Docker `json-file` 使用 `10m × 5` 保留。另使用实际部署的 `kgos-dev-mcp:local` 镜像在**独立随机临时 Volume** 执行 `node scripts/mcp-unified-docker-smoke.mjs`，真实 MCP SDK **31/31**、非 root、无 Node、重启持久化验收均以 exit 0 结束。长期 Dev 没有执行测试写入，也未引入其他未提交 Web 改动。
-- **Git 交付**：Phase 19 已单独提交为 `0bc47ee`（45 个已核对文件，标准 pre-commit `pnpm check:quick` 成功）。本地 `main` 的前一个 Phase 18 提交 `ef1d2c3` 仍未推送；用户于 2026-10-15 明确授权本轮 Dev 部署后执行提交与推送，因此可以按正常非强制 Git 流程交付这两个先后依赖的提交。**Dev 成功不代表远端 CI 已执行**。
-- 后续只有真实实现、定向和全量质量、隔离 Docker、对应 revision 的 CI、最终 Review 与文档同步全部满足，才可按 [通用完成标准](../README.md#6-phase-通用完成标准) 判断 `done`。Git Commit、Push、Dev 部署和 Release 仍需各自授权。
+- **Git 与 Review 交付**：Phase 19 实现提交 `0bc47ee`（45 个文件）、Dev 验收记录 `a9ac341`、Windows 文件权限测试修复 `aef5dbc` 均已提交并非强制推送到 `origin/main`；标准 pre-commit `pnpm check:quick` 成功。Review 发现的 `CANCELLED` 超时误计、Windows POSIX 权限断言已修复，针对本阶段的最终 Review 未发现剩余会影响验收的事项。原有 Phase 14/Web 未提交改动未混入这些提交。
+- **最终远端 CI**：提交 [`aef5dbce6dd243172d48085950d7a96465e65c66`](https://github.com/bYiyLi/kg-os/commit/aef5dbce6dd243172d48085950d7a96465e65c66) 的 [GitHub Actions CI Run 38693436299](https://github.com/bYiyLi/kg-os/actions/runs/38693436299) 状态 **completed / success，8/8 Jobs 全绿**：Ubuntu `Validate`、`Unified Docker / Linux amd64` 以及 Native Runtime `darwin-arm64`、`darwin-x64`、`linux-arm64`、`linux-x64`、`win32-arm64`、`win32-x64`。先前 Run `38692324423` 的 Windows POSIX 权限断言失败已由 `aef5dbc` 修复并在新 Run 的两项 Windows Job 实际验证通过。此 CI 不等于 Tag、GHCR Release 或生产部署；后者没有执行，仍需分别授权。

@@ -990,7 +990,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D97 KG OS 内建可观测性与关键业务结果事件（2026-10-15）
 
-- **决定**：在现有单进程 `kgosd` 内使用 Go `log/slog`、服务端生成的 Request ID、Kernel 确认结果事件和进程内聚合 Metrics 形成轻量可观测性。不引入独立 Agent、日志数据库、分布式追踪或新的 Lithograph 依赖。目标包含 JSON System/Access Logs、业务与安全事件、日志轮转、只读受控运行诊断；实现由 [Phase 19](../development/phases/19-observability.md) 承担，当前工作树已有代码，完整阶段验收状态以该计划为准。
+- **决定**：在现有单进程 `kgosd` 内使用 Go `log/slog`、服务端生成的 Request ID、Kernel 确认结果事件和进程内聚合 Metrics 形成轻量可观测性。不引入独立 Agent、日志数据库、分布式追踪或新的 Lithograph 依赖。目标包含 JSON System/Access Logs、业务与安全事件、日志轮转、只读受控运行诊断；实现及阶段验收证据见 [Phase 19](../development/phases/19-observability.md)。
 - **业务真实结果**：关键写操作在确认结果的业务层记录，不能从 HTTP 200、Graph Execute 的调用形式、NDJSON 已输出的 row 或 MCP Tool 最终状态推断“持久提交”；`kgos_run` 中先成功、后失败的多个操作保留各自结果；取消/断线后的不确定写入按 `unknown` 处理，不重放也不承诺回滚。安全事件由实际认证/OAuth owner 确认，不通过日志新增用户权限或身份语义。
 - **运维与权限**：现有 `.kgos/logs` 作为本地诊断目录，单一文件轮转 owner；Docker 使用原有标准日志流和容器 retention。日志只是可丢弃诊断数据，不是业务 State、审计账本或 exactly-once 事件流。日志失败不能改变业务事务。受保护的 `POST /api/v1/system/diagnostics` 使用现有 API/Web 认证，不向 MCP OAuth Token 提供普通 API 访问权；CLI stdout/stderr 合同不变。
 - **安全取舍**：只允许固定事件/操作/错误类别、耗时、计数、可确认 Commit 等字段；不记录 Token、Cookie、URL Query、Cypher/JavaScript/Patch/Knowledge 正文、用户命名或未筛选底层异常。由此牺牲日志中的完整业务正文与部分定位便利，换取可控的数据暴露和固定指标基数；准确业务真相仍通过已存在的版本/业务 API 核对。

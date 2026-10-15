@@ -59,7 +59,7 @@ pnpm dev:mcp rollback    # 手工回到上次通过验收的镜像，保留数�
 pnpm dev:mcp stop        # 仅停止 KG OS Dev 容器，不删除 Workspace
 ```
 
-Phase 19 的当前工作树代码将 `kgosd` 的诊断日志统一为 JSON Lines，使用可选 `KGOS_LOG_LEVEL=DEBUG|INFO|WARN|ERROR`（默认 INFO，修改后重启生效）；不能借 DEBUG 输出 Token、Cypher、Patch 或脚本正文。Docker 使用容器日志流，受控 Dev Compose 限制日志大小与文件数；正式镜像无法单独强制宿主 Docker driver 的日志保留策略。CLI 自动启动的本地 `kgosd` 由自身维护 `.kgos/logs/kgosd.log`（单文件 10 MiB，最多 5 个），`kgosd.startup.log` 保存启动地址与早期错误，不应拿它充当业务事件日志。
+Phase 19 已将 `kgosd` 的诊断日志统一为 JSON Lines，使用可选 `KGOS_LOG_LEVEL=DEBUG|INFO|WARN|ERROR`（默认 INFO，修改后重启生效）；不能借 DEBUG 输出 Token、Cypher、Patch 或脚本正文。Docker 使用容器日志流，受控 Dev Compose 限制日志大小与文件数；正式镜像无法单独强制宿主 Docker driver 的日志保留策略。CLI 自动启动的本地 `kgosd` 由自身维护 `.kgos/logs/kgosd.log`（单文件 10 MiB，最多 5 个），`kgosd.startup.log` 保存启动地址与早期错误，不应拿它充当业务事件日志。
 
 对当前已授权的 Instance，可通过 `POST /api/v1/system/diagnostics`（JSON 请求体 `{}`）取得进程内指标摘要；必须使用合法 Instance Bearer，或符合现有 Web Access Bearer + Boot Guard 的浏览器会话。不能用 MCP OAuth Token 调用普通 API。需要定位单次请求时，使用服务端返回的 `X-KGOS-Request-ID` 与只属于该 Instance 的安全日志关联；诊断 API 不提供原始日志下载。**Phase 19 能力已部署 Dev 并通过本地只读诊断验收；远端 CI 完成与否仍按 Phase 19 开发记录独立判断。**
 

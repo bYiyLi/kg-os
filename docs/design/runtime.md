@@ -477,7 +477,7 @@ endpoint 永远是本机 loopback URL。token绝不能写入lock；CLI从同一I
 
 ### `logs/`
 
-`logs/` 保存 `kgosd` 的本地诊断日志，不属于 Knowledge Base history 或业务状态真源。结构化日志、关键业务事件、请求关联、文件轮转/保留、容器日志分工与 Metrics 统一由 [Observability](observability.md) 拥有；当前工作树实现由 [Phase 19](../development/phases/19-observability.md) 跟踪，本地日志与轮转的真实验收以该阶段的证据为准。
+`logs/` 保存 `kgosd` 的本地诊断日志，不属于 Knowledge Base history 或业务状态真源。结构化日志、关键业务事件、请求关联、文件轮转/保留、容器日志分工与 Metrics 统一由 [Observability](observability.md) 拥有；具体实现与已通过的验收证据见 [Phase 19](../development/phases/19-observability.md)。
 
 ### `kgos.db`
 

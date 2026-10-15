@@ -4,7 +4,7 @@
 
 本文是 KG OS **日志、关键业务事件、请求关联和运行指标**的唯一设计真源。适用范围是当前单进程 Go `kgosd`、Kernel、HTTP API、Web 认证、OAuth、MCP 与 Sandbox，以及 TypeScript SDK/CLI 的必要诊断适配。实现与验收见 [Phase 19](../development/phases/19-observability.md)；[D97](decisions.md#d97-kgos-observability) 记录架构取舍。
 
-本设计已开始在当前工作树实现：新增 `internal/observability`，统一单进程 `kgosd` 的结构化日志、业务事件、Request ID、指标与只读诊断 API。本地 CLI 启动路径已改为 daemon 自管 `.kgos/logs/kgosd.log` 并轮转，`kgosd.startup.log` 只保存启动时的地址输出/早期诊断；容器继续使用标准日志流。**代码已写入不等于已完成阶段验收**；实测、CI 和阶段状态以 [Phase 19](../development/phases/19-observability.md) 为准。
+本合同已由 [Phase 19](../development/phases/19-observability.md) 实现并完成验收：`internal/observability` 为单进程 `kgosd` 提供结构化日志、业务事件、Request ID、指标与只读诊断 API；本地 CLI 由 daemon 自管 `.kgos/logs/kgosd.log` 轮转，`kgosd.startup.log` 保存启动地址输出/早期诊断，容器继续使用标准日志流。具体实现、Mac/Dev 及 GitHub CI 成功证据归 Phase 19 开发记录维护。
 
 ## 目标与边界
 
