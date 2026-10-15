@@ -9,9 +9,9 @@ import (
 )
 
 type AncestryInput struct {
-	Root   string `json:"root"`
-	Limit  *int   `json:"limit,omitempty"`
-	Cursor string `json:"cursor,omitempty"`
+	Root   string `json:"root" jsonschema:"Branch or Commit reference to inspect, such as branch/main or commit/<id>."`
+	Limit  *int   `json:"limit,omitempty" jsonschema:"Maximum Commits per page, 1 through 1000; default 20."`
+	Cursor string `json:"cursor,omitempty" jsonschema:"Opaque continuation cursor returned by the previous page; omit for the first page."`
 }
 type AncestryOutput struct {
 	Root     string `json:"root"`

@@ -75,6 +75,7 @@ const driverScript = `(() => {
       abort: (req) => call('evolution.merge.abort', req)
     })
   });
+  globalThis.help = freeze((...args) => call('sdk.help', ...args));
   const check = (v, stack = new Set(), depth = 0) => {
     if (depth > 64) throw new TypeError('JSON depth exceeded');
     if (v === null || typeof v === 'string' || typeof v === 'boolean') return;

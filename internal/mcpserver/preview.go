@@ -17,9 +17,9 @@ import (
 const previewPageSize = 100
 
 type PreviewInput struct {
-	Offset       int    `json:"offset,omitempty"`
-	Limit        *int   `json:"limit,omitempty"`
-	ViewRevision string `json:"viewRevision,omitempty"`
+	Offset       int    `json:"offset,omitempty" jsonschema:"Zero-based line offset in the complete Markdown view; default 0."`
+	Limit        *int   `json:"limit,omitempty" jsonschema:"Lines to return, 100 through 500; default 300. This limits the returned window, not the full view generation."`
+	ViewRevision string `json:"viewRevision,omitempty" jsonschema:"Revision from a previous preview call to read the same frozen view; omit to generate a new view."`
 }
 type PreviewOutput struct {
 	TotalLines   int    `json:"totalLines"`

@@ -22,7 +22,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听目标、dynamic loopback endpoint、`auth.json` / `kgosd.lock`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
 | [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |
 | [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
-| [decisions.md](design/decisions.md) | D1–D97 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [decisions.md](design/decisions.md) | D1–D98 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 ## 从配置到调用
@@ -35,6 +35,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 使用方怎么定义模型和索引 | [Ontology 公共格式](design/ontology.md#公共可编辑格式)、[完整编辑示例](design/ontology.md#编辑示例) |
 | 调用方怎么保存正文和查询 | [Graph 合同](design/graph.md#graph-公共调用合同)、[CLI query](design/cli.md#query)、[CLI execute](design/cli.md#execute) |
 | AI 如何通过 MCP / 私人 Plugin 预览知识库及执行受控 SDK | [MCP / Plugin 设计](design/mcp.md) |
+| MCP 内的 AI 怎样获取准确 SDK 入参、出参及使用例子 | [MCP SDK Help](design/mcp.md#mcp-tool-help)、[D98](design/decisions.md#d98-mcp-sdk-help-prompt-contract)、[Phase 20](development/phases/20-mcp-tool-help.md) |
 | 人怎样浏览图谱、查询、编辑和管理版本 | [Web 设计](design/web.md)、[功能画板与覆盖](design/web-materials.md)、[一致评审样例](design/web-examples.md)；内置同源交付见 [Runtime](design/runtime.md#web-hosting) |
 | Web 中英文如何识别、切换与管理文案 | [Web 国际化与语言偏好](design/web.md#国际化与语言偏好)、[Phase 14 P14-00](development/phases/14-web.md#a14-00-国际化基础与双语界面)；CLI locale 为独立合同，见 [CLI 国际化](design/cli.md#国际化) |
 | 需要实现和验证什么 | [工程待办与验收](design/implementation.md) |

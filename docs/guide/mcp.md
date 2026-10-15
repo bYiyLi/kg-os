@@ -80,7 +80,7 @@ curl -i http://127.0.0.1:3777/api/v1/evolution/overview
 
 ## 3. MCP Tool 和 JavaScript
 
-MCP 只暴露以下四个 Tool：
+MCP 提供以下四个 **AI-facing 业务 Tool**；另有一个只用于 ChatGPT 工作区入口的 app-only `kgos_workspace`，因此标准 MCP `tools/list` 可以返回五项。
 
 | Tool | 输入与用途 |
 | --- | --- |
@@ -90,6 +90,20 @@ MCP 只暴露以下四个 Tool：
 | `kgos_run` | `code`；允许 15 Read + 16 Write SDK 方法 |
 
 在 `kgos_read` / `kgos_run` 的 `code` 中编写 **async JavaScript 函数体**，直接使用 `ontology`、`object`、`graph`、`evolution` 四个无前缀命名空间，无需创建 SDK Client 或 HTTP 连接；必须显式 `return` JSON-compatible 值：
+
+需要准确的 SDK 方法签名、参数/返回类型及可执行示例时，先在**只读的** `kgos_read` 中运行：
+
+```js
+return await help(); // 当前 MCP 支持的 31 个方法目录
+```
+
+或者按方法查询（也可用于查询写方法的帮助，但不授予写权限）：
+
+```js
+return await help("evolution.state.create");
+```
+
+结果来自当前 `@kgos/sdk` 公共 TypeScript 类型的版本固定 Help，包含依赖的嵌套类型。示例中的标识、Revision、Branch 和修改内容是**占位值**；执行前必须读取实际 State 并使用真实、已授权的目标。Help 不需要网络调用或额外凭证，不增加第五个 AI-facing 业务 Tool；`@kgos/sdk` 的 TypeScript 调用方也能直接导入本地同步 `help(name?)`。
 
 ```js
 const { state } = await evolution.overview();

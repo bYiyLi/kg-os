@@ -309,6 +309,25 @@ try {
   const endpoint = await start();
   await verifyHTTP(endpoint);
   await connect(endpoint);
+  const helpDoc = toolValue(
+    await mcpClient.callTool({
+      name: "kgos_read",
+      arguments: { code: 'return await help("evolution.state.create")' }
+    })
+  );
+  assert.match(helpDoc.result.signature, /StateCreateRequest/);
+  assert.match(helpDoc.result.typeDefinitions.join("\n"), /interface StateCreateResult/);
+  const helpIndex = toolValue(
+    await mcpClient.callTool({ name: "kgos_read", arguments: { code: "return await help()" } })
+  );
+  assert.equal(helpIndex.result.length, 31, "MCP Help inventory differs from the SDK");
+  const refused = await mcpClient.callTool({
+    name: "kgos_read",
+    arguments: {
+      code: 'return await evolution.branch.create({name:"forbidden",from:"branch/main"})'
+    }
+  });
+  assert.equal(refused.isError, true, "Help did not preserve the read-only sandbox");
   const preview = toolValue(
     await mcpClient.callTool({ name: "kgos_preview", arguments: { limit: 100 } })
   );

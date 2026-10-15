@@ -45,7 +45,7 @@ func (s *Server) registerWorkspace(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "kgos_workspace",
 		Title:       "KG OS Workspace",
-		Description: "Open the KG OS workspace in ChatGPT. Use this entrypoint to display the interactive interface.",
+		Description: "Open the interactive KG OS workspace in a supported MCP Apps host. This app-only entrypoint accepts no arguments; opening the interface does not directly read or modify KG OS data.",
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    true,
 			DestructiveHint: &closed,

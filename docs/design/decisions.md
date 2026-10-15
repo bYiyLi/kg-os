@@ -996,3 +996,12 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **安全取舍**：只允许固定事件/操作/错误类别、耗时、计数、可确认 Commit 等字段；不记录 Token、Cookie、URL Query、Cypher/JavaScript/Patch/Knowledge 正文、用户命名或未筛选底层异常。由此牺牲日志中的完整业务正文与部分定位便利，换取可控的数据暴露和固定指标基数；准确业务真相仍通过已存在的版本/业务 API 核对。
 - **依据与替代方案**：当前 daemon 只有少量启动/错误文本，本地 CLI append 日志没有轮转，HTTP/MCP/Kernel 未提供完整链路业务结果与指标；直接引入 OpenTelemetry、Prometheus、集中日志平台或 Graph 事件存储会在单进程阶段增加没有当前需求支持的服务/依赖和状态。先内建精简、真实、可安全定位的诊断能力；外部观测系统不属于本决定的依赖或产品承诺。
 - 当前合同：[Observability](observability.md)、[Runtime logs](runtime.md#logs)、[MCP](mcp.md)、[Phase 19](../development/phases/19-observability.md)。
+
+<a id="d98-mcp-sdk-help-prompt-contract"></a>
+
+### D98 MCP SDK 自描述帮助与工具提示词合同（2026-10-15）
+
+- **决定**：保留四个 MCP 业务 Tool 与一个 app-only UI Tool，不把 31 个 SDK 方法扩成单独 Tool。两种脚本 Tool 暴露只读 `help()` / `help("method.name")`，让 AI 按需获取真实入参、出参、签名、示例及约束；`kgos_read` 可查看写入方法帮助但不得执行写入。`@kgos/sdk` 同时公开本地同名帮助函数。
+- **真源与实现**：以现有 TypeScript SDK 的方法/类型及领域设计为真源，生成供 TypeScript/Go 使用的版本固定文档快照。MCP Go Bridge 只查询内嵌静态资料，不能重新调用网络或实例数据库；生成一致性/覆盖率由构建检查和测试把关。Tool 描述简短说明适用时机、参数和权限；通用 Server Instructions 只保留跨工具必要规则。
+- **依据与取舍**：只有方法名时 AI 无法确定嵌套参数和结果格式，把 31 套签名都写进 Tool Description 又臃肿、易过时。静态按需 Help 减少猜测与重复定义，但必须维护示例、生成物及跨平台打包验证；不把提示词当权限实施机制，不改变 JS 事务、Sandbox 或业务 API 的真实合同。
+- 现行规则：[MCP Tool / Help](mcp.md#mcp-tool-help)、[Client](client.md#kgossdk)；实施/验收归 [Phase 20](../development/phases/20-mcp-tool-help.md)。

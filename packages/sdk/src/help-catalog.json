@@ -1,0 +1,558 @@
+{
+  "methods": [
+    {
+      "name": "evolution.ancestry",
+      "description": "Read a paginated ancestor DAG from a Branch or Commit.",
+      "access": "read",
+      "signature": "evolution.ancestry(request: EvolutionAncestryRequest): Promise<EvolutionAncestryResult>",
+      "requestType": "EvolutionAncestryRequest",
+      "returnType": "Promise<EvolutionAncestryResult>",
+      "typeDefinitions": [
+        "interface EvolutionAncestryRequest {\n  root: string;\n  limit?: number;\n  cursor?: string;\n}",
+        "interface EvolutionAncestryResult {\n  root: string;\n  items: StateSummary[];\n  cursor?: string;\n}",
+        "interface StateSummary {\n  state: string;\n  parents: string[];\n  author?: string;\n  message?: string;\n  committedAt: number;\n}"
+      ],
+      "example": "return await evolution.ancestry({ root: \"branch/main\", limit: 20 });",
+      "notes": []
+    },
+    {
+      "name": "evolution.branch.create",
+      "description": "Create a Branch from a specified existing State.",
+      "access": "write",
+      "signature": "evolution.branch.create(request: BranchCreateRequest): Promise<BranchMutationResult>",
+      "requestType": "BranchCreateRequest",
+      "returnType": "Promise<BranchMutationResult>",
+      "typeDefinitions": [
+        "interface BranchCreateRequest {\n  name: string;\n  from: string;\n}",
+        "interface BranchMutationResult {\n  name: string;\n  state?: string;\n  previousState?: string;\n}"
+      ],
+      "example": "return await evolution.branch.create({ name: \"<new-branch>\", from: \"<source-state>\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing."
+      ]
+    },
+    {
+      "name": "evolution.branch.delete",
+      "description": "Delete a Branch reference, not its immutable Commit history.",
+      "access": "write",
+      "signature": "evolution.branch.delete(request: BranchDeleteRequest): Promise<BranchMutationResult>",
+      "requestType": "BranchDeleteRequest",
+      "returnType": "Promise<BranchMutationResult>",
+      "typeDefinitions": [
+        "interface BranchDeleteRequest {\n  name: string;\n}",
+        "interface BranchMutationResult {\n  name: string;\n  state?: string;\n  previousState?: string;\n}"
+      ],
+      "example": "return await evolution.branch.delete({ name: \"<target-branch>\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing."
+      ]
+    },
+    {
+      "name": "evolution.branch.list",
+      "description": "List Branch names and their current States.",
+      "access": "read",
+      "signature": "evolution.branch.list(): Promise<EvolutionRefListResult>",
+      "requestType": null,
+      "returnType": "Promise<EvolutionRefListResult>",
+      "typeDefinitions": [
+        "interface EvolutionRefItem {\n  name: string;\n  state: string;\n}",
+        "interface EvolutionRefListResult {\n  items: EvolutionRefItem[];\n}"
+      ],
+      "example": "return await evolution.branch.list();",
+      "notes": []
+    },
+    {
+      "name": "evolution.diff",
+      "description": "Compare public changes between two immutable States.",
+      "access": "read",
+      "signature": "evolution.diff(request: EvolutionDiffRequest): Promise<EvolutionDiffResult>",
+      "requestType": "EvolutionDiffRequest",
+      "returnType": "Promise<EvolutionDiffResult>",
+      "typeDefinitions": [
+        "interface EvolutionChange {\n  change: string;\n  kind: ObjectKind;\n  path: string;\n  beforeRef?: string;\n  afterRef?: string;\n  relatedRefs?: string[];\n  before?: JsonValue;\n  after?: JsonValue;\n}",
+        "interface EvolutionDiffRequest {\n  before: string;\n  after: string;\n  scope: string;\n  object?: EvolutionObjectFilter;\n  limit?: number;\n  cursor?: string;\n}",
+        "interface EvolutionDiffResult {\n  before: string;\n  after: string;\n  items: EvolutionChange[];\n  cursor?: string;\n}",
+        "interface EvolutionObjectFilter {\n  anchorState: string;\n  ref: string;\n}",
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];",
+        "type ObjectKind =\n  | \"domain\"\n  | \"node-definition\"\n  | \"relationship-definition\"\n  | \"knowledge-node\"\n  | \"knowledge-relationship\";"
+      ],
+      "example": "return await evolution.diff({ before: \"<base-state>\", after: \"<target-state>\", scope: \"all\" });",
+      "notes": [
+        "scope is all, ontology, knowledge, or object. For object scope, supply an object filter with anchorState and ref."
+      ]
+    },
+    {
+      "name": "evolution.get",
+      "description": "Inspect one State's metadata, consistency, and State Data.",
+      "access": "read",
+      "signature": "evolution.get(request: EvolutionGetRequest): Promise<EvolutionGetResult>",
+      "requestType": "EvolutionGetRequest",
+      "returnType": "Promise<EvolutionGetResult>",
+      "typeDefinitions": [
+        "interface ConsistencyIssue {\n  code: string;\n  message: string;\n}",
+        "interface ConsistencyStatus {\n  status: string;\n  issues: ConsistencyIssue[];\n}",
+        "interface EvolutionGetRequest {\n  state: string;\n}",
+        "interface EvolutionGetResult extends StateSummary {\n  consistency: ConsistencyStatus;\n  hasData: boolean;\n  data: JsonValue;\n}",
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];",
+        "interface StateSummary {\n  state: string;\n  parents: string[];\n  author?: string;\n  message?: string;\n  committedAt: number;\n}"
+      ],
+      "example": "return await evolution.get({ state: \"branch/main\" });",
+      "notes": []
+    },
+    {
+      "name": "evolution.history",
+      "description": "Read public changes reachable from a State with scope filtering.",
+      "access": "read",
+      "signature": "evolution.history(request: EvolutionHistoryRequest): Promise<EvolutionHistoryResult>",
+      "requestType": "EvolutionHistoryRequest",
+      "returnType": "Promise<EvolutionHistoryResult>",
+      "typeDefinitions": [
+        "interface EvolutionChange {\n  change: string;\n  kind: ObjectKind;\n  path: string;\n  beforeRef?: string;\n  afterRef?: string;\n  relatedRefs?: string[];\n  before?: JsonValue;\n  after?: JsonValue;\n}",
+        "interface EvolutionHistoryEntry {\n  state: string;\n  parents: string[];\n  change: EvolutionChange | null;\n}",
+        "interface EvolutionHistoryRequest {\n  root: string;\n  scope: string;\n  object?: EvolutionObjectFilter;\n  limit?: number;\n  cursor?: string;\n}",
+        "interface EvolutionHistoryResult {\n  root: string;\n  items: EvolutionHistoryEntry[];\n  cursor?: string;\n}",
+        "interface EvolutionObjectFilter {\n  anchorState: string;\n  ref: string;\n}",
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];",
+        "type ObjectKind =\n  | \"domain\"\n  | \"node-definition\"\n  | \"relationship-definition\"\n  | \"knowledge-node\"\n  | \"knowledge-relationship\";"
+      ],
+      "example": "return await evolution.history({ root: \"branch/main\", scope: \"all\", limit: 20 });",
+      "notes": [
+        "scope is all, ontology, knowledge, or object. For object scope, supply an object filter with anchorState and ref."
+      ]
+    },
+    {
+      "name": "evolution.merge.abort",
+      "description": "Abort an unfinished Merge Session at its current revision.",
+      "access": "write",
+      "signature": "evolution.merge.abort(request: MergeAbortRequest): Promise<MergeAbortResult>",
+      "requestType": "MergeAbortRequest",
+      "returnType": "Promise<MergeAbortResult>",
+      "typeDefinitions": [
+        "interface MergeAbortRequest {\n  session: string;\n  expectedRevision: number;\n}",
+        "interface MergeAbortResult {\n  session: string;\n}"
+      ],
+      "example": "const s = await evolution.merge.get({ session: \"<session-id>\" }); return await evolution.merge.abort({ session: s.session, expectedRevision: s.revision });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "Use the observed Merge Session revision. Aborting a Session does not undo previous commits."
+      ]
+    },
+    {
+      "name": "evolution.merge.conflicts",
+      "description": "Read paginated Merge conflicts and the current Session revision.",
+      "access": "read",
+      "signature": "evolution.merge.conflicts(request: MergeConflictsRequest): Promise<MergeConflictsResult>",
+      "requestType": "MergeConflictsRequest",
+      "returnType": "Promise<MergeConflictsResult>",
+      "typeDefinitions": [
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];",
+        "interface MergeConflict {\n  conflictId: string;\n  kind: ObjectKind;\n  path: string;\n  baseRef?: string;\n  oursRef?: string;\n  theirsRef?: string;\n  relatedRefs?: string[];\n  base?: JsonValue;\n  ours?: JsonValue;\n  theirs?: JsonValue;\n  resolution?: MergeConflictResolution;\n}",
+        "interface MergeConflictResolution {\n  choice: string;\n  value?: JsonValue;\n}",
+        "interface MergeConflictsRequest {\n  session: string;\n  limit?: number;\n  cursor?: string;\n}",
+        "interface MergeConflictsResult {\n  session: string;\n  revision: number;\n  items: MergeConflict[];\n  cursor?: string;\n}",
+        "type ObjectKind =\n  | \"domain\"\n  | \"node-definition\"\n  | \"relationship-definition\"\n  | \"knowledge-node\"\n  | \"knowledge-relationship\";"
+      ],
+      "example": "return await evolution.merge.conflicts({ session: \"<session-id>\", limit: 20 });",
+      "notes": []
+    },
+    {
+      "name": "evolution.merge.finalize",
+      "description": "Finalize a Merge Session using its current revision; may fast-forward or create a Commit.",
+      "access": "write",
+      "signature": "evolution.merge.finalize(request: MergeFinalizeRequest): Promise<MergeFinalizeResult>",
+      "requestType": "MergeFinalizeRequest",
+      "returnType": "Promise<MergeFinalizeResult>",
+      "typeDefinitions": [
+        "interface MergeFinalizeRequest {\n  session: string;\n  expectedRevision: number;\n  author?: string;\n  message?: string;\n}",
+        "interface MergeFinalizeResult {\n  status: string;\n  targetState: string;\n  sourceState: string;\n  state: string;\n}"
+      ],
+      "example": "const s = await evolution.merge.get({ session: \"<session-id>\" }); return await evolution.merge.finalize({ session: s.session, expectedRevision: s.revision });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "Use the observed Merge Session revision. The Session may be stale after other changes."
+      ]
+    },
+    {
+      "name": "evolution.merge.get",
+      "description": "Read the current status and revision of a Merge Session.",
+      "access": "read",
+      "signature": "evolution.merge.get(request: MergeGetRequest): Promise<MergeSession>",
+      "requestType": "MergeGetRequest",
+      "returnType": "Promise<MergeSession>",
+      "typeDefinitions": [
+        "interface MergeGetRequest {\n  session: string;\n}",
+        "interface MergeSession extends MergeSessionSummary {\n  status: string;\n  unresolved: number;\n}",
+        "interface MergeSessionSummary {\n  session: string;\n  branch: string;\n  targetState: string;\n  sourceState: string;\n  revision: number;\n}"
+      ],
+      "example": "return await evolution.merge.get({ session: \"<session-id>\" });",
+      "notes": []
+    },
+    {
+      "name": "evolution.merge.list",
+      "description": "List Merge Sessions with optional pagination.",
+      "access": "read",
+      "signature": "evolution.merge.list(request?: MergeListRequest): Promise<MergeListResult>",
+      "requestType": "MergeListRequest",
+      "returnType": "Promise<MergeListResult>",
+      "typeDefinitions": [
+        "interface MergeListRequest {\n  limit?: number;\n  cursor?: string;\n}",
+        "interface MergeListResult {\n  items: MergeSessionSummary[];\n  cursor?: string;\n}",
+        "interface MergeSessionSummary {\n  session: string;\n  branch: string;\n  targetState: string;\n  sourceState: string;\n  revision: number;\n}"
+      ],
+      "example": "return await evolution.merge.list({ limit: 20 });",
+      "notes": []
+    },
+    {
+      "name": "evolution.merge.resolve",
+      "description": "Apply conflict resolutions using the observed Session revision.",
+      "access": "write",
+      "signature": "evolution.merge.resolve(request: MergeResolveRequest): Promise<MergeSession>",
+      "requestType": "MergeResolveRequest",
+      "returnType": "Promise<MergeSession>",
+      "typeDefinitions": [
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];",
+        "interface MergeResolution {\n  conflictId: string;\n  choice: string;\n  value?: JsonValue;\n}",
+        "interface MergeResolveRequest {\n  session: string;\n  expectedRevision: number;\n  resolutions: MergeResolution[];\n}",
+        "interface MergeSession extends MergeSessionSummary {\n  status: string;\n  unresolved: number;\n}",
+        "interface MergeSessionSummary {\n  session: string;\n  branch: string;\n  targetState: string;\n  sourceState: string;\n  revision: number;\n}"
+      ],
+      "example": "const s = await evolution.merge.get({ session: \"<session-id>\" }); return await evolution.merge.resolve({ session: s.session, expectedRevision: s.revision, resolutions: [{ conflictId: \"<conflict-id>\", choice: \"ours\" }] });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "Use the current Merge Session revision, and choose resolutions based on the observed conflicts; 'ours' is only an illustrative choice."
+      ]
+    },
+    {
+      "name": "evolution.merge.start",
+      "description": "Start a Merge Session for an existing target Branch and source State.",
+      "access": "write",
+      "signature": "evolution.merge.start(request: MergeStartRequest): Promise<MergeSession>",
+      "requestType": "MergeStartRequest",
+      "returnType": "Promise<MergeSession>",
+      "typeDefinitions": [
+        "interface MergeSession extends MergeSessionSummary {\n  status: string;\n  unresolved: number;\n}",
+        "interface MergeSessionSummary {\n  session: string;\n  branch: string;\n  targetState: string;\n  sourceState: string;\n  revision: number;\n}",
+        "interface MergeStartRequest {\n  branch: string;\n  source: string;\n}"
+      ],
+      "example": "return await evolution.merge.start({ branch: \"<target-branch>\", source: \"<source-state>\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing."
+      ]
+    },
+    {
+      "name": "evolution.overview",
+      "description": "Resolve the default Branch and current State.",
+      "access": "read",
+      "signature": "evolution.overview(): Promise<EvolutionOverviewResult>",
+      "requestType": null,
+      "returnType": "Promise<EvolutionOverviewResult>",
+      "typeDefinitions": [
+        "interface EvolutionOverviewResult {\n  defaultBranch: string;\n  state: string;\n}"
+      ],
+      "example": "return await evolution.overview();",
+      "notes": []
+    },
+    {
+      "name": "evolution.state.clearData",
+      "description": "Remove a State's mutable Data annotation; no new Commit.",
+      "access": "write",
+      "signature": "evolution.state.clearData(request: StateClearDataRequest): Promise<StateClearDataResult>",
+      "requestType": "StateClearDataRequest",
+      "returnType": "Promise<StateClearDataResult>",
+      "typeDefinitions": [
+        "interface StateClearDataRequest {\n  state: string;\n}",
+        "interface StateClearDataResult {\n  state: string;\n}"
+      ],
+      "example": "return await evolution.state.clearData({ state: \"<target-state>\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "State Data is a mutable annotation, not part of the versioned Knowledge/Ontology graph."
+      ]
+    },
+    {
+      "name": "evolution.state.create",
+      "description": "Create a new Commit/State on an existing Branch, even without graph changes.",
+      "access": "write",
+      "signature": "evolution.state.create(request: StateCreateRequest): Promise<StateCreateResult>",
+      "requestType": "StateCreateRequest",
+      "returnType": "Promise<StateCreateResult>",
+      "typeDefinitions": [
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];",
+        "interface StateCreateRequest {\n  branch: string;\n  data?: JsonValue;\n  author?: string;\n  message?: string;\n}",
+        "interface StateCreateResult {\n  state: string;\n}"
+      ],
+      "example": "return await evolution.state.create({ branch: \"<target-branch>\", message: \"Create a checkpoint\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "Creates a Commit even when the graph snapshot does not change."
+      ]
+    },
+    {
+      "name": "evolution.state.setData",
+      "description": "Replace the mutable JSON State Data on an existing State; no new Commit.",
+      "access": "write",
+      "signature": "evolution.state.setData(request: StateSetDataRequest): Promise<StateSetDataResult>",
+      "requestType": "StateSetDataRequest",
+      "returnType": "Promise<StateSetDataResult>",
+      "typeDefinitions": [
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];",
+        "interface StateSetDataRequest {\n  state: string;\n  data: JsonValue;\n}",
+        "interface StateSetDataResult {\n  state: string;\n  data: JsonValue;\n}"
+      ],
+      "example": "return await evolution.state.setData({ state: \"<target-state>\", data: { note: \"reviewed\" } });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "State Data is a mutable annotation, not part of the versioned Knowledge/Ontology graph."
+      ]
+    },
+    {
+      "name": "evolution.tag.create",
+      "description": "Create a Tag pointing at a State.",
+      "access": "write",
+      "signature": "evolution.tag.create(request: TagCreateRequest): Promise<TagMutationResult>",
+      "requestType": "TagCreateRequest",
+      "returnType": "Promise<TagMutationResult>",
+      "typeDefinitions": [
+        "interface TagCreateRequest {\n  name: string;\n  target: string;\n}",
+        "interface TagMutationResult {\n  name: string;\n  state?: string;\n  previousState?: string;\n}"
+      ],
+      "example": "return await evolution.tag.create({ name: \"<new-tag>\", target: \"<target-state>\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing."
+      ]
+    },
+    {
+      "name": "evolution.tag.delete",
+      "description": "Remove a Tag reference without deleting the underlying Commit.",
+      "access": "write",
+      "signature": "evolution.tag.delete(request: TagDeleteRequest): Promise<TagMutationResult>",
+      "requestType": "TagDeleteRequest",
+      "returnType": "Promise<TagMutationResult>",
+      "typeDefinitions": [
+        "interface TagDeleteRequest {\n  name: string;\n}",
+        "interface TagMutationResult {\n  name: string;\n  state?: string;\n  previousState?: string;\n}"
+      ],
+      "example": "return await evolution.tag.delete({ name: \"<target-tag>\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing."
+      ]
+    },
+    {
+      "name": "evolution.tag.list",
+      "description": "List Tag names and their current States.",
+      "access": "read",
+      "signature": "evolution.tag.list(): Promise<EvolutionRefListResult>",
+      "requestType": null,
+      "returnType": "Promise<EvolutionRefListResult>",
+      "typeDefinitions": [
+        "interface EvolutionRefItem {\n  name: string;\n  state: string;\n}",
+        "interface EvolutionRefListResult {\n  items: EvolutionRefItem[];\n}"
+      ],
+      "example": "return await evolution.tag.list();",
+      "notes": []
+    },
+    {
+      "name": "evolution.tag.move",
+      "description": "Move an existing Tag to another State.",
+      "access": "write",
+      "signature": "evolution.tag.move(request: TagMoveRequest): Promise<TagMutationResult>",
+      "requestType": "TagMoveRequest",
+      "returnType": "Promise<TagMutationResult>",
+      "typeDefinitions": [
+        "interface TagMoveRequest {\n  name: string;\n  target: string;\n}",
+        "interface TagMutationResult {\n  name: string;\n  state?: string;\n  previousState?: string;\n}"
+      ],
+      "example": "return await evolution.tag.move({ name: \"<existing-tag>\", target: \"<target-state>\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing."
+      ]
+    },
+    {
+      "name": "graph.execute",
+      "description": "Execute Cypher on a writable Branch; its effect depends on the statement.",
+      "access": "write",
+      "signature": "graph.execute(request: GraphExecuteRequest): Promise<GraphExecuteResult>",
+      "requestType": "GraphExecuteRequest",
+      "returnType": "Promise<GraphExecuteResult>",
+      "typeDefinitions": [
+        "interface GraphExecuteRequest {\n  branch: string;\n  cypher: string;\n  params?: JsonObject;\n  author?: string;\n  message?: string;\n}",
+        "interface GraphExecuteResult extends GraphQueryResult {\n  counters: JsonValue;\n}",
+        "interface GraphQueryResult {\n  state: string;\n  columns: string[];\n  rows: JsonValue[][];\n}",
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];"
+      ],
+      "example": "return await graph.execute({ branch: \"<target-branch>\", cypher: \"MATCH (n) RETURN count(n) AS count\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "Cypher is passed through unchanged. Calling execute does not guarantee that a new Commit is created."
+      ]
+    },
+    {
+      "name": "graph.query",
+      "description": "Execute a read-only Cypher query at a State.",
+      "access": "read",
+      "signature": "graph.query(request: GraphQueryRequest): Promise<GraphQueryResult>",
+      "requestType": "GraphQueryRequest",
+      "returnType": "Promise<GraphQueryResult>",
+      "typeDefinitions": [
+        "interface GraphQueryRequest {\n  at: string;\n  cypher: string;\n  params?: JsonObject;\n}",
+        "interface GraphQueryResult {\n  state: string;\n  columns: string[];\n  rows: JsonValue[][];\n}",
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];"
+      ],
+      "example": "return await graph.query({ at: \"branch/main\", cypher: \"MATCH (n) RETURN n LIMIT 10\" });",
+      "notes": []
+    },
+    {
+      "name": "graph.streamExecute",
+      "description": "Stream Cypher execution on a writable Branch.",
+      "access": "write",
+      "signature": "graph.streamExecute(request: GraphExecuteRequest): AsyncGenerator<GraphStreamEvent, void, void>",
+      "requestType": "GraphExecuteRequest",
+      "returnType": "AsyncGenerator<GraphStreamEvent, void, void>",
+      "typeDefinitions": [
+        "interface GraphColumnsEvent {\n  type: \"columns\";\n  columns: string[];\n}",
+        "interface GraphExecuteRequest {\n  branch: string;\n  cypher: string;\n  params?: JsonObject;\n  author?: string;\n  message?: string;\n}",
+        "interface GraphRowEvent {\n  type: \"row\";\n  row: JsonValue[];\n}",
+        "type GraphStreamEvent = GraphColumnsEvent | GraphRowEvent | GraphSummaryEvent;",
+        "interface GraphSummaryEvent {\n  type: \"summary\";\n  state: string;\n  counters?: JsonValue;\n}",
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];"
+      ],
+      "example": "const events = []; for await (const event of graph.streamExecute({ branch: \"<target-branch>\", cypher: \"MATCH (n) RETURN count(n)\" })) events.push(event); return events;",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "Rows or columns alone do not confirm success; inspect the terminal summary or error."
+      ]
+    },
+    {
+      "name": "graph.streamQuery",
+      "description": "Stream read-only Cypher columns, rows, and final summary.",
+      "access": "read",
+      "signature": "graph.streamQuery(request: GraphQueryRequest): AsyncGenerator<GraphStreamEvent, void, void>",
+      "requestType": "GraphQueryRequest",
+      "returnType": "AsyncGenerator<GraphStreamEvent, void, void>",
+      "typeDefinitions": [
+        "interface GraphColumnsEvent {\n  type: \"columns\";\n  columns: string[];\n}",
+        "interface GraphQueryRequest {\n  at: string;\n  cypher: string;\n  params?: JsonObject;\n}",
+        "interface GraphRowEvent {\n  type: \"row\";\n  row: JsonValue[];\n}",
+        "type GraphStreamEvent = GraphColumnsEvent | GraphRowEvent | GraphSummaryEvent;",
+        "interface GraphSummaryEvent {\n  type: \"summary\";\n  state: string;\n  counters?: JsonValue;\n}",
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];"
+      ],
+      "example": "const rows = []; for await (const event of graph.streamQuery({ at: \"branch/main\", cypher: \"MATCH (n) RETURN n LIMIT 10\" })) { if (event.type === \"row\") rows.push(event.row); } return rows;",
+      "notes": []
+    },
+    {
+      "name": "object.patch",
+      "description": "Atomically apply a Git Extended Diff spanning public Objects.",
+      "access": "write",
+      "signature": "object.patch(request: PatchRequest): Promise<PatchResult>",
+      "requestType": "PatchRequest",
+      "returnType": "Promise<PatchResult>",
+      "typeDefinitions": [
+        "interface CreatedObject {\n  alias: string;\n  kind: ObjectKind;\n  ref: string;\n}",
+        "type ObjectKind =\n  | \"domain\"\n  | \"node-definition\"\n  | \"relationship-definition\"\n  | \"knowledge-node\"\n  | \"knowledge-relationship\";",
+        "interface PatchRequest {\n  baseState: string;\n  branch: string;\n  patch: string;\n  author?: string;\n  message?: string;\n}",
+        "interface PatchResult {\n  state: string;\n  created: CreatedObject[];\n  transitions: RefTransition[];\n}",
+        "interface RefTransition {\n  from: string;\n  to: string;\n}"
+      ],
+      "example": "return await object.patch({ branch: \"<target-branch>\", baseState: \"<observed-base-state>\", patch: \"<git-extended-diff>\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "Use the observed baseState and canonical editable Object text to construct the patch."
+      ]
+    },
+    {
+      "name": "object.read",
+      "description": "Read public Ontology or Knowledge Objects by Ref at a State.",
+      "access": "read",
+      "signature": "object.read(request: ObjectReadRequest): Promise<ObjectReadResult>",
+      "requestType": "ObjectReadRequest",
+      "returnType": "Promise<ObjectReadResult>",
+      "typeDefinitions": [
+        "interface JsonObject {\n  [key: string]: JsonValue;\n}",
+        "type JsonPrimitive = boolean | null | number | string;",
+        "type JsonValue = JsonPrimitive | JsonObject | JsonValue[];",
+        "type ObjectKind =\n  | \"domain\"\n  | \"node-definition\"\n  | \"relationship-definition\"\n  | \"knowledge-node\"\n  | \"knowledge-relationship\";",
+        "interface ObjectReadItem {\n  kind: ObjectKind;\n  ref: string;\n  value: JsonValue;\n}",
+        "interface ObjectReadRequest {\n  at: string;\n  refs: string[];\n}",
+        "interface ObjectReadResult {\n  state: string;\n  results: ObjectReadItem[];\n}"
+      ],
+      "example": "return await object.read({ at: \"branch/main\", refs: [\"node:Person\"] });",
+      "notes": []
+    },
+    {
+      "name": "object.readText",
+      "description": "Read canonical editable Object text by Ref at a State.",
+      "access": "read",
+      "signature": "object.readText(request: ObjectReadRequest): Promise<ObjectTextReadResult>",
+      "requestType": "ObjectReadRequest",
+      "returnType": "Promise<ObjectTextReadResult>",
+      "typeDefinitions": [
+        "type ObjectKind =\n  | \"domain\"\n  | \"node-definition\"\n  | \"relationship-definition\"\n  | \"knowledge-node\"\n  | \"knowledge-relationship\";",
+        "interface ObjectReadRequest {\n  at: string;\n  refs: string[];\n}",
+        "interface ObjectTextReadItem {\n  kind: ObjectKind;\n  ref: string;\n  body: string;\n}",
+        "interface ObjectTextReadResult {\n  state: string;\n  results: ObjectTextReadItem[];\n}"
+      ],
+      "example": "return await object.readText({ at: \"branch/main\", refs: [\"node:Person\"] });",
+      "notes": []
+    },
+    {
+      "name": "ontology.patch",
+      "description": "Apply an Ontology-scoped Git Extended Diff to a Branch.",
+      "access": "write",
+      "signature": "ontology.patch(request: PatchRequest): Promise<PatchResult>",
+      "requestType": "PatchRequest",
+      "returnType": "Promise<PatchResult>",
+      "typeDefinitions": [
+        "interface CreatedObject {\n  alias: string;\n  kind: ObjectKind;\n  ref: string;\n}",
+        "type ObjectKind =\n  | \"domain\"\n  | \"node-definition\"\n  | \"relationship-definition\"\n  | \"knowledge-node\"\n  | \"knowledge-relationship\";",
+        "interface PatchRequest {\n  baseState: string;\n  branch: string;\n  patch: string;\n  author?: string;\n  message?: string;\n}",
+        "interface PatchResult {\n  state: string;\n  created: CreatedObject[];\n  transitions: RefTransition[];\n}",
+        "interface RefTransition {\n  from: string;\n  to: string;\n}"
+      ],
+      "example": "return await ontology.patch({ branch: \"<target-branch>\", baseState: \"<observed-base-state>\", patch: \"<git-extended-diff>\" });",
+      "notes": [
+        "Example identifiers and revision numbers are placeholders; replace them with verified, authorized targets before executing.",
+        "Use the observed baseState and canonical editable Object text to construct the patch."
+      ]
+    },
+    {
+      "name": "ontology.read",
+      "description": "Read Ontology overview, domains, or definitions at a State.",
+      "access": "read",
+      "signature": "ontology.read(request: OntologyReadRequest): Promise<OntologyReadResult>",
+      "requestType": "OntologyReadRequest",
+      "returnType": "Promise<OntologyReadResult>",
+      "typeDefinitions": [
+        "type ObjectKind =\n  | \"domain\"\n  | \"node-definition\"\n  | \"relationship-definition\"\n  | \"knowledge-node\"\n  | \"knowledge-relationship\";",
+        "interface OntologyReadItem {\n  ref?: string;\n  kind: string;\n  title?: string;\n  description?: string;\n  items: Summary[];\n  total: number;\n  cursor?: string;\n  markdown: string;\n}",
+        "interface OntologyReadRequest {\n  at: string;\n  refs?: string[];\n  limit?: number;\n  cursor?: string;\n}",
+        "interface OntologyReadResult {\n  state: string;\n  results: OntologyReadItem[];\n}",
+        "interface Summary {\n  kind: ObjectKind;\n  ref: string;\n  name: string;\n  title?: string;\n  description?: string;\n  from?: string;\n  to?: string;\n}"
+      ],
+      "example": "return await ontology.read({ at: \"branch/main\" });",
+      "notes": []
+    }
+  ]
+}
