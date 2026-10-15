@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
+import { mockVersionRoutes } from "./version-fixture.js";
+
 const bootID = "69b27834-2c34-4e80-a9c2-b5ac05867e1b";
 const requestID = "a".repeat(43);
 const webToken = "kgws_" + "b".repeat(43);
@@ -50,6 +52,7 @@ async function mockWebConnection(page: Page, loggedIn: boolean, validDetails = t
       body: JSON.stringify({ defaultBranch: "main", state: "commit/test" })
     });
   });
+  await mockVersionRoutes(page);
   await page.route("**/oauth/request?*", async (route) => {
     detailReads++;
     expect(route.request().headers()["authorization"]).toBe("Bearer " + webToken);

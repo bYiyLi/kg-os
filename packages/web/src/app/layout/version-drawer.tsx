@@ -2,22 +2,26 @@ import type { RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "../../shared/ui/icon.js";
+import { VersionTree } from "../../features/version/version-browser.js";
+import type { VersionHistory } from "../../features/version/use-version-history.js";
 
 import { AppBrand } from "./header.js";
 import { LanguageSwitcher } from "./language-switcher.js";
-import { ThemeToggle, VersionTree } from "./version-sidebar.js";
+import { ThemeToggle } from "./version-sidebar.js";
 import type { Theme } from "./version-sidebar.js";
 
 export function VersionDrawer({
   dialogRef,
   theme,
   onToggleTheme,
-  onDisconnect
+  onDisconnect,
+  history
 }: {
   dialogRef: RefObject<HTMLDialogElement | null>;
   theme: Theme;
   onToggleTheme: () => void;
   onDisconnect?: (() => void) | undefined;
+  history: VersionHistory;
 }) {
   const { t } = useTranslation();
   return (
@@ -51,7 +55,7 @@ export function VersionDrawer({
         </button>
       </div>
       <div className="drawer-scroll">
-        <VersionTree />
+        <VersionTree history={history} />
       </div>
       <div className="drawer-bottom">
         {onDisconnect !== undefined && (

@@ -6,6 +6,8 @@
 
 ## 依据与状态
 
+2026-10-15 **当前实现边界**：左侧版本示例已由真实 Evolution SDK/ChatGPT MCP 只读数据替换，支持多 Branch 筛选、已加载 Commit 搜索、分页和选中验证；下面 2026-10-14 的“静态版本示例”仅记录当时的视觉基线，不再描述当前左侧栏行为。右侧查询、图谱、编辑、草稿仍未接入，完整版本 DAG 与 Phase 14 验收尚未完成。
+
 2026-10-14 收起状态的卡片边界修正：侧栏完全隐藏时，**画布上下左右统一保留 12px 外边距**；控制柄轮廓以同一左边框为基准水平镜像，**向画布内部（右侧）凹入 14px**，填充页背景遮住凹入区域的原画布与竖线，箭头朝右。展开时仍向左凸出 14px、箭头朝左。两种状态保留 112px 曲线高度、连续边框、44px 透明点击区域和原来的拖动/键盘行为；此决定替换此前“收起后仍向左凸出、左边距 48px”的过时布局。
 
 2026-10-14 侧栏弧形边框视觉微调：保留边框向左凸出的连续轮廓，但把原约 24px 的凸出收敛至约 **14px**，同时延长上下过渡曲线（轮廓高度约 112px），在顶点保持连续切线，形成更柔和的浅弧。箭头随轮廓向边框靠拢；不使用独立按钮、额外边线或高亮底色。透明点击区保持至少 44px 宽，展开 / 收起、拖动、键盘、双主题和移动端规则不变。
@@ -16,16 +18,17 @@
 
 2026-10-14 **App Shell 深色视觉基线**：以用户选定的深海军蓝 / 低饱和紫蓝光感 Web 截图为基准，深色默认、浅色可切换。左侧 KG OS 品牌、版本树示意和 Branches 直接融入背景，**没有左侧大卡片，也不为当前 main 添加选中卡片**；原始底栏仅有明暗主题切换，现已在同一区域增加国际化语言入口。右侧**不设置独立头部**，但保留独立、有边框和圆角的空白点阵画布占位容器，其内部工具未接入时禁用。窄屏通过画布内版本入口打开抽屉，主题切换仍位于版本抽屉底部。不设 macOS 窗口按钮、Workspace 选择器、全局搜索、Branch / Clean 伪状态、用户头像、欢迎页或品牌口号。版本号、Commit hash 与 Branch 名称是**标记为示意的静态预览**，不代表真实数据。业务数据、查询编辑器、结果帧和 Graph 均等待 Phase 14；此前 Q1 / V1 材料继续作为未来业务交互结构依据，不决定当前外壳的默认视觉。
 
-2026-10-04 核对基线：`main@181628b45c1600476514dfc129a5053c6d394b9e`，版本 `0.2.1`。2026-10-13 已在 [Web app shell](../../packages/web/src/app/app.tsx) 落地静态工作台布局；2026-10-14 已增加强制认证弹窗、已认证 `web.data.info` 启动信息、boot guard 和连接失效 / 显式重连，认证后才可操作外壳。查询、图谱、编辑、持久草稿及版本业务仍未接入；目前只有连接安全基础与静态工作区，不代表 Phase 14 已完成。后端依据是当前 [SDK](../../packages/sdk/src/client.ts)、[类型](../../packages/sdk/src/types.ts) 和 [HTTP adapter](../../internal/daemon/api.go)，而非截图按钮。
+2026-10-04 核对基线：`main@181628b45c1600476514dfc129a5053c6d394b9e`，版本 `0.2.1`。2026-10-13 已在 [Web app shell](../../packages/web/src/app/app.tsx) 落地静态工作台布局；2026-10-14 已增加强制认证弹窗、已认证 `web.data.info` 启动信息、boot guard 和连接失效 / 显式重连，认证后才可操作外壳；2026-10-15 左侧版本导航先行接入真实只读数据。查询、图谱、编辑、持久草稿及完整版本 DAG 仍未实现，不代表 Phase 14 已完成。后端依据是当前 [SDK](../../packages/sdk/src/client.ts)、[类型](../../packages/sdk/src/types.ts) 和 [HTTP adapter](../../internal/daemon/api.go)，而非截图按钮。
 
 | 状态 | 本文处理 |
 | --- | --- |
 | 用户已认可 | 图谱优先；默认深色、克制紫蓝光感，浅色可切换；左侧紧凑版本列表与未来覆盖式纵向 DAG；后续业务阶段实现查询编辑器、独立结果帧、帧内 Graph / JSON、检查器及编辑；旧帧重跑原 State；Branch 前进提示刷新、不自动切换；Web 数据与草稿保存在 Workspace 的 `.kgos` 下并可恢复 |
 | 沿用现有产品合同 | 全世界 immutable State、同 State 读取、Definition 聚合、strict base Object Patch、Graph 原样执行与 Evolution 专用操作 |
-| 已落地静态外壳 | `packages/web/src/app/layout/` 实现左侧品牌 / 静态版本树预览、可折叠侧栏、右侧空白画布、主题切换及窄屏版本抽屉；`app/styles/` 管理深浅主题变量、基础样式和布局；画布工具尚未实现并禁用，不暗示有真实连接或知识数据 |
+| 已落地工作台外壳 | `packages/web/src/app/layout/` 实现左侧品牌、可折叠侧栏、右侧空白画布、主题切换及窄屏版本抽屉；`app/styles/` 管理深浅主题变量、基础样式和布局；画布工具尚未实现并禁用，不暗示已有图谱或查询数据 |
+| 已落地只读版本导航（局部） | `features/version/` 使用真实 SDK 获取 Branch / Tag / Commit 历史，普通浏览器与 ChatGPT 内嵌页面复用同一组件，支持筛选、已加载搜索、分页、选中验证和异常重试；不代表完整 DAG、查询 State 上下文或 Phase 14 已验收 |
 | 已落地认证与刷新恢复 | `features/connection/` 的强制弹窗、Token 显隐、错误反馈；首次根 Token 登录创建服务端持久 Web Session，刷新从 HttpOnly Cookie 自动恢复并取得临时 Web Bearer；根 Token 不持久化在浏览器；`core/client/` 仍通过 SDK Bearer + Boot Guard 访问 API，主动退出由服务端撤销 Session；未认证时背景模糊且不可操作 |
 | 已实现的 Web 国际化基础 | `app/i18n/` 内置 English / 简体中文、浏览器语言解析与语言偏好；当前 Shell、强制认证与 MCP 授权弹窗均可切换，错误与相对时间随语言更新，定向浏览器/单测已通过；正式打包和阶段门禁仍按 [Phase 14 P14-00](../development/phases/14-web.md#a14-00-国际化基础与双语界面) 核对 |
-| 本次工程方案，尚未实现 | 查询帧状态、图投影、分页接入、表单到 Patch、完整业务上下文与持久草稿恢复、业务键盘与窄屏规则；`.kgos/web/ui.db`、可丢弃结果缓存、`info` 以外的 Web 数据 API 与按记录并发校验 |
+| 本次工程方案，尚未实现 | 查询帧状态、图投影、查询 / 详情分页接入、表单到 Patch、完整业务上下文与持久草稿恢复、业务键盘与窄屏规则；`.kgos/web/ui.db`、可丢弃结果缓存、`info` 以外的 Web 数据 API 与按记录并发校验 |
 | 本轮决定更新 | 用户接受前两项默认，并追加“数据可以放到 kgos 下面，Web 临时数据也放里面”；按现有 Workspace→`.kgos` 合同理解，草稿不再默认随刷新丢失。随后明确“再简化点，不要过度设计”：首版只呈现常用工作流，保存 / 恢复在原编辑位置，缓存自动管理，普通错误就地短提示，真实冲突才打开比较。内部安全与持久化合同保留，均不代表已经实现 |
 
 ### 前端代码架构
@@ -76,7 +79,7 @@ src/
 └── shared/ui/icon.tsx # 无领域语义的 SVG 图标
 ```
 
-设计变量集中于 `tokens.css`，`global.css` 只负责页面基础规则，`layout.css` 拥有顶层容器、间距、响应式及窄屏版本抽屉样式。新外壳无独立顶栏；浏览器在 100% 缩放下使用紧凑布局；桌面侧栏默认 240px，可在 240–420px 间拖动调整或通过方向键按 16px 微调，收起时宽度为 0；右侧独立点阵画布保留细边框与圆角，收起后画布四边距均为 12px。画布左边框中置的连续轮廓由 `SidebarHandle` 绘制，展开时向左凸出、收起时向右凹入，并局部覆盖原直线边框；不是分离按钮，且不被画布裁剪。桌面明暗主题位于侧栏底部，窄屏主题位于版本抽屉底部；窄屏画布内保留版本入口及原生 Dialog 的 Esc、关闭按钮和遮罩退出。查询、真实版本记录、连接、本体与业务 Feature 仍按 Phase 14 实现，不用静态预览替代业务验收。
+设计变量集中于 `tokens.css`，`global.css` 只负责页面基础规则，`layout.css` 拥有顶层容器、间距、响应式及窄屏版本抽屉样式。新外壳无独立顶栏；浏览器在 100% 缩放下使用紧凑布局；桌面侧栏默认 240px，可在 240–420px 间拖动调整或通过方向键按 16px 微调，收起时宽度为 0；右侧独立点阵画布保留细边框与圆角，收起后画布四边距均为 12px。画布左边框中置的连续轮廓由 `SidebarHandle` 绘制，展开时向左凸出、收起时向右凹入，并局部覆盖原直线边框；不是分离按钮，且不被画布裁剪。桌面明暗主题位于侧栏底部，窄屏主题位于版本抽屉底部；窄屏画布内保留版本入口及原生 Dialog 的 Esc、关闭按钮和遮罩退出。左侧真实版本导航已先行接入；查询、图谱、本体、编辑等其余业务 Feature 仍按 Phase 14 实现，不用静态预览或局部完成替代业务验收。
 
 ### ChatGPT 内嵌 Web（MCP Apps）
 
@@ -94,7 +97,7 @@ packages/web
 
 **数据与认证隔离**：ChatGPT iframe 不假设能携带原站 `SameSite=Strict` Session Cookie，也不从 `localStorage`、URL、页面 DOM、宿主对象读取 Instance Token、Web Bearer 或 MCP OAuth Token。嵌入页面经标准 `ui/initialize` / `tools/call` Bridge 请宿主代发已授权 MCP 请求，由服务端逐次认证；`window.openai` 仅作有能力检测的 ChatGPT 专属扩展。独立 Web 的 `@kgos/sdk` 仍为 HTTP 合同真源；内嵌 UI 不直接请求 `/api/v1/*` 作为认证捷径，不将 OAuth Token 变成普通 API Token。
 
-**第一阶段最小真实数据**：Phase 18 仅经 Bridge 调用现有 `kgos_read`，用固定安全脚本读取 `evolution.overview()` 并显示真实连接 / 版本状态；尚未接入的版本树占位数据必须标明预览，不能伪装成业务数据。其余查询、图谱、Ontology/Knowledge 编辑、History、Diff、Merge 等业务能力仍由 [Phase 14](../development/phases/14-web.md) 开发、验收，之后再逐 Feature 接入内嵌运行环境。不得预建全部 HTTP API → JavaScript 字符串的通用网关或重复 Graph/Object/Evolution 语义；到实际 Feature 再按输入、typed 结果、流式、取消及写入语义选择最小适配。宿主不支持某能力时显示不可用，而非绕过认证。
+**分阶段真实数据**：Phase 18 首次经 Bridge 调用已有 `kgos_read`，以固定安全脚本读取 `evolution.overview()` 证明连接与版本状态。后续 Phase 14 的紧凑版本导航直接复用 Web 的 `VersionReader`、扁平 Commit 列表、多分支筛选和分页：普通浏览器接 HTTP SDK，ChatGPT 内嵌入口仅适配为宿主 `callServerTool(kgos_read)`，分别读取 `evolution.branch.list / tag.list / ancestry / get`；所有请求仍由 Go MCP 服务端授权。Script 方法名固定、参数 JSON 编码、取消信号传给 Bridge；普通 MCP 工具错误在列表内提示重试，宿主拒绝调用或服务端明确返回认证 / 授权失败码则使内嵌连接失效并清除过期版本数据。选中 Commit 仅回读已解析 State ID，不通过 Bridge 传输整个 Snapshot 正文。当前只读选择仍属版本导航本地状态，未接入右侧图谱/查询上下文。其余查询、图谱、Ontology/Knowledge 编辑、History、Diff、Merge 等仍由 [Phase 14](../development/phases/14-web.md) 开发、验收。不得预建全部 HTTP API → JavaScript 字符串的通用网关或重复 Graph/Object/Evolution 语义；到实际 Feature 再按输入、typed 结果、流式、取消及写入语义选择最小适配。宿主不支持某能力时显示不可用，而非绕过认证。
 
 **布局、状态与降级**：复用响应式 Shell，遵守宿主实际视口，主题、English/简体中文均可用，但不假定 iframe 存储与独立站点共享；支持时读取宿主提供的 theme/locale，缺失时沿用 Web 已有选择与回退规则。`global` 与每个 `thread` 有各自的选择、暂存输入和当前页面状态，**不保证实时同步**；同一 Instance 的实际知识由服务端共享。外部 AI 修改 Branch 时不自动切换 pinned State，用户明确刷新再读取。宿主没有入口或不支持 MCP Apps 时，原有四个业务 MCP Tool 和独立 Web 保持可用；不退回直接嵌套整站 iframe 或跨站 Cookie。官方规范对 classic ChatGPT 网页端和 Work/桌面端支持范围有区别，真实验收见 [Phase 18](../development/phases/18-chatgpt-embedded-web.md)。
 
@@ -161,15 +164,19 @@ Web 作为浏览器中的人类界面，首版统一支持 **English (`en`)** �
 
 ### 紧凑提交列表
 
-左侧保留独立滚动、搜索 / 过滤、“展开”和渐进加载。每条显示拓扑节点、彩色轨道、短 hash、提交摘要、时间及当前指向该 State 的 Branch / Tag 标签。选中的浏览 State 与 Branch head 用不同文字 / 图形标记；短 hash 仅用于显示，复制与请求使用完整 `commit/<64-hex>`。
+**当前紧凑侧栏采用多 Branch 筛选 + 扁平 Commit 列表**，不渲染 DAG 轨道、分叉或合并连线。初次载入默认勾选全部 Branch；用户可逐个取消 / 恢复选择或全选 / 清空，筛选只影响列表，不等于 checkout、改变当前浏览 State 或确定写入目标。每个 Commit 按完整 State ID 去重，只出现一次；不同颜色的小点标识已从哪些所选 Branch 的已加载 ancestry 证实可达，共享祖先可有多个点，**颜色不表示 Commit 独占归属**。Merge 只以真实 `parents.length > 1` 标记；Branch / Tag 小标签只标记当前实际指向该 Commit 的引用，不能给所有祖先重复加同一 Branch 标签。列表展示消息、短 Hash、真实 `committedAt` 相对时间及按需 author，选中浏览 State 与 Branch head 分开表示，短 Hash 仅用于阅读；请求、复制与选中使用完整 StateRef。
 
-时间使用 immutable `committedAt`（UTC epoch microseconds）转换为显示时间；State Data 不用来冒充提交摘要或提交时间。缺少 message / author 时显示缺省说明。轨道由已加载 parents 推导，不能将所有祖先标成某个 Branch 的专属数据；ref 标签来自独立 Branch / Tag 枚举，且可能晚于该 Snapshot。
+数据来自 SDK `evolution.branch.list / tag.list / ancestry / get`：先列出引用与当前 head，再按各 Branch 的**已解析 immutable head Commit** 分别请求有界 ancestry，避免 Branch 前进使旧 cursor 改指另一历史；每个 Branch 的 root、cursor 和已加载范围独立保留。去重后对**已加载集合**按 `committedAt` 降序、完整 State ID 升序排列；服务端各 root 的 ancestry 保持原 reverse-topological 分页，不能把页面排序冒充完整 DAG 顺序或全库最新历史。首次按 Branch 各读取有界一页，“加载更多”逐 Branch 沿旧 root/cursor 继续，直到没有 cursor。搜索仅匹配已加载 Commit，必须标识范围；未加载时的共享归属仍未知，颜色随加载可补全。分支筛选不改变底层分页根，失败可重试，不把部分加载误报为完成。
+
+时间使用 immutable `committedAt`（UTC epoch microseconds）转换为显示时间；State Data 不用来冒充提交摘要或提交时间。缺少 message / author 时显示缺省说明。当前页面与窄屏抽屉复用同一读取 / 筛选 / 选中状态，断连中止在途请求，不使用静态版本示例替代 API 响应。点击 Commit 用 `evolution.get` 验证后再更新只读浏览 State；失败保留旧选择，旧帧与写入目标不变。新 Branch head 只提示显式刷新，不能静默修改已固定的浏览 State。
 
 `ancestry` 提供 topology，`history` 提供 scope / 对象变更，两者不能互相代替。历史筛选支持 `all / ontology / knowledge / object`；对象范围携带合法的 anchor State + Ref。hash / message / author 文本过滤目前仅针对已加载 ancestry，界面明确标为“已加载历史内搜索”；没有匹配时可清除筛选、继续加载或用完整 StateRef 直接定位，不能宣称全历史无匹配。过滤结果保留必要父节点或标明跨过滤连接，不能造出新 parent 边。
 
-按可见行 / 节点与少量预加载范围设置 limit，首屏可从约 20 条开始，使用现有 opaque cursor 继续加载；接口允许 1..1000，省略时为 100。列表只挂载可见行和缓冲范围，追加按完整 State 去重。现有 cursor 顺序前进，不承诺按画布坐标或任意历史序号随机跳页。cursor 绑定已解析 root，Branch 前进时提供“加载新 head”的入口并重新开一组分页，不混用旧 cursor。历史加载失败留在版本区域；左侧搜索与知识 Cypher 输入不是同一功能。
+按可见行与少量预加载范围设置 limit，首屏每 Branch 可从约 20 条开始，使用现有 opaque cursor 渐进加载；接口允许 1..1000，省略时为 100。长历史的可见范围渲染属于后续大规模验收，当前实现不能将累计页视为完整历史。cursor 绑定原 immutable root；显式加载新 head 须重新开始该 Branch 的分页，不能混用旧 cursor。历史加载失败留在版本区域；左侧搜索与知识 Cypher 输入不是同一功能。
 
 ### 覆盖式纵向 Git DAG
+
+以下是未来的独立版本拓扑阅读能力；**本轮紧凑侧栏与真实 API 接入不提供“展开 DAG”入口，也不以 DAG 实现替换扁平列表**。
 
 展开为**匹配当前主题的不透明抽屉**，带阴影、淡背景遮罩和可见关闭按钮。抽屉叠在现有左侧与工作区之上；开关不改变底层工作区盒子尺寸、结果帧图尺寸或相机，不调用 fit-to-view、不重新计算知识图布局。展开状态锁住背景交互和页面滚动；查询可继续运行，返回数据不会触发背景自动缩放。
 

@@ -31,7 +31,7 @@ test("100% browser zoom uses a compact desktop shell and readable authentication
       scale: window.visualViewport?.scale,
       sidebarWidth: box(".version-sidebar").width,
       brandHeight: box(".sidebar-brand").height,
-      commitHeight: box(".commit-item").height,
+      unloadedCount: document.querySelectorAll(".commit-item").length,
       dialogWidth: box(".authentication-dialog").width,
       dialogHeight: box(".authentication-dialog").height,
       dialogTop: box(".authentication-dialog").top,
@@ -45,7 +45,7 @@ test("100% browser zoom uses a compact desktop shell and readable authentication
   expect(dimensions.scale).toBe(1);
   expect(dimensions.sidebarWidth).toBe(240);
   expect(dimensions.brandHeight).toBe(78);
-  expect(dimensions.commitHeight).toBe(62);
+  expect(dimensions.unloadedCount).toBe(0);
   expect(dimensions.dialogWidth).toBe(496);
   expect(dimensions.dialogTop).toBeGreaterThanOrEqual(0);
   expect(dimensions.dialogTop + dimensions.dialogHeight).toBeLessThanOrEqual(900);

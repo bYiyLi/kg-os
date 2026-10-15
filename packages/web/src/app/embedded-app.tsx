@@ -4,6 +4,9 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 
 // cspell:words hostcontextchanged toolresult
 
+import { readMcpResult } from "../core/client/mcp-read.js";
+import { createMcpVersionReader } from "../features/version/mcp-version-reader.js";
+import type { VersionReader } from "../features/version/version-data.js";
 import { detectLocale, i18n } from "./i18n/index.js";
 import { WorkspaceShell } from "./layout/workspace-shell.js";
 import type { Theme } from "./layout/version-sidebar.js";
@@ -15,27 +18,13 @@ interface Overview {
   defaultBranch: string;
 }
 
-type Connection = { status: "loading" } | { status: "ready"; data: Overview } | { status: "error" };
+type Connection =
+  | { status: "loading" }
+  | { status: "ready"; data: Overview; versionReader: VersionReader }
+  | { status: "error" };
 
 export function readOverview(result: unknown): Overview {
-  if (typeof result !== "object" || result === null) throw new Error("Invalid MCP result");
-  const call = result as Record<string, unknown>;
-  if (call["isError"] === true) throw new Error("MCP read failed");
-  const content = call["content"];
-  if (!Array.isArray(content)) throw new Error("MCP result has no content");
-  const item = content.find(
-    (entry: unknown) =>
-      typeof entry === "object" &&
-      entry !== null &&
-      (entry as Record<string, unknown>)["type"] === "text"
-  ) as Record<string, unknown> | undefined;
-  const text = item?.["text"];
-  if (typeof text !== "string") throw new Error("MCP result has no text");
-  const response: unknown = JSON.parse(text);
-  if (typeof response !== "object" || response === null || Array.isArray(response)) {
-    throw new Error("Invalid MCP envelope");
-  }
-  const value: unknown = (response as Record<string, unknown>)["result"];
+  const value = readMcpResult(result);
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("Invalid overview");
   }
@@ -59,12 +48,22 @@ export function EmbeddedApp() {
   );
 }
 
+function applyHostPreferences(app: McpApp, setTheme: (theme: Theme) => void) {
+  const context = app.getHostContext();
+  if (context?.theme === "light" || context?.theme === "dark") {
+    setTheme(context.theme);
+  }
+  if (typeof context?.locale === "string") {
+    void i18n.changeLanguage(detectLocale(null, [context.locale]));
+  }
+}
+
 function EmbeddedWorkspace() {
   const [connection, setConnection] = useState<Connection>({ status: "loading" });
   const [hostTheme, setHostTheme] = useState<Theme | undefined>();
   const appRef = useRef<McpApp | null>(null);
+  const readerRef = useRef<VersionReader | null>(null);
   const generation = useRef(0);
-
   const refresh = useCallback(async (app: McpApp) => {
     const current = ++generation.current;
     setConnection({ status: "loading" });
@@ -74,32 +73,38 @@ function EmbeddedWorkspace() {
         arguments: { code: overviewCode }
       });
       const data = readOverview(result);
-      if (generation.current === current) setConnection({ status: "ready", data });
+      if (generation.current === current) {
+        const versionReader = createMcpVersionReader(app, () => {
+          // Host Bridge failure/revocation invalidates all old version data.
+          if (appRef.current !== app || readerRef.current !== versionReader) return;
+          generation.current++;
+          readerRef.current = null;
+          setConnection({ status: "error" });
+        });
+        readerRef.current = versionReader;
+        setConnection({ status: "ready", data, versionReader });
+      }
     } catch {
-      if (generation.current === current) setConnection({ status: "error" });
+      if (generation.current === current) {
+        readerRef.current = null;
+        setConnection({ status: "error" });
+      }
     }
   }, []);
-
   useEffect(() => {
     const app = new McpApp({ name: "KG OS Workspace", version: "1.0.0" }, {});
     appRef.current = app;
     const started = generation.current;
-
     const updateHost = () => {
       if (appRef.current !== app) return;
-      const context = app.getHostContext();
-      if (context?.theme === "light" || context?.theme === "dark") {
-        setHostTheme(context.theme);
-      }
-      if (typeof context?.locale === "string") {
-        void i18n.changeLanguage(detectLocale(null, [context.locale]));
-      }
+      applyHostPreferences(app, setHostTheme);
     };
     app.addEventListener("hostcontextchanged", updateHost);
     app.addEventListener("toolresult", (result) => {
       // Only the entrypoint result is delivered here; never repeat the call.
       if (result.isError === true) {
         generation.current++;
+        readerRef.current = null;
         setConnection({ status: "error" });
       }
     });
@@ -120,15 +125,17 @@ function EmbeddedWorkspace() {
     return () => {
       generation.current++;
       appRef.current = null;
+      readerRef.current = null;
       void app.close().catch(() => {
         // Host disconnect is best-effort during teardown.
       });
     };
   }, [refresh]);
-
   return (
     <WorkspaceShell
       hostTheme={hostTheme}
+      versionReader={connection.status === "ready" ? connection.versionReader : null}
+      initialVersionState={connection.status === "ready" ? connection.data.state : null}
       canvasChildren={
         <ConnectionPanel
           connection={connection}

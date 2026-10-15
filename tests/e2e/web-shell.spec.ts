@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
+import { mockVersionRoutes, states } from "./version-fixture.js";
+
 const testBootID = "e48245ac-51a4-4b6b-93ba-07bb4d0626a6";
 const secondBootID = "b6f0ba69-d40a-4819-9ed0-f09759c17292";
 const webAccess = "kgws_" + "A".repeat(43);
@@ -42,7 +44,7 @@ async function mockInstance(page: Page) {
         body: JSON.stringify(
           kind === "info"
             ? { daemonBootId: state.bootID, storageStatus: "unsupported" }
-            : { defaultBranch: "main", state: "known-commit" }
+            : { defaultBranch: "main", state: states.main }
         )
       });
     }
@@ -91,6 +93,7 @@ async function mockInstance(page: Page) {
   });
   await page.route("**/api/v1/web/data/info", async (route) => respond(route, "info"));
   await page.route("**/api/v1/evolution/overview", async (route) => respond(route, "overview"));
+  await mockVersionRoutes(page);
   return state;
 }
 
@@ -102,19 +105,17 @@ async function authenticate(page: Page) {
   await expect(page.getByRole("dialog", { name: "Authentication Required" })).toHaveCount(0);
 }
 
-test("renders the selected dark shell with an example version tree and blank canvas", async ({
-  page
-}) => {
+test("renders API-backed versions with a blank graph canvas", async ({ page }) => {
   await authenticate(page);
 
   await expect(page).toHaveTitle("KG OS");
   await expect(page.getByRole("heading", { name: "KG OS" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Version navigation" })).toBeVisible();
-  await expect(page.locator(".version-sidebar .commit-item")).toHaveCount(4);
-  await expect(page.locator(".version-sidebar .branch-list li")).toHaveCount(3);
+  await expect(page.locator(".version-sidebar .commit-item")).toHaveCount(8);
+  await expect(page.locator(".version-sidebar .version-tree-heading")).toHaveCount(0);
   await expect(
-    page.locator(".version-sidebar").getByText("Design preview · No live data")
-  ).toBeVisible();
+    page.locator(".version-sidebar").getByRole("button", { name: "Filter branches" })
+  ).toContainText("All branches");
   await expect(page.getByRole("region", { name: "Graph canvas" })).toBeVisible();
   await expect(page.locator(".workspace-controls")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
@@ -128,7 +129,7 @@ test("renders the selected dark shell with an example version tree and blank can
     const shell = document.querySelector(".app-shell");
     const sidebar = document.querySelector(".version-sidebar");
     const canvas = document.querySelector(".canvas-stage");
-    const selected = document.querySelector(".version-current");
+    const selected = document.querySelector('.version-sidebar .commit-row[aria-pressed="true"]');
     return {
       theme: shell?.getAttribute("data-theme"),
       sidebarWidth: sidebar?.getBoundingClientRect().width ?? 0,
@@ -146,13 +147,59 @@ test("renders the selected dark shell with an example version tree and blank can
   expect(metrics.sidebarWidth).toBeLessThanOrEqual(320);
   expect(metrics.sidebarBorder).toBe("0px");
   expect(metrics.sidebarBackground).toBe("rgba(0, 0, 0, 0)");
-  expect(metrics.selectedBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(metrics.selectedBackground).not.toBe("rgba(0, 0, 0, 0)");
   expect(metrics.canvasBorder).toBe("1px");
   expect(metrics.canvasTop).toBeLessThan(30);
   expect(metrics.horizontalOverflow).toBe(false);
   await expect(page.locator(".global-header")).toHaveCount(0);
-  await expect(page.locator("input")).toHaveCount(0);
+  await expect(page.locator(".version-sidebar input[type=search]")).toHaveCount(1);
+  await expect(page.locator(".canvas-stage input")).toHaveCount(0);
   await expect(page.getByText("Connected")).toHaveCount(0);
+});
+
+test("filters real Evolution-shaped commits across branches without changing the canvas", async ({
+  page
+}) => {
+  await authenticate(page);
+  const sidebar = page.locator(".version-sidebar");
+  const branchFilter = sidebar.getByRole("button", { name: "Filter branches" });
+  const history = sidebar.locator(".commit-item");
+
+  await expect(history).toHaveCount(8);
+  await branchFilter.click();
+  const choices = sidebar.getByRole("group", { name: "Filter branches" });
+  await expect(choices.getByRole("checkbox")).toHaveCount(4);
+  await expect(choices.getByRole("checkbox", { name: "main" })).toBeChecked();
+
+  await choices.getByRole("checkbox", { name: "develop" }).uncheck();
+  await expect(history).toHaveCount(7);
+  await choices.getByRole("checkbox", { name: "experiment" }).uncheck();
+  await expect(history).toHaveCount(7);
+  await choices.getByRole("checkbox", { name: "main" }).uncheck();
+  await expect(history).toHaveCount(4);
+  await expect(sidebar.getByText("Update knowledge model")).toHaveCount(0);
+  await choices.getByRole("checkbox", { name: "feature/search" }).uncheck();
+  await expect(history).toHaveCount(0);
+  await expect(sidebar.getByText("Select a branch to show commits.")).toBeVisible();
+
+  await choices.getByRole("button", { name: "Select all" }).click();
+  await expect(history).toHaveCount(8);
+  await branchFilter.click();
+  const search = sidebar.getByRole("searchbox", { name: "Search commits..." });
+  await search.fill("7A1D9E");
+  await expect(history).toHaveCount(1);
+  await expect(sidebar.getByText("Add knowledge sources")).toBeVisible();
+  await search.fill("unknown-hash");
+  await expect(history).toHaveCount(0);
+  await expect(sidebar.getByText("No matching commits.")).toBeVisible();
+  await search.clear();
+  await sidebar.getByRole("button", { name: /Fix node properties/ }).click();
+  await expect(sidebar.getByRole("button", { name: /Fix node properties/ })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await expect(page.getByRole("region", { name: "Graph canvas" })).toBeVisible();
+  await expect(page.locator(".canvas-stage .commit-item")).toHaveCount(0);
 });
 
 test("switches themes and hides the entire sidebar from the canvas border", async ({ page }) => {
@@ -286,9 +333,16 @@ test("keeps version navigation available at 320 CSS px without horizontal overfl
   await expect(page.getByRole("region", { name: "Graph canvas" })).toBeVisible();
   await expect(page.locator(".sidebar-handle")).toBeHidden();
   await expect(page.getByRole("complementary", { name: "Version navigation" })).toBeHidden();
-  await page.getByRole("button", { name: "Version navigation" }).click();
+  const navigation = page.getByRole("button", { name: "Version navigation" });
+  await expect(navigation).toHaveAttribute("title", "Version navigation");
+  await expect(navigation).toHaveText("");
+  await expect(navigation.locator("svg")).toHaveCount(1);
+  const bounds = await navigation.boundingBox();
+  expect(bounds?.width).toBe(44);
+  expect(bounds?.height).toBe(44);
+  await navigation.click();
   await expect(page.getByRole("dialog", { name: "Mobile version navigation" })).toBeVisible();
-  await expect(page.locator(".version-drawer .commit-item")).toHaveCount(4);
+  await expect(page.locator(".version-drawer .commit-item")).toHaveCount(8);
   await page
     .getByRole("dialog", { name: "Mobile version navigation" })
     .getByRole("button", { name: "Light theme" })

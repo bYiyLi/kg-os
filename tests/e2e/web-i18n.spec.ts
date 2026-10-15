@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
+import { mockVersionRoutes, states } from "./version-fixture.js";
+
 async function mockConnectedInstance(page: Page) {
   let requestCount = 0;
   await page.route("**/api/v1/web/auth/login", async (route) => {
@@ -32,9 +34,10 @@ async function mockConnectedInstance(page: Page) {
     requestCount++;
     await route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({ defaultBranch: "main", state: "test-state" })
+      body: JSON.stringify({ defaultBranch: "main", state: states.main })
     });
   });
+  await mockVersionRoutes(page);
   return () => requestCount;
 }
 
@@ -125,8 +128,10 @@ test("supports switching inside the mobile drawer at narrow widths", async ({ pa
   await expect(drawer).toBeVisible();
   const before = getRequestCount();
   await drawer.getByRole("button", { name: "简体中文" }).click();
-  await expect(page.getByRole("dialog", { name: "移动端版本导航" })).toBeVisible();
-  await expect(page.locator(".version-drawer").getByText("设计示例 · 未连接数据")).toBeVisible();
+  const chineseDrawer = page.getByRole("dialog", { name: "移动端版本导航" });
+  await expect(chineseDrawer).toBeVisible();
+  await expect(chineseDrawer.locator(".version-tree-heading")).toHaveCount(0);
+  await expect(chineseDrawer.locator(".version-branch-trigger")).toBeVisible();
   expect(getRequestCount()).toBe(before);
   expect(
     await page.evaluate(

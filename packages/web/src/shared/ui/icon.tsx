@@ -12,6 +12,18 @@ const shapes = {
   chevronDown: <path d="m6 9 6 6 6-6" />,
   chevronLeft: <path d="m15 5-7 7 7 7" />,
   chevronRight: <path d="m9 5 7 7-7 7" />,
+  search: (
+    <>
+      <circle cx="10.8" cy="10.8" r="6.7" />
+      <path d="m16 16 4.5 4.5" />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d="M20.5 10A8.5 8.5 0 1 0 21 14" />
+      <path d="m20.5 4 .2 6-6-.3" />
+    </>
+  ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   lock: (
     <>

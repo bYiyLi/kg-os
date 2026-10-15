@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-`deferred`（2026-10-11 决定暂缓业务功能实施）。本阶段原定把已确认的 [Web 设计](../../design/web.md)接入现有 Runtime、SDK 与业务 API，交付可以真实浏览、查询、编辑和管理版本的内置 Web 工作区。2026-10-13 已另行提前实现静态页面外壳；2026-10-14 先行实现强制 Token 认证弹窗、`web.data.info`、daemon boot guard 与 Web 连接失效 / 显式重连，通过 SDK 对受保护业务 API 发起请求；已增加服务器持久 Web Session、Cookie 无感刷新恢复及退出撤销，不依赖后续 Web UI store。Web 数据存储、查询、编辑及其它业务 Feature 尚未实现或验收。2026-10-14 **P14-00 Web 国际化基础已实现并通过定向测试**；正式打包与整体 Phase 验收仍未完成，原 P14-01–11 的 Acceptance 不因本次国际化开发而改变。
+`deferred`（2026-10-11 决定暂缓完整业务阶段实施，后续允许局部 Web Feature 先行）。本阶段原定把已确认的 [Web 设计](../../design/web.md)接入现有 Runtime、SDK 与业务 API，交付可以真实浏览、查询、编辑和管理版本的内置 Web 工作区。2026-10-13 已另行提前实现静态页面外壳；2026-10-14 先行实现强制 Token 认证弹窗、`web.data.info`、daemon boot guard 与 Web 连接失效 / 显式重连，通过 SDK 对受保护业务 API 发起请求；已增加服务器持久 Web Session、Cookie 无感刷新恢复及退出撤销，不依赖后续 Web UI store。2026-10-14 **P14-00 Web 国际化基础已实现并通过定向测试**；2026-10-15 **先行实现紧凑版本导航的真实 Evolution SDK 读取**。Web 数据存储、查询、编辑及完整 A14-08/整体 Phase 验收仍未完成，原 P14-01–11 的 Acceptance 不因局部先行开发而改变。
 
 **职责补充（2026-10-14）**：[Phase 18](18-chatgpt-embedded-web.md) 负责 ChatGPT MCP Apps 的双入口、同一 React Shell 复用及宿主通信验收；本阶段仍独占真实 Web 查询、图谱、Ontology/Knowledge 编辑、版本/草稿等业务 Feature。Phase 18 的入口联通不替代本阶段 A14 业务验收，后续每个已实现 Feature 再按需复用到内嵌 UI。
 
@@ -225,6 +225,10 @@
 - Commit/push、版本发布与部署分别记录真实动作；它们不因本计划完成而自动执行，正式发布不是本阶段完成条件。
 
 ## 当前实现与验收证据
+
+2026-10-15 **P14-08 紧凑版本导航局部实现，非完整验收**：普通浏览器 Web 在原认证连接上通过 `@kgos/sdk` 调用现有 `evolution.branch.list / tag.list / ancestry / get`，不新增 Runtime API、依赖或第二条传输。左侧默认全选分支、多选过滤、按已加载完整 State ID 去重的扁平 Commit 列表、真实 Parent Merge 判定、Branch/Tag 当前指针标签、提交摘要/时间、局部搜索、每分支固定 root/cursor 的有界增量加载、读取失败原列表保留与显式重试；桌面和窄屏抽屉共用数据和本地只读选择，选中前用 `get` 验证，失败不更新选择。已删除静态 Mock 版本数据，非连接状态不展示伪造历史。经本机真实 daemon 只读 API 和浏览器登录验证，历史输入 `commit/<64-hex>`、无 Parent 时 `null` 的 Go 编码已适配。**当前仅实现左侧导航自身的选中状态**，不代表已经接入未来图谱/查询帧的顶层 State 上下文；未实现完整 DAG、长历史虚拟渲染、外部 ref 变化观察或 UI 持久化。因此 A14-08 及整个 Phase 14 保持未完成，不能用版本浏览局部成功替代阶段验收。
+
+2026-10-15 **ChatGPT MCP Apps 版本读取适配（Phase 14 局部增量）**：在已实现的 Phase 18 双入口与同一 Shell 上，为现有 `VersionReader` 增加 MCP Bridge 只读适配器，固定 `kgos_read` 脚本调用 Branch/Tag/Ancestry/Get，不调用 iframe HTTP API、不引入新 Tool/Token/后端 API；保留已有 `overview` 入口与右侧状态面板。Host 工具调用支持 AbortSignal，宿主拒绝请求或 MCP 服务端返回明确认证 / 授权失败码时失效连接并清除旧列表，普通工具错误保留可用历史与局部重试。复用普通 Web 版本组件及其分页 / 搜索 / 选择，不复制业务功能。代码与本地测试证据需按实际最终验证记录，不以 Phase 18 的历史客户端验收代替**本次新版界面的真实 ChatGPT 宿主验收**；未部署 Dev、未在真实宿主验收前不得称两个入口均已更新。
 
 截至2026-10-11，本阶段业务功能实现仍未开始，P14-01–11及A14-01–11均待执行；当时页面仅为 Runtime shell。2026-10-13 提前实现静态工作台壳层，不包含 P14 的 API、数据、查询、图谱或编辑能力，也不代表任一 A14 已通过。原 `ready` 依据是设计、前置实现基线、实施依赖与验收计划齐备；现仍保持 `deferred`，不引用 Phase 13 的运行成功替代本阶段证据。
 

@@ -23,9 +23,14 @@ export function Workspace({
   return (
     <main className="workspace-main" aria-label={t("workspace.label")}>
       <section className="canvas-stage" aria-label={t("workspace.canvas")}>
-        <button className="mobile-versions-button" type="button" onClick={onOpenVersions}>
+        <button
+          className="mobile-versions-button"
+          type="button"
+          aria-label={t("versions.navigation")}
+          title={t("versions.navigation")}
+          onClick={onOpenVersions}
+        >
           <Icon name="menu" />
-          <span>{t("versions.navigation")}</span>
         </button>
         <div className="canvas-toolbar" aria-label={t("workspace.pendingTools")}>
           {pendingTools.map((tool) => (

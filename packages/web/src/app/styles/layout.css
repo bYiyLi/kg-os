@@ -71,159 +71,353 @@
 }
 
 .version-tree {
-  padding: 10px 8px 16px;
+  padding: 12px 9px 22px;
 }
 
-.version-tree-example-label {
-  padding: 0 8px 6px;
-  color: var(--color-subtle);
-  font-size: 11px;
-  letter-spacing: 0.035em;
-}
-
-.version-current {
+.version-browser-controls {
   display: flex;
-  min-height: 38px;
   align-items: center;
-  gap: 9px;
-  padding: 0 12px;
-  color: var(--color-text);
-  font-weight: 600;
+  gap: 6px;
 }
 
-.version-current .icon:first-child {
+.version-branch-picker {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  flex: 1;
+}
+
+.version-refresh-button {
+  display: grid;
+  width: 40px;
+  height: 39px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-control);
+  color: var(--color-muted);
+}
+
+.version-refresh-button:not(:disabled):hover {
+  background: var(--color-control-hover);
+  color: var(--color-text);
+}
+
+.version-refresh-button:disabled {
+  opacity: 0.6;
+}
+
+.version-branch-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 39px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-control);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.version-branch-trigger:hover,
+.version-branch-trigger[aria-expanded="true"] {
+  border-color: var(--color-primary);
+}
+
+.version-branch-trigger .icon:first-child {
+  width: 17px;
   color: var(--color-primary);
 }
 
-.version-current .icon:last-child {
-  width: 17px;
-  height: 17px;
-  margin-left: auto;
+.version-branch-trigger .icon:last-child {
+  width: 15px;
+}
+
+.version-branch-trigger-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.version-branch-count {
+  flex: none;
+  color: var(--color-muted);
+  font-family: var(--font-code);
+  font-size: 10px;
+}
+
+.version-branch-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  left: 0;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-sidebar);
+  box-shadow: 0 12px 28px rgb(3 7 22 / 32%);
+}
+
+.version-branch-menu-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 6px 7px;
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.version-branch-menu-heading button {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: inherit;
+}
+
+.version-branch-option {
+  display: flex;
+  min-height: 35px;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.version-branch-option:hover {
+  background: var(--color-control-hover);
+}
+
+.version-branch-option input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.version-branch-option-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.branch-color-dot.is-blue {
+  background: var(--color-commit-blue);
+}
+
+.branch-color-dot.is-green {
+  background: var(--color-commit-green);
+}
+
+.branch-color-dot.is-violet {
+  background: var(--color-commit-violet);
+}
+
+.branch-color-dot.is-orange {
+  background: var(--color-commit-orange);
+}
+
+.version-commit-search {
+  display: flex;
+  min-height: 37px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-control);
+  color: var(--color-muted);
+}
+
+.version-commit-search:focus-within {
+  border-color: var(--color-primary);
+}
+
+.version-commit-search .icon {
+  width: 16px;
+}
+
+.version-commit-search input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.version-commit-search input::placeholder {
+  color: var(--color-subtle);
 }
 
 .commit-list {
-  margin: 0 0 0 24px;
-  padding: 7px 0 0 23px;
-  border-left: 1.5px solid var(--color-track);
+  margin: 9px 0 0;
+  padding: 0;
   list-style: none;
 }
 
 .commit-item {
-  position: relative;
+  margin: 0;
+}
+
+.commit-row {
   display: flex;
+  width: 100%;
   min-height: 62px;
   align-items: flex-start;
-  padding: 9px 4px 0 0;
+  gap: 9px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
 }
 
-.commit-dot {
-  position: absolute;
-  top: 12px;
-  left: -30px;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--color-page);
-  border-radius: 50%;
-  box-shadow: 0 0 0 1px var(--color-border);
+.commit-row:hover {
+  background: var(--color-control-hover);
 }
 
-.commit-dot.is-violet {
-  background: var(--color-commit-violet);
+.commit-row[aria-pressed="true"] {
+  background: var(--color-primary-soft);
 }
 
-.commit-dot.is-blue {
-  background: var(--color-commit-blue);
+.commit-branch-colors {
+  display: flex;
+  width: 9px;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding-top: 4px;
 }
 
-.commit-dot.is-green {
-  background: var(--color-commit-green);
-}
-
-.commit-dot.is-orange {
-  background: var(--color-commit-orange);
+.commit-branch-colors .branch-color-dot {
+  width: 7px;
+  height: 7px;
 }
 
 .commit-details {
   display: block;
-  width: 100%;
   min-width: 0;
+  flex: 1;
 }
 
 .commit-title {
   display: block;
-  font-size: 13px;
-  font-weight: 520;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 590;
+  line-height: 1.4;
 }
 
 .commit-meta {
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  margin-top: 3px;
+  margin-top: 2px;
   color: var(--color-muted);
-  font-family: var(--font-code);
   font-size: 11px;
   white-space: nowrap;
 }
 
-.commit-meta span:last-child {
-  font-family: inherit;
-  font-size: 11px;
+.commit-meta code {
+  font-family: var(--font-code);
 }
 
-.branch-section {
-  margin: 12px 8px 0;
-  padding-top: 15px;
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.branch-section h2 {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 520;
-}
-
-.branch-section h2 .icon {
-  width: 14px;
-  height: 14px;
-}
-
-.branch-list {
-  margin: 7px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.branch-list li {
-  display: flex;
-  min-height: 36px;
-  align-items: center;
-  gap: 9px;
-  padding-left: 10px;
-}
-
-.branch-list .icon {
-  width: 16px;
-  height: 16px;
-  color: var(--color-muted);
-}
-
-.branch-name {
-  min-width: 0;
+.commit-meta span {
   overflow: hidden;
-  color: var(--color-text);
-  font-size: 13px;
+  text-overflow: ellipsis;
+}
+
+.commit-refs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 1px;
+}
+
+.commit-ref {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 5px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 5px;
+  background: var(--color-control);
+  color: var(--color-muted);
+  font-size: 10px;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.branch-status {
-  margin-left: auto;
+.commit-ref.is-branch {
+  border-color: var(--color-border);
+  color: var(--color-primary);
+}
+
+.commit-ref.is-merge {
+  color: var(--color-text);
+}
+
+.version-commit-empty {
+  padding: 22px 10px;
+  color: var(--color-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.version-list-status {
+  margin: 9px 8px;
   color: var(--color-muted);
   font-size: 11px;
-  white-space: nowrap;
+}
+
+.version-list-status[role="alert"] {
+  color: var(--color-text);
+}
+
+.version-load-more {
+  display: block;
+  min-height: 36px;
+  margin: 10px 0 0;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 12px;
+}
+
+.version-load-more:hover:not(:disabled) {
+  background: var(--color-control-hover);
+}
+
+.version-loaded-note {
+  display: block;
+  margin: 9px 8px 0;
+  color: var(--color-subtle);
+  font-size: 10px;
 }
 
 .sidebar-bottom {
@@ -412,17 +606,15 @@
   left: 14px;
   z-index: 1;
   display: none;
-  min-width: 44px;
-  min-height: 44px;
+  width: 44px;
+  height: 44px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   border: 1px solid var(--color-border);
   border-radius: 9px;
   background: var(--color-control);
   color: var(--color-text);
-  padding: 0 12px;
-  font-size: 12px;
+  padding: 0;
 }
 
 .canvas-stage {

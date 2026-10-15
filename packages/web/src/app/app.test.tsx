@@ -10,6 +10,38 @@ import { i18n } from "./i18n/index.js";
 
 const TOKEN_INPUT = "#kgos-access-token";
 const AUTH_DIALOG = ".authentication-dialog";
+const MAIN_STATE = "a81c2f".padEnd(64, "0");
+
+function mockEvolutionResponse(target: string): object {
+  if (target.includes("/evolution/branch/list")) {
+    return { items: [{ name: "main", state: MAIN_STATE }] };
+  }
+  if (target.includes("/evolution/tag/list")) return { items: [] };
+  if (target.includes("/evolution/ancestry")) {
+    return {
+      root: MAIN_STATE,
+      items: [
+        {
+          state: MAIN_STATE,
+          parents: [],
+          message: "Update knowledge model",
+          committedAt: (Date.now() - 2 * 3600000) * 1000
+        }
+      ]
+    };
+  }
+  if (target.includes("/evolution/get")) {
+    return {
+      state: MAIN_STATE,
+      parents: [],
+      committedAt: Date.now() * 1000,
+      consistency: { status: "valid", issues: [] },
+      hasData: false,
+      data: null
+    };
+  }
+  return { defaultBranch: "main", state: MAIN_STATE };
+}
 
 let host: HTMLDivElement;
 let root: Root;
@@ -52,7 +84,7 @@ beforeEach(async () => {
                   daemonBootId: "e48245ac-51a4-4b6b-93ba-07bb4d0626a6",
                   storageStatus: "unsupported"
                 }
-              : { defaultBranch: "main", state: "commit-example" }
+              : mockEvolutionResponse(target)
           ),
           { status: 200, headers: { "Content-Type": "application/json" } }
         )
@@ -146,9 +178,11 @@ it("requires authentication before the static shell can be used", async () => {
   expect(host.querySelector(TOKEN_INPUT)?.getAttribute("type")).toBe("password");
   expect(host.querySelector(".sidebar-brand h1")?.textContent).toBe("KG OS");
   expect(host.querySelector('[aria-label="Version navigation"]')).not.toBeNull();
-  expect(host.querySelectorAll(".version-sidebar .commit-item")).toHaveLength(4);
-  expect(host.querySelectorAll(".version-sidebar .branch-list li")).toHaveLength(3);
-  expect(host.textContent).toContain("Design preview · No live data");
+  expect(host.querySelectorAll(".version-sidebar .commit-item")).toHaveLength(0);
+  expect(host.querySelector(".version-sidebar .version-branch-trigger")?.textContent).toContain(
+    "All branches"
+  );
+  expect(host.querySelector(".version-tree-heading")).toBeNull();
   expect(host.querySelector('[aria-label="Graph canvas"]')).not.toBeNull();
   expect(host.textContent).not.toContain("Welcome");
   expect(host.textContent).not.toContain("Workspace ·");
@@ -161,6 +195,11 @@ it("requires authentication before the static shell can be used", async () => {
   expect(host.querySelector(".sidebar-handle")).not.toBeNull();
   expect(host.querySelector(".sidebar-collapse-button")).toBeNull();
   expect(host.querySelector(".canvas-stage .mobile-versions-button")).not.toBeNull();
+  expect(host.querySelector(".mobile-versions-button")?.textContent).toBe("");
+  expect(host.querySelector(".mobile-versions-button")?.getAttribute("aria-label")).toBe(
+    i18n.t("versions.navigation")
+  );
+  expect(host.querySelectorAll(".mobile-versions-button svg")).toHaveLength(1);
   expect(host.querySelectorAll(".canvas-toolbar button:disabled")).toHaveLength(5);
 });
 
@@ -234,7 +273,7 @@ it("opens a mobile version drawer and closes using the close control", async () 
   });
   expect(showModal).toHaveBeenCalledTimes(1);
   expect(dialog.open).toBe(true);
-  expect(dialog.querySelectorAll(".commit-item")).toHaveLength(4);
+  expect(dialog.querySelectorAll(".commit-item")).toHaveLength(1);
   expect(dialog.querySelectorAll(".theme-option")).toHaveLength(2);
   act(() => {
     buttonByName("Close version navigation").click();
@@ -312,11 +351,16 @@ it("switches language without losing authentication input or the connected works
     connectedLanguage?.querySelector<HTMLButtonElement>('[lang="zh-CN"]')?.click();
     await Promise.resolve();
   });
-  expect(host.textContent).toContain("设计示例 · 未连接数据");
+  expect(host.textContent).not.toContain("模拟数据");
   expect(host.textContent).toContain("2小时前");
-  expect(host.textContent).toContain("领先 3 个提交");
+  expect(host.textContent).toContain("全部分支");
   expect(currentTheme()).toBe("dark");
-  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4);
+  expect(
+    vi.mocked(fetch).mock.calls.some(([url]) => {
+      const address = url instanceof Request ? url.url : String(url);
+      return address.includes("/evolution/ancestry");
+    })
+  ).toBe(true);
 });
 
 it("invalidates an established connection after a boot change and requires explicit reconnect", async () => {
