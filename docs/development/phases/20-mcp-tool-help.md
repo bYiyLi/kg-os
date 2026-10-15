@@ -4,7 +4,7 @@
 
 ## 目标与状态
 
-**`in_progress`（2026-10-15）**。针对现有四个 AI-facing MCP Tool 优化准确、可执行的提示词与参数说明，并提供 SDK 方法的按需自描述帮助，消除模型只知道方法名、却无法获取真实入参/出参类型和调用示例的问题。现有 `kgos_workspace` 仍为 app-only UI 入口，不增加业务 MCP Tool。
+**`done`（2026-10-15）**。已针对现有四个 AI-facing MCP Tool 优化准确、可执行的提示词与参数说明，并提供 SDK 方法的按需自描述帮助，消除模型只知道方法名、却无法获取真实入参/出参类型和调用示例的问题。现有 `kgos_workspace` 仍为 app-only UI 入口，不增加业务 MCP Tool。
 
 本 Phase 只涉及 **Tool metadata、MCP server instructions、SDK Help 生成物、TypeScript SDK 本地 Help、Go/WASM Bridge、验证**；不修改 Plugin/Skill 内容、底层 Knowledge / Cypher / Evolution 语义、OAuth、Web、HTTP API、SDK 既有业务方法或持久化结构。提交、推送、Dev 部署、正式发布各自独立授权。
 
@@ -65,4 +65,5 @@
 - **交付进展（2026-10-15）**：Phase 20 实现及设计/计划以 `6ca1716c31de484b373429dadc8f5c517c9dcbed` 单独提交，pre-commit `pnpm check:quick` 成功（Vitest 231/231），并已推送 `origin/main`。原先在 `main` 上、属于其它 Web 任务的 `a4001d5` 作为已有历史随正常非强制 Push 同步，没有混入本 Phase 提交。
 - **正式 Dev 部署**：从上述 clean revision 执行 `pnpm dev:mcp deploy` exit 0，遵守先备份、构建、切换、验收的项目部署脚本；OpenClaw 运行镜像 `sha256:a8907388716f92c5aae7621567619d2a366cdfa4ce35c9d74e3349bb38dedc2e`，记录 `2026-10-15T09:53:20Z`、`clean`。`pnpm dev:mcp check` exit 0，健康、Instance Bearer、Web/OAuth、四业务 Tool + app-only UI、Preview/State/Ancestry 均通过。用**实际已部署镜像**在独立临时 Docker Volume 完成新版 `31/31` SDK 和重启持久化 Smoke（exit 0），没有向长期 Dev 写测试数据；通过本会话实际连接的 `kgos-dev` 插件只读调用 `help("evolution.state.create")`，返回当前 StateCreateRequest/Result、签名、示例和注意事项。
 - **旧 CI 失败事实与新门禁**：Run [38715878540](https://github.com/bYiyLi/kg-os/actions/runs/38715878540) 精确对应上述 SHA，最终为 **failure**；Linux amd64 Docker 是 `success`，Windows x64 Native/npm Smoke 中 `kgosd.exe` 退出代码 `3221226505`，Windows arm64 MSYS2 `paccache` 退出代码 `4`。这两项失败不能记录为成功。用户随后通过 [D99](../../design/decisions.md#d99-linux-amd64-docker-only-distribution) 明确停止全产品 Native/npm 发行并收敛到 Linux amd64 Docker；新目标需在 **Phase 21 提交后的 Ubuntu Validate + Linux amd64 Docker** CI 实际通过，才满足本 Phase 的现行远端完成门禁，而不是宣布旧 Run 全绿。
+- **现行门禁及关闭（2026-10-15）**：MCP Help 代码已在 `main` 的 `6ca1716` 实现、提交、推送并部署 Dev；实际连接的 `kgos-dev` MCP 对 `help("evolution.state.create")` 只读查询再次返回方法签名、类型与示例。D99 取代六平台发布目标后，包含该 MCP Help 源码的最终测试修复提交 [`32b7584`](https://github.com/bYiyLi/kg-os/commit/32b75841c72745b5504518bc63f7e12f50871915) 对应 [GitHub CI Run 38734363706](https://github.com/bYiyLi/kg-os/actions/runs/38734363706)，**Ubuntu Validate + Linux amd64 Docker = 2/2 success**；真实 Docker 测试与 31/31 SDK 均通过。此验收关闭 P20-01–04 / A20-01–04；**不追改旧 8-job Run 的失败结论**，不声称独立目标模型评测、GHCR 正式 Release 或生产部署已执行。
 - **完成门槛**：P20-01–04 与 A20-01–04 均有实际验证，文档/生成数据/代码相符，无剩余本阶段 task-affecting review finding；缺少隔离 Docker 或最终 revision 的 GitHub CI 保持 `in_progress`，不能自动承袭旧 Phase 的门禁成功。

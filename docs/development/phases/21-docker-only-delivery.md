@@ -2,7 +2,7 @@
 
 ## 状态和目标
 
-`in_progress`（2026-10-15）。按照 [D99](../../design/decisions.md#d99-linux-amd64-docker-only-distribution)，将未来 KG OS 正式交付收敛到 **Linux amd64 单镜像**，删除不再使用的六平台 Native/npm 发布与重复门禁，同时继续验证 Web/API/MCP/Graph/Evolution 的真实行为。
+`done`（2026-10-15）。已按照 [D99](../../design/decisions.md#d99-linux-amd64-docker-only-distribution)，将未来 KG OS 正式交付收敛到 **Linux amd64 单镜像**，删除不再使用的六平台 Native/npm 发布与重复门禁，保留 Web/API/MCP/Graph/Evolution 的真实行为验收。
 
 ## 范围与责任
 
@@ -53,5 +53,5 @@ README、Client、Runtime、MCP、CLI、设计索引、AGENTS、开发路线/指
 - **Mac 最终门禁（2026-10-15）**：当前工作区执行完整 `pnpm validate` **exit 0**：Go race 通过、Go 总语句覆盖率 **90.0%**、govulncheck、SDK Help 31/31、Vitest **224/224**、TypeScript 类型覆盖率 **99.73%**、Playwright **26/26**、Knip 未使用代码检查、零重复代码、格式、License 与依赖审计、`check:diff` 均通过。生产依赖审计没有已知漏洞；全部开发依赖仍报告 **2 项告警**，按照仓库原有阈值与特定豁免规则退出码 0，不能声称零风险。
 - **Workflow / 文档静态复验**：CI YAML 解析后为两个 `ubuntu-24.04` Job；Release YAML 为一个 Docker Job，所有 GitHub Actions 内联 Bash 经 `bash -n` 解析成功，构建→Smoke→Push→Digest→Release 顺序正确，严格使用已有 v* Tag、当前版本、main 祖先与精确 SHA，不使用 npm Publish 或六平台任务。修改过的 Markdown 相对路径有效、Markdownlint **0 issue**、CSpell **0 issue**、Prettier 通过、`git diff --check` 通过。静态 workflow Review 不等于远程 GitHub Actions 已实际运行。
 - **首轮新 CI 和修正（2026-10-15）**：Docker-only 改造以 [`d9f4376`](https://github.com/bYiyLi/kg-os/commit/d9f4376333756b0f24d1219412d8364b48eee4f7) 推送到 `main`。新两 Job [Run 38732217540](https://github.com/bYiyLi/kg-os/actions/runs/38732217540) 的 Linux amd64 Docker（真实隔离 Smoke）为 **success**；Ubuntu Validate 在 `go test -race` 的 `TestQuickJSGuestLowLevelInvalidExportsAndJSCalls` 中出现 `module closed with context deadline exceeded`，旧 8 秒测试上下文在 Linux CI 负载下实际耗时约 8.58 秒，因此 **Validate=failed，不能算作通过**。已将该测试（仅测试上下文，不是运行时沙箱预算）改为有界 30 秒，与相邻 QuickJS 测试的运行预算一致；本机对该测试执行 `go test -race -count=3` **exit 0**。最终阶段关闭仍要求修正提交后的 GitHub Ubuntu Validate + Docker 两 Job 实际通过。
-- **尚未执行的远端交付**：尚未提交、推送本轮 Phase 21 源码，新两 Job GitHub CI 和新 Release workflow 均未触发，也未执行 GHCR 发布或生产部署；不能把 Phase 20 的旧 8-job CI 或本轮独立 OpenClaw QA 结果直接记为 Phase 21 的远端 CI 已通过。
-- **完成**：P21-01–05 / A21-01–05 已实现、通过范围内 Review/相关本地或 OpenClaw 验证并记录真实证据。GitHub CI/Tag/发布需按实际权限与执行另行取证；没有当次对应 Commit/CI 时状态保持 `in_progress`，不能用历史 Run 自动标 `done`。
+- **最终 CI 修复与关闭证据（2026-10-15）**：`d9f4376` 的首轮 CI Run 38732217540 为 failure，失败在 Linux Go race 的 QuickJS 边界测试 `8s` 上下文预算（耗时约 8.58s），而 Docker Job 已 success。保持实际生产 Sandbox 超时和权限完全不变，仅将测试上下文改为 `30s`；定向 `go test -race -count=3` exit 0，修复提交 [`32b7584`](https://github.com/bYiyLi/kg-os/commit/32b75841c72745b5504518bc63f7e12f50871915) 已推送 `origin/main`。对应 [CI Run 38734363706](https://github.com/bYiyLi/kg-os/actions/runs/38734363706) **Validate = success；Unified Docker / Linux amd64 = success；整轮 2/2 success**，Docker Job 包含从当前提交构建同一镜像、独立 Volume 的 Web/API/MCP/31/31 SDK/权限与重启持久化 Smoke。不能将旧失败 Run 写成成功。
+- **完成结论**：P21-01–05 / A21-01–05 已完成：设计与开发计划同步、清理旧 npm/六平台交付链、Linux amd64 Docker 构建与隔离测试、Mac 完整 `pnpm validate`、两 Job GitHub CI 和多轮 Review 均有实际证据。**新 Tag Release workflow 已被 GitHub 识别为 active，且静态合同检查通过，但没有触发实际 GHCR 发布**；GHCR 正式 Release、Tag、生产部署为后续独立授权动作，不冒称已完成。
