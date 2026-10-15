@@ -11,7 +11,9 @@ import (
 // The JS guest must never expose the Go/WASI host, and malformed guest calls
 // must not leave the native/WASM runtime unable to serve later MCP requests.
 func TestQuickJSGuestLowLevelInvalidExportsAndJSCalls(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	// WASM compilation and several guest calls run under the race detector in
+	// CI. Bound this test independently of the production sandbox limits.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	g, err := newGuest(ctx, 1024)
 	if err != nil {
