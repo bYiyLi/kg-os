@@ -12,7 +12,9 @@ const allowed = new Set(
   ).split(";")
 );
 
-for (const name of ["cli", "web"]) {
+// Only the browser Web bundle ships in the Docker runtime. The retired CLI
+// remains available as internal source, but is not a distribution gate.
+for (const name of ["web"]) {
   const output = await runCapture(
     "pnpm",
     ["--filter", "@kgos/" + name, "licenses", "list", "--prod", "--json"],

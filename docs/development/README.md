@@ -96,6 +96,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 20 MCP Tool Prompt & SDK Help 当前为 `in_progress`（2026-10-15）。** 按 [D98](../design/decisions.md#d98-mcp-sdk-help-prompt-contract) 优化 Tool/参数/Server Instructions，并从现有 `@kgos/sdk` 公共方法和 TypeScript 类型生成无网络的 `help(name?)` 自描述目录，供 TS SDK 和 Go MCP Sandbox 同步使用。不增加 MCP 业务 Tool、HTTP API 或 Plugin/Skill 改动；实施和验收见 [Phase 20](phases/20-mcp-tool-help.md)。本阶段门禁不能沿用 Phase 19 结果。
 
+**Phase 21 Docker-only Distribution & CI Simplification 当前为 `in_progress`（2026-10-15）。** [D99](../design/decisions.md#d99-linux-amd64-docker-only-distribution) 决定 KG OS 未来仅交付 Linux amd64 Docker：普通 CI 收敛为 Ubuntu Validate + 单镜像 Docker Smoke，Tag Release 不再发布 npm/六平台 Native 包。历史 v0.2.1/npm/Phase 08–13 的完成结果保留但不成为新的发布承诺；具体 Feature、Acceptance 与本轮证据见 [Phase 21](phases/21-docker-only-delivery.md)。Phase 20 原实现的远端 CI 失败是历史 Run 的事实，不可用尚未执行的 Phase 21 CI 结果取代。
+
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |
@@ -120,7 +122,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [17 MCP Unified Auth & Web Authorization](phases/17-mcp-web-authorization.md) | `done`（用户批准例外） | MCP 复用 Instance 认证，Web 弹窗与 OAuth 已部署 Dev 并经用户真实 ChatGPT 重新授权；本地质量和正式 Dev Docker 构建通过；GitHub CI / 全新版隔离矩阵未运行，用户明确批准不阻塞本 Phase 关闭 | [D95](../design/decisions.md#d95-unified-mcp-web-authorization)、[MCP 认证目标](../design/mcp.md#统一-instance-认证与-web-内的-mcp-连接授权phase-17-目标)、Web owner 的已登录上下文与安全提交接口 |
 | [18 ChatGPT Embedded Web](phases/18-chatgpt-embedded-web.md) | `done`（用户批准例外） | 双入口、Go UI Tool/Resource、Bridge 实读已实现；Mac `pnpm validate`、Web 86/86、Playwright 26/26、OpenClaw Dev / Docker 31/31 和用户实际 ChatGPT 双入口交互验收通过；GitHub CI / 六平台矩阵未运行，用户明确批准不阻塞阶段关闭 | [D96](../design/decisions.md#d96-chatgpt-mcp-apps-web)、[Web 内嵌适配](../design/web.md#chatgpt-内嵌-webmcp-apps)、[MCP UI 合同](../design/mcp.md#chatgpt-mcp-apps-ui-合同)、Phase 14/16/17 基线 |
 | [19 KG OS Observability](phases/19-observability.md) | `done` | JSON Logs、Request ID、关键业务事件、Metrics/诊断 API；Mac 90.0% coverage、隔离 Docker 31/31 SDK、clean-source Dev 和 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38693436299) 完成验收；未发布正式镜像 | [D97](../design/decisions.md#d97-kgos-observability)、[Observability](../design/observability.md)、[Phase 19 完成证据](phases/19-observability.md#完成条件与当前证据) |
-| [20 MCP Tool Prompt & SDK Help](phases/20-mcp-tool-help.md) | `in_progress` | 四 Tool 提示词/参数/安全注解、SDK 与 MCP 一致的按需 `help(name?)`、生成校验及回归，尚未完成最终验收 | [D98](../design/decisions.md#d98-mcp-sdk-help-prompt-contract)、[MCP SDK Help](../design/mcp.md#mcp-tool-help) |
+| [20 MCP Tool Prompt & SDK Help](phases/20-mcp-tool-help.md) | `in_progress` | 四 Tool 提示词/参数/安全注解、SDK 与 MCP 一致的按需 `help(name?)`、生成校验及回归；旧 8-job Run 中的 Windows 失败不构成新 Docker-only 的未来门禁 | [D98](../design/decisions.md#d98-mcp-sdk-help-prompt-contract)、[MCP SDK Help](../design/mcp.md#mcp-tool-help) |
+| [21 Docker-only Distribution & CI Simplification](phases/21-docker-only-delivery.md) | `in_progress` | 全产品 Linux amd64 Docker-only、两 Job CI、单镜像 GHCR Release、删除 npm-only 发布链与多平台候选门禁 | [D99](../design/decisions.md#d99-linux-amd64-docker-only-distribution)、[Docker-only Client](../design/client.md#docker-only-交付) |
 
 当前实现依赖顺序：
 
@@ -165,6 +168,8 @@ Go Engineering Foundation
          (slog / rotation → request correlation → confirmed business events → metrics / diagnostics → acceptance)
        Phase 20: MCP Tool Prompt & SDK Help [in_progress; D98]
          (Tool metadata → SDK-generated Help → Go/WASM Bridge → Mac / isolated Docker / final CI)
+       Phase 21: Docker-only Distribution & CI Simplification [in_progress; D99]
+         (single Linux amd64 image → 2 CI jobs → Docker-only Tag Release)
 ```
 
 Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 保持 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 以 `ea37ddf` / CI 7/7 成功关闭为 `done`；[Phase 16 Go 原生 MCP](phases/16-kgosd-unified-mcp.md) 为 `done`，真实 ChatGPT OAuth/隔离写入及 Codex Skill 验收完成，最终实现提交 `813bff4` 的 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) 全部成功；[Phase 17 MCP 统一认证](phases/17-mcp-web-authorization.md) 按用户批准例外关闭为 `done`，2026-10-14 的真实 ChatGPT 重新授权来自用户验收，不以 Phase 16 替代；本阶段未执行 GitHub CI / 全新版隔离矩阵，不得声称已通过。Docker 正式 Release/部署另行授权。
@@ -206,5 +211,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 18：ChatGPT Embedded Web](phases/18-chatgpt-embedded-web.md)
 - [Phase 19：KG OS Observability](phases/19-observability.md)
 - [Phase 20：MCP Tool Prompt & SDK Help](phases/20-mcp-tool-help.md)
+- [Phase 21：Docker-only Distribution & CI Simplification](phases/21-docker-only-delivery.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

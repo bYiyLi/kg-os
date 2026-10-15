@@ -1,6 +1,6 @@
 # Phase 20：MCP Tool Prompt & SDK Help
 
-<!-- cspell:words mcpsandbox mcpserver -->
+<!-- cspell:words mcpsandbox mcpserver MSYS paccache -->
 
 ## 目标与状态
 
@@ -43,7 +43,7 @@
 ### A20-04 验证、Review 与交付
 
 1. 运行生成门禁、SDK 本地单测、Go Sandbox 与真实 MCP 协议定向测试（参数错误、Help parity、输出/权限及最小模型可见文本），并在本次工作树完成 `pnpm validate`、最终静态 Review 与 diff 审核。
-2. Mac 上不跑 Docker。OpenClaw 对**本次源码**使用独立隔离 Instance/Volume 测试最终 Linux amd64 镜像、四业务 Tool + UI Tool、31/31 SDK、read-help/write-denied、重启持久化；不在长期 Dev 上写测试数据。最终 Commit 对应的 GitHub Actions Docker/质量/六平台 CI 为独立门禁，无 Push/CI 证据不能标为通过。
+2. Mac 上不跑 Docker。OpenClaw 对**本次源码**使用独立隔离 Instance/Volume 测试最终 Linux amd64 镜像、四业务 Tool + UI Tool、31/31 SDK、read-help/write-denied、重启持久化；不在长期 Dev 上写测试数据。最终 Commit 对应的远端 CI 必须真实通过，无 Push/CI 证据不能标为通过。**原定六平台 Native/npm 发行 CI 已由 [D99](../../design/decisions.md#d99-linux-amd64-docker-only-distribution) 取代**，现行关闭门禁是同一源码上的 Ubuntu Validate + Linux amd64 Docker 两 Job，而不是忽略运行失败的旧发行 CI。
 3. 通过已冻结的代表性提示词场景核查工具选择与参数说明；静态元数据检查仅证明文本/合同正确，不声称独立 ChatGPT 模型质量提升。Plugin 与 Skill 内容不得改动，Web 并行工作树保持原样。
 
 ## Review 特别检查
@@ -61,5 +61,8 @@
 - **OpenClaw Linux amd64 隔离实测**：从独立临时目录 `/tmp/kgos-phase20-1CCxPe/src` 中的本轮源码，用未修改的 `Dockerfile.unified` 构建镜像 `kgos-phase20-help:20261015-qa1`，实际镜像 ID `sha256:80429007b0d4eed0b75cc40b062bd481e6f5fc0e31625ccfc46165f3b569f1bb`。默认构建最初在 Docker Hub 基础层校验、随后在 npm registry 下载时因网络失败；使用可信基础镜像代理及**仅在构建阶段**的 host-network / 已配置宿主代理后，同一 Dockerfile 完成构建。最终镜像仍为 `linux/amd64`、非 root UID `10001`；对该镜像设置 `KGOS_UNIFIED_DOCKER_SMOKE_IMAGE`，用独立随机 Docker Volume 运行 `pnpm test:docker:unified`，**exit 0**：四业务 Tool + UI Tool、31/31 SDK、Help 读取、读写权限隔离、无 Node、单 `kgosd`、重启持久化均通过。长期 Dev 未部署或进行写入。
 - **Mac 全量门禁（2026-10-15）**：包含 SDK Help 示例静态类型检查与本轮 Review 修正的最终工作树 `pnpm validate` **exit 0**；涵盖 Go race / coverage / 静态与安全检查、TypeScript 类型/格式/Lint、Vitest、Playwright **26/26**、原生 Lithograph/Jieba、正式 Web/Go 构建、SDK 打包与 exports、许可证、依赖审计、重复代码与 diff 门禁。实际从编译后的 `packages/sdk/dist/index.js` 导入 `help`，读取 **31 个方法与 StateCreateRequest** 成功。生产依赖审计无已知漏洞；全依赖仍提示 1 项 low 与 1 项按仓库现有规则忽略的 high，不能报为零风险。新增 Phase 记录经 Markdown、CSpell（0 项）和 `git diff --check` 定向复验。
 - **模型可见文案静态 Review**：按“发现模型→`kgos_preview`、版本 ancestry→`state_ancestry`、定向只读→`kgos_read`、已授权修改→先 `kgos_read` 查询准确 Help 后用 `kgos_run`、未知方法→`INVALID_ARGUMENT`”核对了实际 Tool Description、参数 Schema、Help 返回及权限约束。此结论是源代码/真实 MCP Client 的合同检查，**不是**目标 ChatGPT 模型自动选工具成功率的实测。Review 修正过的事项包括写入示例不可默认针对 `main`、复杂 Merge 必须读取真实 Session revision、JS Helper 多余参数须拒绝、Go race 定向测试要有足够但有界的 WASM 超时，以及 Help 生成文件受控豁免重复文件扫描；已针对改动复验。
-- **仍未执行**：当前代码尚未 Commit、Push；本 Phase 对应提交的 GitHub Actions / 六平台矩阵 / CI Docker 尚未运行。未进行实际 ChatGPT 新版本部署与独立模型行为评测；这不能由 Go MCP Client 或隔离 Docker 结果推断为通过。
+- **原始交付前基线**：实现阶段的本地 Review 只验证源码与隔离 MCP Client，尚未包含提交、推送、长期 Dev 部署或当前 SHA 的 GitHub CI；以下交付记录提供其后续实际结果。
+- **交付进展（2026-10-15）**：Phase 20 实现及设计/计划以 `6ca1716c31de484b373429dadc8f5c517c9dcbed` 单独提交，pre-commit `pnpm check:quick` 成功（Vitest 231/231），并已推送 `origin/main`。原先在 `main` 上、属于其它 Web 任务的 `a4001d5` 作为已有历史随正常非强制 Push 同步，没有混入本 Phase 提交。
+- **正式 Dev 部署**：从上述 clean revision 执行 `pnpm dev:mcp deploy` exit 0，遵守先备份、构建、切换、验收的项目部署脚本；OpenClaw 运行镜像 `sha256:a8907388716f92c5aae7621567619d2a366cdfa4ce35c9d74e3349bb38dedc2e`，记录 `2026-10-15T09:53:20Z`、`clean`。`pnpm dev:mcp check` exit 0，健康、Instance Bearer、Web/OAuth、四业务 Tool + app-only UI、Preview/State/Ancestry 均通过。用**实际已部署镜像**在独立临时 Docker Volume 完成新版 `31/31` SDK 和重启持久化 Smoke（exit 0），没有向长期 Dev 写测试数据；通过本会话实际连接的 `kgos-dev` 插件只读调用 `help("evolution.state.create")`，返回当前 StateCreateRequest/Result、签名、示例和注意事项。
+- **旧 CI 失败事实与新门禁**：Run [38715878540](https://github.com/bYiyLi/kg-os/actions/runs/38715878540) 精确对应上述 SHA，最终为 **failure**；Linux amd64 Docker 是 `success`，Windows x64 Native/npm Smoke 中 `kgosd.exe` 退出代码 `3221226505`，Windows arm64 MSYS2 `paccache` 退出代码 `4`。这两项失败不能记录为成功。用户随后通过 [D99](../../design/decisions.md#d99-linux-amd64-docker-only-distribution) 明确停止全产品 Native/npm 发行并收敛到 Linux amd64 Docker；新目标需在 **Phase 21 提交后的 Ubuntu Validate + Linux amd64 Docker** CI 实际通过，才满足本 Phase 的现行远端完成门禁，而不是宣布旧 Run 全绿。
 - **完成门槛**：P20-01–04 与 A20-01–04 均有实际验证，文档/生成数据/代码相符，无剩余本阶段 task-affecting review finding；缺少隔离 Docker 或最终 revision 的 GitHub CI 保持 `in_progress`，不能自动承袭旧 Phase 的门禁成功。

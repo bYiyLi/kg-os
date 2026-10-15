@@ -1,11 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreDependencies": [
-    "@arethetypeswrong/cli",
-    "@secretlint/secretlint-rule-preset-recommend",
-    "secretlint",
-    "publint"
-  ],
+  "ignoreDependencies": ["@secretlint/secretlint-rule-preset-recommend", "secretlint"],
   "workspaces": {
     ".": {
       "entry": [

@@ -6,13 +6,7 @@ const packagePaths = [
   "package.json",
   "packages/sdk/package.json",
   "packages/cli/package.json",
-  "packages/web/package.json",
-  "packages/runtime-darwin-arm64/package.json",
-  "packages/runtime-darwin-x64/package.json",
-  "packages/runtime-linux-arm64/package.json",
-  "packages/runtime-linux-x64/package.json",
-  "packages/runtime-win32-arm64/package.json",
-  "packages/runtime-win32-x64/package.json"
+  "packages/web/package.json"
 ];
 const exactVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 

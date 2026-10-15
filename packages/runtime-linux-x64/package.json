@@ -8,9 +8,6 @@
     "url": "git+https://github.com/bYiyLi/kg-os.git",
     "directory": "packages/runtime-linux-x64"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "os": [
     "linux"
   ],
@@ -29,5 +26,6 @@
   ],
   "exports": {
     "./package.json": "./package.json"
-  }
+  },
+  "private": true
 }

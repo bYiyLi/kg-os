@@ -178,7 +178,9 @@ func waitForKGOSDLocator(t *testing.T, root string, done <-chan int, stderr *byt
 	if err != nil {
 		t.Fatalf("resolve Runtime paths: %v", err)
 	}
-	deadline := time.Now().Add(10 * time.Second)
+	// Native extension initialization can exceed 10s on a loaded race-enabled
+	// runner. This is a bounded startup test, not a user-facing 10s SLA.
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		select {
 		case code := <-done:

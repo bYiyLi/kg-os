@@ -35,12 +35,7 @@ const taskCommands = {
     ["check:type-coverage"],
     ["check:duplicates"],
     ["check:unused"],
-    ["check:versions"],
-    ["check:dedupe"],
-    ["check:exports"],
     ["exec", "playwright", "test", "--config", "config/test/playwright.config.ts"],
-    ["test:native"],
-    ["check:package"],
     ["check:licenses"],
     ["check:security"],
     ["check:diff"]

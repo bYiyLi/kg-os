@@ -15,12 +15,13 @@ RUN pnpm install --frozen-lockfile --ignore-scripts \
 # files as *build artifacts*. This does not install or require Node.js in the
 # running container and does not publish a new npm distribution.
 FROM ${NODE_IMAGE} AS native-builder
-ARG RUNTIME_VERSION=0.2.1
+# Historical, verified build-only extension bundle; NOT the Docker release tag.
+ARG NATIVE_RUNTIME_VERSION=0.2.1
 RUN npm install --prefix /tmp/native --omit=dev --ignore-scripts --no-audit --no-fund \
-    @kgos/runtime-linux-x64@${RUNTIME_VERSION}
+    @kgos/runtime-linux-x64@${NATIVE_RUNTIME_VERSION}
 
 FROM ${NODE_IMAGE} AS daemon-builder
-ARG RUNTIME_VERSION=0.2.1
+ARG NATIVE_RUNTIME_VERSION=0.2.1
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ca-certificates curl gcc libc6-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -34,7 +35,7 @@ RUN curl --fail --location --retry 5 --retry-all-errors --output /tmp/go.tar.gz 
 ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOTOOLCHAIN=local
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY go.mod go.sum package.json ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
@@ -43,7 +44,7 @@ RUN mkdir -p /out && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
     go build -tags=sqlite_fts5 -trimpath -o /out/kgosd ./cmd/kgosd
 
 COPY --from=native-builder /tmp/native/node_modules/@kgos/runtime-linux-x64/ /out/runtime/
-RUN RUNTIME_VERSION="${RUNTIME_VERSION}" node -e 'const fs=require("node:fs"),crypto=require("node:crypto"); const base="/out/runtime",p=base+"/manifest.json"; const m=JSON.parse(fs.readFileSync(p,"utf8")); if(m.platform!=="linux"||m.arch!=="x64"||m.version!==process.env.RUNTIME_VERSION)throw Error("Native Runtime mismatch"); const daemon=m.files.find(item=>item.file==="kgosd"); if(!daemon)throw Error("Missing kgosd"); fs.copyFileSync("/out/kgosd",base+"/kgosd"); fs.chmodSync(base+"/kgosd",0o755); daemon.sha256=crypto.createHash("sha256").update(fs.readFileSync(base+"/kgosd")).digest("hex"); fs.writeFileSync(p,JSON.stringify(m,null,2)+"\n");'
+RUN NATIVE_RUNTIME_VERSION="${NATIVE_RUNTIME_VERSION}" node -e 'const fs=require("node:fs"),crypto=require("node:crypto"); const base="/out/runtime",p=base+"/manifest.json"; const m=JSON.parse(fs.readFileSync(p,"utf8")); if(m.platform!=="linux"||m.arch!=="x64"||m.version!==process.env.NATIVE_RUNTIME_VERSION)throw Error("Native Runtime mismatch"); const daemon=m.files.find(item=>item.file==="kgosd"); if(!daemon)throw Error("Missing kgosd"); fs.copyFileSync("/out/kgosd",base+"/kgosd"); fs.chmodSync(base+"/kgosd",0o755); daemon.sha256=crypto.createHash("sha256").update(fs.readFileSync(base+"/kgosd")).digest("hex"); m.version=JSON.parse(fs.readFileSync("/src/package.json","utf8")).version; if(!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(m.version))throw Error("Invalid KG OS Docker version"); fs.writeFileSync(p,JSON.stringify(m,null,2)+"\n");'
 RUN set -eu; \
     modules="$(go env GOPATH)/pkg/mod"; \
     mkdir -p /out/notices; \

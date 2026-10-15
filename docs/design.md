@@ -4,6 +4,8 @@
 
 开发阶段、状态与验收见[开发计划](development/README.md)，当前已实现版本的实际开发/验证命令见[开发指南](guide/development.md)。Phase 00–13 已完成；当前公开版本为 **v0.2.1**，在 v0.2.0 基线上正式交付 Phase 13 的 D84 late-bound Embedding credential、init wizard 与 doctor credential 诊断调整。v0.2.1 的仓库实现、六平台 CI 与正式发布证据见[Phase 13](development/phases/13-init-wizard-credential-boundary.md)；v0.2.0 的 Phase 12 发布基线继续由[Phase 12](development/phases/12-first-run-cli-productization.md)维护。v0.1.1 的 Windows 首发与认证收尾继续由[Phase 11](development/phases/11-windows-runtime-acceptance.md)维护为历史证据。official Jieba exact artifact选择与跨平台证据见[研究记录](research/jieba-tokenizer.md)。完成证据由开发计划与 Phase 文件维护。
 
+**未来官方交付只包含 Linux amd64 Docker 镜像**。v0.2.1 已发行的 npm/六平台产物属于历史事实，不再新增正式版本。详见 [D99](design/decisions.md#d99-linux-amd64-docker-only-distribution) 与 [Phase 21](development/phases/21-docker-only-delivery.md)。
+
 KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下的职责文件共同构成当前设计真源；**每个主题只有一个正文 owner**，本索引不复制详细设计。跨文档引用应链接到 owner 文件，不在其它文件重新维护同一规则。
 
 ## 设计职责
@@ -17,19 +19,20 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
 | [mcp.md](design/mcp.md) | `kgosd` 原生 Go MCP、Go/WASM JavaScript Sandbox、私人 OpenAI Plugin / Skill、四个 AI-facing Tool、ChatGPT UI Tool/Resource、外部认证与 Markdown 视图 |
 | [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同，以及 Web 持久数据错误方案 |
-| [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、npm/npx 分发、platform native Runtime package、Client version/package topology |
+| [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、当前 Docker-only 交付、TypeScript SDK、内部 CLI 与历史 npm 分发边界 |
 | [cli.md](design/cli.md) | AI-first CLI command tree、`--root` / `KGOS_ROOT`、分层 help、`doctor/init` setup、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听目标、dynamic loopback endpoint、`auth.json` / `kgosd.lock`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
 | [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |
 | [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
-| [decisions.md](design/decisions.md) | D1–D98 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [decisions.md](design/decisions.md) | D1–D99 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 ## 从配置到调用
 
 | 要解决的问题 | 正文位置 |
 | --- | --- |
-| npm / npx 怎么分发 CLI 与 native Runtime | [Client npm package topology](design/client.md#npm-package-topology)、[Native Runtime package](design/runtime.md#native-runtime-package) |
+| 当前 Docker 怎么发布和运行 | [Client Docker-only](design/client.md#docker-only-交付)、[MCP 部署](design/mcp.md#docker-only-交付)、[D99](design/decisions.md#d99-linux-amd64-docker-only-distribution) |
+| 旧 v0.2.1 npm 如何定位 | [历史 npm 分发](design/client.md#npm-package-topology)、[历史 CLI](design/cli.md) |
 | 第一次怎么定位并初始化 KG OS Instance | [CLI Global root](design/cli.md#global-root)、[Doctor](design/cli.md#doctor)、[Init](design/cli.md#init)、[Workspace Root / Instance](design/runtime.md#instance-root) |
 | kgosd 怎么配置扩展、模型和凭证 | [Runtime config](design/runtime.md#configtoml)、[Embedding 配置映射](design/runtime.md#embedding-配置与索引映射) |
 | 使用方怎么定义模型和索引 | [Ontology 公共格式](design/ontology.md#公共可编辑格式)、[完整编辑示例](design/ontology.md#编辑示例) |
@@ -47,8 +50,8 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 
 | 状态 | 范围与入口 |
 | --- | --- |
-| 已确认 | Ontology 渐进读取 / 聚合编辑、Object batch read / Patch、Knowledge / Graph、Evolution；Client 统一 TypeScript，Runtime / Kernel 保留 Go；npm/npx 分发；Workspace Root→`.kgos` 单 Instance、`--root > KGOS_ROOT`、完整 ready 的 `init`、单库/单 Token/每 Instance 最多一个 daemon，以及职责分层的高信息密度 CLI；具体规则见上面的 owner 表 |
-| 当前实现基线 | Phase 00–13 已完成；当前公开版本 v0.2.1 已包含 D84 的 late-bound Embedding credential 与新版 init wizard/doctor 行为，并继续包含 Phase 12 的真实 `@kgos/sdk` + TypeScript `@kgos/cli`、Workspace Root→`.kgos`、`--root > KGOS_ROOT`、complete init/readiness/recovery、per-instance dynamic `kgosd`、六平台 native Runtime packages、八包 npm 与 GitHub Release。当前发布状态由[开发计划](development/README.md)与[Phase 13](development/phases/13-init-wizard-credential-boundary.md)维护；v0.2.0 历史基线见[Phase 12](development/phases/12-first-run-cli-productization.md) |
+| 已确认 | Ontology 渐进读取 / 聚合编辑、Object batch read / Patch、Knowledge / Graph、Evolution；Client 统一 TypeScript，Runtime / Kernel 保留 Go；未来只发布 Linux amd64 Docker（D99）；Workspace Root→`.kgos` 单 Instance、`--root > KGOS_ROOT`、完整 ready 的 `init`、单库/单 Token/每 Instance 最多一个 daemon，以及职责分层的高信息密度 CLI；具体规则见上面的 owner 表 |
+| 当前实现基线 | Phase 00–13 已完成；当前公开版本 v0.2.1 已包含 D84 的 late-bound Embedding credential 与新版 init wizard/doctor 行为，并历史上继续包含 Phase 12 的真实 `@kgos/sdk` + TypeScript `@kgos/cli`、Workspace Root→`.kgos`、`--root > KGOS_ROOT`、complete init/readiness/recovery、per-instance dynamic `kgosd`、六平台 native Runtime packages、八包 npm 与 GitHub Release；这些是历史发布事实，之后仅发布 Docker。当前发布状态由[开发计划](development/README.md)与[Phase 13](development/phases/13-init-wizard-credential-boundary.md)维护；v0.2.0 历史基线见[Phase 12](development/phases/12-first-run-cli-productization.md) |
 | 已确认调整 | [D59 Cypher passthrough](design/decisions.md#d59-cypher-passthrough)、[D65 Go runtime](design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](design/decisions.md#d66-lithograph-v030-sql-only)、[D67–D74](design/decisions.md)、[D75 TypeScript Client](design/decisions.md#d75-typescript-client)、[D76 npm distribution](design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](design/decisions.md#d79-stale-daemon-recovery)、[D80 official Jieba](design/decisions.md#d80-official-jieba)。D78–D80在不增加新业务能力的前提下收紧 Runtime connection/recovery 与默认 Full-text 行为；[D81](design/decisions.md#d81-workspace-root)、[D82](design/decisions.md#d82-init-readiness)、[D83](design/decisions.md#d83-cli-progressive-disclosure)进一步重做 Workspace/Instance、first-run readiness 与 CLI 信息设计；[D84](design/decisions.md#d84-late-bound-embedding-credential) 的 Embedding credential operation-time 解析与 init wizard 输入恢复边界已由 Phase 13 实现并验收 |
 | 检索范围与限制 | [首版 Semantic 只支持单字段且不公开 filterProperties，Cypher 联合检索可组合；post-YIELD 过滤不等价于过滤范围内 top-k](design/ontology.md#语义索引的首版范围)；不把既有底层限制概括成联合检索不可用 |
 | 工程待办 | Phase 00–13 已完成，Phase 14 Web `deferred`。[Phase 15](development/phases/15-mcp.md) 独立 TypeScript MCP / Private Plugin 基础连接已凭 Linux Dev、真实 ChatGPT 与 [CI Run #65](https://github.com/bYiyLi/kg-os/actions/runs/38261156640) 7/7 成功关闭为 `done`。原生 Go MCP、WASM Bridge 与统一单进程 Docker 归 [Phase 16](development/phases/16-kgosd-unified-mcp.md) `done` / D93–D94；长期 Dev 已切换为 Go `kgosd`，31/31 SDK、四 Tool 与隔离持久化通过，旧 TypeScript MCP / Node Worker 源码已清理。最终 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947)、ChatGPT OAuth 重新授权/隔离写入回读与 Codex 私人 Skill 主动加载已通过。**[Phase 17 MCP/Web 统一认证](development/phases/17-mcp-web-authorization.md) 按用户批准例外关闭为 `done`：新版 Dev 主题/认证正式 Docker 部署、本地 `pnpm validate` 及用户 ChatGPT 重新授权成功；GitHub CI / 全新版隔离矩阵未执行，未宣称通过。** 正式 GHCR 发布与生产部署另行授权。 |

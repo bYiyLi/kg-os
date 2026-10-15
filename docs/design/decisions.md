@@ -1005,3 +1005,15 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **真源与实现**：以现有 TypeScript SDK 的方法/类型及领域设计为真源，生成供 TypeScript/Go 使用的版本固定文档快照。MCP Go Bridge 只查询内嵌静态资料，不能重新调用网络或实例数据库；生成一致性/覆盖率由构建检查和测试把关。Tool 描述简短说明适用时机、参数和权限；通用 Server Instructions 只保留跨工具必要规则。
 - **依据与取舍**：只有方法名时 AI 无法确定嵌套参数和结果格式，把 31 套签名都写进 Tool Description 又臃肿、易过时。静态按需 Help 减少猜测与重复定义，但必须维护示例、生成物及跨平台打包验证；不把提示词当权限实施机制，不改变 JS 事务、Sandbox 或业务 API 的真实合同。
 - 现行规则：[MCP Tool / Help](mcp.md#mcp-tool-help)、[Client](client.md#kgossdk)；实施/验收归 [Phase 20](../development/phases/20-mcp-tool-help.md)。
+
+<a id="d99-linux-amd64-docker-only-distribution"></a>
+
+### D99 KG OS 全产品仅交付 Linux amd64 Docker 镜像（2026-10-15）
+
+- **决定**：KG OS 此后的唯一官方可执行交付物是 `ghcr.io/<owner 小写>/kgos:v<version>` 的 **Linux amd64 Docker / OCI 镜像**：单一 Go `kgosd`，同进程提供 Web、HTTP API、MCP，并内含 Lithograph / Provider / Jieba 原生扩展与 Web 静态资源。只承诺 Linux amd64 容器运行；不再构建、测试、发布新版 macOS/Windows/Linux arm64 Native Runtime、独立 npm CLI/SDK/Runtime 包或其它架构 Docker 镜像。已发布的 v0.2.1 等 npm 产物及对应旧 Phase/Tag/CI 是历史事实，不撤销、不追溯改写。
+- **源代码边界**：`packages/sdk` 的公共类型/方法是 Web 和 MCP SDK Help 的真源；`packages/web` 仍构建内嵌浏览器入口；`packages/cli` 与当前六个平台 Runtime package 的源码可暂留作为**本地开发/历史迁移素材**，但不是新的官方交付品，不要求发布或六平台 CI。后续如需要独立可分发 CLI 或原生客户端，必须另行设计，不因为源码仍存在自动恢复 npm 产品承诺。
+- **构建依赖**：镜像可在**构建阶段**使用 Node/pnpm、Go/CGO、固定版本的原生扩展或已有只读第三方/历史 artifact；最终容器必须无 Node.js 运行时，且只包含经校验的 Linux amd64 文件。当前冻结的旧 `@kgos/runtime-linux-x64@0.2.1` 仅允许作为临时、精确版本的**构建输入**获取未变更的三种原生扩展，不要求新 Docker 镜像的版本与该历史 npm 包版本一致，也不构成未来 npm 发布承诺。今后需要更新官方扩展时，再用当前验证过的单一 Linux amd64 artifact 来源替换这一构建输入，不提前增加多平台构建层。
+- **CI 与门禁**：PR/main 只保留 **Ubuntu/Linux amd64 Validate** 和 **Linux amd64 Docker 真构建+隔离 Smoke** 两个远端 Job；删除六平台 Native/pack/registry 发布矩阵。Validate 仍要验证 Go Kernel/Runtime 的测试、竞态与既有 90% coverage、安全与依赖、SDK Help 合同、TypeScript/Web 单测、Playwright、格式/静态检查、License 和 diff；减少重复执行的 native smoke、npm 打包/exports/发布候选等仅服务旧交付品的门禁。Docker Smoke 必须真实验证非 root、无运行时 Node、初始化、Web/API/MCP、OAuth/权限边界、31/31 SDK、状态重启持久化；旧六平台失败不再是**新交付目标**的验收要求，但不假称旧 Run 已成功。
+- **Release**：只有用户明确授权 Tag/正式发布时才从已存在的 `v<version>` Tag 且位于 `main` 历史内的精确 revision 构建**一份** Linux amd64 镜像，在推送 GHCR 前用同一镜像完成隔离 Smoke；推送后核实架构、source revision、digest，再完成 GitHub Release。Release 不再执行 npm OIDC Publish、六平台 Registry smoke 或 npm artifacts 聚合；普通 PR/main CI 不执行 GHCR Push，Dev 部署和正式 Release 相互独立。
+- **替代关系与取舍**：D99 仅取代 [D76](#d76-npm-distribution) 的**当前 npm 分发承诺**、[D91](#d91-mcp-docker-only-delivery) 的「只有 MCP Docker-only、CLI/SDK/Runtime npm 仍发布」例外、[D94](#d94-openclaw-docker-development-and-ci) 的六平台 CI 并行条款及旧 npm Release 工作流；D75 的 SDK/CLI/Web 源码职责、D93 的 Go 单进程、D98 的 SDK Help/Tool 契约和业务 API 全部保留。大幅减少平台/发布维护成本，代价是无 Docker 或非 Linux amd64 的用户没有当前官方运行包；不以减少发行版为理由删除必要的安全、版本数据或业务集成校验。
+- 当前真源：[Client/交付边界](client.md#docker-only-交付)、[Runtime](runtime.md#native-runtime-package)、[MCP](mcp.md#docker-only-交付)、[Phase 21](../development/phases/21-docker-only-delivery.md)。

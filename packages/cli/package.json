@@ -9,9 +9,6 @@
     "directory": "packages/cli"
   },
   "type": "module",
-  "publishConfig": {
-    "access": "public"
-  },
   "bin": {
     "kg": "./dist/bin.js"
   },
@@ -41,5 +38,6 @@
   },
   "scripts": {
     "build": "tsc -b"
-  }
+  },
+  "private": true
 }

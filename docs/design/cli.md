@@ -1,6 +1,6 @@
 # CLI
 
-本文件是 KG OS v1 **AI-facing CLI 命令、参数、输入输出、错误与非交互行为**的设计真源。CLI 只适配已经确认的 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。TypeScript SDK / npm 分发由 [Client](client.md) 负责；Workspace Root / `.kgos` Instance、`kgosd` endpoint、认证与 lifecycle 由 [Runtime](runtime.md) 负责。
+本文件保留 KG OS 的**现存 TypeScript CLI 命令与行为合同**，以便内部开发/历史兼容；[D99](decisions.md#d99-linux-amd64-docker-only-distribution) 已停止后续 npm CLI 分发，官方运行交付仅为 Linux amd64 Docker，**容器内不包含 TypeScript CLI**。CLI 只适配已经确认的 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 与 [共享公共合同](contracts.md)，不得建立第二套业务能力。SDK 和当前交付边界由 [Client](client.md) 拥有；Workspace Root / Instance、认证和生命周期由 [Runtime](runtime.md) 拥有。
 
 ## 目标与边界
 
@@ -12,13 +12,13 @@ CLI      → @kgos/cli
 Daemon   → kgosd
 ```
 
-v1 CLI 以 npm package `@kgos/cli` 分发，AI / CI 的 canonical invocation 为：
+**历史 v0.2.1 npm CLI** 的 canonical invocation 为：
 
 ```text
 npx --yes @kgos/cli@<version> --root <workspace-root> <command>
 ```
 
-`@kgos/cli` package 只暴露一个 npm bin `kg`，用于 npx/npm exec 的确定 executable 映射；这不表示用户需要全局安装它。本文后续示例中的 `kg ...` 仅作为**命令语法简写**。AI / CI 使用 `npx --yes`；`--yes` 属于 npm 而非 KG OS。Instance 命令的 Workspace Root 可以由 `--root` 或 `KGOS_ROOT` 明确提供；自动化推荐固定版本并显式传 `--root`，避免继承宿主环境导致目标漂移。
+`@kgos/cli` 曾用一个 npm bin `kg` 提供命令行入口；本文后续 `kg ...` 仅作为**现存源码的命令语法简写**，不是对后续 Docker 新版可执行入口的承诺。已有 npm 版本仍按其历史合同运行，新的 AI/外部 Client 优先接入当前 Docker 的 MCP / Web/API；`--root` / `KGOS_ROOT` 等规则只对这份内部 CLI 源码有效。
 
 CLI 遵守以下边界：
 

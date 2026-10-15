@@ -15,13 +15,13 @@ KG OS（Knowledge Graph Operating System）是**面向 AI 的可编程知识基�
 - **调用方定义 Model**：Kernel 不预定义领域节点、关系或知识语义。
 - **Agent 在系统外部**：理解、提炼、分类、建模和决策由外部 Agent 与 Skill 完成。
 - **KG OS 提供确定性基础设施**：负责存储、读取、图操作、查询、索引和管理；SQLite Extension、Full-text analyzer 与 OpenAI-compatible Embeddings 都是运行时基础依赖，不是领域 Model 或 Agent。
-- 面向 AI 提供 **CLI + Skill**，面向人提供 **Web**。
+- 面向 AI 提供 **MCP + Skill**，面向人提供 **Web**；历史 CLI 源码保留作内部开发与迁移参考，当前唯一发行形式为 Docker。
 
 KG OS 独立于 Noven 或任何具体领域；领域语义由调用方表达。
 
 ## 使用模型
 
-通过 **Ontology 全局概览 → 可选 Domain → Definition 详情**理解模型；已知 Ref 可以直接读取，也可以 batch 读取同一 State 下的一组模型。`--edit` 取得 canonical YAML，`kg ontology patch` 提交局部变化；跨 Ontology + Knowledge 的原子修改使用同一个 Object Patch。
+通过 **Ontology 全局概览 → 可选 Domain → Definition 详情**理解模型；已知 Ref 可以直接读取，也可以 batch 读取同一 State 下的一组模型。通过现有 API/MCP 取得 canonical YAML 并提交局部 Patch；跨 Ontology + Knowledge 的原子修改使用同一个 Object Patch。历史 `kg` CLI 语法由 [CLI 设计](docs/design/cli.md)保留。
 
 Node / Relationship Definition 一起表达字段、约束和索引。单字段索引放在字段下，复合索引放在模型顶层；当前只有 Full-text / Managed Semantic 支持跨 Definition 共享 `targets`，Range / Text / Point 保持 Definition-local。没有顶层索引时省略 `indexes`。Knowledge 保持 Property Graph。Graph 原样执行 Lithograph Cypher，`query` / `execute` 分别选择只读 / 读写连接，KG OS 不审查语句内容；Evolution 提供 State、Branch、History、Diff、Merge 的专用交互。
 
@@ -29,7 +29,7 @@ Node / Relationship Definition 一起表达字段、约束和索引。单字段�
 
 KG OS v1 的语言边界是：`kgosd`、Kernel、Lithograph Host 和 Go 原生 MCP 使用 Go；`@kgos/sdk`、`@kgos/cli` 与浏览器 Web 使用 TypeScript。**`kgosd` 统一承载 Web、HTTP API 和 MCP**：Web 静态资源与 API 已内嵌；Phase 16 已实现并提交同进程 Go MCP + QuickJS-NG/wazero 受控脚本，**当前长期 Dev 已切换到新单进程 Go 镜像**，并通过真实 ChatGPT 四 Tool 读取、隔离 31/31 SDK 方法和重启持久化测试。旧 TypeScript MCP Server、Node Worker 与双进程镜像源码已清理，仅保留 Phase 15 Git 历史与 Dev 受控回退镜像；最终 CI 8/8、真实 ChatGPT OAuth 重连和测试 Branch 写入、Codex Skill 主动加载均已验收，Phase 16 = `done`；正式 GHCR/生产部署未执行。设计与实际状态分别见 [架构](docs/design/architecture.md#v1-运行时与技术分层)、[Runtime](docs/design/runtime.md#统一-http--mcp-hostingphase-16-目标)、[MCP](docs/design/mcp.md)。
 
-正式 AI / CI Client 分发形态为 `npx --yes @kgos/cli@<version> --root <workspace-root> ...`；`@kgos/cli` 的正式运行前置是 **Node.js >= 24.15.0**，`--yes` 属于 npm 自身的首次 package acquisition 确认，普通人类交互可省略。当前公开版本为 **v0.2.1**：它在 v0.2.0 的 Workspace Root / `.kgos` / complete init/readiness 基线上正式交付 Phase 13 的 D84 late-bound Embedding credential、改进后的 init wizard 与 doctor non-blocking credential 诊断。八个 npm package 均已发布为 `0.2.1` / `latest`，macOS、Linux glibc、Windows arm64/x64 六平台 public-registry `npx` smoke 与 GitHub Release 均已完成；v0.2.0 与 v0.1.1 继续保留为对应历史发布事实。
+**此后 KG OS 唯一官方新运行产物是 `ghcr.io/<owner 小写>/kgos:v<version>` 的 Linux amd64 Docker 镜像**，单进程提供 Web + HTTP API + MCP；不再新增 CLI/SDK/Runtime npm 或六平台 Native 发布。旧 `npx --yes @kgos/cli@<version>` 是已发行 v0.2.1 的历史入口，不代表后续 Docker 新版。此前 npm 最终公开版本为 **v0.2.1**：它在 v0.2.0 的 Workspace Root / `.kgos` / complete init/readiness 基线上正式交付 Phase 13 的 D84 late-bound Embedding credential、改进后的 init wizard 与 doctor non-blocking credential 诊断。八个 npm package 均已发布为 `0.2.1` / `latest`，macOS、Linux glibc、Windows arm64/x64 六平台 public-registry `npx` smoke 与 GitHub Release 均已完成；v0.2.0 与 v0.1.1 继续保留为对应历史发布事实。
 
 配置、模型与调用示例，以及设计职责索引，统一从 [设计入口](docs/design.md)进入。本文只维护产品定义，具体配置、数据和接口规则由各 owner 文档维护。
 

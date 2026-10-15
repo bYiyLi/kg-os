@@ -4,6 +4,8 @@
 
 这里记录 **KG OS 自己的长期集成 Dev 环境**及其可重复执行的管理入口。KG OS 产品的 MCP/认证/部署行为以 [MCP 设计真源](../design/mcp.md)为准；旧 TypeScript 部署的历史证据由 [Phase 15](../development/phases/15-mcp.md)维护，新 Go 统一服务的目标和验收由 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)维护。本文件不定义产品接口，也不把 Dev 验证冒充正式发布。
 
+**当前交付边界（[D99](../design/decisions.md#d99-linux-amd64-docker-only-distribution)）**：此后 KG OS 仅正式发行 Linux amd64 Docker。Dev 仍使用本文件的 OpenClaw/Compose、备份和回退入口；普通 CI 改为 Ubuntu Validate + Linux amd64 Docker Smoke 两个 Job，旧六平台 npm/Native Runtime CI 与新版发布已停止。历史部署记录保持不变；本轮简化不意味着已经部署或发布新镜像。
+
 **环境职责（D94）**：Mac 只做源码与非 Docker 验证；OpenClaw Linux amd64 负责 Dev Docker，GitHub Actions PR/main CI 独立构建/测试同一单进程镜像。**2026-10-13 已将长期 Dev 切换到 `Dockerfile.unified` 与单个 Go `kgosd` 进程**，保留原 Workspace、凭证、端口和 `pnpm dev:mcp` 管理入口；旧 Node MCP 的镜像仅作为迁移回退候选。
 
 **2026-10-14 Phase 17 Dev 部署成功**：使用 Mac 当前 `dirty` 工作树通过正式 `Dockerfile.unified` 在 OpenClaw 构建并切换镜像；`kgos-dev-mcp-1` 已 `healthy`，`pnpm dev:mcp check` 通过统一 Instance Bearer、OAuth Discovery 与四个 Tool 的只读请求。镜像 ID 为 `sha256:81216e09a1f64ac8ed67db3b30ea4e31c400a209135eaf339eccf7018c2e8951`；部署前受保护的 SQLite 一致性快照位于 `/data/apps/KgosDev/data/backups/20261014T070920Z-qwRPyKkr`。公网 HTTPS 首页及 OAuth 资源/授权元数据已返回 200，无凭证 MCP/请求详情返回 401；用户已确认新版 ChatGPT 重新授权成功，GitHub CI / 完整新版隔离矩阵未验收。历史独立 MCP Token 文件保留用于旧镜像回退，不由新版认证使用。2026-10-14 主题适配后的最新 Dev 镜像为 `sha256:6c67e96e381f97fa1764fc5e994cd488498d018ae3b361d2d46da6f1e4c6f6c3`，正式 Docker 构建、健康检查、只读 MCP 自动验收及公网主题 CSS 验证通过；Phase 17 按用户批准的未完成 CI 例外标记 `done`。

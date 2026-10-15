@@ -59,7 +59,7 @@ http://<host>:<port>/          → Web UI
 same origin                    → KG OS API / streaming
 ```
 
-Web 构建产物随 `kgosd` native Runtime package 一起交付，由 `kgosd` 的 HTTP server直接提供页面和资源；本地业务 CLI 在需要时自动确保该 Workspace Instance 的 daemon 已运行，同一个 active endpoint即可访问 Web 与 API。没有独立 Web 启动命令、第二个服务端口或单独部署步骤。
+Web 构建产物随 Linux amd64 Docker 镜像一起交付，由 `kgosd` 的 HTTP server直接提供页面和资源；本地业务 CLI 在需要时自动确保该 Workspace Instance 的 daemon 已运行，同一个 active endpoint即可访问 Web 与 API。没有独立 Web 启动命令、第二个服务端口或单独部署步骤。
 
 ChatGPT MCP Apps 仍共享 `packages/web` 源码和 `kgosd` 内嵌构建链：普通 Web 由 HTTP `/` 分发，额外的自包含 MCP App HTML 由同进程受认证 `/mcp` 上的 `resources/read` 返回。两种产物的宿主入口不同，但复用 React 业务界面；不增加第二个 Web 域名、Node 运行服务或监听端口。UI Resource / Tool 协议见 [MCP](mcp.md#chatgpt-mcp-apps-ui-合同)，组件复用见 [Web](web.md#chatgpt-内嵌-webmcp-apps)。
 
@@ -138,23 +138,25 @@ Web 登录使用单一根 Token，不引入账号或密码，也不把其凭证�
 
 登录、恢复、退出和错误响应一律 `Cache-Control: no-store`，无跨域 CORS，Cookie 不可由 JS 读取；Session Cookie **不允许直接认证** `/api/v1/ontology`、`/api/v1/graph`、`/mcp` 或 `/oauth/token`。浏览器业务 SDK 统一发送被进程内验证的临时 Web Access Bearer，并携带 `X-KGOS-Expected-Daemon-Boot`。Web Access Bearer 只在同一进程内有效，普通 CLI/SDK 的根 Bearer 不受影响；过期、撤销或 daemon 重启后旧值不能继续写入。已有 Web MCP 授权 `/oauth/request` 和 `/oauth/decision` 只可借此已验证的同源 Web 会话调用，不让 Cookie 直接调用 MCP 或签发 Grant；批准仍须服务端独立校验 OAuth request 与显式确认。对不安全方法验证精确同源 `Origin`，不得依赖 SameSite 防护替代 CSRF 校验。TLS 终止代理应由其明确提供 HTTPS 访问；不得信任任意客户端传入的 `X-Forwarded-Proto` 来放松 Cookie 或 Origin 检查。
 
-## Native Runtime package
+## Docker 原生运行文件（唯一当前交付）
 
-官方 native Runtime 通过 platform-specific npm package交付。它不包含 TypeScript CLI，只包含当前平台必须的 daemon与 official SQLite extensions：
+<a id="native-runtime-package"></a>
+
+当前 KG OS **不再发行新的 platform-specific native npm Runtime 包**。Linux amd64 Docker 镜像在构建时编译当前 `kgosd`，随镜像内置以下文件（不是另一套独立产品）：
 
 ```text
-<runtime-package>/
+/opt/kgos/
 ├── kgosd
 ├── extensions/
-│   ├── lithograph.<platform-library-suffix>
-│   ├── lithograph-openai-compatible.<platform-library-suffix>
-│   └── kgos-jieba.<platform-library-suffix>
+│   ├── lithograph.so
+│   ├── lithograph-openai-compatible.so
+│   └── kgos-jieba.so
 └── manifest.json
 ```
 
-`@kgos/cli` 从当前 npm dependency graph解析对应 `@kgos/runtime-<platform>-<arch>`，验证 package version、target与manifest hash后按绝对路径启动其中的 `kgosd`（Windows 为 `kgosd.exe`）；不依赖系统PATH、全局daemon或用户手工提供official library path。当前源码目标为 macOS / Linux glibc / Windows x64/arm64，具体package topology与已发布版本边界由 [Client](client.md#npm-package-topology)拥有。
-
-official Lithograph / Provider / Jieba path **不写入** Instance `config.toml`。daemon从自身Runtime package发现并验证这些 files，再使用现有 resolver语义把它们固定为 `<workspace-root>/.kgos/extensions/<sha256>/` 的 immutable runtime artifact；正常首次使用由 `init` 启动 daemon 并等待这一 materialization 完成，因此 `init` 成功时 official artifacts 已经存在于 Instance cache，而不是推迟到第一条业务命令。这样运行中的connection不依赖npm cache源文件继续存在。official Jieba artifact必须把运行所需 tokenizer code 与词典/数据固定在当前 Runtime package / manifest identity 中，不依赖宿主预装词典、运行时网络下载或可变外部文件。额外第三方extension继续由通用 `[[sqlite.extensions]]` config表达并使用同一content-addressed cache。
+- 镜像从固定、经过 manifest/SHA-256 校验的历史 `@kgos/runtime-linux-x64@0.2.1` 原生文件取得三个扩展，**只用于构建**；当前 `kgosd` 由本次 Go 源码重新编译，并更新 manifest 内的 daemon SHA-256。镜像自身用 `v<version>` Tag 与精确源码 revision 标识；不能把旧扩展输入版本错误等同于当前镜像版本。
+- `kgosd` 仍从可执行文件相邻的 manifest/extensions 找到 required official artifacts，启动时验证后固定到 `<workspace>/.kgos/extensions/<sha256>`，与原有 Instance 及 SQLite 连接的一致性规则相同。额外扩展继续由 `[[sqlite.extensions]]` 显式定义，不依赖 Node/npm 运行时。
+- **只支持 Linux amd64** 的正式运行镜像。已有六平台 npm Runtime 及本地 `packages/cli` 的启动机制属于历史/内部开发路径，不再是产品交付或远端 CI 兼容目标。分发与 Release 见 [Client](client.md#docker-only-交付)、[D99](decisions.md#d99-linux-amd64-docker-only-distribution)。
 
 <a id="instance-root"></a>
 

@@ -51,7 +51,7 @@ ChatGPT / MCP Client      Browser       CLI / SDK
 
 ### Docker-only 交付
 
-统一 KG OS 首版运行镜像仅交付**Linux amd64 Docker / OCI**，不交付独立 MCP npm 包或 Linux arm64 镜像。新镜像计划命名 `ghcr.io/<owner 小写>/kgos:v<版本>`，替代旧方案**尚未正式发布**的 `kgos-mcp` 镜像；已公开的 CLI / SDK / Runtime v0.2.1 仍是历史发布事实，其后续独立发布路线不在本 MCP 迁移中重新定义。用户仍自行决定公网 HTTPS、隧道或代理接入方案。
+按 [D99](decisions.md#d99-linux-amd64-docker-only-distribution)，**整个 KG OS 唯一新的官方运行产物**是 **Linux amd64 Docker / OCI**，而不只是 MCP 不发行 npm。镜像名称为 `ghcr.io/<owner 小写>/kgos:v<版本>`；已经公开的 CLI / SDK / Runtime v0.2.1 保留为历史发布，不再提供后续 npm 新版本或六平台二进制。用户仍自行决定公网 HTTPS、隧道或代理接入方案。
 
 | 形式 | 部署单元与依赖 | 使用方式 |
 | --- | --- | --- |

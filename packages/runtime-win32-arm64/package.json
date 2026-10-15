@@ -8,9 +8,6 @@
     "url": "git+https://github.com/bYiyLi/kg-os.git",
     "directory": "packages/runtime-win32-arm64"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "os": [
     "win32"
   ],
@@ -26,5 +23,6 @@
   ],
   "exports": {
     "./package.json": "./package.json"
-  }
+  },
+  "private": true
 }

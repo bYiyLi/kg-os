@@ -8,9 +8,6 @@
     "url": "git+https://github.com/bYiyLi/kg-os.git",
     "directory": "packages/runtime-darwin-arm64"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "os": [
     "darwin"
   ],
@@ -26,5 +23,6 @@
   ],
   "exports": {
     "./package.json": "./package.json"
-  }
+  },
+  "private": true
 }

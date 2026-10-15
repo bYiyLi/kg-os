@@ -4,6 +4,8 @@
 
 KG OS 的当前目标是**一个 Go `kgosd` 进程、一个 HTTP listener**，同时提供内嵌 Web、现有 `/api/v1/*` 与 `/mcp`。服务端 JavaScript 使用 QuickJS-NG WASM / Go Kernel Bridge，不依赖运行时 Node.js MCP 服务，也不需要宿主安装 `kgosd`。正式合同见 [MCP](../design/mcp.md)、[Runtime](../design/runtime.md)、[D93](../design/decisions.md#d93-kgosd-unified-mcp)。
 
+**发行说明**：按 [D99](../design/decisions.md#d99-linux-amd64-docker-only-distribution)，当前 Docker-only 交付覆盖整个 KG OS 的 Web/API/MCP，不再为后续版本发布独立 npm CLI/SDK/多平台 Native Runtime；下文历史 Dev 认证与 OAuth 验收不等于正式 GHCR 镜像已发布。
+
 **当前状态**：Phase 16 为 `done`。2026-10-14 Phase 17 统一 Instance + Web 授权流程已通过正式 `Dockerfile.unified` 构建部署到 `https://kgos-dev.y2l.top` 的 Dev 实例，自动只读四 Tool / OAuth metadata 验收成功；用户已实际重新完成 ChatGPT OAuth 授权并确认测试正常；Phase 17 已按用户批准的 CI / 完整隔离矩阵例外关闭为 `done`，并不表示相关 CI 已运行。Go 单进程 Linux amd64 镜像已在 OpenClaw 开发环境构建并部署、隔离 31/31 SDK Smoke 成功；现有 ChatGPT 私人连接已调用新版四 Tool，官方 Skill 已保存到私人 Plugin v1.0.1。**最终实现提交 `813bff4` 的 GitHub CI 8/8、真实 ChatGPT OAuth/隔离写入以及 Codex Skill 新会话加载均已通过；尚未正式发布 GHCR**。旧 `Dockerfile.mcp` / `packages/mcp` 的源码已移除，历史仅保留 Git 记录，不再是服务端部署入口。
 
 ## 1. 镜像与首次初始化

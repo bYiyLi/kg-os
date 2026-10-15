@@ -1,27 +1,29 @@
-# Client SDK 与 npm 分发
+# Client SDK 与 Docker-only 交付
 
-本文件是 KG OS v1 **TypeScript Client SDK、npm package topology、npx 入口与 native Runtime package 选择**的设计真源。CLI 命令语义见 [CLI](cli.md)，本地 Instance / `kgosd` lifecycle 见 [Runtime](runtime.md)，Object / Graph / Evolution 的业务合同仍由各自 owner 文档维护。
+本文件拥有 KG OS **TypeScript HTTP SDK、现存 CLI 适配层和当前 Docker-only 交付关系**。未来唯一官方运行产物按 [D99](decisions.md#d99-linux-amd64-docker-only-distribution) 为 Linux amd64 Docker 镜像；npm/npx 及六平台 Runtime 仅属已完成的历史发布。CLI 命令语义见 [CLI](cli.md)，本地 Instance / `kgosd` lifecycle 见 [Runtime](runtime.md)，Object / Graph / Evolution 的业务合同仍由各自 owner 文档维护。
 
 ## 客户端分层
 
-KG OS 的客户端层统一使用 TypeScript；Go 只保留在本地 Runtime / Kernel / Database Host：
+KG OS 的浏览器与内部开发客户端使用 TypeScript；正式容器由 Go `kgosd` 承载，不运行 Node CLI：
 
 ```text
-AI / Human
-    │
-    ▼
-@kgos/cli ─────┐
-               │
-Web ───────────┼──→ @kgos/sdk ── HTTP ──→ kgosd (Go)
-               │
-TS Application ┘
+AI / Agent                  Browser / TS Application / internal CLI
+    │                                      │
+    ▼                                      ▼
+ MCP + Skill                         packages/sdk
+    │                               (TypeScript HTTP)
+    │                                      │
+    └─────────────────┬────────────────────┘
+                      ▼
+                  kgosd (Go)
+               Web / HTTP API / MCP
 ```
 
 - `@kgos/sdk` 是公共 HTTP Client 的唯一 TypeScript 实现，不拥有本地文件、daemon process 或 npm native artifact lifecycle。
-- `@kgos/cli` 是 Node.js CLI adapter；它负责本地 Instance / Runtime 管理，再通过 `@kgos/sdk` 调用同一 HTTP API。
+- `packages/cli` 是历史 TypeScript CLI 的当前源码；可供内部开发/兼容测试使用，但不作为新的 npm 发行单元或官方 Docker 运行入口。
 - 浏览器 Web 与第三方 TypeScript application 可以直接使用 `@kgos/sdk`，不得通过 CLI 子进程间接访问 KG OS。
 - [Phase 16 Go 原生 MCP](mcp.md)由 `kgosd` 直接承载，与 Web、HTTP API 共用进程与监听端口；MCP Tool 直接映射 Kernel 的公共操作，不通过 `@kgos/sdk` 再发一次本机 HTTP。`@kgos/sdk` 仍是 TypeScript CLI / 浏览器 / 外部 TypeScript 调用方的 HTTP Client 合同，MCP 必须对齐其公开参数、结果和错误语义。独立 TypeScript MCP 与 Node Worker 已随 Phase 16 迁移从现行工作树移除，历史实现保留在 [Phase 15 已提交 revision](https://github.com/bYiyLi/kg-os/tree/ea37ddfca8c69bc701de0bb41d10d465f92c6b64/packages/mcp)，并非已发布的第九个 npm 包；当前统一 Go MCP 的开发及验收状态见 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)。
-- Phase 00–07 的 Go `kg` CLI 是 Phase 08 的迁移行为基准；当前实现已经在 TypeScript parity 与 packed package smoke 通过后删除 Go CLI，只保留 `@kgos/cli` 这一套正式 Client。
+- Phase 08 的 TypeScript CLI 取代了早期 Go `kg` CLI；这一已完成历史保留，但 [D99](decisions.md#d99-linux-amd64-docker-only-distribution) 不再承诺为它维护平台 native/npm 发布。
 
 ## `@kgos/sdk`
 
@@ -60,117 +62,34 @@ Object namespace 可以同时提供 structured `read` 与 canonical-text `readTe
 
 CLI 的 stdout/stderr/exit 映射仍由 [CLI](cli.md#error-与-exit-code)拥有；SDK 只提供足够结构让 CLI 区分 daemon error、transport error 与已经交付的 partial stream。
 
-## `@kgos/cli`
+## `@kgos/cli`（内部源码）
 
-`@kgos/cli` 是 KG OS v1 面向 AI / shell 的正式分发与执行入口，并且 package 只暴露一个 npm `bin` entry：`kg`。单一 bin 使 npm/npx 对 scoped package 的 executable 推断保持确定，不建立第二个 CLI executable 名。
+仓库保留 `packages/cli`，复用 SDK 及已有 CLI 命令/行为规范，供本地开发或迁移参考。它不是新的交付产物：`npx --yes @kgos/cli@<version>` 仅对应以往已发布版本，不对应未来 Docker 新版，也不进入当前 CI、GHCR Release 门禁。当前 Docker 中没有 Node.js 运行时，不以 `docker exec` 运行 TypeScript CLI。历史 Node CLI / Native package 的语义、初始化与退出码设计仍见 [CLI owner](cli.md)，不因发布方式收敛而自动改写业务 API。
 
-`@kgos/cli` 的正式 Node.js runtime baseline 为 **Node >= 24.15.0**；package `engines.node`、仓库 pinned Node toolchain、CI 与发布 smoke 必须保持一致。版本不满足时属于 Client 前置条件不满足，不为兼容旧 Node 隐式切换另一套 CLI 实现。README / 使用指南必须在 canonical npx 路径附近明确这一要求，避免只依赖 npm 的 engine-version incompatibility warning 作为用户说明。`@kgos/sdk` 的浏览器 / Web Platform 边界不因为 CLI 的 Node baseline 自动变成 Node-only。
+<a id="npm-package-topology"></a>
 
-AI / CI 的 canonical invocation 为：
+## 历史 npm 分发（已停止新增发布）
 
-```text
-npx --yes @kgos/cli@<version> --root <workspace-root> <command>
-```
+<a id="版本关系"></a>
+<a id="发布与验证边界"></a>
 
-例如：
+v0.2.1 已发布的 `@kgos/sdk`、`@kgos/cli` 和六个 `@kgos/runtime-*` 属于既有历史结果，相关 Phase 08–13 和 D76 不撤销。现行仓库中的平台 package manifest、Native Runtime 组装代码仅用于已存在的本机 CLI 开发路径；**不再作为用户新的安装、发布、测试平台承诺**。新的发布流程不会执行 npm Publish/OIDC、Registry Smoke 或 Runtime tarball matrix。
 
-```sh
-npx --yes @kgos/cli@<version> --root ./my-project ontology --at branch/main
-```
+<a id="docker-only-交付"></a>
 
-`--yes` 是 npm/npx 自身的非交互确认选项，必须位于 package specifier 之前；它不是 KG OS CLI flag。npm 在未安装 package 时可能先提示确认，因此 AI / CI 显式使用 `--yes`；非 TTY / CI 环境即使 npm 自动假定 yes，也保持这一 canonical spelling 以避免环境差异。人类交互使用可以省略 `--yes`。AI / CI 还应固定明确版本；`@latest` 可以用于人工试用，但不作为可复现自动化的推荐形式。
-
-CLI 的业务命令通过 `@kgos/sdk` 调用 daemon。只有 Workspace Root 解析（`--root` / `KGOS_ROOT`）、`.kgos` Instance discovery、`doctor`、`init`、credential 读取、Runtime ensure、native package resolution、stdin/file adapter、CLI presentation、i18n 与 exit code 属于 CLI 自己的本机职责。
-
-## npm package topology
-
-发布单元固定分为跨平台 TypeScript package 与平台 native Runtime package：
+## 当前 Docker-only 交付
 
 ```text
-@kgos/sdk
-@kgos/cli
-
-@kgos/runtime-darwin-arm64
-@kgos/runtime-darwin-x64
-@kgos/runtime-linux-arm64
-@kgos/runtime-linux-x64
-@kgos/runtime-win32-arm64
-@kgos/runtime-win32-x64
+Linux amd64 Docker / OCI (one official runtime artifact)
+  └── kgosd (Go; non-root; no Node.js runtime)
+        ├── HTTP API + Web (built from packages/sdk + packages/web)
+        ├── MCP / SDK Help (generated from packages/sdk public types)
+        ├── Lithograph + Provider + official Jieba extensions
+        └── <workspace>/.kgos persistent Instance
 ```
 
-`@kgos/cli` 以 exact-version normal dependency 关联同版本 `@kgos/sdk`，再以 exact-version `optionalDependencies` 关联同版本的平台 Runtime package。每个 native package 使用 npm `os` / `cpu` metadata 声明目标；npm 可以跳过当前平台不适用的 optional package，也允许调用方整体 omit optional dependencies，因此 CLI 仍必须验证当前 platform/arch 对应 package 确实存在、metadata 匹配且 manifest 有效。SDK version mismatch或native package缺失/unsupported target统一 fail closed，不在运行时临时下载第二份 binary。
-
-这些 package 都是普通预构建 npm artifacts：`@kgos/cli` 与 native Runtime packages 不使用 `preinstall/install/postinstall` lifecycle script 下载、选择或改写 binary。平台选择只依赖 npm package metadata + CLI runtime resolution；Unix native package中的 `kgosd` 必须在 packed artifact中保留可执行权限，Windows package提供 `kgosd.exe`。六个 `@kgos/*` Runtime package与 `@kgos/cli` / `@kgos/sdk` 均按 public scoped package准备（manifest不得保留 `private: true`；发布时使用public access metadata），实际registry publish仍由release动作单独授权。
-
-平台 package 的 logical layout 为：
-
-```text
-<runtime-package>/
-├── kgosd（Windows 为 kgosd.exe）
-├── extensions/
-│   ├── lithograph.<platform-suffix>
-│   ├── lithograph-openai-compatible.<platform-suffix>
-│   └── kgos-jieba.<platform-suffix>
-└── manifest.json
-```
-
-package 不再包含 native `kg` binary。`kgosd` 与三个 required official extension 使用同一 KG OS package version；manifest 记录 target、version 与每个 native artifact 的 SHA-256，缺失、target/version 不匹配或 hash 不匹配必须 fail closed。official Jieba 的 tokenizer code / dictionary data必须随当前 platform package形成可复现 artifact，不依赖宿主预装资源或运行时下载。
-
-当前源码的 native package target 为 macOS arm64/x64、Linux **glibc** arm64/x64 与 Windows arm64/x64。Windows 使用 Node/npm 的 `win32` target 名、`.dll` 扩展和 `kgosd.exe`；Linux native package除 `os/cpu` 外还必须声明与实际构建一致的 npm `libc` metadata。当前公开 v0.2.1 已发布六个平台的 Runtime package；v0.1.0 的四平台、v0.1.1 的首次六平台与 v0.2.0 基线结论保留为历史事实，不被追溯改写。没有对应 native package 的平台返回明确 unsupported-platform local error，不从源码即时编译、不回退任意远端 binary。
-
-## Runtime package 与 Instance 分离
-
-npm package location 属于软件分发状态，不能进入 Instance 持久配置：
-
-```text
-npx --yes @kgos/cli@0.2.1
-        │
-        └── @kgos/runtime-<os>-<arch>@0.2.1
-                 └── kgosd + official extensions
-
---root /data/world
-        └── .kgos/
-              └── config / auth / lock / kgos.db / caches
-```
-
-因此：
-
-- `config.toml` 不保存 npm cache / `node_modules` 中的 `kgosd` 或 official extension absolute path；
-- CLI 每次 invocation 从当前 npm dependency graph 解析 native package；
-- `init` 启动当前 daemon 完成首次 setup；daemon 从自身 Runtime package 校验 required official extensions，并把 official 与 caller additional artifacts 固定到 `<root>/.kgos/extensions` 的 content-addressed cache。后续 restart/connection 复用同一 resolver 合同，不依赖 npm cache 文件继续存在；
-- 第三方 SQLite extension 仍由 Instance `config.toml` 的通用 extension 配置管理，不归 npm platform package 所有。
-
-KG OS 不建立第二个长期 runtime installation directory 或自制 package manager。npm/npx 负责软件 version acquisition；Workspace Root 只负责定位，`<root>/.kgos` 才保存 Instance 数据与运行状态。
-
-## 版本关系
-
-一次 npx invocation 的 `@kgos/cli`、`@kgos/sdk` 与 resolved native Runtime package 使用同一个 KG OS package version。新启动的 daemon 必须报告与启动它的 Runtime package 一致的版本。
-
-如果目标 Workspace 的 `.kgos` 已有 active daemon，CLI 必须验证 daemon identity / version。当前 v1 不静默替换正在运行的不同 Runtime；不兼容时 fail closed并由 `doctor` 报告实际/请求版本。未来如要自动 rolling restart，必须单独设计 lifecycle 与并发语义。
-
-## 发布与验证边界
-
-npm 是正式分发入口；GitHub artifacts 可以继续作为 CI / provenance / 调试证据，但不要求用户手工下载后才能使用 KG OS。
-
-发布候选至少验证 SDK exports/types、Node >=24.15.0 baseline、packed `@kgos/cli` 的 `npm exec` 与 `npx --yes`、`--root` / `KGOS_ROOT` resolution、platform selection、native manifest/hash、repo 外 fresh Workspace 的 `init -> doctor ready -> 首次业务命令`、`.kgos` layout、official/additional extension materialization、daemon/auth/streaming，以及 macOS arm64/x64、Linux glibc arm64/x64、Windows arm64/x64 对应 runner 的真实 native load。六个平台都必须实际加载 official Jieba tokenizer并证明新 Instance 省略 `--fulltext-analyzer` 后写出/使用 `jieba`，不能只检查 package里存在一个文件。
-
-`@kgos/*` 使用 npm organization scope。实际发布前必须由有权限的 npm account / organization确认可以发布 `@kgos` scope；若该 namespace不可用，属于 release naming blocker，需要在发布前单独裁决，不能静默换名后仍宣称符合本设计。
-
-正式 Release 由已经存在的 `v<version>` Git tag 触发 GitHub Actions。tag 名必须与 root/package version 完全一致，并指向 `main` 历史中的同一 source revision；普通 PR / `main` push 不触发 publish。手工 `workflow_dispatch` 只用于对一个已经存在的 release tag 恢复或重跑，不产生第二套 release version/source。
-
-发布顺序固定为六个 Runtime package、SDK、CLI 最后。六平台 immutable candidate、native load 与 packed smoke 全部通过后，八个 package 直接使用本次正式 dist-tag 发布；CLI 只有在其 exact SDK / Runtime dependency 已经能从 registry 解析到同版本 artifact 后才允许发布。这样在 CLI 切换前，用户正式入口不会提前指向一个依赖不完整的新版本，也不需要发布完成后再执行单独的 npm `dist-tag add`。
-
-GitHub Actions 的长期 npm 发布认证使用 npm Trusted Publishing / OIDC；published package 的 `repository.url` 必须绑定当前 GitHub repository，Release publish job 必须拥有 `id-token: write`，正式 publish step 不注入长期 `NODE_AUTH_TOKEN`。首个 package 尚未存在、无法在 package settings 建立 trusted publisher 时，允许使用一次短期 bootstrap credential完成首次 publish；bootstrap credential 只能保存在 GitHub Actions secret，不进入 repository、artifact 或 log，并在本次首发 package 都配置 trusted publisher 后删除。
-
-实际 npm registry publish、public-registry smoke 与 GitHub Release 是发布动作；只有真实执行并取得 registry evidence 后才能声称已发布。Git tag 是发布指令与 source identity，不再表示“发布完成后才补建的结果”。
-
-## 非目标
-
-v1 不因为 npm 分发而：
-
-- 把 `kgosd` / Kernel / SQLite Host 改写成 Node.js；
-- 让 SDK 直接打开 `kgos.db`；
-- 要求用户全局安装 CLI 或 `kgosd`；
-- 暴露 `kgosd` 为普通用户 lifecycle command；
-- 把 npm cache path、package manager内部目录或 native binary path写入 Knowledge Base State；
-- 为不同 client surface复制 Object / Graph / Evolution 产品语义。
+- 唯一当前官方镜像为 `ghcr.io/<owner 小写>/kgos:v<version>`，只支持 Linux amd64；一次 Tag Release 发布且验证同一 Docker image，不再发布新 npm 包。镜像构建时的 TS/Node 是开发工具，不作为镜像运行时能力。
+- `packages/sdk` 保持 TypeScript API 合同真源，是 Web 及 MCP SDK Help 生成的必要源码；不因为不对外发布 npm 而删除 SDK 类型定义、API 错误/流式约束或必要测试。
+- 当前镜像构建暂复用先前已发布的 `@kgos/runtime-linux-x64@0.2.1` 中的**固定原生扩展文件**，仅为 build-only 历史 artifact 输入。这个输入版本独立于 KG OS 镜像 Tag；Docker 阶段重新编译当前 `kgosd`。完整原生扩展安装、Instance/materialization、网络和安全规则仍由 [Runtime](runtime.md#native-runtime-package)、[MCP Docker](mcp.md#docker-only-交付) 拥有。
+- 验证只对单一交付目标做 Ubuntu/Linux amd64 源码质量门禁与 Linux amd64 Docker 隔离 Smoke。镜像中的原生扩展及 Go/JS/WASM 实际行为必须测试；旧 npm packaging/六平台 runner 不是这条链上的门禁。
+- Tag、镜像 digest、GHCR 发布、Dev 部署/生产部署互相独立；未执行的动作不得写成已成功。详见 [D99](decisions.md#d99-linux-amd64-docker-only-distribution) 和 [Phase 21](../development/phases/21-docker-only-delivery.md)。
