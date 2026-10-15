@@ -5,15 +5,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
 )
 
-func (service *Service) PatchOntology(ctx context.Context, request PatchRequest) (PatchResult, error) {
+func (service *Service) PatchOntology(ctx context.Context, request PatchRequest) (observed PatchResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		outcome := "committed"
+		if loggedErr == nil && observed.State == request.BaseState {
+			outcome = "no_change"
+		}
+		recordBusinessResult(ctx, "ontology.patch", outcome, observed.State, len(observed.Created)+len(observed.Transitions), started, loggedErr)
+	}()
 	return service.patchObjects(ctx, request, true)
 }
 
-func (service *Service) PatchObjects(ctx context.Context, request PatchRequest) (PatchResult, error) {
+func (service *Service) PatchObjects(ctx context.Context, request PatchRequest) (observed PatchResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		outcome := "committed"
+		if loggedErr == nil && observed.State == request.BaseState {
+			outcome = "no_change"
+		}
+		recordBusinessResult(ctx, "object.patch", outcome, observed.State, len(observed.Created)+len(observed.Transitions), started, loggedErr)
+	}()
 	return service.patchObjects(ctx, request, false)
 }
 

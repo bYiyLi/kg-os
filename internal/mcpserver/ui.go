@@ -3,7 +3,9 @@ package mcpserver
 import (
 	"context"
 	"encoding/base64"
+	"time"
 
+	"github.com/bYiyLi/kg-os/internal/observability"
 	"github.com/bYiyLi/kg-os/internal/webui"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -63,7 +65,11 @@ func (s *Server) registerWorkspace(server *mcp.Server) {
 			MIMEType: "image/svg+xml",
 			Sizes:    []string{"any"},
 		}},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+		started := s.beginTool(ctx)
+		if observer := observability.FromContext(ctx); observer != nil {
+			observer.Tool(ctx, "kgos_workspace", "", time.Since(started))
+		}
 		return &mcp.CallToolResult{
 			StructuredContent: map[string]any{"view": "workspace"},
 			Content:           []mcp.Content{&mcp.TextContent{Text: "Open KG OS Workspace"}},

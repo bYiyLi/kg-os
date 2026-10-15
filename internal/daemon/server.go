@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/bYiyLi/kg-os/internal/observability"
 	runtimehost "github.com/bYiyLi/kg-os/internal/runtime"
 )
 
@@ -62,6 +65,9 @@ func ServeWithOptions(ctx context.Context, runtime *runtimehost.Runtime, handler
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
+		// net/http's default stderr error log bypasses our privacy allowlist.
+		// Explicit server failures are instead logged by the daemon owner.
+		ErrorLog: log.New(io.Discard, "", 0),
 		BaseContext: func(net.Listener) context.Context {
 			return ctx
 		},
@@ -85,6 +91,7 @@ func ServeWithOptions(ctx context.Context, runtime *runtimehost.Runtime, handler
 		cancel()
 		return fmt.Errorf("publish daemon endpoint: %w", err)
 	}
+	observability.Log(ctx, slog.LevelInfo, "runtime", "runtime.started")
 	if output != nil {
 		_, _ = fmt.Fprintf(output, "KG OS daemon: %s\n", endpoint)
 		_, _ = fmt.Fprintf(output, "KG OS listen: %s://%s\n", map[bool]string{true: "https", false: "http"}[secure], address)

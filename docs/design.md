@@ -20,8 +20,9 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、npm/npx 分发、platform native Runtime package、Client version/package topology |
 | [cli.md](design/cli.md) | AI-first CLI command tree、`--root` / `KGOS_ROOT`、分层 help、`doctor/init` setup、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听目标、dynamic loopback endpoint、`auth.json` / `kgosd.lock`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
+| [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |
 | [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
-| [decisions.md](design/decisions.md) | D1–D96 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [decisions.md](design/decisions.md) | D1–D97 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 ## 从配置到调用
@@ -38,6 +39,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | Web 中英文如何识别、切换与管理文案 | [Web 国际化与语言偏好](design/web.md#国际化与语言偏好)、[Phase 14 P14-00](development/phases/14-web.md#a14-00-国际化基础与双语界面)；CLI locale 为独立合同，见 [CLI 国际化](design/cli.md#国际化) |
 | 需要实现和验证什么 | [工程待办与验收](design/implementation.md) |
 | Web 如何同时运行于浏览器和 ChatGPT | [Web 双入口](design/web.md#chatgpt-内嵌-webmcp-apps)、[MCP Apps UI 合同](design/mcp.md#chatgpt-mcp-apps-ui-合同)、[D96](design/decisions.md#d96-chatgpt-mcp-apps-web)、[Phase 18](development/phases/18-chatgpt-embedded-web.md) |
+| KG OS 如何记录关键业务结果、追踪请求及查看运行指标 | [Observability](design/observability.md)、[D97](design/decisions.md#d97-kgos-observability)、[Phase 19](development/phases/19-observability.md) |
 | 第一阶段怎么搭开发环境 | [开发路线](development/README.md)、[Phase 00 计划](development/phases/00-engineering-foundation.md)、[本地开发指南](guide/development.md) |
 
 ## 设计状态导航
@@ -52,6 +54,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | MCP 设计 | [统一 Go MCP / Plugin 架构](design/mcp.md#部署与责任划分)、[Docker-only 交付与完整配置](design/mcp.md#部署交付与运行合同)、[统一 Instance / Web OAuth 认证目标](design/mcp.md#统一-instance-认证与-web-内的-mcp-连接授权phase-17-目标)（[D95](design/decisions.md#d95-unified-mcp-web-authorization)、[Phase 17 done（用户关闭例外）](development/phases/17-mcp-web-authorization.md)）、[四个 Tool 与 Go/WASM Sandbox](design/mcp.md#javascript-sdk-执行)、[完整 Markdown Preview](design/mcp.md#kgos_preview虚拟-markdown-文件)、[Ancestry](design/mcp.md#state_ancestrycommit-dag-markdown-历史)；[D93](design/decisions.md#d93-kgosd-unified-mcp) 取代旧独立 MCP 架构，保留 [D91](design/decisions.md#d91-mcp-docker-only-delivery) 的 Linux amd64 范围；现行 Mac / OpenClaw / 远程 Docker CI / Release 分工以 [D94](design/decisions.md#d94-openclaw-docker-development-and-ci) 为准 |
 | Web 设计 | [图谱优先、覆盖式版本 DAG、独立查询结果帧与帧内检查器方向已认可](design/web.md#依据与状态)；原 State 重跑、Branch 前进仅提示刷新及 `.kgos` 下恢复 Web 数据已确认，首版按[本轮简化范围](design/web.md#信息架构与当前上下文)收敛；[国际化与语言偏好](design/web.md#国际化与语言偏好)的 English / 简体中文基础已在当前 Web 组件中实现、完成定向测试，Phase 14 P14-00 仍待正式打包与阶段验收；[当前接口与工程待办](design/web.md#当前能力与工程待办)区分已有能力和本轮持久化方案。其余业务页面仍为壳层，不代表动态业务验收完成；内置交付见 [Runtime](design/runtime.md#web-交互设计状态) |
 | ChatGPT 内嵌 Web | [D96](design/decisions.md#d96-chatgpt-mcp-apps-web) 的单 Web 双入口与 MCP Apps 认证/资源合同已由 [Phase 18](development/phases/18-chatgpt-embedded-web.md) 实现并在 OpenClaw Dev 及用户真实 ChatGPT 两个入口验收；Phase 18 按用户批准的远端 CI 例外标记 `done`，对应 GitHub CI / 六平台矩阵未运行，不代表已通过。Phase 14 的业务页面仍然 `deferred`。 |
+| 可观测性 | [D97](design/decisions.md#d97-kgos-observability) 与 [Observability 设计](design/observability.md) 拥有日志、关键业务事件、追踪与指标合同；[Phase 19](development/phases/19-observability.md) 为 `in_progress`，核心代码、Mac 全量质量与隔离 Docker Smoke 已验收，等待 Git 交付及相应提交的 GitHub CI。 |
 
 **已确认不等于已实现；未实现不等于未设计。** Lithograph 的 Phase / release 状态以 Lithograph 仓库为准，不在 KG OS 复制第二份完成状态。文档示例校验不能代替数据库、真实 loadable extension、SQL streaming 与 cancellation 集成测试。
 
@@ -61,6 +64,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 - 按“配置 → 模型 → 调用”理解本次语义检索设计，使用上面的入口。
 - 查询 / 写入的完整事务与错误边界分别读 [Object](design/object.md)、[Graph](design/graph.md)、[Evolution](design/evolution.md) 和 [公共合同](design/contracts.md)。
 - 面向 ChatGPT / 通用 MCP Client 的受控 JavaScript、完整 Ontology 预览和私人 Plugin / Skill 方案读 [MCP](design/mcp.md)。
+- 日志、业务事件、跨层请求关联及运行指标读 [Observability](design/observability.md)，具体实施与验收读 [Phase 19](development/phases/19-observability.md)。
 - 人的图形阅读、查询结果帧、版本导航与前端编辑读 [Web](design/web.md)；按功能浏览 [Web 材料与覆盖矩阵](design/web-materials.md)，一致样例见 [Web 样例](design/web-examples.md)。
 - 决策依据与被替换规则读 [Decisions](design/decisions.md)；历史条目的后续调整不与 owner 正文并行生效。
 - 实现只能沿用对应 owner 已确认的规则；剩余 mapping / 验收由 [Implementation](design/implementation.md)记录。

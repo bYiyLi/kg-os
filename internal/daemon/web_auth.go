@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 type webAuthResponse struct {
@@ -78,7 +79,7 @@ func webAuthError(w http.ResponseWriter, err error) {
 }
 
 func (s *webSessionStore) routes(mux *http.ServeMux, token, bootID string) {
-	mux.HandleFunc("/api/v1/web/auth/login", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/web/auth/login", observability.SecurityHTTP("web.auth.login", func(w http.ResponseWriter, r *http.Request) {
 		webAuthHeaders(w)
 		secure, valid := validWebOrigin(r)
 		if !valid {
@@ -99,7 +100,7 @@ func (s *webSessionStore) routes(mux *http.ServeMux, token, bootID string) {
 		}
 		setWebSessionCookie(w, s.cookieName, cookie, secure, s.now())
 		writeJSON(w, http.StatusOK, webAuthResponse{AccessToken: access, DaemonBootID: bootID})
-	})
+	}))
 	mux.HandleFunc("/api/v1/web/auth/session", func(w http.ResponseWriter, r *http.Request) {
 		webAuthHeaders(w)
 		secure, valid := validWebOrigin(r)
@@ -123,7 +124,7 @@ func (s *webSessionStore) routes(mux *http.ServeMux, token, bootID string) {
 		setWebSessionCookie(w, s.cookieName, cookie, secure, s.now())
 		writeJSON(w, http.StatusOK, webAuthResponse{AccessToken: access, DaemonBootID: bootID})
 	})
-	mux.HandleFunc("/api/v1/web/auth/logout", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/web/auth/logout", observability.SecurityHTTP("web.auth.logout", func(w http.ResponseWriter, r *http.Request) {
 		webAuthHeaders(w)
 		secure, valid := validWebOrigin(r)
 		if !valid {
@@ -140,7 +141,7 @@ func (s *webSessionStore) routes(mux *http.ServeMux, token, bootID string) {
 		}
 		clearWebSessionCookie(w, s.cookieName, secure)
 		w.WriteHeader(http.StatusNoContent)
-	})
+	}))
 }
 
 // Ordinary API and MCP Token flows keep their existing Bearer validation.
@@ -166,7 +167,7 @@ func (s *webSessionStore) webBearer(next http.Handler, rootToken string) http.Ha
 						return
 					}
 				}
-				copyRequest := r.Clone(r.Context())
+				copyRequest := r.Clone(observability.WithSurface(r.Context(), "web"))
 				copyRequest.Header.Set("Authorization", "Bearer "+rootToken)
 				next.ServeHTTP(w, copyRequest)
 				return

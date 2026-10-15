@@ -57,6 +57,10 @@ pnpm dev:mcp rollback    # 手工回到上次通过验收的镜像，保留数�
 pnpm dev:mcp stop        # 仅停止 KG OS Dev 容器，不删除 Workspace
 ```
 
+Phase 19 的当前工作树代码将 `kgosd` 的诊断日志统一为 JSON Lines，使用可选 `KGOS_LOG_LEVEL=DEBUG|INFO|WARN|ERROR`（默认 INFO，修改后重启生效）；不能借 DEBUG 输出 Token、Cypher、Patch 或脚本正文。Docker 使用容器日志流，受控 Dev Compose 限制日志大小与文件数；正式镜像无法单独强制宿主 Docker driver 的日志保留策略。CLI 自动启动的本地 `kgosd` 由自身维护 `.kgos/logs/kgosd.log`（单文件 10 MiB，最多 5 个），`kgosd.startup.log` 保存启动地址与早期错误，不应拿它充当业务事件日志。
+
+对当前已授权的 Instance，可通过 `POST /api/v1/system/diagnostics`（JSON 请求体 `{}`）取得进程内指标摘要；必须使用合法 Instance Bearer，或符合现有 Web Access Bearer + Boot Guard 的浏览器会话。不能用 MCP OAuth Token 调用普通 API。需要定位单次请求时，使用服务端返回的 `X-KGOS-Request-ID` 与只属于该 Instance 的安全日志关联；诊断 API 不提供原始日志下载。**当前新增能力尚待 Phase 19 全部验收；长期 Dev 上的旧镜像不等于已经部署该能力。**
+
 入口为 `scripts/mcp-dev.mjs`，远端单机生命周期归 `scripts/mcp-dev-remote.sh`，**Go 单进程只读验收由 OpenClaw 宿主执行 `scripts/mcp-dev-accept-unified.mjs`**，Compose 归仓库根 `compose.dev.yaml`。原 `scripts/mcp-dev-accept.mjs` 仅在旧镜像回退验证时使用。这些是可重复执行的 Dev 入口，不在持久 `data/` 中保存第二套部署脚本。
 
 ### 首次初始化（仅新 Workspace）

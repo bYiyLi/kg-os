@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 )
@@ -210,7 +211,9 @@ func executeRaw(
 	cypher string,
 	params any,
 	options any,
-) (Result, error) {
+) (result Result, observedErr error) {
+	started := time.Now()
+	defer func() { observeDatabaseOperation(ctx, "execute", started, observedErr) }()
 	paramsJSON, err := marshalObject(params)
 	if err != nil {
 		return Result{}, fmt.Errorf("encode Lithograph params: %w", err)
@@ -240,7 +243,9 @@ func streamRaw(
 	params any,
 	options any,
 	consume func(Event) error,
-) error {
+) (observedErr error) {
+	started := time.Now()
+	defer func() { observeDatabaseOperation(ctx, "stream", started, observedErr) }()
 	if consume == nil {
 		return fmt.Errorf("stream consumer is required")
 	}

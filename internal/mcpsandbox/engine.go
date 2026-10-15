@@ -8,7 +8,15 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
+
+func recordBudgetLimit(ctx context.Context) {
+	if observer := observability.FromContext(ctx); observer != nil {
+		observer.SandboxLimit(ctx)
+	}
+}
 
 type DispatchFunc func(context.Context, string, []json.RawMessage) (json.RawMessage, error)
 type StreamFunc func(context.Context, string, json.RawMessage, func(json.RawMessage) error) error
@@ -153,6 +161,7 @@ func (i *invocation) call(request callRequest) {
 		}
 	}()
 	if len(request.Params) > 1<<20 {
+		recordBudgetLimit(i.ctx)
 		res.Code = "RESOURCE_ERROR"
 		res.Message = "SDK parameters exceed budget"
 		return
@@ -191,6 +200,7 @@ func (i *invocation) call(request callRequest) {
 	// the final script result would leave individual Kernel responses unbounded.
 	// Reject before allocating a corresponding QuickJS string.
 	if i.limits.MaxOutputBytes > 0 && len(raw) > i.limits.MaxOutputBytes {
+		recordBudgetLimit(i.ctx)
 		res.Code = "RESOURCE_ERROR"
 		res.Message = "SDK result exceeds budget"
 		return
@@ -209,6 +219,7 @@ func (i *invocation) streamCall(method string, args []json.RawMessage) (json.Raw
 		i.streamLock.Lock()
 		if len(i.streams) >= i.limits.MaxStreams {
 			i.streamLock.Unlock()
+			recordBudgetLimit(i.ctx)
 			return nil, &CallError{Code: "RESOURCE_ERROR", Message: "stream budget exceeded"}
 		}
 		i.nextStream++
@@ -224,6 +235,7 @@ func (i *invocation) streamCall(method string, args []json.RawMessage) (json.Raw
 					return errors.New("invalid Kernel stream event")
 				}
 				if i.limits.MaxOutputBytes > 0 && len(v) > i.limits.MaxOutputBytes {
+					recordBudgetLimit(ctx)
 					return &CallError{Code: "RESOURCE_ERROR", Message: "Graph stream event exceeds budget"}
 				}
 				select {
@@ -305,6 +317,7 @@ func ExecuteWithLimits(ctx context.Context, code string, readOnly bool, dispatch
 		return nil, err
 	}
 	if len(code) > limits.MaxCodeBytes {
+		recordBudgetLimit(ctx)
 		return nil, errors.New("RESOURCE_ERROR: code budget exceeded")
 	}
 	if dispatch == nil || stream == nil {
@@ -317,6 +330,7 @@ func ExecuteWithLimits(ctx context.Context, code string, readOnly bool, dispatch
 			runErr = &ScriptError{Code: "CANCELLED", Message: "Call cancelled; writes may have completed"}
 			result = nil
 		} else if runCtx.Err() != nil {
+			recordBudgetLimit(ctx)
 			runErr = &ScriptError{Code: "RESOURCE_ERROR", Message: "Sandbox deadline exceeded; writes may have completed"}
 			result = nil
 		}
@@ -350,10 +364,12 @@ func ExecuteWithLimits(ctx context.Context, code string, readOnly bool, dispatch
 		}
 		for _, req := range batch {
 			if i.calls >= limits.MaxCalls {
+				recordBudgetLimit(ctx)
 				return nil, errors.New("RESOURCE_ERROR: bridge call budget exceeded")
 			}
 			i.calls++
 			if inFlight >= 16 {
+				recordBudgetLimit(ctx)
 				return nil, errors.New("RESOURCE_ERROR: concurrent bridge call limit exceeded")
 			}
 			inFlight++
@@ -364,6 +380,7 @@ func ExecuteWithLimits(ctx context.Context, code string, readOnly bool, dispatch
 			return nil, err
 		}
 		if len(status) > limits.MaxOutputBytes {
+			recordBudgetLimit(ctx)
 			return nil, errors.New("RESOURCE_ERROR: result exceeds budget")
 		}
 		var state struct {

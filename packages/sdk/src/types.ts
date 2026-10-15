@@ -1,4 +1,6 @@
 export type JsonPrimitive = boolean | null | number | string;
+
+// cspell:words goroutines
 export interface JsonObject {
   [key: string]: JsonValue;
 }
@@ -13,6 +15,26 @@ export interface RequestOptions {
 export interface WebDataInfoResult {
   daemonBootId: string;
   storageStatus: "ready" | "unavailable" | "unsupported" | "mismatch";
+}
+
+// Current-process summary; counters reset whenever kgosd restarts.
+export interface SystemDiagnosticsResult {
+  uptime_seconds: number;
+  process: { heap_alloc_bytes: number; goroutines: number };
+  http: {
+    requests_total: number;
+    non_2xx_total: number;
+    in_flight: number;
+    latency_ms_buckets: { le_50: number; le_250: number; le_1000: number; over_1000: number };
+  };
+  mcp: {
+    tool_calls_total: number;
+    tool_errors_total: number;
+    tool_timeouts_total: number;
+    in_flight: number;
+  };
+  business: { operations_total: number; outcomes: Record<string, number> };
+  sandbox: { resource_limits_total: number };
 }
 
 export type ObjectKind =

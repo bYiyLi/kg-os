@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, openSync } from "node:fs";
+import { closeSync, constants, fchmodSync, lstatSync, openSync } from "node:fs";
 import { access, mkdir, readFile, stat } from "node:fs/promises";
 import { connect } from "node:net";
 import { dirname, join } from "node:path";
@@ -356,21 +356,39 @@ async function spawnRuntime(root: string, runtime: NativeRuntime): Promise<void>
   const logs = resolveWorkspacePaths(root).logsDir;
   try {
     await mkdir(logs, { recursive: true, mode: 0o700 });
+    if (lstatSync(logs).isSymbolicLink() || !lstatSync(logs).isDirectory()) {
+      throw new Error("unsafe log directory");
+    }
     await access(runtime.daemon);
   } catch {
     throw localIOError("native Runtime kgosd is unavailable");
   }
-  const logPath = join(logs, "kgosd.log");
+  // The daemon exclusively owns kgosd.log and rotates it in-process.
+  // Startup stdout / early errors go to a bounded, private fallback file.
+  const logPath = join(logs, "kgosd.startup.log");
   let descriptor: number;
   try {
-    descriptor = openSync(logPath, "a", 0o600);
+    try {
+      if (lstatSync(logPath).isSymbolicLink()) throw new Error("symlink");
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) {
+        throw error;
+      }
+    }
+    descriptor = openSync(
+      logPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW,
+      0o600
+    );
+    fchmodSync(descriptor, 0o600);
   } catch {
     throw localIOError("open kgosd log failed");
   }
   try {
     const child = spawn(runtime.daemon, ["--root", root], {
       detached: true,
-      stdio: ["ignore", descriptor, descriptor]
+      stdio: ["ignore", descriptor, descriptor],
+      env: { ...process.env, KGOS_INTERNAL_LOG_TO_FILE: "1" }
     });
     child.once("error", () => undefined);
     child.unref();

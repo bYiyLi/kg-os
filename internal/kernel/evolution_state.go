@@ -9,6 +9,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
@@ -116,7 +117,11 @@ func (service *Service) EvolutionAncestry(ctx context.Context, request Evolution
 	return EvolutionAncestryResult{Root: root, Items: items, Cursor: next}, nil
 }
 
-func (service *Service) EvolutionStateCreate(ctx context.Context, request StateCreateRequest) (StateCreateResult, error) {
+func (service *Service) EvolutionStateCreate(ctx context.Context, request StateCreateRequest) (observed StateCreateResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		recordBusinessResult(ctx, "evolution.state.create", "committed", observed.State, 0, started, loggedErr)
+	}()
 	if err := validateRefName(request.Branch, "Branch"); err != nil {
 		return StateCreateResult{}, err
 	}
@@ -152,7 +157,11 @@ func (service *Service) EvolutionStateCreate(ctx context.Context, request StateC
 	return StateCreateResult{State: created}, nil
 }
 
-func (service *Service) EvolutionStateSetData(ctx context.Context, request StateSetDataRequest) (StateSetDataResult, error) {
+func (service *Service) EvolutionStateSetData(ctx context.Context, request StateSetDataRequest) (observed StateSetDataResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		recordBusinessResult(ctx, "evolution.state.set_data", "applied", observed.State, 0, started, loggedErr)
+	}()
 	state, err := service.resolveEvolutionState(ctx, request.State)
 	if err != nil {
 		return StateSetDataResult{}, err
@@ -167,7 +176,11 @@ func (service *Service) EvolutionStateSetData(ctx context.Context, request State
 	return StateSetDataResult{State: state, Data: data}, nil
 }
 
-func (service *Service) EvolutionStateClearData(ctx context.Context, request StateClearDataRequest) (StateClearDataResult, error) {
+func (service *Service) EvolutionStateClearData(ctx context.Context, request StateClearDataRequest) (observed StateClearDataResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		recordBusinessResult(ctx, "evolution.state.clear_data", "applied", observed.State, 0, started, loggedErr)
+	}()
 	state, err := service.resolveEvolutionState(ctx, request.State)
 	if err != nil {
 		return StateClearDataResult{}, err
@@ -186,7 +199,11 @@ func (service *Service) EvolutionBranchList(ctx context.Context) (EvolutionRefLi
 	return evolutionRefList(refs), nil
 }
 
-func (service *Service) EvolutionBranchCreate(ctx context.Context, request BranchCreateRequest) (BranchMutationResult, error) {
+func (service *Service) EvolutionBranchCreate(ctx context.Context, request BranchCreateRequest) (observed BranchMutationResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		recordBusinessResult(ctx, "evolution.branch.create", "applied", observed.State, 0, started, loggedErr)
+	}()
 	if err := validateRefName(request.Name, "Branch"); err != nil {
 		return BranchMutationResult{}, err
 	}
@@ -201,7 +218,11 @@ func (service *Service) EvolutionBranchCreate(ctx context.Context, request Branc
 	return BranchMutationResult{Name: created.Name, State: created.Commit}, nil
 }
 
-func (service *Service) EvolutionBranchDelete(ctx context.Context, request BranchDeleteRequest) (BranchMutationResult, error) {
+func (service *Service) EvolutionBranchDelete(ctx context.Context, request BranchDeleteRequest) (observed BranchMutationResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		recordBusinessResult(ctx, "evolution.branch.delete", "applied", observed.PreviousState, 0, started, loggedErr)
+	}()
 	if err := validateRefName(request.Name, "Branch"); err != nil {
 		return BranchMutationResult{}, err
 	}
@@ -220,7 +241,11 @@ func (service *Service) EvolutionTagList(ctx context.Context) (EvolutionRefListR
 	return evolutionRefList(refs), nil
 }
 
-func (service *Service) EvolutionTagCreate(ctx context.Context, request TagCreateRequest) (TagMutationResult, error) {
+func (service *Service) EvolutionTagCreate(ctx context.Context, request TagCreateRequest) (observed TagMutationResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		recordBusinessResult(ctx, "evolution.tag.create", "applied", observed.State, 0, started, loggedErr)
+	}()
 	if err := validateRefName(request.Name, "Tag"); err != nil {
 		return TagMutationResult{}, err
 	}
@@ -235,7 +260,11 @@ func (service *Service) EvolutionTagCreate(ctx context.Context, request TagCreat
 	return TagMutationResult{Name: created.Name, State: created.Commit}, nil
 }
 
-func (service *Service) EvolutionTagMove(ctx context.Context, request TagMoveRequest) (TagMutationResult, error) {
+func (service *Service) EvolutionTagMove(ctx context.Context, request TagMoveRequest) (observed TagMutationResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		recordBusinessResult(ctx, "evolution.tag.move", "applied", observed.State, 0, started, loggedErr)
+	}()
 	if err := validateRefName(request.Name, "Tag"); err != nil {
 		return TagMutationResult{}, err
 	}
@@ -250,7 +279,11 @@ func (service *Service) EvolutionTagMove(ctx context.Context, request TagMoveReq
 	return TagMutationResult{Name: moved.Name, State: moved.Commit, PreviousState: previous}, nil
 }
 
-func (service *Service) EvolutionTagDelete(ctx context.Context, request TagDeleteRequest) (TagMutationResult, error) {
+func (service *Service) EvolutionTagDelete(ctx context.Context, request TagDeleteRequest) (observed TagMutationResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		recordBusinessResult(ctx, "evolution.tag.delete", "applied", observed.PreviousState, 0, started, loggedErr)
+	}()
 	if err := validateRefName(request.Name, "Tag"); err != nil {
 		return TagMutationResult{}, err
 	}

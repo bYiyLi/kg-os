@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"sync"
 	"time"
+
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 const (
@@ -267,7 +269,11 @@ func (o *oauthBroker) routes() map[string]http.Handler {
 		"/oauth/decision", "/oauth/token"}
 	routes := make(map[string]http.Handler, len(paths))
 	for _, path := range paths {
-		routes[path] = http.HandlerFunc(o.serveHTTP)
+		if path == "/oauth/token" {
+			routes[path] = observability.SecurityHTTP("oauth.token.exchange", o.serveHTTP)
+		} else {
+			routes[path] = http.HandlerFunc(o.serveHTTP)
+		}
 	}
 	return routes
 }

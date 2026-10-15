@@ -92,6 +92,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 18 ChatGPT Embedded Web 按用户批准的远端 CI 验收例外关闭为 `done`（2026-10-14）。** [D96](../design/decisions.md#d96-chatgpt-mcp-apps-web) 的 Browser / MCP Apps 双入口、`global` + `thread` 元数据、Go app-only UI Tool/Resource 与 Bridge 只读 `overview` 已在本阶段源码中实现。Mac `pnpm validate`、Web Vitest **86/86**、Playwright **26/26**、OpenClaw Dev Docker 与隔离 **31/31 SDK Smoke** 均通过；用户提供两张真实 ChatGPT 双入口截图，确认刷新、主题、语言、分支筛选交互“正常”。**对应本次源码的 GitHub Actions / 六平台 CI 未运行，不记为通过**，用户明确同意不等待 CI 关闭本 Phase；详见 [Phase 18 关闭记录](phases/18-chatgpt-embedded-web.md#阶段关闭记录2026-10-14用户批准例外)。Phase 14 仍 `deferred`，业务 Feature 不转移到本阶段。
 
+**Phase 19 KG OS Observability 当前为 `in_progress`（2026-10-15）。** 依据 [D97](../design/decisions.md#d97-kgos-observability) 与 [Observability 设计](../design/observability.md)，当前工作树已接入 JSON Logs、关键业务/安全事件、HTTP/MCP/Kernel Request ID、进程内 Metrics、受保护的诊断 API 和本地日志轮转；Mac 完整 `pnpm validate`（覆盖率 90.0%）、从暂存源码导出的隔离 Linux Docker Smoke（31/31 SDK、重启持久化）均通过。尚待对应提交的 GitHub CI / Git 交付闭环，不改变 Phase 14 `deferred` 与 Phase 16–18 的既有完成记录。详见 [Phase 19](phases/19-observability.md)。
+
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |
@@ -115,6 +117,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [16 `kgosd` Unified MCP](phases/16-kgosd-unified-mcp.md) | `done` | 单进程 Go `kgosd` Web/API/MCP、QuickJS-NG/wazero、OAuth、私人 Plugin/Skill 已实现并部署 Dev；隔离 Docker 31/31 SDK、ChatGPT OAuth 重连及测试 Branch 写入回读、Codex 新会话主动加载 Skill、旧 Node MCP 源码清理已验收；实现提交 `813bff4` 的 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) 全绿，正式 GHCR/生产部署未执行 | [完成证据](phases/16-kgosd-unified-mcp.md#当前实现与验收证据)、[MCP owner](../design/mcp.md)、[D93](../design/decisions.md#d93-kgosd-unified-mcp)、[D94](../design/decisions.md#d94-openclaw-docker-development-and-ci) |
 | [17 MCP Unified Auth & Web Authorization](phases/17-mcp-web-authorization.md) | `done`（用户批准例外） | MCP 复用 Instance 认证，Web 弹窗与 OAuth 已部署 Dev 并经用户真实 ChatGPT 重新授权；本地质量和正式 Dev Docker 构建通过；GitHub CI / 全新版隔离矩阵未运行，用户明确批准不阻塞本 Phase 关闭 | [D95](../design/decisions.md#d95-unified-mcp-web-authorization)、[MCP 认证目标](../design/mcp.md#统一-instance-认证与-web-内的-mcp-连接授权phase-17-目标)、Web owner 的已登录上下文与安全提交接口 |
 | [18 ChatGPT Embedded Web](phases/18-chatgpt-embedded-web.md) | `done`（用户批准例外） | 双入口、Go UI Tool/Resource、Bridge 实读已实现；Mac `pnpm validate`、Web 86/86、Playwright 26/26、OpenClaw Dev / Docker 31/31 和用户实际 ChatGPT 双入口交互验收通过；GitHub CI / 六平台矩阵未运行，用户明确批准不阻塞阶段关闭 | [D96](../design/decisions.md#d96-chatgpt-mcp-apps-web)、[Web 内嵌适配](../design/web.md#chatgpt-内嵌-webmcp-apps)、[MCP UI 合同](../design/mcp.md#chatgpt-mcp-apps-ui-合同)、Phase 14/16/17 基线 |
+| [19 KG OS Observability](phases/19-observability.md) | `in_progress` | 代码及 Mac 全量质量（90.0%）与隔离 Docker（31/31 SDK）已验收；等待 Git 交付及对应源码的 GitHub CI | [D97](../design/decisions.md#d97-kgos-observability)、[Observability](../design/observability.md)、Phase 16–18 单进程/认证基线 |
 
 当前实现依赖顺序：
 
@@ -155,6 +158,8 @@ Go Engineering Foundation
          (Instance credential reuse → OAuth Web handoff → authenticated consent API → real ChatGPT acceptance)
        Phase 18: ChatGPT Embedded Web [done; user-approved CI exception; D96]
          (shared React shell → MCP Apps Go resource / global+thread → Bridge overview → real host + Docker / CI)
+       Phase 19: KG OS Observability [in_progress; D97; local implementation]
+         (slog / rotation → request correlation → confirmed business events → metrics / diagnostics → acceptance)
 ```
 
 Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 保持 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 以 `ea37ddf` / CI 7/7 成功关闭为 `done`；[Phase 16 Go 原生 MCP](phases/16-kgosd-unified-mcp.md) 为 `done`，真实 ChatGPT OAuth/隔离写入及 Codex Skill 验收完成，最终实现提交 `813bff4` 的 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) 全部成功；[Phase 17 MCP 统一认证](phases/17-mcp-web-authorization.md) 按用户批准例外关闭为 `done`，2026-10-14 的真实 ChatGPT 重新授权来自用户验收，不以 Phase 16 替代；本阶段未执行 GitHub CI / 全新版隔离矩阵，不得声称已通过。Docker 正式 Release/部署另行授权。
@@ -194,5 +199,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 16：`kgosd` Unified MCP](phases/16-kgosd-unified-mcp.md)
 - [Phase 17：MCP Unified Auth & Web Authorization](phases/17-mcp-web-authorization.md)
 - [Phase 18：ChatGPT Embedded Web](phases/18-chatgpt-embedded-web.md)
+- [Phase 19：KG OS Observability](phases/19-observability.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

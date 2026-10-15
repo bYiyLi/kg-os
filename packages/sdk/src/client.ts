@@ -46,6 +46,7 @@ import type {
   StateCreateResult,
   StateSetDataRequest,
   StateSetDataResult,
+  SystemDiagnosticsResult,
   TagCreateRequest,
   TagDeleteRequest,
   TagMoveRequest,
@@ -63,25 +64,32 @@ export class KGOSDaemonError extends Error {
   readonly code: string;
   readonly details: JsonObject | undefined;
   readonly status: number;
+  readonly requestId: string | undefined;
 
-  constructor(error: PublicError, status: number) {
+  constructor(error: PublicError, status: number, requestId?: string) {
     super(error.message);
     this.name = "KGOSDaemonError";
     this.code = error.code;
     this.details = error.details;
     this.status = status;
+    this.requestId = requestId;
   }
 }
 
 export class KGOSTransportError extends Error {
   readonly aborted: boolean;
   readonly causeValue: unknown;
+  readonly requestId: string | undefined;
 
-  constructor(message: string, options?: { aborted?: boolean; cause?: unknown }) {
+  constructor(
+    message: string,
+    options?: { aborted?: boolean; cause?: unknown; requestId?: string | undefined }
+  ) {
     super(message);
     this.name = "KGOSTransportError";
     this.aborted = options?.aborted ?? false;
     this.causeValue = options?.cause;
+    this.requestId = options?.requestId;
   }
 }
 
@@ -102,24 +110,25 @@ function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-function invalidResponse(message: string, cause?: unknown): KGOSTransportError {
-  return new KGOSTransportError(message, { cause });
+function invalidResponse(message: string, cause?: unknown, requestId?: string): KGOSTransportError {
+  return new KGOSTransportError(message, { cause, requestId });
 }
 
 async function decodePublicError(response: Response): Promise<KGOSDaemonError> {
+  const requestId = response.headers.get("X-KGOS-Request-ID") ?? undefined;
   let value: unknown;
   try {
     value = await response.json();
   } catch (error) {
-    throw invalidResponse("KG OS daemon returned an invalid error response", error);
+    throw invalidResponse("KG OS daemon returned an invalid error response", error, requestId);
   }
   if (!isPublicError(value)) {
-    throw invalidResponse("KG OS daemon returned an invalid error response");
+    throw invalidResponse("KG OS daemon returned an invalid error response", undefined, requestId);
   }
-  return new KGOSDaemonError(value, response.status);
+  return new KGOSDaemonError(value, response.status, requestId);
 }
 
-function graphEvent(value: unknown): GraphStreamEvent | KGOSDaemonError {
+function graphEvent(value: unknown, requestId?: string): GraphStreamEvent | KGOSDaemonError {
   if (!isRecord(value) || typeof value["type"] !== "string") {
     throw invalidResponse("KG OS daemon returned an invalid Graph stream event");
   }
@@ -150,21 +159,21 @@ function graphEvent(value: unknown): GraphStreamEvent | KGOSDaemonError {
       if (!isPublicError(value["error"])) {
         throw invalidResponse("KG OS daemon returned an invalid Graph error event");
       }
-      return new KGOSDaemonError(value["error"], 200);
+      return new KGOSDaemonError(value["error"], 200, requestId);
     }
     default:
       throw invalidResponse("KG OS daemon returned an unknown Graph stream event");
   }
 }
 
-function decodeGraphLine(line: string): GraphStreamEvent {
+function decodeGraphLine(line: string, requestId?: string): GraphStreamEvent {
   let decoded: unknown;
   try {
     decoded = JSON.parse(line);
   } catch (error) {
     throw invalidResponse("KG OS daemon returned invalid Graph NDJSON", error);
   }
-  const event = graphEvent(decoded);
+  const event = graphEvent(decoded, requestId);
   if (event instanceof KGOSDaemonError) {
     throw event;
   }
@@ -208,19 +217,30 @@ async function* ndjsonLines(body: ReadableStream<Uint8Array>): AsyncGenerator<st
   }
 }
 
-function graphStreamFailure(error: unknown, options?: RequestOptions): Error {
-  if (error instanceof KGOSDaemonError || error instanceof KGOSTransportError) {
+function graphStreamFailure(error: unknown, options?: RequestOptions, requestId?: string): Error {
+  if (error instanceof KGOSDaemonError) {
     return error;
+  }
+  if (error instanceof KGOSTransportError) {
+    return error.requestId === undefined && requestId !== undefined
+      ? new KGOSTransportError(error.message, {
+          aborted: error.aborted,
+          cause: error.causeValue,
+          requestId
+        })
+      : error;
   }
   return new KGOSTransportError("KG OS Graph stream failed", {
     aborted: isAbort(error) || options?.signal?.aborted === true,
-    cause: error
+    cause: error,
+    requestId
   });
 }
 
 async function* graphEvents(
   body: ReadableStream<Uint8Array>,
-  options?: RequestOptions
+  options?: RequestOptions,
+  requestId?: string
 ): AsyncGenerator<GraphStreamEvent, void, void> {
   let terminal = false;
   try {
@@ -228,7 +248,7 @@ async function* graphEvents(
       if (terminal) {
         throw invalidResponse("KG OS daemon sent data after the terminal Graph event");
       }
-      const event = decodeGraphLine(line);
+      const event = decodeGraphLine(line, requestId);
       terminal = event.type === "summary";
       yield event;
     }
@@ -236,11 +256,15 @@ async function* graphEvents(
       throw invalidResponse("KG OS Graph stream ended without a terminal event");
     }
   } catch (error) {
-    throw graphStreamFailure(error, options);
+    throw graphStreamFailure(error, options, requestId);
   }
 }
 
 export class KGOSClient {
+  readonly system = {
+    diagnostics: (options?: RequestOptions) =>
+      this.post<SystemDiagnosticsResult>("/api/v1/system/diagnostics", {}, options)
+  };
   readonly web = {
     data: {
       info: (options?: RequestOptions) =>
@@ -370,7 +394,11 @@ export class KGOSClient {
     try {
       return (await response.json()) as Result;
     } catch (error) {
-      throw invalidResponse("KG OS daemon returned invalid JSON", error);
+      throw invalidResponse(
+        "KG OS daemon returned invalid JSON",
+        error,
+        response.headers.get("X-KGOS-Request-ID") ?? undefined
+      );
     }
   }
 
@@ -380,10 +408,11 @@ export class KGOSClient {
     options?: RequestOptions
   ): AsyncGenerator<GraphStreamEvent, void, void> {
     const response = await this.request(path, request, "application/x-ndjson", options);
+    const requestId = response.headers.get("X-KGOS-Request-ID") ?? undefined;
     if (response.body === null) {
-      throw invalidResponse("KG OS daemon returned an empty Graph stream");
+      throw invalidResponse("KG OS daemon returned an empty Graph stream", undefined, requestId);
     }
-    for await (const event of graphEvents(response.body, options)) {
+    for await (const event of graphEvents(response.body, options, requestId)) {
       yield event;
     }
   }

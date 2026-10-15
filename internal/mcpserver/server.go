@@ -14,6 +14,7 @@ import (
 	"github.com/bYiyLi/kg-os/internal/buildinfo"
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/bYiyLi/kg-os/internal/mcpsandbox"
+	"github.com/bYiyLi/kg-os/internal/observability"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -116,7 +117,7 @@ func New(k *kernel.Service, settings Options) (*Server, error) {
 			http.NotFound(w, r)
 			return
 		}
-		ctx, cancel := context.WithTimeout(context.WithValue(r.Context(), oauthPrincipalKey{}, principal), s.timeout)
+		ctx, cancel := context.WithTimeout(observability.WithSurface(context.WithValue(r.Context(), oauthPrincipalKey{}, principal), "mcp"), s.timeout)
 		defer cancel()
 		select {
 		case s.semaphore <- struct{}{}:
@@ -209,6 +210,52 @@ func toolResult(value any, err error) (*mcp.CallToolResult, error) {
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}}, nil
 }
+
+func (s *Server) beginTool(ctx context.Context) time.Time {
+	if observer := observability.FromContext(ctx); observer != nil {
+		observer.ToolStart()
+	}
+	return time.Now()
+}
+
+func toolCode(err error) string {
+	if err == nil {
+		return ""
+	}
+	var public *kernel.PublicError
+	var script *mcpsandbox.ScriptError
+	if errors.As(err, &public) {
+		return string(public.Code)
+	}
+	if errors.As(err, &script) {
+		return script.Code
+	}
+	if errors.Is(err, context.Canceled) {
+		return "CANCELLED"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "TIMEOUT"
+	}
+	for _, code := range []string{"RESOURCE_ERROR", "INVALID_ARGUMENT", "VIEW_EXPIRED", "SCRIPT_RESULT_ERROR", "SCRIPT_ERROR"} {
+		if strings.HasPrefix(err.Error(), code+":") {
+			return code
+		}
+	}
+	return "INTERNAL_ERROR"
+}
+
+func (s *Server) finishTool(ctx context.Context, name string, started time.Time, value any, err error) *mcp.CallToolResult {
+	result, _ := toolResult(value, err)
+	code := toolCode(err)
+	if code == "" && result.IsError {
+		code = "INTERNAL_ERROR"
+	}
+	if observer := observability.FromContext(ctx); observer != nil {
+		observer.Tool(ctx, name, code, time.Since(started))
+	}
+	return result
+}
+
 func (s *Server) toolServer() *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "kgos", Version: buildinfo.Version}, nil)
 	s.registerWorkspace(server)
@@ -216,19 +263,18 @@ func (s *Server) toolServer() *mcp.Server {
 	yes := true
 	preview := mcp.AddTool[PreviewInput, any]
 	preview(server, &mcp.Tool{Name: "kgos_preview", Title: "KG OS ontology preview", Description: "Read a stable Markdown line window for all Branches and pinned Ontologies.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &closed, DestructiveHint: &closed}}, func(ctx context.Context, _ *mcp.CallToolRequest, input PreviewInput) (*mcp.CallToolResult, any, error) {
+		started := s.beginTool(ctx)
 		principal, _ := ctx.Value(oauthPrincipalKey{}).(string)
 		if principal == "" {
-			result, _ := toolResult(nil, errors.New("authorization context unavailable"))
-			return result, nil, nil
+			return s.finishTool(ctx, "kgos_preview", started, nil, errors.New("authorization context unavailable")), nil, nil
 		}
 		value, err := s.preview(ctx, principal, input)
-		result, _ := toolResult(value, err)
-		return result, nil, nil
+		return s.finishTool(ctx, "kgos_preview", started, value, err), nil, nil
 	})
 	mcp.AddTool(server, &mcp.Tool{Name: "state_ancestry", Title: "KG OS Commit ancestry", Description: "Read the pinned Commit DAG and full original messages in Markdown.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &closed, DestructiveHint: &closed}}, func(ctx context.Context, _ *mcp.CallToolRequest, input AncestryInput) (*mcp.CallToolResult, any, error) {
+		started := s.beginTool(ctx)
 		value, err := StateAncestry(ctx, s.kernel, input)
-		result, _ := toolResult(value, err)
-		return result, nil, nil
+		return s.finishTool(ctx, "state_ancestry", started, value, err), nil, nil
 	})
 	type ScriptInput struct {
 		Code string `json:"code" jsonschema:"required"`
@@ -244,17 +290,15 @@ func (s *Server) toolServer() *mcp.Server {
 		entry := item
 		serverName := entry.Name
 		mcp.AddTool(server, &mcp.Tool{Name: serverName, Title: entry.Title, Description: entry.Description, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: entry.ReadOnly, OpenWorldHint: &closed, DestructiveHint: &yes}}, func(ctx context.Context, _ *mcp.CallToolRequest, input ScriptInput) (*mcp.CallToolResult, any, error) {
+			started := s.beginTool(ctx)
 			if input.Code == "" {
-				result, _ := toolResult(nil, fmt.Errorf("SCRIPT_ERROR: code is empty"))
-				return result, nil, nil
+				return s.finishTool(ctx, serverName, started, nil, fmt.Errorf("SCRIPT_ERROR: code is empty")), nil, nil
 			}
 			raw, err := mcpsandbox.ExecuteWithLimits(ctx, input.Code, entry.ReadOnly, adapter.Invoke, adapter.Stream, s.sandbox)
 			if err != nil {
-				result, _ := toolResult(nil, err)
-				return result, nil, nil
+				return s.finishTool(ctx, serverName, started, nil, err), nil, nil
 			}
-			result, _ := toolResult(map[string]json.RawMessage{"result": raw}, nil)
-			return result, nil, nil
+			return s.finishTool(ctx, serverName, started, map[string]json.RawMessage{"result": raw}, nil), nil, nil
 		})
 	}
 	return server

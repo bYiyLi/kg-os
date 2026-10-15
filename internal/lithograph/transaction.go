@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 )
 
 type Transaction struct {
@@ -94,7 +95,9 @@ func (transaction *Transaction) Stream(
 	return nil
 }
 
-func (transaction *Transaction) Commit(ctx context.Context) ([]byte, error) {
+func (transaction *Transaction) Commit(ctx context.Context) (rawCommit []byte, returnErr error) {
+	started := time.Now()
+	defer func() { observeDatabaseOperation(ctx, "commit", started, returnErr) }()
 	operationCtx, done, err := transaction.host.operationContext(ctx)
 	if err != nil {
 		return nil, err

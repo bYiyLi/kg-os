@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
+	"github.com/bYiyLi/kg-os/internal/observability"
 	runtimehost "github.com/bYiyLi/kg-os/internal/runtime"
 )
 
@@ -34,6 +35,16 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler, extra ...Ex
 	}
 	mux := http.NewServeMux()
 	sessions.routes(mux, runtime.Credential.Token, bootID)
+	mux.HandleFunc("/api/v1/system/diagnostics", postJSONHandler(
+		runtime.Credential.Token,
+		func(ctx context.Context, _ struct{}) (observability.Snapshot, error) {
+			observer := observability.FromContext(ctx)
+			if observer == nil {
+				return observability.Snapshot{}, &kernel.PublicError{Code: kernel.CodeInternal, Message: "diagnostics unavailable"}
+			}
+			return observer.Snapshot(), nil
+		},
+	))
 	mux.HandleFunc("/api/v1/web/data/info", postJSONHandler(
 		runtime.Credential.Token,
 		func(_ context.Context, _ struct{}) (webDataInfo, error) {

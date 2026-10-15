@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 func readOAuthForm(w http.ResponseWriter, r *http.Request) (url.Values, bool) {
@@ -160,6 +162,8 @@ func (o *oauthBroker) authorizationRedirect(authorization oauthAuthorization, va
 }
 
 func (o *oauthBroker) finishAuthorization(w http.ResponseWriter, r *http.Request) {
+	operation, decision := "oauth.authorization.decision", "rejected"
+	defer func() { observability.Security(r.Context(), operation, decision) }()
 	if r.Header.Get("Origin") != o.issuer {
 		oauthFailure(w, http.StatusForbidden, "invalid_request")
 		return
@@ -210,6 +214,7 @@ func (o *oauthBroker) finishAuthorization(w http.ResponseWriter, r *http.Request
 			oauthFailure(w, 400, "invalid_request")
 			return
 		}
+		operation, decision = "oauth.authorization.deny", "applied"
 		oauthJSON(w, 200, map[string]string{"redirect_url": target})
 		return
 	}
@@ -233,6 +238,7 @@ func (o *oauthBroker) finishAuthorization(w http.ResponseWriter, r *http.Request
 		oauthFailure(w, 400, "invalid_request")
 		return
 	}
+	operation, decision = "oauth.authorization.approve", "applied"
 	oauthJSON(w, 200, map[string]string{"redirect_url": target})
 }
 

@@ -46,7 +46,7 @@ func TestRunReportsRuntimePackageFailure(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
-	if !strings.Contains(stderr.String(), "runtime manifest") {
+	if !strings.Contains(stderr.String(), `"event":"runtime.open.failed"`) || strings.Contains(stderr.String(), root) {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }

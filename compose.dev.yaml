@@ -18,6 +18,11 @@ services:
         http_proxy: ${http_proxy:-}
         https_proxy: ${https_proxy:-}
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     # The existing persistent Dev Workspace and administrator secret belong
     # to UID 1000. Keep their ownership unchanged during the image migration.
     # The distributed image itself still defaults to non-root UID 10001.

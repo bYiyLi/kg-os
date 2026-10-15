@@ -985,3 +985,14 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **部署与验证**：`kgosd` 仍是一个 Go 进程与一个 HTTPS/HTTP listener，容器内仍无 Node.js 运行时。官方协议支持 `global` / `thread`，但不同 ChatGPT 客户端并不保证都已开放；必须在真实支持对应能力的客户端验收，无法验证不能宣布 Phase 完成。不支持时继续使用普通 Web + 四个文本 MCP Tool。发布、部署与代码提交分别授权。
 - **依据/取舍**：UI 真正差异是启动、认证和通信宿主，不是知识业务语义；复用同一 Web 代码减少双维护。基于 MCP Apps 标准 UI/Bridge 加 OpenAI Entrypoint Extension，而非套原站 iframe，避免跨站 Cookie、重复登录和 CSP 放宽；代价是首次需接入新的前端入口与 Go UI 资源声明。
 - 当前合同：[Web 内嵌适配](web.md#chatgpt-内嵌-webmcp-apps)、[MCP UI 协议](mcp.md#chatgpt-mcp-apps-ui-合同)、[Runtime Web 交付](runtime.md#web-hosting)、[Phase 18](../development/phases/18-chatgpt-embedded-web.md)。外部证据见 [OpenAI MCP Apps 调研](../research/chatgpt-mcp-apps.md)。
+
+<a id="d97-kgos-observability"></a>
+
+### D97 KG OS 内建可观测性与关键业务结果事件（2026-10-15）
+
+- **决定**：在现有单进程 `kgosd` 内使用 Go `log/slog`、服务端生成的 Request ID、Kernel 确认结果事件和进程内聚合 Metrics 形成轻量可观测性。不引入独立 Agent、日志数据库、分布式追踪或新的 Lithograph 依赖。目标包含 JSON System/Access Logs、业务与安全事件、日志轮转、只读受控运行诊断；实现由 [Phase 19](../development/phases/19-observability.md) 承担，当前工作树已有代码，完整阶段验收状态以该计划为准。
+- **业务真实结果**：关键写操作在确认结果的业务层记录，不能从 HTTP 200、Graph Execute 的调用形式、NDJSON 已输出的 row 或 MCP Tool 最终状态推断“持久提交”；`kgos_run` 中先成功、后失败的多个操作保留各自结果；取消/断线后的不确定写入按 `unknown` 处理，不重放也不承诺回滚。安全事件由实际认证/OAuth owner 确认，不通过日志新增用户权限或身份语义。
+- **运维与权限**：现有 `.kgos/logs` 作为本地诊断目录，单一文件轮转 owner；Docker 使用原有标准日志流和容器 retention。日志只是可丢弃诊断数据，不是业务 State、审计账本或 exactly-once 事件流。日志失败不能改变业务事务。受保护的 `POST /api/v1/system/diagnostics` 使用现有 API/Web 认证，不向 MCP OAuth Token 提供普通 API 访问权；CLI stdout/stderr 合同不变。
+- **安全取舍**：只允许固定事件/操作/错误类别、耗时、计数、可确认 Commit 等字段；不记录 Token、Cookie、URL Query、Cypher/JavaScript/Patch/Knowledge 正文、用户命名或未筛选底层异常。由此牺牲日志中的完整业务正文与部分定位便利，换取可控的数据暴露和固定指标基数；准确业务真相仍通过已存在的版本/业务 API 核对。
+- **依据与替代方案**：当前 daemon 只有少量启动/错误文本，本地 CLI append 日志没有轮转，HTTP/MCP/Kernel 未提供完整链路业务结果与指标；直接引入 OpenTelemetry、Prometheus、集中日志平台或 Graph 事件存储会在单进程阶段增加没有当前需求支持的服务/依赖和状态。先内建精简、真实、可安全定位的诊断能力；外部观测系统不属于本决定的依赖或产品承诺。
+- 当前合同：[Observability](observability.md)、[Runtime logs](runtime.md#logs)、[MCP](mcp.md)、[Phase 19](../development/phases/19-observability.md)。

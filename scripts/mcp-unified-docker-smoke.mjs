@@ -246,10 +246,41 @@ async function verifyHTTP(base) {
     });
   const rejected = await request("invalid-instance-bearer");
   assert.equal(rejected.status, 401, "Wrong Instance bearer must be rejected");
+  assert.match(rejected.headers.get("x-kgos-request-id") ?? "", /^req_[a-f0-9]{32}$/);
   await rejected.body?.cancel();
   const authorized = await request(token);
   assert.equal(authorized.status, 200, "Instance credential must still authorize the API");
+  assert.match(authorized.headers.get("x-kgos-request-id") ?? "", /^req_[a-f0-9]{32}$/);
   assert.equal(typeof (await authorized.json()).state, "string");
+
+  const diagnostics = (bearer) =>
+    fetch(base + "/api/v1/system/diagnostics", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + bearer, "Content-Type": "application/json" },
+      body: "{}"
+    });
+  const diagnosticsDenied = await diagnostics("mcp-oauth-wrong-audience");
+  assert.equal(
+    diagnosticsDenied.status,
+    401,
+    "MCP credentials cannot read the API diagnostic summary"
+  );
+  await diagnosticsDenied.body?.cancel();
+  const snapshotResponse = await diagnostics(token);
+  assert.equal(snapshotResponse.status, 200, "Instance must read its own metrics");
+  const snapshot = await snapshotResponse.json();
+  assert.equal(typeof snapshot.uptime_seconds, "number");
+  assert.equal(typeof snapshot.process.heap_alloc_bytes, "number");
+  assert.ok(snapshot.http.requests_total > 0);
+  assert.ok(snapshot.http.non_2xx_total > 0);
+  assert.deepEqual(Object.keys(snapshot.business.outcomes).sort(), [
+    "applied",
+    "committed",
+    "failed",
+    "no_change",
+    "rejected",
+    "unknown"
+  ]);
 }
 
 async function stop() {
@@ -292,6 +323,14 @@ try {
     })
   );
   assert.equal(created.result.name, "unified-persist");
+  // Docker preserves stdout and stderr as separate streams; kgosd startup
+  // locators use stdout while structured diagnostics go to stderr.
+  const collectedLogs = await runCapture("docker", ["logs", container], { cwd: root });
+  const logs = collectedLogs.stdout + collectedLogs.stderr;
+  assert.match(logs, /"event":"business.operation.finished"/);
+  assert.match(logs, /"event":"mcp.tool.finished"/);
+  assert.doesNotMatch(logs, /unified-persist/, "Log leaked an object name");
+  assert.doesNotMatch(logs, /"token"/, "Log leaked a credential field");
   await stop();
   await connect(await start());
   const saved = toolValue(

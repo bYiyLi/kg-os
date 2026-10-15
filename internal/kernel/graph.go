@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
@@ -90,7 +91,13 @@ func (service *Service) QueryGraph(ctx context.Context, request GraphQueryReques
 func (service *Service) ExecuteGraph(
 	ctx context.Context,
 	request GraphExecuteRequest,
-) (GraphExecuteResult, error) {
+) (observed GraphExecuteResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		// execute can contain read-only Cypher; 'applied' means only that
+		// Lithograph confirmed execution, not that the graph was modified.
+		recordBusinessResult(ctx, "graph.execute", "applied", observed.State, 0, started, loggedErr)
+	}()
 	params, err := validateGraphExecuteRequest(request)
 	if err != nil {
 		return GraphExecuteResult{}, err
@@ -156,7 +163,12 @@ func (service *Service) StreamGraphExecute(
 	ctx context.Context,
 	request GraphExecuteRequest,
 	consume func(GraphStreamEvent) error,
-) error {
+) (loggedErr error) {
+	started := time.Now()
+	var observedState string
+	defer func() {
+		recordBusinessResult(ctx, "graph.execute", "applied", observedState, 0, started, loggedErr)
+	}()
 	if consume == nil {
 		return publicError(CodeInvalidArgument, "Graph stream consumer is required", nil)
 	}
@@ -179,6 +191,9 @@ func (service *Service) StreamGraphExecute(
 			projected, projectErr := projector.projectExecute(event)
 			if projectErr != nil {
 				return projectErr
+			}
+			if projected.Type == "summary" && projected.State != nil {
+				observedState = *projected.State
 			}
 			consumerErr = consume(projected)
 			return consumerErr

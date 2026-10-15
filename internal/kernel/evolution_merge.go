@@ -3,6 +3,7 @@ package kernel
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
 )
@@ -10,7 +11,9 @@ import (
 func (service *Service) EvolutionMergeStart(
 	ctx context.Context,
 	request MergeStartRequest,
-) (MergeSession, error) {
+) (observed MergeSession, loggedErr error) {
+	started := time.Now()
+	defer func() { recordBusinessResult(ctx, "evolution.merge.start", "applied", "", 0, started, loggedErr) }()
 	if err := validateBranchName(request.Branch); err != nil {
 		return MergeSession{}, err
 	}
@@ -134,7 +137,9 @@ func (service *Service) EvolutionMergeConflicts(
 func (service *Service) EvolutionMergeResolve(
 	ctx context.Context,
 	request MergeResolveRequest,
-) (MergeSession, error) {
+) (observed MergeSession, loggedErr error) {
+	started := time.Now()
+	defer func() { recordBusinessResult(ctx, "evolution.merge.resolve", "applied", "", 0, started, loggedErr) }()
 	if err := validateMergeSessionToken(request.Session); err != nil {
 		return MergeSession{}, err
 	}
@@ -221,7 +226,11 @@ func (service *Service) EvolutionMergeResolve(
 func (service *Service) EvolutionMergeFinalize(
 	ctx context.Context,
 	request MergeFinalizeRequest,
-) (MergeFinalizeResult, error) {
+) (observed MergeFinalizeResult, loggedErr error) {
+	started := time.Now()
+	defer func() {
+		recordBusinessResult(ctx, "evolution.merge.finalize", "committed", observed.State, 0, started, loggedErr)
+	}()
 	if err := validateMergeSessionToken(request.Session); err != nil {
 		return MergeFinalizeResult{}, err
 	}
@@ -263,7 +272,9 @@ func (service *Service) EvolutionMergeFinalize(
 func (service *Service) EvolutionMergeAbort(
 	ctx context.Context,
 	request MergeAbortRequest,
-) (MergeAbortResult, error) {
+) (observed MergeAbortResult, loggedErr error) {
+	started := time.Now()
+	defer func() { recordBusinessResult(ctx, "evolution.merge.abort", "applied", "", 0, started, loggedErr) }()
 	if err := validateMergeSessionToken(request.Session); err != nil {
 		return MergeAbortResult{}, err
 	}
