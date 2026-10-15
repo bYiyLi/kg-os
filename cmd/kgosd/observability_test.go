@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -29,7 +30,7 @@ func TestRunOwnsPrivateRotatingLogsForDetachedCLI(t *testing.T) {
 	if stdout.Len() != 0 || stderr.Len() != 0 {
 		t.Fatalf("detached stdout/stderr contaminated: %q / %q", stdout.String(), stderr.String())
 	}
-	if info, err := os.Stat(file); err != nil || info.Mode().Perm() != 0o600 {
+	if info, err := os.Stat(file); err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) {
 		t.Fatalf("log permission incorrect: %v %v", info, err)
 	}
 }
