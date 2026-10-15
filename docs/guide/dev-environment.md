@@ -10,6 +10,8 @@
 
 **2026-10-14 Phase 18 Dev 部署成功**：使用当前 `main@8e7bf56` 的 `dirty` 工作树经 `pnpm dev:mcp deploy` 同步至 OpenClaw，构建并切换 Linux amd64 单进程镜像 `sha256:60fcac91fb95532ba40aead7757d076113c6c8bd300957d9c3eee9757ca87193`；`kgos-dev-mcp-1` 为 `healthy`，UTC 部署记录为 `2026-10-14T11:49:37Z`。部署前创建 SQLite 一致性备份 `/data/apps/KgosDev/data/backups/`（2026-10-14T11:47:26Z）（含私有凭证，禁止公开）。自动验收及 `pnpm dev:mcp check` 通过四业务 Tool + `kgos_workspace` 的双入口元数据、受认证 `resources/list/read`、自包含 HTML/CSP、OAuth 与 Web/API 安全隔离；公网 HTTPS `/` 200、`/mcp` 匿名 401、OAuth metadata 200、`/mcp-app.html` 404。使用本次镜像在**隔离临时 Volume** 完成 31/31 SDK、重启持久化、单进程、非 root、无 Node.js 运行时 Smoke，不写长期 Dev 知识数据；部署时还未进行真实 ChatGPT 入口验收；随后用户实际打开 Sidebar App 和 Conversation Panel 并确认刷新/主题/语言/分支筛选正常（见 [Phase 18 关闭记录](../development/phases/18-chatgpt-embedded-web.md#阶段关闭记录2026-10-14用户批准例外)）；远端 GitHub CI 尚未运行。
 
+**2026-10-15 Phase 19 Dev 部署成功**：从提交 `0bc47ee` 的**独立干净 worktree** 调用正式部署入口，不同步 Mac 正在编辑的 Web 文件。SQLite 一致性备份后，Linux amd64 统一镜像 `sha256:9b409ec1090e4099cc236805a9057e4e651b6ecaa8500e6656438268fd24369a` 更新成功；UTC 记录为 `2026-10-15T06:19:26Z`，`pnpm dev:mcp check` 验证 `healthy`、统一 Web/API/MCP、认证隔离、OAuth 与 UI Resource。现有 Bearer 调用受保护诊断 API 为 200，无凭证请求为 401；请求 ID、指标字段、Docker `json-file` 10 MiB × 5 保留配置均通过。长期 Instance 未作验收写入，隔离 Docker SDK 31/31 与重启持久化独立验证；GitHub CI 另行取证。
+
 ## 1. 固定环境与职责
 
 | 项目 | 值 |
@@ -59,7 +61,7 @@ pnpm dev:mcp stop        # 仅停止 KG OS Dev 容器，不删除 Workspace
 
 Phase 19 的当前工作树代码将 `kgosd` 的诊断日志统一为 JSON Lines，使用可选 `KGOS_LOG_LEVEL=DEBUG|INFO|WARN|ERROR`（默认 INFO，修改后重启生效）；不能借 DEBUG 输出 Token、Cypher、Patch 或脚本正文。Docker 使用容器日志流，受控 Dev Compose 限制日志大小与文件数；正式镜像无法单独强制宿主 Docker driver 的日志保留策略。CLI 自动启动的本地 `kgosd` 由自身维护 `.kgos/logs/kgosd.log`（单文件 10 MiB，最多 5 个），`kgosd.startup.log` 保存启动地址与早期错误，不应拿它充当业务事件日志。
 
-对当前已授权的 Instance，可通过 `POST /api/v1/system/diagnostics`（JSON 请求体 `{}`）取得进程内指标摘要；必须使用合法 Instance Bearer，或符合现有 Web Access Bearer + Boot Guard 的浏览器会话。不能用 MCP OAuth Token 调用普通 API。需要定位单次请求时，使用服务端返回的 `X-KGOS-Request-ID` 与只属于该 Instance 的安全日志关联；诊断 API 不提供原始日志下载。**当前新增能力尚待 Phase 19 全部验收；长期 Dev 上的旧镜像不等于已经部署该能力。**
+对当前已授权的 Instance，可通过 `POST /api/v1/system/diagnostics`（JSON 请求体 `{}`）取得进程内指标摘要；必须使用合法 Instance Bearer，或符合现有 Web Access Bearer + Boot Guard 的浏览器会话。不能用 MCP OAuth Token 调用普通 API。需要定位单次请求时，使用服务端返回的 `X-KGOS-Request-ID` 与只属于该 Instance 的安全日志关联；诊断 API 不提供原始日志下载。**Phase 19 能力已部署 Dev 并通过本地只读诊断验收；远端 CI 完成与否仍按 Phase 19 开发记录独立判断。**
 
 入口为 `scripts/mcp-dev.mjs`，远端单机生命周期归 `scripts/mcp-dev-remote.sh`，**Go 单进程只读验收由 OpenClaw 宿主执行 `scripts/mcp-dev-accept-unified.mjs`**，Compose 归仓库根 `compose.dev.yaml`。原 `scripts/mcp-dev-accept.mjs` 仅在旧镜像回退验证时使用。这些是可重复执行的 Dev 入口，不在持久 `data/` 中保存第二套部署脚本。
 

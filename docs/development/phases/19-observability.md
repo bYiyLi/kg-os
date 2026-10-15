@@ -4,7 +4,7 @@
 
 ## 目标与状态
 
-**`in_progress`：核心代码已写入当前工作树并通过部分本地验证，完整质量/隔离 Docker/对应 revision 的 GitHub CI 和阶段 Review 尚未完成。**
+**`in_progress`：核心代码已提交；Mac 全量质量、隔离 Docker 和长期 Dev 验收已通过，仍待对应推送 SHA 的 GitHub CI 验收。**
 
 把当前单进程 `kgosd` 的启动/错误文本与 CLI append 日志升级为内建可观测性：统一 JSON Logs、可靠表达**关键业务操作真实结果**的 Business Events、跨 HTTP/MCP/Kernel 的 Request ID，以及进程内 Metrics 和受现有认证保护的只读诊断摘要。
 
@@ -84,5 +84,6 @@
 - **当前状态：`in_progress`（2026-10-15）**。P19-01–04 代码及定向/集成测试已写入当前工作树；真实 Lithograph Kernel 写入、MCP 多步部分成功、Web/SDK 诊断认证、Request ID、安全日志与轮转已完成针对性验收。包含最终 `CANCELLED` 修复的 Mac `pnpm validate` **完成且 exit 0**：Go 静态/竞态、statement coverage **90.0%**、TypeScript/Lint、Vitest **228/228**、Playwright **26/26**、Native、打包、依赖/许可证、安全和 diff 门禁通过；依赖审计输出仍含 **1 个已忽略 high** 与 1 个 low，不把忽略项误报为零漏洞。
 - **Review 修正（2026-10-15）**：`internal/observability/observer.go` 的 `Tool` 统计已把 `CANCELLED` 从 `tool_timeouts_total` 中剔除；取消仍计入 Tool errors，真正 `TIMEOUT` / `DEADLINE_EXCEEDED` 才计入超时。`internal/observability/extra_test.go` 覆盖资源失败、超时、取消的区分；定向测试和修复后的完整质量门禁均通过。
 - **隔离 Docker 证据**：OpenClaw 从本次**仅包含 Phase 19 变更的暂存 Git 树** `26be2b7fb266acc04cdfdd19b8cb1a20dc11a52f` 导出干净源码，Linux amd64 镜像 `kgos-phase19-staged:26be2b7fb2` 构建成功；`KGOS_UNIFIED_DOCKER_SMOKE_IMAGE=kgos-phase19-staged:26be2b7fb2 node scripts/mcp-unified-docker-smoke.mjs` 在随机临时 Volume 真实执行并以 **exit 0** 结束，验证非 root、Node-free、统一 Web/API/MCP、31/31 SDK 调用及重启持久化。此源码树包含 `CANCELLED` 修复，且不包含工作树里无关的 Web 未提交修改；后续只补充本段验收文档，未改 Docker 测试的可执行代码。长期 Dev 未部署；该结果不能代替对应提交的 GitHub CI、正式发布或生产部署。
-- **Git 交付前置条件**：2026-10-15 检查本地 `main` 相对公开仓库的 `origin/main` 仍有未推送的 Phase 18 提交 `ef1d2c3`。Phase 19 的提交只能包含本阶段相关文件；由于推送 `main` 会同时推送已有 Phase 18 提交，在没有额外授权前不能把该前置提交捆绑推送，也不能声称远端 CI 已触发。
+- **长期 Dev（2026-10-15）**：按用户授权，从独立干净 Git worktree 的 `0bc47eeeba83091434d60d699c918b32a35ecda5`（`clean`）执行正式 `dev:mcp deploy`；部署前完成 SQLite 在线一致性备份，自动切换和只读统一 Web/API/MCP/OAuth/5 Tool 验收均成功。UTC 记录 `2026-10-15T06:19:26Z`、当前镜像 `sha256:9b409ec1090e4099cc236805a9057e4e651b6ecaa8500e6656438268fd24369a`，之后 `pnpm dev:mcp check` exit 0；带现有 Instance Bearer 的 `POST /api/v1/system/diagnostics` 返回 200，无认证返回 401，服务端 Request ID 格式及安全指标字段正确，Docker `json-file` 使用 `10m × 5` 保留。另使用实际部署的 `kgos-dev-mcp:local` 镜像在**独立随机临时 Volume** 执行 `node scripts/mcp-unified-docker-smoke.mjs`，真实 MCP SDK **31/31**、非 root、无 Node、重启持久化验收均以 exit 0 结束。长期 Dev 没有执行测试写入，也未引入其他未提交 Web 改动。
+- **Git 交付**：Phase 19 已单独提交为 `0bc47ee`（45 个已核对文件，标准 pre-commit `pnpm check:quick` 成功）。本地 `main` 的前一个 Phase 18 提交 `ef1d2c3` 仍未推送；用户于 2026-10-15 明确授权本轮 Dev 部署后执行提交与推送，因此可以按正常非强制 Git 流程交付这两个先后依赖的提交。**Dev 成功不代表远端 CI 已执行**。
 - 后续只有真实实现、定向和全量质量、隔离 Docker、对应 revision 的 CI、最终 Review 与文档同步全部满足，才可按 [通用完成标准](../README.md#6-phase-通用完成标准) 判断 `done`。Git Commit、Push、Dev 部署和 Release 仍需各自授权。
