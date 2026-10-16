@@ -4,15 +4,15 @@
 
 ## 目标与状态
 
-**状态：`in_progress`（2026-10-16）**。已获授权的 Lithograph v0.3.1 本地依赖升级、MCP `docs.read()`、TSDoc/TypeDoc 文档生成、KG OS Cypher 手册与旧 Help 迁移已在**未提交的源码工作树实现**，并取得本地验证证据。最终 Linux amd64 Docker/独立 Volume 和最终 GitHub CI 尚未验收，**不得因此宣布 Phase `done`**。本 Phase 交付一套**不依赖 Skill** 的 MCP 内建自描述资料：从 `tools/list` 发现入口、按需阅读 SDK/类型/Cypher/Guides、在现有 `kgos_read` / `kgos_run` 中正确执行，并将文档固定在同一个 `kgosd` Docker 版本。
+**状态：`done`（2026-10-16）**。Lithograph v0.3.1 依赖升级、MCP `docs.read()`、TSDoc/TypeDoc 文档生成、KG OS Cypher 手册及旧 Help 清理已交付；源码提交 [`a84ce5e`](https://github.com/bYiyLi/kg-os/commit/a84ce5ef40f56e0f95fc115a8140200623faf88e) 已推送 `main`，该 SHA 的 [GitHub CI Run 38874967382](https://github.com/bYiyLi/kg-os/actions/runs/38874967382) **Validate + Unified Docker / Linux amd64 2/2 success**。本 Phase 交付一套**不依赖 Skill** 的 MCP 内建自描述资料：从 `tools/list` 发现入口、按需阅读 SDK/类型/Cypher/Guides、在现有 `kgos_read` / `kgos_run` 中正确执行，并将文档固定在同一个 `kgosd` Docker 版本。
 
-本 Phase 还完成经用户明确授权的官方 Lithograph **v0.3.1** 升级，以保证 MCP Cypher 手册适配真实加载版本；不修改 Lithograph 仓库、不设计 Cypher 方言、不新增数据库或额外 MCP Tool。此任务仅授权源码/文档修改和必要测试，**没有授权提交、推送、Dev/生产部署、Tag 或 Release**。
+本 Phase 还完成经用户明确授权的官方 Lithograph **v0.3.1** 升级，以保证 MCP Cypher 手册适配真实加载版本；不修改 Lithograph 仓库、不设计 Cypher 方言、不新增数据库或额外 MCP Tool。2026-10-16 用户另行授权**提交和推送至 Phase 22 `done`**，不包含 Dev/生产部署、Tag 或 Release。
 
 ## Design Inputs 与已有基线
 
 - [D100](../../design/decisions.md#d100-mcp-self-describing-docs) 和 [MCP 文档合同](../../design/mcp.md#mcp-tool-help) 是虚拟文档入口、结构、安全及完整度的产品真源；[Client](../../design/client.md#kgossdk) 拥有方法/类型，业务约束分别由 [Ontology](../../design/ontology.md)、[Object](../../design/object.md)、[Graph](../../design/graph.md)、[Evolution](../../design/evolution.md) 拥有。
 - [D101](../../design/decisions.md#d101-lithograph-v031-upgrade) 决定将官方底层依赖锁定到 v0.3.1；上游 Lithograph v0.3.1 的 [Cypher 手册](https://github.com/bYiyLi/Lithograph/blob/v0.3.1/docs/cypher/index.md)、[兼容 Profile](https://github.com/bYiyLi/Lithograph/blob/v0.3.1/docs/reference/cypher-compatibility.md) 和 [函数/Procedure Reference](https://github.com/bYiyLi/Lithograph/blob/v0.3.1/docs/reference/README.md) 只是**固定版本证据**，不在 KG OS 复制其设计真源。
-- [Phase 20](20-mcp-tool-help.md) 已 `done`，当前真实源码已有 `help(name?)`、31 方法 Help、Go/WASM Bridge；本阶段将其替换并清理，不能撤销旧完成证据。[D99](../../design/decisions.md#d99-linux-amd64-docker-only-distribution)/[Phase 21](21-docker-only-delivery.md) 约束唯一未来运行交付为 Linux amd64 Docker，现行 CI 为 Ubuntu Validate + 同源 Docker Smoke。
+- [Phase 20](20-mcp-tool-help.md) 已 `done`，其历史基线提供了 `help(name?)`、31 方法 Help、Go/WASM Bridge；本阶段已经替换并清理旧 Help，保留旧阶段完成证据。[D99](../../design/decisions.md#d99-linux-amd64-docker-only-distribution)/[Phase 21](21-docker-only-delivery.md) 约束唯一未来运行交付为 Linux amd64 Docker，现行 CI 为 Ubuntu Validate + 同源 Docker Smoke。
 - Go MCP 直接调用 Kernel，不通过 TypeScript HTTP SDK 发起环回请求；Sandbox 只有四个业务 namespace 和经 Go Host 许可的 15 个 Read + 16 个 Write 方法。Go/JS/TypeScript 客户端的原业务合同、OAuth/UI、Preview/Ancestry 与数据持久化不属于本次重设计。
 
 ## Feature 顺序
@@ -60,7 +60,7 @@ P22-00 是 Cypher 示例执行前置；P22-01 是 SDK 文档准确生成的前�
 3. 获得独立 Commit/Push 授权后，对**最终 SHA** 的两项 GitHub CI（Ubuntu Validate + Linux amd64 Docker）分别取得真实成功证据才允许 `done`；未获授权/未执行时保持 `in_progress`。Dev 部署、Tag、GHCR Release、生产部署另行授权，不能用本地/旧镜像/旧 CI 代替。
 4. 对设计与实现交叉 Review：Cypher 语言真源与 KG OS 手册边界、Method allowlist 与文档一致性、旧 Help 全面清理、对外静态资料安全、版本制品与 Docker 字节一致、未知写入处理与流式副作用、旧 Phase20 完成记录保留。修复确认的问题后复验受影响范围，最终再次查看工作树和 diff；保护无关用户改动。
 
-## 当前证据（非 Phase 完成证明）
+## 实施过程证据（历史记录）
 
 - 2026-10-16 对 `origin/main` 对齐的 clean KG OS 主工作树检查：Phase 20/21 已 `done`，当前默认 `help()` 尚在，`docs.read()` 尚不存在；新文档合同和新计划已被用户授权写入。
 - 由 GitHub Releases latest API 核实 Lithograph v0.3.1 正式发布；v0.3.1 语言 Profile 与既有 `CY25-2026.08` 一致。已更新 KG OS `scripts/lithograph-artifacts.mjs` 的六制品固定 SHA、Go Host exact extension version、依赖校验及 Dockerfile 的 v0.3.1 Linux amd64 两扩展替换方案；该源码变更**未提交、未部署**。
@@ -74,4 +74,11 @@ P22-00 是 Cypher 示例执行前置；P22-01 是 SDK 文档准确生成的前�
 - **隔离 Docker 阻塞（2026-10-16）**：使用 OpenClaw **独立** `/tmp/kgos-phase22-*` 构建上下文、固定代理及源镜像时，Docker Hub metadata 与阶段依赖下载先后出现网络错误；后续 `apt-get update` 对 Debian 归档返回 `At least one invalid signature was encountered`。同一容器手工下载的 InRelease 能通过 `gpgv` 签名校验，但 BuildKit 的相应构建层尚不能稳定通过。**没有降低签名校验或声称镜像成功**；未取得最终 v0.3.1 Linux amd64 装载/独立 Volume/restart 证据，CI/部署均未执行。
 - **Linux 原生制品独立验证（2026-10-16）**：在 OpenClaw 的独立 `/tmp/kgos-phase22-*` 临时目录下载官方 `lithograph-linux-x64.tar.gz`，按 D101 固定的 `b4170e31…858a8d1d` SHA-256 全量校验通过；在 Linux 主机的**标准 SQLite 3.46.1** 中加载 `lithograph.so`，`lithograph_version()` 确认 `extension=0.3.1`、`cypherProfile=CY25-2026.08`。这只验证本地 Linux Native Release，不替代最终 `kgosd` Docker 运行验证。
 - **Linux amd64 隔离构建与运行复验（2026-10-16）**：在 OpenClaw 直接从官方 Registry 拉取 Node 24.15.0 与 Debian bookworm-slim 基础镜像，绕过错误的镜像层缓存；仅清理 Docker **未使用、可重建的 BuildKit 缓存**，未清理镜像、Volume 或长期 Dev 数据。定位到该主机容器的 APT 默认受限用户验签异常：仅在隔离源码目录内生成**临时 Dockerfile 副本**，将 `apt-get update` 指定为 `APT::Sandbox::User=root`，仍保留 APT 签名验证、官方 Lithograph v0.3.1 Release SHA-256 与 Runtime manifest 完整性校验。该临时 Dockerfile 完整构建出 `kgos-phase22-review:isolated`（Linux amd64）；在独立 Volume/临时容器中执行 `KGOS_UNIFIED_DOCKER_SMOKE_IMAGE=kgos-phase22-review:isolated node scripts/mcp-unified-docker-smoke.mjs` **exit 0**：non-root、无 Node.js、单 `kgosd`、Web/API/MCP、内建 `docs.read`、**31/31 SDK**、容器重启持久化均通过。**仓库正式 `Dockerfile.unified` 未为环境差异修改**；本证据是隔离环境适配构建，不能代替正式原样 Dockerfile 的 GitHub CI。未提交、未推送、未部署；Phase 仍为 `in_progress`，等待正式 CI 最终验收。
-- **完成条件**：P22-00–04 / A22-01–05 全部实际满足并有最终 Review/CI 证据。此处先记录已验证子集，后续实施更新对应状态，不把文档编写完成或测试计划存在算成 Phase `done`。
+- **验收标准**：P22-00–04 / A22-01–05 必须有实际实现、Review、隔离 Docker 与最终 CI 证据；以上条目保留实施过程中各次尝试的原始结果，最终判断以随后阶段关闭记录及其精确提交 SHA 为准。
+
+## 阶段关闭记录（2026-10-16）
+
+- **已提交、已推送**：实施源码 [`a84ce5ef40f56e0f95fc115a8140200623faf88e`](https://github.com/bYiyLi/kg-os/commit/a84ce5ef40f56e0f95fc115a8140200623faf88e) 已推送到 `origin/main`；提交前本地 `pnpm validate` exit 0，Git pre-commit `pnpm check:quick` 与 `git diff --check` 通过，最终 diff 未发现需修复的阶段相关问题。
+- **A22-01 / A22-05 正式 CI**：[GitHub CI Run 38874967382](https://github.com/bYiyLi/kg-os/actions/runs/38874967382) 对该精确 SHA 执行原样 `Dockerfile.unified` 构建，并在临时 Volume 完成真正的单进程、非 root、无 Node.js、Web/API/MCP、内嵌文档、31/31 SDK 和重启持久化 Smoke；`Unified Docker / Linux amd64` Job **116887692120 success**。此前仅在 OpenClaw 复现的 APT 沙箱问题没有被写入正式 Dockerfile，也未在 GitHub CI 上复现。
+- **A22-02 / A22-03 / A22-04 / A22-05 质量与 Review**：同一 CI Run 的 `Validate` Job **116887692656 success**，覆盖 `pnpm validate`、方法/类型及文档生成清单、Go Race/覆盖率、TypeScript 类型与测试、Playwright、真实 Lithograph v0.3.1 集成与文档 Cypher 示例。31 方法/75 类型/132 页文档、无 Skill MCP `tools/list` / `docs.read`、权限和路径拒绝、函数/Procedure 清单均已在本地及 CI 所检查的源码中得到验证。
+- **交付边界**：Phase 22 的完成指代码、文档和必要验收完成，不代表新镜像已经部署 Dev、推送 GHCR、发布 Tag 或进入生产。关闭状态与路线图的文档提交是后续独立 Git SHA，其 CI 仍需按该 SHA 再次核对；不得用实施提交的结果冒充不同 SHA 的通过记录。
