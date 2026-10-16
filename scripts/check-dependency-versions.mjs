@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { LITHOGRAPH_VERSION } from "./lithograph-artifacts.mjs";
+
 const root = resolve(import.meta.dirname, "..");
 const packagePaths = [
   "package.json",
@@ -78,6 +80,19 @@ const lithographArtifacts = await readFile(
   resolve(root, "scripts/lithograph-artifacts.mjs"),
   "utf8"
 );
-if (!lithographArtifacts.includes('LITHOGRAPH_VERSION = "0.3.0"')) {
-  throw new Error("Lithograph fixture must remain pinned to v0.3.0");
+if (!lithographArtifacts.includes('LITHOGRAPH_VERSION = "0.3.1"')) {
+  throw new Error("Lithograph fixture must remain pinned to v0.3.1");
+}
+const linuxArtifactSha = lithographArtifacts.match(
+  /"linux-x64": \{[\s\S]*?sha256: "([0-9a-f]{64})"/
+)?.[1];
+const dockerfile = await readFile(resolve(root, "Dockerfile.unified"), "utf8");
+const hostTypes = await readFile(resolve(root, "internal/lithograph/types.go"), "utf8");
+if (
+  !linuxArtifactSha ||
+  !dockerfile.includes(`ARG LITHOGRAPH_VERSION=${LITHOGRAPH_VERSION}`) ||
+  !dockerfile.includes(`ARG LITHOGRAPH_LINUX_X64_SHA256=${linuxArtifactSha}`) ||
+  !new RegExp(`expectedExtension\\s*=\\s*"${LITHOGRAPH_VERSION}"`).test(hostTypes)
+) {
+  throw new Error("Go Host, native Docker release and Lithograph fixture pins differ");
 }

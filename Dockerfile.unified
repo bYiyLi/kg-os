@@ -9,16 +9,30 @@ WORKDIR /src
 RUN npm install --global --ignore-scripts --no-audit --no-fund pnpm@10.34.5
 COPY . .
 RUN pnpm install --frozen-lockfile --ignore-scripts \
+    && pnpm check:docs \
     && pnpm --filter @kgos/web build
 
-# Phase 16 reuses the already published, fixed v0.2.1 Linux native Runtime
-# files as *build artifacts*. This does not install or require Node.js in the
-# running container and does not publish a new npm distribution.
+# Reuse the historical v0.2.1 Runtime only for KG OS Jieba/licenses.
+# Replace Lithograph and its Provider with the pinned release below.
+# No Node.js or npm is required in the final running container.
 FROM ${NODE_IMAGE} AS native-builder
-# Historical, verified build-only extension bundle; NOT the Docker release tag.
 ARG NATIVE_RUNTIME_VERSION=0.2.1
 RUN npm install --prefix /tmp/native --omit=dev --ignore-scripts --no-audit --no-fund \
     @kgos/runtime-linux-x64@${NATIVE_RUNTIME_VERSION}
+ARG LITHOGRAPH_VERSION=0.3.1
+ARG LITHOGRAPH_LINUX_X64_SHA256=b4170e31a307e71f243365d4629b359f8e2e1c1fcf9703722c7f314b858a8d1d
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+RUN set -eu; \
+    curl --fail --location --retry 5 --retry-all-errors \
+      --output /tmp/lithograph.tar.gz \
+      "https://github.com/bYiyLi/Lithograph/releases/download/v${LITHOGRAPH_VERSION}/lithograph-linux-x64.tar.gz"; \
+    printf '%s  /tmp/lithograph.tar.gz\n' "${LITHOGRAPH_LINUX_X64_SHA256}" | sha256sum --check; \
+    mkdir -p /tmp/lithograph; \
+    tar -xzf /tmp/lithograph.tar.gz -C /tmp/lithograph; \
+    test "$(cat /tmp/lithograph/VERSION)" = "${LITHOGRAPH_VERSION}"
+RUN node -e 'const fs=require("node:fs"),crypto=require("node:crypto"); const base="/tmp/native/node_modules/@kgos/runtime-linux-x64",p=base+"/manifest.json",m=JSON.parse(fs.readFileSync(p,"utf8")); for(const file of ["lithograph.so","lithograph-openai-compatible.so"]){const source="/tmp/lithograph/"+file,target=base+"/extensions/"+file; fs.copyFileSync(source,target); const entry=m.files.find(x=>x.file==="extensions/"+file); if(!entry)throw Error("Missing native manifest entry: "+file); entry.sha256=crypto.createHash("sha256").update(fs.readFileSync(target)).digest("hex");} fs.writeFileSync(p,JSON.stringify(m,null,2)+"\n");'
 
 FROM ${NODE_IMAGE} AS daemon-builder
 ARG NATIVE_RUNTIME_VERSION=0.2.1

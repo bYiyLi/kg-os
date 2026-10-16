@@ -29,7 +29,9 @@ AI / Agent                  Browser / TS Application / internal CLI
 
 `@kgos/sdk` 映射 KG OS 已确认的公共 HTTP logical contract，按 `ontology / object / graph / evolution` 暴露对应 namespace。各 namespace 只适配对应 owner 已定义的 request/result/error，不重新发明第二套产品模型。
 
-公共 `help(name?)` 是**不需要 Client/Token 的本地 SDK 文档查询**，并非 `KGOSClient` 的业务请求或额外 HTTP API；无参列出 MCP 沙箱当前支持的 31 个 SDK 业务方法，指定方法名返回来自本 SDK 类型合同的签名、入参/出参类型定义、示例及必要边界。帮助数据与 Go MCP 的同名异步 `help(name?)` 采用同一生成合同并在构建时验证；MCP 准入、参数与写权限继续由 Go Bridge 强制执行。具体模型可见语义由 [MCP SDK Help](mcp.md#mcp-tool-help) 拥有。
+Phase 20 已交付的公共 `help(name?)` 是不需 Client/Token 的**历史帮助接口**；[D100](decisions.md#d100-mcp-self-describing-docs) 决定将其整体迁移到 MCP 自描述文档。**当前未提交的 Phase 22 工作树已经删除** TypeScript/Go 两端的旧 Help，改为 MCP Sandbox 的 `docs.read(path)`；[Phase 22](../development/phases/22-mcp-self-describing-docs.md) 仍待 Linux Docker 和 CI 验收，旧 Dev/正式部署不能自动视为已迁移。`docs.read` **不是** `@kgos/sdk` 的新 HTTP 客户端方法。
+
+SDK 的 `client.ts` 方法、`types.ts` 公共 Request/Result/类型及 TSDoc 注释是 MCP 方法参考的程序化输入；TypeDoc + 必要的 TypeScript AST 映射在构建时生成完整、可导航的 Markdown 类型参考。**只对照 Go Sandbox 已允许的 15 Read + 16 Write** 方法生成 MCP 可调用目录，示例必须是无需创建 Client/配置 Token 的 JS 函数体；HTTP Client 独有的初始化、`system`、`web` 不混入 MCP 方法清单。Ref 和 Merge 的公共 TypeScript 类型要精确表达 [Evolution](evolution.md) 已冻结的 StateRef、MergeChoice、状态及 resolution 的条件约束，不复制另一套 Go 业务校验。实际虚拟读取、安全、文档和构建验收归 [MCP 文档 owner](mcp.md#mcp-tool-help)。
 
 [Web 工作区数据](web.md#受控-api-与多窗口保存)的 `web.data.info({})` 已作为认证后连接启动信息入口实现，返回 `daemonBootId` 和 `storageStatus`；其余 `web.data / web.cache` 记录、缓存和导出 API 仍待实现。后续 adapter 沿用浏览器 Web Platform 边界和共享错误 envelope，下载使用 Blob，不加入本地文件系统访问、root discovery、Knowledge State 或自动 mutation retry。
 
@@ -83,13 +85,13 @@ v0.2.1 已发布的 `@kgos/sdk`、`@kgos/cli` 和六个 `@kgos/runtime-*` 属于
 Linux amd64 Docker / OCI (one official runtime artifact)
   └── kgosd (Go; non-root; no Node.js runtime)
         ├── HTTP API + Web (built from packages/sdk + packages/web)
-        ├── MCP / SDK Help (generated from packages/sdk public types)
+        ├── MCP / SDK self-documentation (D100 / Phase 22 target)
         ├── Lithograph + Provider + official Jieba extensions
         └── <workspace>/.kgos persistent Instance
 ```
 
 - 唯一当前官方镜像为 `ghcr.io/<owner 小写>/kgos:v<version>`，只支持 Linux amd64；一次 Tag Release 发布且验证同一 Docker image，不再发布新 npm 包。镜像构建时的 TS/Node 是开发工具，不作为镜像运行时能力。
-- `packages/sdk` 保持 TypeScript API 合同真源，是 Web 及 MCP SDK Help 生成的必要源码；不因为不对外发布 npm 而删除 SDK 类型定义、API 错误/流式约束或必要测试。
-- 当前镜像构建暂复用先前已发布的 `@kgos/runtime-linux-x64@0.2.1` 中的**固定原生扩展文件**，仅为 build-only 历史 artifact 输入。这个输入版本独立于 KG OS 镜像 Tag；Docker 阶段重新编译当前 `kgosd`。完整原生扩展安装、Instance/materialization、网络和安全规则仍由 [Runtime](runtime.md#native-runtime-package)、[MCP Docker](mcp.md#docker-only-交付) 拥有。
+- `packages/sdk` 保持 TypeScript API 合同真源，是 Web 和未来 MCP SDK Reference 生成的必要源码；不因为不对外发布 npm 而删除 SDK 类型定义、API 错误/流式约束或必要测试。当前镜像仍使用 Phase 20 的旧 Help，Phase 22 验收后才切换到内建文档。
+- [D101](decisions.md#d101-lithograph-v031-upgrade) 规定 Docker 构建中的 Lithograph 主扩展及 Provider 使用经过 SHA-256 校验的 **v0.3.1** Release 制品；历史 `@kgos/runtime-linux-x64@0.2.1` 仅保留 Jieba/许可等 build-only 输入，所含旧 Lithograph/Provider 必须被替换且 Runtime manifest 摘要重算。构建阶段重新编译 `kgosd`；历史 npm 版本独立于 KG OS 镜像 Tag，不构成 npm 发行承诺。完整原生扩展安装、Instance/materialization、网络和安全规则仍由 [Runtime](runtime.md#native-runtime-package)、[MCP Docker](mcp.md#docker-only-交付) 拥有；正式镜像升级状态由实际 Docker 测试证明。
 - 验证只对单一交付目标做 Ubuntu/Linux amd64 源码质量门禁与 Linux amd64 Docker 隔离 Smoke。镜像中的原生扩展及 Go/JS/WASM 实际行为必须测试；旧 npm packaging/六平台 runner 不是这条链上的门禁。
 - Tag、镜像 digest、GHCR 发布、Dev 部署/生产部署互相独立；未执行的动作不得写成已成功。详见 [D99](decisions.md#d99-linux-amd64-docker-only-distribution) 和 [Phase 21](../development/phases/21-docker-only-delivery.md)。

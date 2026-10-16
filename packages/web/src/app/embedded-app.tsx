@@ -31,7 +31,7 @@ export function readOverview(result: unknown): Overview {
   const overview = value as Record<string, unknown>;
   if (
     typeof overview["state"] !== "string" ||
-    overview["state"].length === 0 ||
+    !/^commit\/[0-9a-f]{64}$/.test(overview["state"]) ||
     typeof overview["defaultBranch"] !== "string" ||
     overview["defaultBranch"].length === 0
   ) {

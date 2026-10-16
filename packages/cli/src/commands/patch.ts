@@ -1,4 +1,4 @@
-import type { PatchRequest } from "@kgos/sdk";
+import type { PatchRequest, ResolvedState } from "@kgos/sdk";
 
 import { parseOptions, requiredValue } from "../args.js";
 import { usageError } from "../errors.js";
@@ -14,7 +14,7 @@ export async function parsePatchRequest(
   if (parsed.positionals.length !== 0) {
     throw usageError(command + " does not accept positional arguments");
   }
-  const baseState = requiredValue(parsed, "--base-state");
+  const baseState = requiredValue(parsed, "--base-state") as ResolvedState;
   if (!isResolvedState(baseState)) {
     throw usageError("--base-state must be commit/<64-hex>");
   }

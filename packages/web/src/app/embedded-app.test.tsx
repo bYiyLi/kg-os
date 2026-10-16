@@ -10,7 +10,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { EmbeddedApp, readOverview } from "./embedded-app.js";
 import { i18n } from "./i18n/index.js";
 
-const commitOne = vi.hoisted(() => "commit-one");
+const commitOne = vi.hoisted(() => "commit/" + "a".repeat(64));
+const commitTwo = vi.hoisted(() => "commit/" + "d".repeat(64));
 const branchTwo = vi.hoisted(() => "commit/" + "b".repeat(64));
 const shared = vi.hoisted(() => "commit/" + "c".repeat(64));
 const textType = vi.hoisted(() => "text");
@@ -38,7 +39,7 @@ function versionReply(code: string) {
   }
   if (code.startsWith("return await evolution.ancestry(")) {
     const main = code.includes(commitOne);
-    const root = main ? "commit/" + commitOne : branchTwo;
+    const root = main ? commitOne : branchTwo;
     return reply({
       root,
       items: [
@@ -58,7 +59,7 @@ function versionReply(code: string) {
     });
   }
   if (code.startsWith("const item = await evolution.get(")) {
-    return reply({ state: code.includes(commitOne) ? "commit/" + commitOne : branchTwo });
+    return reply({ state: code.includes(commitOne) ? commitOne : branchTwo });
   }
   return reply({ defaultBranch: "main", state: commitOne });
 }
@@ -248,7 +249,7 @@ it("changes language without a new tool call, but refreshes only on explicit act
   bridge.callServerTool.mockImplementation((request) =>
     Promise.resolve(
       request.arguments.code === "return await evolution.overview()"
-        ? reply({ defaultBranch: "develop", state: "commit-two" })
+        ? reply({ defaultBranch: "develop", state: commitTwo })
         : versionReply(request.arguments.code)
     )
   );
@@ -256,7 +257,7 @@ it("changes language without a new tool call, but refreshes only on explicit act
     button("刷新").click();
     await Promise.resolve();
   });
-  expect(host.textContent).toContain("commit-two");
+  expect(host.textContent).toContain(commitTwo);
   expect(host.textContent).not.toContain(commitOne);
   expect(overviewCalls()).toBe(2);
 });
@@ -279,6 +280,15 @@ it("requires host support for MCP server tool calls", async () => {
   await renderEmbedded();
   expect(host.querySelector(alertSelector)).not.toBeNull();
   expect(bridge.callServerTool).not.toHaveBeenCalled();
+});
+
+it("fails safely when MCP overview returns a malformed resolved State", async () => {
+  bridge.callServerTool.mockResolvedValueOnce(
+    reply({ defaultBranch: "main", state: "commit-one" })
+  );
+  await renderEmbedded();
+  expect(host.querySelector(alertSelector)).not.toBeNull();
+  expect(host.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
 });
 
 it("handles rejected host connections without querying", async () => {

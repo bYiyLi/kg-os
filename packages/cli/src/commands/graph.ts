@@ -3,6 +3,7 @@ import type {
   GraphQueryRequest,
   GraphStreamEvent,
   JsonObject,
+  StateRef,
   KGOSClient
 } from "@kgos/sdk";
 
@@ -78,7 +79,7 @@ async function runQuery(invocation: GraphInvocation): Promise<void> {
   ) {
     throw usageError("graph query does not accept --branch, --author, or --message");
   }
-  const request: GraphQueryRequest = { at: requiredValue(parsed, "--at"), cypher };
+  const request: GraphQueryRequest = { at: requiredValue(parsed, "--at") as StateRef, cypher };
   if (params !== undefined) {
     request.params = params;
   }

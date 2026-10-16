@@ -1,5 +1,12 @@
 import type { Page, Route } from "@playwright/test";
-import type { StateSummary } from "@kgos/sdk";
+// Synthetic browser fixture intentionally supplies bare Commit IDs to cover
+// the Web adapter's normalization boundary, not the public SDK response type.
+interface FixtureCommit {
+  state: string;
+  message: string;
+  committedAt: number;
+  parents: string[];
+}
 
 function sha(prefix: string): string {
   return prefix.padEnd(64, "0");
@@ -24,7 +31,12 @@ const branches = [
 ];
 
 const epoch = Date.now() * 1000;
-function commit(state: string, message: string, hoursAgo: number, parents: string[]): StateSummary {
+function commit(
+  state: string,
+  message: string,
+  hoursAgo: number,
+  parents: string[]
+): FixtureCommit {
   return { state, message, committedAt: epoch - hoursAgo * 3600 * 1_000_000, parents };
 }
 
@@ -39,7 +51,7 @@ const items = {
   genesis: commit(states.genesis, "Initialize knowledge base", 120, [])
 };
 
-const ancestry = new Map<string, StateSummary[]>([
+const ancestry = new Map<string, FixtureCommit[]>([
   [
     states.main,
     [items.main, items.merge, items.experiment, items.shared, items.index, items.genesis]

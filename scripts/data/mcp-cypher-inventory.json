@@ -1,0 +1,1268 @@
+{
+  "functions": [
+    {
+      "category": "Numeric",
+      "deprecated": "—",
+      "name": "abs",
+      "signature": "abs(input :: INTEGER | FLOAT) :: INTEGER | FLOAT"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "acos",
+      "signature": "acos(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Predicate",
+      "deprecated": "—",
+      "name": "all",
+      "signature": "all(variable :: ANY, list :: LIST<ANY>, predicate :: ANY) :: BOOLEAN"
+    },
+    {
+      "category": "Predicate",
+      "deprecated": "—",
+      "name": "allReduce",
+      "signature": "allReduce(accumulator = initial, stepVariable IN list | reductionFunction, predicate) :: BOOLEAN"
+    },
+    {
+      "category": "Predicate",
+      "deprecated": "—",
+      "name": "any",
+      "signature": "any(variable :: ANY, list :: LIST<ANY>, predicate :: ANY) :: BOOLEAN"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "asin",
+      "signature": "asin(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "atan",
+      "signature": "atan(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "atan2",
+      "signature": "atan2(y :: FLOAT, x :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "avg",
+      "signature": "avg(input :: INTEGER | FLOAT | DURATION) :: INTEGER | FLOAT | DURATION"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "btrim",
+      "signature": "btrim(input :: STRING[, trimCharacterString :: STRING]) :: STRING"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "cardinality",
+      "signature": "cardinality(input :: MAP | LIST<ANY> | PATH) :: INTEGER"
+    },
+    {
+      "category": "Numeric",
+      "deprecated": "—",
+      "name": "ceil",
+      "signature": "ceil(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Numeric",
+      "deprecated": "—",
+      "name": "ceiling",
+      "signature": "ceiling(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "char_length",
+      "signature": "char_length(input :: STRING) :: INTEGER"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "character_length",
+      "signature": "character_length(input :: STRING) :: INTEGER"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "coalesce",
+      "signature": "coalesce(input :: ANY) :: ANY"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "coll.distinct",
+      "signature": "coll.distinct(list :: LIST<ANY>) :: LIST<ANY>"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "coll.flatten",
+      "signature": "coll.flatten(list :: LIST<ANY>, depth = 1 :: INTEGER) :: LIST<ANY>"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "coll.indexOf",
+      "signature": "coll.indexOf(list :: LIST<ANY>, value :: ANY) :: INTEGER"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "coll.insert",
+      "signature": "coll.insert(list :: LIST<ANY>, index :: INTEGER, value :: ANY) :: LIST<ANY>"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "coll.max",
+      "signature": "coll.max(list :: LIST<ANY>) :: ANY"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "coll.min",
+      "signature": "coll.min(list :: LIST<ANY>) :: ANY"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "coll.remove",
+      "signature": "coll.remove(list :: LIST<ANY>, index :: INTEGER) :: LIST<ANY>"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "coll.sort",
+      "signature": "coll.sort(list :: LIST<ANY>) :: LIST<ANY>"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "collect",
+      "signature": "collect(input :: ANY) :: LIST<ANY>"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "collect_list",
+      "signature": "collect_list(input :: ANY) :: LIST<ANY>"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "cos",
+      "signature": "cos(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "cosh",
+      "signature": "cosh(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "cot",
+      "signature": "cot(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "coth",
+      "signature": "coth(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "count",
+      "signature": "count(input :: ANY) :: INTEGER"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "date",
+      "signature": "date(input = DEFAULT_TEMPORAL_ARGUMENT :: ANY[, pattern :: STRING]) :: DATE"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "date.realtime",
+      "signature": "date.realtime(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: DATE"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "date.statement",
+      "signature": "date.statement(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: DATE"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "date.transaction",
+      "signature": "date.transaction(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: DATE"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "date.truncate",
+      "signature": "date.truncate(unit :: STRING, input = DEFAULT_TEMPORAL_ARGUMENT :: ANY, fields = null :: MAP) :: DATE"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "datetime",
+      "signature": "datetime(input = DEFAULT_TEMPORAL_ARGUMENT :: ANY[, pattern :: STRING]) :: ZONED DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "datetime.fromEpoch",
+      "signature": "datetime.fromEpoch(seconds :: INTEGER | FLOAT, nanoseconds :: INTEGER | FLOAT) :: ZONED DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "datetime.fromEpochMillis",
+      "signature": "datetime.fromEpochMillis(milliseconds :: INTEGER | FLOAT) :: ZONED DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "datetime.realtime",
+      "signature": "datetime.realtime(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: ZONED DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "datetime.statement",
+      "signature": "datetime.statement(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: ZONED DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "datetime.transaction",
+      "signature": "datetime.transaction(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: ZONED DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "datetime.truncate",
+      "signature": "datetime.truncate(unit :: STRING, input = DEFAULT_TEMPORAL_ARGUMENT :: ANY, fields = null :: MAP) :: ZONED DATETIME"
+    },
+    {
+      "category": "Database",
+      "deprecated": "—",
+      "name": "db.nameFromElementId",
+      "signature": "db.nameFromElementId(elementId :: STRING) :: STRING"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "degrees",
+      "signature": "degrees(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "duration",
+      "signature": "duration(input :: ANY[, pattern :: STRING]) :: DURATION"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "duration.between",
+      "signature": "duration.between(from :: ANY, to :: ANY) :: DURATION"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "duration.inDays",
+      "signature": "duration.inDays(from :: ANY, to :: ANY) :: DURATION"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "duration.inMonths",
+      "signature": "duration.inMonths(from :: ANY, to :: ANY) :: DURATION"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "duration.inSeconds",
+      "signature": "duration.inSeconds(from :: ANY, to :: ANY) :: DURATION"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "duration_between",
+      "signature": "duration_between(from :: ANY, to :: ANY) :: DURATION"
+    },
+    {
+      "category": "Logarithmic",
+      "deprecated": "—",
+      "name": "e",
+      "signature": "e() :: FLOAT"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "elementId",
+      "signature": "elementId(input :: NODE | RELATIONSHIP) :: STRING"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "endNode",
+      "signature": "endNode(input :: RELATIONSHIP) :: NODE"
+    },
+    {
+      "category": "Predicate",
+      "deprecated": "—",
+      "name": "exists",
+      "signature": "exists(input :: ANY) :: BOOLEAN"
+    },
+    {
+      "category": "Logarithmic",
+      "deprecated": "—",
+      "name": "exp",
+      "signature": "exp(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "file",
+      "signature": "file() :: STRING"
+    },
+    {
+      "category": "Numeric",
+      "deprecated": "—",
+      "name": "floor",
+      "signature": "floor(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "format",
+      "signature": "format(value :: DATE | LOCAL TIME | ZONED TIME | LOCAL DATETIME | ZONED DATETIME | DURATION[, pattern :: STRING]) :: STRING"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "haversin",
+      "signature": "haversin(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "head",
+      "signature": "head(list :: LIST<ANY>) :: ANY"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "elementId",
+      "name": "id",
+      "signature": "id(input :: NODE | RELATIONSHIP) :: INTEGER"
+    },
+    {
+      "category": "Predicate",
+      "deprecated": "—",
+      "name": "isEmpty",
+      "signature": "isEmpty(input :: LIST<ANY> | MAP | STRING) :: BOOLEAN"
+    },
+    {
+      "category": "Numeric",
+      "deprecated": "—",
+      "name": "isNaN",
+      "signature": "isNaN(input :: INTEGER | FLOAT) :: BOOLEAN"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "keys",
+      "signature": "keys(input :: NODE | RELATIONSHIP | MAP) :: LIST<STRING>"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "labels",
+      "signature": "labels(input :: NODE) :: LIST<STRING>"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "last",
+      "signature": "last(list :: LIST<ANY>) :: ANY"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "left",
+      "signature": "left(original :: STRING, length :: INTEGER) :: STRING"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "length",
+      "signature": "length(input :: PATH) :: INTEGER"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "linenumber",
+      "signature": "linenumber() :: INTEGER"
+    },
+    {
+      "category": "Logarithmic",
+      "deprecated": "—",
+      "name": "ln",
+      "signature": "ln(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "local_datetime",
+      "signature": "local_datetime(input = DEFAULT_TEMPORAL_ARGUMENT :: ANY[, pattern :: STRING]) :: LOCAL DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "local_time",
+      "signature": "local_time(input = DEFAULT_TEMPORAL_ARGUMENT :: ANY[, pattern :: STRING]) :: LOCAL TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localdatetime",
+      "signature": "localdatetime(input = DEFAULT_TEMPORAL_ARGUMENT :: ANY[, pattern :: STRING]) :: LOCAL DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localdatetime.realtime",
+      "signature": "localdatetime.realtime(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: LOCAL DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localdatetime.statement",
+      "signature": "localdatetime.statement(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: LOCAL DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localdatetime.transaction",
+      "signature": "localdatetime.transaction(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: LOCAL DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localdatetime.truncate",
+      "signature": "localdatetime.truncate(unit :: STRING, input = DEFAULT_TEMPORAL_ARGUMENT :: ANY, fields = null :: MAP) :: LOCAL DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localtime",
+      "signature": "localtime(input = DEFAULT_TEMPORAL_ARGUMENT :: ANY[, pattern :: STRING]) :: LOCAL TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localtime.realtime",
+      "signature": "localtime.realtime(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: LOCAL TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localtime.statement",
+      "signature": "localtime.statement(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: LOCAL TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localtime.transaction",
+      "signature": "localtime.transaction(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: LOCAL TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "localtime.truncate",
+      "signature": "localtime.truncate(unit :: STRING, input = DEFAULT_TEMPORAL_ARGUMENT :: ANY, fields = null :: MAP) :: LOCAL TIME"
+    },
+    {
+      "category": "Logarithmic",
+      "deprecated": "—",
+      "name": "log",
+      "signature": "log(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Logarithmic",
+      "deprecated": "—",
+      "name": "log10",
+      "signature": "log10(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "lower",
+      "signature": "lower(input :: STRING) :: STRING"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "ltrim",
+      "signature": "ltrim(input :: STRING[, trimCharacterString :: STRING]) :: STRING"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "max",
+      "signature": "max(input :: ANY) :: ANY"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "min",
+      "signature": "min(input :: ANY) :: ANY"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "nodes",
+      "signature": "nodes(input :: PATH) :: LIST<NODE>"
+    },
+    {
+      "category": "Predicate",
+      "deprecated": "—",
+      "name": "none",
+      "signature": "none(variable :: ANY, list :: LIST<ANY>, predicate :: ANY) :: BOOLEAN"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "normalize",
+      "signature": "normalize(input :: STRING [, normalForm = NFC :: [NFC, NFD, NFKC, NFKD]]) :: STRING"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "nullIf",
+      "signature": "nullIf(v1 :: ANY, v2 :: ANY) :: ANY"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "path_length",
+      "signature": "path_length(input :: PATH) :: INTEGER"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "percentile_cont",
+      "signature": "percentile_cont(input :: FLOAT, percentile :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "percentile_disc",
+      "signature": "percentile_disc(input :: INTEGER | FLOAT, percentile :: FLOAT) :: INTEGER | FLOAT"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "percentileCont",
+      "signature": "percentileCont(input :: FLOAT, percentile :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "percentileDisc",
+      "signature": "percentileDisc(input :: INTEGER | FLOAT, percentile :: FLOAT) :: INTEGER | FLOAT"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "pi",
+      "signature": "pi() :: FLOAT"
+    },
+    {
+      "category": "Spatial",
+      "deprecated": "—",
+      "name": "point",
+      "signature": "point(input :: MAP) :: POINT"
+    },
+    {
+      "category": "Spatial",
+      "deprecated": "—",
+      "name": "point.distance",
+      "signature": "point.distance(from :: POINT, to :: POINT) :: FLOAT"
+    },
+    {
+      "category": "Spatial",
+      "deprecated": "—",
+      "name": "point.withinBBox",
+      "signature": "point.withinBBox(point :: POINT, lowerLeft :: POINT, upperRight :: POINT) :: BOOLEAN"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "properties",
+      "signature": "properties(input :: NODE | RELATIONSHIP | MAP) :: MAP"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "radians",
+      "signature": "radians(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Numeric",
+      "deprecated": "—",
+      "name": "rand",
+      "signature": "rand() :: FLOAT"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "randomUUID",
+      "signature": "randomUUID() :: STRING"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "range",
+      "signature": "range(start :: INTEGER, end :: INTEGER[, step :: INTEGER]) :: LIST<INTEGER>"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "reduce",
+      "signature": "reduce(accumulator :: VARIABLE = initial :: ANY, variable :: VARIABLE IN list :: LIST<ANY> expression :: ANY) :: ANY"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "relationships",
+      "signature": "relationships(input :: PATH) :: LIST<RELATIONSHIP>"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "replace",
+      "signature": "replace(original :: STRING, search :: STRING, replace :: STRING[, limit :: INTEGER]) :: STRING"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "reverse",
+      "signature": "reverse(input :: LIST<ANY>) :: LIST<ANY>"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "reverse",
+      "signature": "reverse(input :: STRING) :: STRING"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "right",
+      "signature": "right(original :: STRING, length :: INTEGER) :: STRING"
+    },
+    {
+      "category": "Numeric",
+      "deprecated": "—",
+      "name": "round",
+      "signature": "round(input :: FLOAT [, precision :: INTEGER | FLOAT, mode :: STRING]) :: FLOAT"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "rtrim",
+      "signature": "rtrim(input :: STRING[, trimCharacterString :: STRING]) :: STRING"
+    },
+    {
+      "category": "Numeric",
+      "deprecated": "—",
+      "name": "sign",
+      "signature": "sign(input :: INTEGER | FLOAT) :: INTEGER"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "sin",
+      "signature": "sin(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Predicate",
+      "deprecated": "—",
+      "name": "single",
+      "signature": "single(variable :: ANY, list :: LIST<ANY>, predicate :: ANY) :: BOOLEAN"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "sinh",
+      "signature": "sinh(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "size",
+      "signature": "size(input :: STRING | LIST<ANY> | VECTOR) :: INTEGER"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "split",
+      "signature": "split(original :: STRING, splitDelimiters :: STRING | LIST<STRING>) :: LIST<STRING>"
+    },
+    {
+      "category": "Logarithmic",
+      "deprecated": "—",
+      "name": "sqrt",
+      "signature": "sqrt(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "startNode",
+      "signature": "startNode(input :: RELATIONSHIP) :: NODE"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "stDev",
+      "signature": "stDev(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "stdev_pop",
+      "signature": "stdev_pop(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "stdev_samp",
+      "signature": "stdev_samp(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "stDevP",
+      "signature": "stDevP(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "string.indexOf",
+      "signature": "string.indexOf(input :: STRING, value :: STRING) :: INTEGER"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "string.join",
+      "signature": "string.join(input :: LIST<STRING>, delimiter :: STRING) :: STRING"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "string.regexReplace",
+      "signature": "string.regexReplace(original :: STRING, regex :: STRING, replacement :: STRING) :: STRING"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "substring",
+      "signature": "substring(original :: STRING, start :: INTEGER[, length :: INTEGER]) :: STRING"
+    },
+    {
+      "category": "Aggregating",
+      "deprecated": "—",
+      "name": "sum",
+      "signature": "sum(input :: INTEGER | FLOAT | DURATION) :: INTEGER | FLOAT | DURATION"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "tail",
+      "signature": "tail(input :: LIST<ANY>) :: LIST<ANY>"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "tan",
+      "signature": "tan(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Trigonometric",
+      "deprecated": "—",
+      "name": "tanh",
+      "signature": "tanh(input :: FLOAT) :: FLOAT"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "time",
+      "signature": "time(input = DEFAULT_TEMPORAL_ARGUMENT :: ANY[, pattern :: STRING]) :: ZONED TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "time.realtime",
+      "signature": "time.realtime(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: ZONED TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "time.statement",
+      "signature": "time.statement(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: ZONED TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "time.transaction",
+      "signature": "time.transaction(timezone = DEFAULT_TEMPORAL_ARGUMENT :: ANY) :: ZONED TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "time.truncate",
+      "signature": "time.truncate(unit :: STRING, input = DEFAULT_TEMPORAL_ARGUMENT :: ANY, fields = null :: MAP) :: ZONED TIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "timestamp",
+      "signature": "timestamp() :: INTEGER"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "toBoolean",
+      "signature": "toBoolean(input :: BOOLEAN | STRING | INTEGER) :: BOOLEAN"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "toBooleanList",
+      "signature": "toBooleanList(input :: LIST<ANY>) :: LIST<BOOLEAN>"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "toBooleanOrNull",
+      "signature": "toBooleanOrNull(input :: ANY) :: BOOLEAN"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "toFloat",
+      "signature": "toFloat(input :: STRING | INTEGER | FLOAT) :: FLOAT"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "toFloatList",
+      "signature": "toFloatList(input :: VECTOR | LIST<ANY>) :: LIST<FLOAT>"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "toFloatOrNull",
+      "signature": "toFloatOrNull(input :: ANY) :: FLOAT"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "toInteger",
+      "signature": "toInteger(input :: BOOLEAN | STRING | INTEGER | FLOAT) :: INTEGER"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "toIntegerList",
+      "signature": "toIntegerList(input :: VECTOR | LIST<ANY>) :: LIST<INTEGER>"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "toIntegerOrNull",
+      "signature": "toIntegerOrNull(input :: ANY) :: INTEGER"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "toLower",
+      "signature": "toLower(input :: STRING) :: STRING"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "toString",
+      "signature": "toString(input :: ANY) :: STRING"
+    },
+    {
+      "category": "List",
+      "deprecated": "—",
+      "name": "toStringList",
+      "signature": "toStringList(input :: LIST<ANY>) :: LIST<STRING>"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "toStringOrNull",
+      "signature": "toStringOrNull(input :: ANY) :: STRING"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "toUpper",
+      "signature": "toUpper(input :: STRING) :: STRING"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "trim",
+      "signature": "trim([[LEADING | TRAILING | BOTH] [trimCharacterString :: STRING] FROM] input :: STRING) :: STRING"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "type",
+      "signature": "type(input :: RELATIONSHIP) :: STRING"
+    },
+    {
+      "category": "String",
+      "deprecated": "—",
+      "name": "upper",
+      "signature": "upper(input :: STRING) :: STRING"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "uuid",
+      "signature": "uuid() :: UUID"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "uuid",
+      "signature": "uuid(mostSigBits :: INTEGER, leastSigBits :: INTEGER) :: UUID"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "uuid",
+      "signature": "uuid(name :: STRING) :: UUID"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "uuid.leastSignificantBits",
+      "signature": "uuid.leastSignificantBits(uuid :: UUID) :: INTEGER"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "uuid.mostSignificantBits",
+      "signature": "uuid.mostSignificantBits(uuid :: UUID) :: INTEGER"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "valueType",
+      "signature": "valueType(input :: ANY) :: STRING"
+    },
+    {
+      "category": "Scalar",
+      "deprecated": "—",
+      "name": "vector",
+      "signature": "vector(vectorValue :: STRING | LIST<INTEGER | FLOAT>, dimension :: INTEGER, coordinateType :: [INTEGER64, INTEGER32, INTEGER16, INTEGER8, FLOAT64, FLOAT32]) :: VECTOR"
+    },
+    {
+      "category": "Vector",
+      "deprecated": "—",
+      "name": "vector.similarity.cosine",
+      "signature": "vector.similarity.cosine(a :: VECTOR | LIST<INTEGER | FLOAT>, b :: VECTOR | LIST<INTEGER | FLOAT>) :: FLOAT"
+    },
+    {
+      "category": "Vector",
+      "deprecated": "—",
+      "name": "vector.similarity.euclidean",
+      "signature": "vector.similarity.euclidean(a :: VECTOR | LIST<INTEGER | FLOAT>, b :: VECTOR | LIST<INTEGER | FLOAT>) :: FLOAT"
+    },
+    {
+      "category": "Vector",
+      "deprecated": "—",
+      "name": "vector_dimension_count",
+      "signature": "vector_dimension_count(vector :: VECTOR) :: INTEGER"
+    },
+    {
+      "category": "Vector",
+      "deprecated": "—",
+      "name": "vector_distance",
+      "signature": "vector_distance(vector1 :: VECTOR, vector2 :: VECTOR, vectorDistanceMetric :: [EUCLIDEAN, EUCLIDEAN_SQUARED, MANHATTAN, COSINE, DOT, HAMMING]) :: FLOAT"
+    },
+    {
+      "category": "Vector",
+      "deprecated": "—",
+      "name": "vector_norm",
+      "signature": "vector_norm(vector :: VECTOR, vectorDistanceMetric :: [EUCLIDEAN, MANHATTAN]) :: FLOAT"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "zoned_datetime",
+      "signature": "zoned_datetime(input = DEFAULT_TEMPORAL_ARGUMENT :: ANY[, pattern :: STRING]) :: ZONED DATETIME"
+    },
+    {
+      "category": "Temporal",
+      "deprecated": "—",
+      "name": "zoned_time",
+      "signature": "zoned_time(input = DEFAULT_TEMPORAL_ARGUMENT :: ANY[, pattern :: STRING]) :: ZONED TIME"
+    }
+  ],
+  "procedures": [
+    {
+      "mode": "READ",
+      "name": "db.index.fulltext.queryNodes",
+      "outputs": "`node, score`",
+      "signature": "db.index.fulltext.queryNodes(indexName :: STRING, queryString :: STRING, options = {} :: MAP) :: (node :: NODE, score :: FLOAT)"
+    },
+    {
+      "mode": "READ",
+      "name": "db.index.fulltext.queryRelationships",
+      "outputs": "`relationship, score`",
+      "signature": "db.index.fulltext.queryRelationships(indexName :: STRING, queryString :: STRING, options = {} :: MAP) :: (relationship :: RELATIONSHIP, score :: FLOAT)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "db.index.semantic.createNodeIndex",
+      "outputs": "无",
+      "signature": "db.index.semantic.createNodeIndex(indexName :: STRING, labels :: LIST<STRING>, sourceProperty :: STRING, options :: MAP)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "db.index.semantic.createRelationshipIndex",
+      "outputs": "无",
+      "signature": "db.index.semantic.createRelationshipIndex(indexName :: STRING, relationshipTypes :: LIST<STRING>, sourceProperty :: STRING, options :: MAP)"
+    },
+    {
+      "mode": "READ",
+      "name": "db.index.semantic.queryNodes",
+      "outputs": "`node, score`",
+      "signature": "db.index.semantic.queryNodes(indexName :: STRING, queryString :: STRING, options :: MAP) :: (node :: NODE, score :: FLOAT)"
+    },
+    {
+      "mode": "READ",
+      "name": "db.index.semantic.queryRelationships",
+      "outputs": "`relationship, score`",
+      "signature": "db.index.semantic.queryRelationships(indexName :: STRING, queryString :: STRING, options :: MAP) :: (relationship :: RELATIONSHIP, score :: FLOAT)"
+    },
+    {
+      "mode": "READ",
+      "name": "db.index.semantic.rebuild",
+      "outputs": "`name, commit, indexedEntities, embeddedTexts`",
+      "signature": "db.index.semantic.rebuild(name :: STRING, version :: STRING) :: (name :: STRING, commit :: STRING, indexedEntities :: INTEGER, embeddedTexts :: INTEGER)"
+    },
+    {
+      "mode": "READ",
+      "name": "db.labels",
+      "outputs": "`label`",
+      "signature": "db.labels() :: (label :: STRING)"
+    },
+    {
+      "mode": "READ",
+      "name": "db.propertyKeys",
+      "outputs": "`propertyKey`",
+      "signature": "db.propertyKeys() :: (propertyKey :: STRING)"
+    },
+    {
+      "mode": "READ",
+      "name": "db.relationshipTypes",
+      "outputs": "`relationshipType`",
+      "signature": "db.relationshipTypes() :: (relationshipType :: STRING)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.branch.checkout",
+      "outputs": "`name, commit`",
+      "signature": "lithograph.branch.checkout(name :: STRING)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.branch.create",
+      "outputs": "`name, commit`",
+      "signature": "lithograph.branch.create(name :: STRING [, from :: STRING])"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.branch.delete",
+      "outputs": "`name, previousCommit`",
+      "signature": "lithograph.branch.delete(name :: STRING)"
+    },
+    {
+      "mode": "READ",
+      "name": "lithograph.branch.list",
+      "outputs": "`name, commit, active`",
+      "signature": "lithograph.branch.list()"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.commit.create",
+      "outputs": "`commit`",
+      "signature": "lithograph.commit.create([data :: ANY])"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.commit.data.clear",
+      "outputs": "`commit`",
+      "signature": "lithograph.commit.data.clear(version :: STRING)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.commit.data.set",
+      "outputs": "`commit, data`",
+      "signature": "lithograph.commit.data.set(version :: STRING, data :: ANY)"
+    },
+    {
+      "mode": "READ",
+      "name": "lithograph.commit.get",
+      "outputs": "`commit, parents, author, message, committedAt, hasData, data`",
+      "signature": "lithograph.commit.get(version :: STRING)"
+    },
+    {
+      "mode": "READ",
+      "name": "lithograph.diff",
+      "outputs": "`patch`",
+      "signature": "lithograph.diff(before :: STRING, after :: STRING)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.gc",
+      "outputs": "`commits, layers, schemas, checkpoints, commitData`",
+      "signature": "lithograph.gc()"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.index.rebuild",
+      "outputs": "`name, commit, indexedEntities`",
+      "signature": "lithograph.index.rebuild(name :: STRING, version :: STRING) :: (name :: STRING, commit :: STRING, indexedEntities :: INTEGER)"
+    },
+    {
+      "mode": "READ",
+      "name": "lithograph.log",
+      "outputs": "`commit, parents, author, message, committedAt, cursor`",
+      "signature": "lithograph.log([version :: STRING [, limit :: INTEGER [, cursor :: STRING]]])"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.merge.abort",
+      "outputs": "`session`",
+      "signature": "lithograph.merge.abort(session :: STRING, expectedRevision :: INTEGER)"
+    },
+    {
+      "mode": "READ",
+      "name": "lithograph.merge.conflicts",
+      "outputs": "`session, revision, conflictId, slot, base, ours, theirs, resolution, cursor`",
+      "signature": "lithograph.merge.conflicts(session :: STRING [, limit :: INTEGER [, cursor :: STRING]])"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.merge.finalize",
+      "outputs": "`status, commit`",
+      "signature": "lithograph.merge.finalize(session :: STRING, expectedRevision :: INTEGER)"
+    },
+    {
+      "mode": "READ",
+      "name": "lithograph.merge.get",
+      "outputs": "`session, targetBranch, ours, theirs, revision, status, unresolved`",
+      "signature": "lithograph.merge.get(session :: STRING)"
+    },
+    {
+      "mode": "READ",
+      "name": "lithograph.merge.list",
+      "outputs": "`session, targetBranch, ours, theirs, revision, createdAt, cursor`",
+      "signature": "lithograph.merge.list([limit :: INTEGER [, cursor :: STRING]])"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.merge.resolve",
+      "outputs": "`session, revision, status, unresolved`",
+      "signature": "lithograph.merge.resolve(session :: STRING, expectedRevision :: INTEGER, resolutions :: LIST<MAP>)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.merge.start",
+      "outputs": "`session, targetBranch, ours, theirs, revision, status, unresolved`",
+      "signature": "lithograph.merge.start(source :: STRING [, expectedHead :: STRING])"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.patch.apply",
+      "outputs": "`commit`",
+      "signature": "lithograph.patch.apply(patch :: MAP)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.rebase",
+      "outputs": "`status, commit, rewritten, conflicts`",
+      "signature": "lithograph.rebase(onto :: STRING [, options :: MAP])"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.reset",
+      "outputs": "`from, to`",
+      "signature": "lithograph.reset(target :: STRING)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.revert",
+      "outputs": "`commit`",
+      "signature": "lithograph.revert(commit :: STRING [, options :: MAP])"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.squash",
+      "outputs": "`from, previousHead, commit`",
+      "signature": "lithograph.squash(since :: STRING)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.tag.create",
+      "outputs": "`name, commit`",
+      "signature": "lithograph.tag.create(name :: STRING, target :: STRING)"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.tag.delete",
+      "outputs": "`name, previousCommit`",
+      "signature": "lithograph.tag.delete(name :: STRING)"
+    },
+    {
+      "mode": "READ",
+      "name": "lithograph.tag.list",
+      "outputs": "`name, commit`",
+      "signature": "lithograph.tag.list()"
+    },
+    {
+      "mode": "WRITE",
+      "name": "lithograph.tag.move",
+      "outputs": "`name, previousCommit, commit`",
+      "signature": "lithograph.tag.move(name :: STRING, target :: STRING)"
+    }
+  ],
+  "profile": "CY25-2026.08",
+  "version": "0.3.1"
+}

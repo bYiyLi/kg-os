@@ -17,7 +17,12 @@ const side = "d".repeat(64);
 const starting = Date.now() * 1000;
 
 function entry(state: string, offset: number, parents: string[]): StateSummary {
-  return { state, committedAt: starting + offset, parents, message: state.slice(0, 5) };
+  return {
+    state: stateRef(state),
+    committedAt: starting + offset,
+    parents: parents.map(stateRef),
+    message: state.slice(0, 5)
+  };
 }
 
 function reader(): VersionReader {
@@ -168,7 +173,7 @@ it("stops loading when the connection is aborted", async () => {
 it("keeps a single copy of a commit returned across page boundaries", async () => {
   const api = reader();
   vi.mocked(api.ancestry).mockResolvedValueOnce({
-    root,
+    root: stateRef(root),
     items: [entry(root, 4000, [source]), entry(shared, 1000, [])],
     cursor: "next-main"
   });
@@ -184,15 +189,15 @@ it("orders commits with equal timestamps by the complete State ID", async () => 
   const api = reader();
   vi.mocked(api.branch.list).mockResolvedValueOnce({
     items: [
-      { name: "side", state: side },
-      { name: "root", state: root },
-      { name: "source", state: source }
+      { name: "side", state: stateRef(side) },
+      { name: "root", state: stateRef(root) },
+      { name: "source", state: stateRef(source) }
     ]
   });
   vi.mocked(api.ancestry).mockImplementation((request) =>
     Promise.resolve({
-      root: request.root,
-      items: [{ state: request.root, parents: [], committedAt: starting }]
+      root: stateRef(request.root),
+      items: [{ state: stateRef(request.root), parents: [], committedAt: starting }]
     })
   );
   const snapshot = await loadVersions(api, new AbortController().signal);
@@ -203,7 +208,7 @@ it("orders commits with equal timestamps by the complete State ID", async () => 
 it("safely indexes legally named branches without prototype pollution", async () => {
   const api = reader();
   vi.mocked(api.branch.list).mockResolvedValueOnce({
-    items: [{ name: "__proto__", state: root }]
+    items: [{ name: "__proto__", state: stateRef(root) }]
   });
   const signal = new AbortController().signal;
   const first = await loadVersions(api, signal);

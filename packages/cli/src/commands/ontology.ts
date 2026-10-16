@@ -1,4 +1,4 @@
-import type { KGOSClient, OntologyReadResult, ObjectTextReadResult } from "@kgos/sdk";
+import type { KGOSClient, OntologyReadResult, ObjectTextReadResult, StateRef } from "@kgos/sdk";
 
 import { extractPretty, optionalInteger, parseOptions, requiredValue } from "../args.js";
 import { usageError } from "../errors.js";
@@ -17,7 +17,7 @@ export async function runOntology(client: KGOSClient, args: readonly string[]): 
     boolean: ["--edit"],
     value: ["--at", "--limit", "--cursor"]
   });
-  const at = requiredValue(parsed, "--at");
+  const at = requiredValue(parsed, "--at") as StateRef;
   const refs = parsed.positionals;
   if (refs.length > 100 || new Set(refs).size !== refs.length) {
     throw usageError("ontology read accepts at most 100 unique OntologyRef values");
@@ -39,7 +39,7 @@ export async function runOntology(client: KGOSClient, args: readonly string[]): 
     return;
   }
 
-  const request: { at: string; refs?: string[]; limit?: number; cursor?: string } = { at };
+  const request: { at: StateRef; refs?: string[]; limit?: number; cursor?: string } = { at };
   if (refs.length !== 0) {
     request.refs = [...refs];
   }

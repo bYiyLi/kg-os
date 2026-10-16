@@ -3,6 +3,7 @@ import type {
   EvolutionAncestryRequest,
   EvolutionAncestryResult,
   EvolutionGetRequest,
+  EvolutionGetResult,
   EvolutionRefListResult,
   RequestOptions
 } from "@kgos/sdk";
@@ -69,7 +70,7 @@ export function createMcpVersionReader(
     get: (request: EvolutionGetRequest, options) =>
       // Version selection only needs the resolved ID. Do not transfer full
       // Snapshot data through the MCP sandbox or into the embedded UI.
-      read<{ state: string }>(
+      read<Pick<EvolutionGetResult, "state">>(
         `const item = await evolution.get(${JSON.stringify(request)}); return { state: item.state }`,
         options
       )

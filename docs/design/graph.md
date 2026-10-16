@@ -69,7 +69,7 @@ graph execute → 读写连接 → Lithograph
 
 公共 Graph 不注入排除 `__kgos_` 的 Knowledge `graphView`，不在参数、结果或提交前按 Vector / reserved identifier 增加 KG OS 检查。否则仍会限制有效 Cypher，或使底层 Schema / Version Procedure 因固定 Graph View 而无法执行。Object / Ontology 的聚合编辑、内部数据投影和一致性检查仍由各自合同负责，不反向变成 Graph 的执行条件。
 
-公共 Graph 只使用 Lithograph v0.3.0 的 SQL execution surface：非 streaming request 使用 `lithograph()` 完整 envelope，streaming request 使用真正增量的 `lithograph_rows()` `columns -> row* -> summary` event stream。Semantic query、`LOAD CSV`、graph/schema/version mutation 与 transaction subquery 都不因为 streaming adapter 另设 KG OS 限制；`query` / `execute` 只决定只读 / 读写 connection。KG OS 负责认证、request / parameter 解码、连接与执行上下文、结果传输和 cancellation；语句解析、读写判定、procedure 行为、事务与数据库错误由 Lithograph 负责。具体接入证据见 [integration readiness](implementation.md#managed-semantic-integration-readiness)。
+公共 Graph 使用 Lithograph 当前锁定的 v0.3.1 SQL execution surface（[D101](decisions.md#d101-lithograph-v031-upgrade)）：非 streaming request 使用 `lithograph()` 完整 envelope，streaming request 使用真正增量的 `lithograph_rows()` `columns -> row* -> summary` event stream。Semantic query、`LOAD CSV`、graph/schema/version mutation 与 transaction subquery 都不因为 streaming adapter 另设 KG OS 限制；`query` / `execute` 只决定只读 / 读写 connection。KG OS 负责认证、request / parameter 解码、连接与执行上下文、结果传输和 cancellation；语句解析、读写判定、procedure 行为、事务与数据库错误由 Lithograph 负责。具体接入证据见 [integration readiness](implementation.md#managed-semantic-integration-readiness)。面向 MCP AI 的 Cypher 使用手册由 [MCP 文档 owner](mcp.md#mcp-tool-help) 维护，但不拥有底层语言语义，也不改变本 Graph 执行边界。
 
 KG OS-managed Full-text 默认使用目标 State 的实际 versioned IndexDefinition 中的 analyzer；全局 `[fulltext].analyzer` 只用于创建或因业务 Schema 变化重建索引。调用方在 Cypher 中显式传入底层 `{analyzer: ...}` 时原样执行，不修改全局配置或已有 IndexDefinition。KG OS 不为此增加解析或重写逻辑。
 

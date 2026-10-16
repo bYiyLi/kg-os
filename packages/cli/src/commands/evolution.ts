@@ -4,7 +4,8 @@ import type {
   EvolutionObjectFilter,
   JsonValue,
   KGOSClient,
-  StateCreateRequest
+  StateCreateRequest,
+  StateRef
 } from "@kgos/sdk";
 
 import {
@@ -36,7 +37,7 @@ export async function runEvolution(
       return;
     case "get":
       requireCount(args.slice(1), 1, "get requires exactly one StateRef");
-      outputJSON(await client.evolution.get({ state: args[1] ?? "" }), pretty);
+      outputJSON(await client.evolution.get({ state: (args[1] ?? "") as StateRef }), pretty);
       return;
     case "ancestry":
       await runAncestry(client, args.slice(1), pretty);
@@ -73,7 +74,9 @@ async function runAncestry(
     throw usageError("ancestry requires a StateRef");
   }
   const parsed = parseEvolutionPage(args.slice(1));
-  const request: { root: string; limit?: number; cursor?: string } = { root: args[0] ?? "" };
+  const request: { root: StateRef; limit?: number; cursor?: string } = {
+    root: (args[0] ?? "") as StateRef
+  };
   addEvolutionPage(request, parsed);
   outputJSON(await client.evolution.ancestry(request), pretty);
 }
@@ -87,7 +90,10 @@ async function runHistory(
     throw usageError("history requires a StateRef");
   }
   const parsed = parseScope(args.slice(1));
-  const request: EvolutionHistoryRequest = { root: args[0] ?? "", scope: parsed.scope };
+  const request: EvolutionHistoryRequest = {
+    root: (args[0] ?? "") as StateRef,
+    scope: parsed.scope
+  };
   if (parsed.object !== undefined) {
     request.object = parsed.object;
   }
@@ -117,8 +123,8 @@ async function runDiff(
   const scope = parseScopeValue(requiredValue(parsed, "--scope"));
   const object = parseObjectFilter(parsed, scope);
   const request: EvolutionDiffRequest = {
-    before: requiredValue(parsed, "--before"),
-    after: requiredValue(parsed, "--after"),
+    before: requiredValue(parsed, "--before") as StateRef,
+    after: requiredValue(parsed, "--after") as StateRef,
     scope
   };
   if (object !== undefined) {
@@ -177,7 +183,7 @@ async function runState(
       });
       outputJSON(
         await client.evolution.state.setData({
-          state: parsed.positionals[0] ?? "",
+          state: (parsed.positionals[0] ?? "") as StateRef,
           data: data.value
         }),
         pretty
@@ -188,7 +194,9 @@ async function runState(
       const parsed = parseOptions(args.slice(1), {});
       assertPositionals(parsed, 1, 1, "state clear-data requires exactly one StateRef");
       outputJSON(
-        await client.evolution.state.clearData({ state: parsed.positionals[0] ?? "" }),
+        await client.evolution.state.clearData({
+          state: (parsed.positionals[0] ?? "") as StateRef
+        }),
         pretty
       );
       return;
@@ -223,7 +231,7 @@ async function runBranch(
       outputJSON(
         await client.evolution.branch.create({
           name: args[1] ?? "",
-          from: requiredValue(parsed, "--from")
+          from: requiredValue(parsed, "--from") as StateRef
         }),
         pretty
       );
@@ -257,7 +265,10 @@ async function runTag(client: KGOSClient, args: readonly string[], pretty: boole
       if (parsed.positionals.length !== 0) {
         throw usageError("tag " + command + " accepts exactly one name");
       }
-      const request = { name: args[1] ?? "", target: requiredValue(parsed, "--target") };
+      const request = {
+        name: args[1] ?? "",
+        target: requiredValue(parsed, "--target") as StateRef
+      };
       outputJSON(
         command === "create"
           ? await client.evolution.tag.create(request)
@@ -310,7 +321,7 @@ function parseObjectFilter(
     if (ref === undefined || anchorState === undefined) {
       throw usageError("--scope object requires --object-ref and --anchor-state");
     }
-    return { ref, anchorState };
+    return { ref, anchorState: anchorState as StateRef };
   }
   if (ref !== undefined || anchorState !== undefined) {
     throw usageError("--object-ref and --anchor-state are valid only with --scope object");

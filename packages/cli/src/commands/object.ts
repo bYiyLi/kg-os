@@ -1,4 +1,4 @@
-import type { KGOSClient, ObjectReadResult, ObjectTextReadResult } from "@kgos/sdk";
+import type { KGOSClient, ObjectReadResult, ObjectTextReadResult, StateRef } from "@kgos/sdk";
 
 import { extractPretty, parseOptions, requiredValue } from "../args.js";
 import { parseError, usageError } from "../errors.js";
@@ -29,7 +29,7 @@ async function runRead(client: KGOSClient, args: readonly string[]): Promise<voi
     boolean: ["--body", "--pretty"],
     value: ["--at", "--refs-file", "--format"]
   });
-  const at = requiredValue(parsed, "--at");
+  const at = requiredValue(parsed, "--at") as StateRef;
   const refs = await readRefs(parsed.positionals, parsed.values.get("--refs-file"));
   if (refs.length < 1 || refs.length > 100) {
     throw usageError("object read requires 1..100 ObjectRef values");

@@ -9,7 +9,7 @@ import (
 	"github.com/zeebo/blake3"
 )
 
-// lithographGraphConstraintName mirrors the frozen Lithograph v0.3.0
+// lithographGraphConstraintName mirrors the frozen Lithograph v0.3.1
 // automatic name for KEY/UNIQUE constraints originating from a Graph Type.
 // Matching is exact; the graph_constraint_* prefix is not KG OS-reserved.
 func lithographGraphConstraintName(

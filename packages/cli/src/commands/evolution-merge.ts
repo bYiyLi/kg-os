@@ -1,4 +1,4 @@
-import type { JsonValue, KGOSClient, MergeResolution } from "@kgos/sdk";
+import type { JsonValue, KGOSClient, MergeResolution, StateRef } from "@kgos/sdk";
 
 import { parseOptions, requiredInteger, requiredValue, type ParsedOptions } from "../args.js";
 import { usageError } from "../errors.js";
@@ -50,7 +50,7 @@ async function runStart(
   outputJSON(
     await client.evolution.merge.start({
       branch: requiredValue(parsed, "--branch"),
-      source: requiredValue(parsed, "--source")
+      source: requiredValue(parsed, "--source") as StateRef
     }),
     pretty
   );
@@ -198,11 +198,9 @@ function decodeResolution(value: JsonValue, index: number): MergeResolution {
   if (choice !== "value" && hasValue) {
     throw usageError(label + ".value is valid only when choice=value");
   }
-  const resolution: MergeResolution = { conflictId, choice };
-  if (hasValue) {
-    resolution.value = value["value"] ?? null;
-  }
-  return resolution;
+  return choice === "value"
+    ? { conflictId, choice, value: value["value"] ?? null }
+    : { conflictId, choice };
 }
 
 function requireLeadingValue(args: readonly string[], message: string): string {

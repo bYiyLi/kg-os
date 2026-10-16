@@ -309,18 +309,27 @@ try {
   const endpoint = await start();
   await verifyHTTP(endpoint);
   await connect(endpoint);
-  const helpDoc = toolValue(
+  const rootDoc = toolValue(
     await mcpClient.callTool({
       name: "kgos_read",
-      arguments: { code: 'return await help("evolution.state.create")' }
+      arguments: { code: 'return await docs.read("index.md")' }
     })
   );
-  assert.match(helpDoc.result.signature, /StateCreateRequest/);
-  assert.match(helpDoc.result.typeDefinitions.join("\n"), /interface StateCreateResult/);
-  const helpIndex = toolValue(
-    await mcpClient.callTool({ name: "kgos_read", arguments: { code: "return await help()" } })
+  assert.match(rootDoc.result, /sdk\/index\.md/);
+  const methodDoc = toolValue(
+    await mcpClient.callTool({
+      name: "kgos_read",
+      arguments: { code: 'return await docs.read("sdk/evolution/state/create.md")' }
+    })
   );
-  assert.equal(helpIndex.result.length, 31, "MCP Help inventory differs from the SDK");
+  assert.match(methodDoc.result, /StateCreateRequest/);
+  const cypherDoc = toolValue(
+    await mcpClient.callTool({
+      name: "kgos_read",
+      arguments: { code: 'return await docs.read("cypher/index.md")' }
+    })
+  );
+  assert.match(cypherDoc.result, /Cypher 25/);
   const refused = await mcpClient.callTool({
     name: "kgos_read",
     arguments: {

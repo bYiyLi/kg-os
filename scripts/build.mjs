@@ -15,7 +15,7 @@ const goEnv = {
   GOTOOLCHAIN: "go1.27.2"
 };
 
-await run("node", ["scripts/generate-sdk-help.mjs", "--check"], { cwd: root });
+await run("node", ["scripts/generate-mcp-docs.mjs", "--check"], { cwd: root });
 
 await run("pnpm", ["clean"], { cwd: root });
 await run("pnpm", ["exec", "tsc", "-b", "--pretty", "false"], { cwd: root });

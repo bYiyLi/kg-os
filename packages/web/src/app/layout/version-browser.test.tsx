@@ -9,7 +9,7 @@ import type { EvolutionGetResult } from "@kgos/sdk";
 
 import { i18n } from "../i18n/index.js";
 import { VersionTree as VersionBrowser } from "../../features/version/version-browser.js";
-import type { VersionReader } from "../../features/version/version-data.js";
+import { stateRef, type VersionReader } from "../../features/version/version-data.js";
 import { useVersionHistory } from "../../features/version/use-version-history.js";
 
 const main = "a".repeat(64);
@@ -146,7 +146,7 @@ function rows() {
 
 function resolved(state: string): EvolutionGetResult {
   return {
-    state,
+    state: stateRef(state),
     parents: [],
     committedAt: at,
     consistency: { status: "valid", issues: [] },
@@ -255,7 +255,7 @@ it("distinguishes an empty repository from a disconnected session", async () => 
 it("renders an immutable commit that has no message or parent", async () => {
   const api = mockReader();
   vi.mocked(api.ancestry).mockResolvedValueOnce({
-    root: main,
+    root: stateRef(main),
     items: [{ state: main, committedAt: at, parents: null }] as never
   });
   await render(api);
@@ -377,10 +377,14 @@ it("closes branch picker on outside interaction and Escape without clearing filt
 
 it("does not replace a new connection with a late old connection response", async () => {
   const old = mockReader();
-  let resolveOld: ((response: { items: { name: string; state: string }[] }) => void) | undefined;
-  const pending = new Promise<{ items: { name: string; state: string }[] }>((resolve) => {
-    resolveOld = resolve;
-  });
+  let resolveOld:
+    | ((response: { items: { name: string; state: ReturnType<typeof stateRef> }[] }) => void)
+    | undefined;
+  const pending = new Promise<{ items: { name: string; state: ReturnType<typeof stateRef> }[] }>(
+    (resolve) => {
+      resolveOld = resolve;
+    }
+  );
   vi.mocked(old.branch.list).mockImplementationOnce(() => pending);
   await render(old);
   expect(host.textContent).toContain("Loading history...");
@@ -390,7 +394,7 @@ it("does not replace a new connection with a late old connection response", asyn
   expect(oldSignal?.aborted).toBe(true);
   expect(rows()).toHaveLength(6);
   await act(async () => {
-    resolveOld?.({ items: [{ name: "main", state: genesis }] });
+    resolveOld?.({ items: [{ name: "main", state: stateRef(genesis) }] });
     await Promise.resolve();
   });
   expect(rows()).toHaveLength(6);

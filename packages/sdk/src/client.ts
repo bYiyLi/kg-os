@@ -17,6 +17,7 @@ import type {
   GraphQueryRequest,
   GraphQueryResult,
   GraphStreamEvent,
+  GraphSummaryEvent,
   JsonObject,
   JsonValue,
   MergeAbortRequest,
@@ -152,8 +153,8 @@ function graphEvent(value: unknown, requestId?: string): GraphStreamEvent | KGOS
       }
       const counters = value["counters"] as JsonValue | undefined;
       return counters === undefined
-        ? { type: "summary", state: value["state"] }
-        : { type: "summary", state: value["state"], counters };
+        ? { type: "summary", state: value["state"] as GraphSummaryEvent["state"] }
+        : { type: "summary", state: value["state"] as GraphSummaryEvent["state"], counters };
     }
     case "error": {
       if (!isPublicError(value["error"])) {
@@ -273,82 +274,311 @@ export class KGOSClient {
   };
 
   readonly ontology = {
+    /**
+     * Read Ontology overview, domains, or definitions at a State.
+     * @example
+     * ```js
+     * return await ontology.read({ at: "branch/main" });
+     * ```
+     */
     read: (request: OntologyReadRequest, options?: RequestOptions) =>
       this.post<OntologyReadResult>("/api/v1/ontology/read", request, options),
+    /**
+     * Apply an Ontology-scoped Git Extended Diff to a Branch.
+     * @remarks Use the observed baseState and canonical editable Object text to construct the patch.
+     * @example
+     * ```js
+     * const {state} = await evolution.overview(); return await ontology.patch({ branch: "<target-branch>", baseState: state, patch: "<git-extended-diff>" });
+     * ```
+     */
     patch: (request: PatchRequest, options?: RequestOptions) =>
       this.post<PatchResult>("/api/v1/ontology/patch", request, options)
   };
 
   readonly object = {
+    /**
+     * Read public Ontology or Knowledge Objects by Ref at a State.
+     * @example
+     * ```js
+     * return await object.read({ at: "branch/main", refs: ["node:Person"] });
+     * ```
+     */
     read: (request: ObjectReadRequest, options?: RequestOptions) =>
       this.post<ObjectReadResult>("/api/v1/object/read", request, options),
+    /**
+     * Read canonical editable Object text by Ref at a State.
+     * @example
+     * ```js
+     * return await object.readText({ at: "branch/main", refs: ["node:Person"] });
+     * ```
+     */
     readText: (request: ObjectReadRequest, options?: RequestOptions) =>
       this.post<ObjectTextReadResult>("/api/v1/object/read-text", request, options),
+    /**
+     * Atomically apply a Git Extended Diff spanning public Objects.
+     * @remarks Use the observed baseState and canonical editable Object text to construct the patch.
+     * @example
+     * ```js
+     * const {state} = await evolution.overview(); return await object.patch({ branch: "<target-branch>", baseState: state, patch: "<git-extended-diff>" });
+     * ```
+     */
     patch: (request: PatchRequest, options?: RequestOptions) =>
       this.post<PatchResult>("/api/v1/object/patch", request, options)
   };
 
   readonly graph = {
+    /**
+     * Execute a read-only Cypher query at a State.
+     * @example
+     * ```js
+     * return await graph.query({ at: "branch/main", cypher: "MATCH (n) RETURN n LIMIT 10" });
+     * ```
+     */
     query: (request: GraphQueryRequest, options?: RequestOptions) =>
       this.post<GraphQueryResult>("/api/v1/graph/query", request, options),
+    /**
+     * Execute Cypher on a writable Branch; its effect depends on the statement.
+     * @remarks Cypher is passed through unchanged. Calling execute does not guarantee that a new Commit is created.
+     * @example
+     * ```js
+     * return await graph.execute({ branch: "<target-branch>", cypher: "MATCH (n) RETURN count(n) AS count" });
+     * ```
+     */
     execute: (request: GraphExecuteRequest, options?: RequestOptions) =>
       this.post<GraphExecuteResult>("/api/v1/graph/execute", request, options),
+    /**
+     * Stream read-only Cypher columns, rows, and final summary.
+     * @example
+     * ```js
+     * const rows = []; for await (const event of graph.streamQuery({ at: "branch/main", cypher: "MATCH (n) RETURN n LIMIT 10" })) { if (event.type === "row") rows.push(event.row); } return rows;
+     * ```
+     */
     streamQuery: (request: GraphQueryRequest, options?: RequestOptions) =>
       this.stream("/api/v1/graph/query", request, options),
+    /**
+     * Stream Cypher execution on a writable Branch.
+     * @remarks Rows or columns alone do not confirm success; inspect the terminal summary or error.
+     * @example
+     * ```js
+     * const events = []; for await (const event of graph.streamExecute({ branch: "<target-branch>", cypher: "MATCH (n) RETURN count(n)" })) events.push(event); return events;
+     * ```
+     */
     streamExecute: (request: GraphExecuteRequest, options?: RequestOptions) =>
       this.stream("/api/v1/graph/execute", request, options)
   };
 
   readonly evolution = {
+    /**
+     * Resolve the default Branch and current State.
+     * @example
+     * ```js
+     * return await evolution.overview();
+     * ```
+     */
     overview: (options?: RequestOptions) =>
       this.post<EvolutionOverviewResult>("/api/v1/evolution/overview", {}, options),
+    /**
+     * Inspect one State's metadata, consistency, and State Data.
+     * @example
+     * ```js
+     * return await evolution.get({ state: "branch/main" });
+     * ```
+     */
     get: (request: EvolutionGetRequest, options?: RequestOptions) =>
       this.post<EvolutionGetResult>("/api/v1/evolution/get", request, options),
+    /**
+     * Read a paginated ancestor DAG from a Branch or Commit.
+     * @example
+     * ```js
+     * return await evolution.ancestry({ root: "branch/main", limit: 20 });
+     * ```
+     */
     ancestry: (request: EvolutionAncestryRequest, options?: RequestOptions) =>
       this.post<EvolutionAncestryResult>("/api/v1/evolution/ancestry", request, options),
+    /**
+     * Read public changes reachable from a State with scope filtering.
+     * @remarks scope is all, ontology, knowledge, or object. For object scope, supply an object filter with anchorState and ref.
+     * @example
+     * ```js
+     * return await evolution.history({ root: "branch/main", scope: "all", limit: 20 });
+     * ```
+     */
     history: (request: EvolutionHistoryRequest, options?: RequestOptions) =>
       this.post<EvolutionHistoryResult>("/api/v1/evolution/history", request, options),
+    /**
+     * Compare public changes between two immutable States.
+     * @remarks scope is all, ontology, knowledge, or object. For object scope, supply an object filter with anchorState and ref.
+     * @example
+     * ```js
+     * return await evolution.diff({ before: "branch/main", after: "branch/main", scope: "all" });
+     * ```
+     */
     diff: (request: EvolutionDiffRequest, options?: RequestOptions) =>
       this.post<EvolutionDiffResult>("/api/v1/evolution/diff", request, options),
     state: {
+      /**
+       * Create a new Commit/State on an existing Branch, even without graph changes.
+       * @remarks Creates a Commit even when the graph snapshot does not change.
+       * @example
+       * ```js
+       * return await evolution.state.create({ branch: "<target-branch>", message: "Create a checkpoint" });
+       * ```
+       */
       create: (request: StateCreateRequest, options?: RequestOptions) =>
         this.post<StateCreateResult>("/api/v1/evolution/state/create", request, options),
+      /**
+       * Replace the mutable JSON State Data on an existing State; no new Commit.
+       * @remarks State Data is a mutable annotation, not part of the versioned Knowledge/Ontology graph.
+       * @example
+       * ```js
+       * return await evolution.state.setData({ state: "branch/main", data: { note: "reviewed" } });
+       * ```
+       */
       setData: (request: StateSetDataRequest, options?: RequestOptions) =>
         this.post<StateSetDataResult>("/api/v1/evolution/state/set-data", request, options),
+      /**
+       * Remove a State's mutable Data annotation; no new Commit.
+       * @remarks State Data is a mutable annotation, not part of the versioned Knowledge/Ontology graph.
+       * @example
+       * ```js
+       * return await evolution.state.clearData({ state: "branch/main" });
+       * ```
+       */
       clearData: (request: StateClearDataRequest, options?: RequestOptions) =>
         this.post<StateClearDataResult>("/api/v1/evolution/state/clear-data", request, options)
     },
     branch: {
+      /**
+       * List Branch names and their current States.
+       * @example
+       * ```js
+       * return await evolution.branch.list();
+       * ```
+       */
       list: (options?: RequestOptions) =>
         this.post<EvolutionRefListResult>("/api/v1/evolution/branch/list", {}, options),
+      /**
+       * Create a Branch from a specified existing State.
+       * @example
+       * ```js
+       * return await evolution.branch.create({ name: "<new-branch>", from: "branch/main" });
+       * ```
+       */
       create: (request: BranchCreateRequest, options?: RequestOptions) =>
         this.post<BranchMutationResult>("/api/v1/evolution/branch/create", request, options),
+      /**
+       * Delete a Branch reference, not its immutable Commit history.
+       * @example
+       * ```js
+       * return await evolution.branch.delete({ name: "<target-branch>" });
+       * ```
+       */
       delete: (request: BranchDeleteRequest, options?: RequestOptions) =>
         this.post<BranchMutationResult>("/api/v1/evolution/branch/delete", request, options)
     },
     tag: {
+      /**
+       * List Tag names and their current States.
+       * @example
+       * ```js
+       * return await evolution.tag.list();
+       * ```
+       */
       list: (options?: RequestOptions) =>
         this.post<EvolutionRefListResult>("/api/v1/evolution/tag/list", {}, options),
+      /**
+       * Create a Tag pointing at a State.
+       * @example
+       * ```js
+       * return await evolution.tag.create({ name: "<new-tag>", target: "branch/main" });
+       * ```
+       */
       create: (request: TagCreateRequest, options?: RequestOptions) =>
         this.post<TagMutationResult>("/api/v1/evolution/tag/create", request, options),
+      /**
+       * Move an existing Tag to another State.
+       * @example
+       * ```js
+       * return await evolution.tag.move({ name: "<existing-tag>", target: "branch/main" });
+       * ```
+       */
       move: (request: TagMoveRequest, options?: RequestOptions) =>
         this.post<TagMutationResult>("/api/v1/evolution/tag/move", request, options),
+      /**
+       * Remove a Tag reference without deleting the underlying Commit.
+       * @example
+       * ```js
+       * return await evolution.tag.delete({ name: "<target-tag>" });
+       * ```
+       */
       delete: (request: TagDeleteRequest, options?: RequestOptions) =>
         this.post<TagMutationResult>("/api/v1/evolution/tag/delete", request, options)
     },
     merge: {
+      /**
+       * Start a Merge Session for an existing target Branch and source State.
+       * @example
+       * ```js
+       * return await evolution.merge.start({ branch: "<target-branch>", source: "branch/main" });
+       * ```
+       */
       start: (request: MergeStartRequest, options?: RequestOptions) =>
         this.post<MergeSession>("/api/v1/evolution/merge/start", request, options),
+      /**
+       * List Merge Sessions with optional pagination.
+       * @example
+       * ```js
+       * return await evolution.merge.list({ limit: 20 });
+       * ```
+       */
       list: (request: MergeListRequest = {}, options?: RequestOptions) =>
         this.post<MergeListResult>("/api/v1/evolution/merge/list", request, options),
+      /**
+       * Read the current status and revision of a Merge Session.
+       * @example
+       * ```js
+       * return await evolution.merge.get({ session: "<session-id>" });
+       * ```
+       */
       get: (request: MergeGetRequest, options?: RequestOptions) =>
         this.post<MergeSession>("/api/v1/evolution/merge/get", request, options),
+      /**
+       * Read paginated Merge conflicts and the current Session revision.
+       * @example
+       * ```js
+       * return await evolution.merge.conflicts({ session: "<session-id>", limit: 20 });
+       * ```
+       */
       conflicts: (request: MergeConflictsRequest, options?: RequestOptions) =>
         this.post<MergeConflictsResult>("/api/v1/evolution/merge/conflicts", request, options),
+      /**
+       * Apply conflict resolutions using the observed Session revision.
+       * @remarks Use the current Merge Session revision, and choose resolutions based on the observed conflicts; 'ours' is only an illustrative choice.
+       * @example
+       * ```js
+       * const s = await evolution.merge.get({ session: "<session-id>" }); return await evolution.merge.resolve({ session: s.session, expectedRevision: s.revision, resolutions: [{ conflictId: "<conflict-id>", choice: "ours" }] });
+       * ```
+       */
       resolve: (request: MergeResolveRequest, options?: RequestOptions) =>
         this.post<MergeSession>("/api/v1/evolution/merge/resolve", request, options),
+      /**
+       * Finalize a Merge Session using its current revision; may fast-forward or create a Commit.
+       * @remarks Use the observed Merge Session revision. The Session may be stale after other changes.
+       * @example
+       * ```js
+       * const s = await evolution.merge.get({ session: "<session-id>" }); return await evolution.merge.finalize({ session: s.session, expectedRevision: s.revision });
+       * ```
+       */
       finalize: (request: MergeFinalizeRequest, options?: RequestOptions) =>
         this.post<MergeFinalizeResult>("/api/v1/evolution/merge/finalize", request, options),
+      /**
+       * Abort an unfinished Merge Session at its current revision.
+       * @remarks Use the observed Merge Session revision. Aborting a Session does not undo previous commits.
+       * @example
+       * ```js
+       * const s = await evolution.merge.get({ session: "<session-id>" }); return await evolution.merge.abort({ session: s.session, expectedRevision: s.revision });
+       * ```
+       */
       abort: (request: MergeAbortRequest, options?: RequestOptions) =>
         this.post<MergeAbortResult>("/api/v1/evolution/merge/abort", request, options)
     }

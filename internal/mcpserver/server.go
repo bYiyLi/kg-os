@@ -278,15 +278,15 @@ func (s *Server) toolServer() *mcp.Server {
 		return s.finishTool(ctx, "state_ancestry", started, value, err), nil, nil
 	})
 	type ScriptInput struct {
-		Code string `json:"code" jsonschema:"Async JavaScript function body, not a module. Available globals: ontology, object, graph, evolution, help(name?). Use return await help() to list available SDK methods and return await help('evolution.state.create') for exact input, result types and examples. Await asynchronous methods and explicitly return JSON-compatible data; no imports or client setup."`
+		Code string `json:"code" jsonschema:"Async JavaScript function body, not a module. Globals: ontology, object, graph, evolution, docs.read(path). Start with return await docs.read('index.md') to discover 31 SDK methods, their types, Cypher 25 syntax and task guides. Explicitly return JSON-compatible results; no imports, credentials or client setup."`
 	}
 	adapter := Adapter{Kernel: s.kernel}
 	for _, item := range []struct {
 		Name, Title, Description string
 		ReadOnly                 bool
 	}{
-		{"kgos_read", "Read KG OS Data with JavaScript", "Execute read-only KG OS SDK operations in an async JavaScript function body. Query Ontology, Objects, Graph and Evolution. Call return await help() or return await help('method.name') to discover exact methods, input/output types and examples, including documentation for write methods. Only read methods may execute. Return JSON-compatible data; pin one State for consistent related reads.", true},
-		{"kgos_run", "Execute KG OS Read/Write JavaScript", "Execute async JavaScript with both read and write SDK methods. Use only when a requested task requires changes; prefer kgos_read for read-only work. Query method contracts with return await help('method.name'). Each operation follows its own persistence rules: a script is not an atomic transaction, and earlier writes may persist after later errors or cancellation. Verify uncertain outcomes before retrying; return JSON-compatible data.", false},
+		{"kgos_read", "Read KG OS Data with JavaScript", "Execute read-only KG OS SDK operations in async JavaScript. Start with return await docs.read('index.md') to discover built-in SDK, Cypher 25 and workflow docs, without a Skill. Use ontology, object, graph and evolution read methods. You can read write-method documentation but cannot execute writes. Return JSON-compatible data and pin one State for consistent related reads.", true},
+		{"kgos_run", "Execute KG OS Read/Write JavaScript", "Execute async JavaScript with the full authorized SDK. Use only when the user requested changes; prefer kgos_read otherwise. Read exact method/type contracts and Cypher 25 syntax via return await docs.read('index.md'). A script is not an atomic transaction; earlier writes may persist after a later error or cancellation. Verify uncertain effects before retrying.", false},
 	} {
 		entry := item
 		serverName := entry.Name

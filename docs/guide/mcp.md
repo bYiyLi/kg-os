@@ -93,19 +93,25 @@ MCP 提供以下四个 **AI-facing 业务 Tool**；另有一个只用于 ChatGPT
 
 在 `kgos_read` / `kgos_run` 的 `code` 中编写 **async JavaScript 函数体**，直接使用 `ontology`、`object`、`graph`、`evolution` 四个无前缀命名空间，无需创建 SDK Client 或 HTTP 连接；必须显式 `return` JSON-compatible 值：
 
-需要准确的 SDK 方法签名、参数/返回类型及可执行示例时，先在**只读的** `kgos_read` 中运行：
+Phase 22 的 MCP 内建文档已经通过 `docs.read(path)` 提供，无须安装 Skill、访问外部网站，也不需要创建 HTTP SDK Client。首次连接时，建议先在**只读的** `kgos_read` 中阅读文档目录：
 
 ```js
-return await help(); // 当前 MCP 支持的 31 个方法目录
+return await docs.read("index.md");
 ```
 
-或者按方法查询（也可用于查询写方法的帮助，但不授予写权限）：
+再按需阅读具体方法的请求、返回类型与可执行示例：
 
 ```js
-return await help("evolution.state.create");
+return await docs.read("sdk/evolution/state/create.md");
 ```
 
-结果来自当前 `@kgos/sdk` 公共 TypeScript 类型的版本固定 Help，包含依赖的嵌套类型。示例中的标识、Revision、Branch 和修改内容是**占位值**；执行前必须读取实际 State 并使用真实、已授权的目标。Help 不需要网络调用或额外凭证，不增加第五个 AI-facing 业务 Tool；`@kgos/sdk` 的 TypeScript 调用方也能直接导入本地同步 `help(name?)`。
+Cypher 25 的完整 MCP 使用说明也从同一入口获取：
+
+```js
+return await docs.read("cypher/index.md");
+```
+
+还可通过 `docs.read("guides/index.md")` 查看多个 SDK 方法如何组合。MCP 中只暴露原有的 15 个只读和 16 个写入方法；阅读写入方法的文档**不会授予写权限**。文档由 TypeScript SDK 类型、TSDoc 和 KG OS 对应版本的 Cypher 手册构建并嵌入 `kgosd`；`docs.read()` 是 Sandbox 内的只读虚拟文件访问，不是额外的 SDK HTTP 方法，不增加第五个业务 Tool。示例中的目标、Revision、Branch 等实际值必须根据已授权的知识库读取后填写；不能直接执行含占位符的写入代码。
 
 ```js
 const { state } = await evolution.overview();

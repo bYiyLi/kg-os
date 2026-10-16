@@ -4,11 +4,11 @@
 
 本文件记录 KG OS 架构决策的**决定、依据、备选、取舍与被替换基线**。具体运行行为仍由对应职责设计文件拥有；本文件不建立第二份操作合同。
 
-当前运行架构由 [D65 Go runtime](#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only](#d66-lithograph-v030-sql-only)、[D75 TypeScript Client](#d75-typescript-client)、[D76 npm distribution](#d76-npm-distribution)、[D77 explicit Instance Root](#d77-explicit-instance-root)，以及 2026-09-26 新增的 [D78 operation-scoped Branch](#d78-operation-scoped-branch)、[D79 stale daemon recovery](#d79-stale-daemon-recovery)、[D80 official Jieba](#d80-official-jieba) 共同定义：Go 保留 daemon / Kernel / Database Host，Client 统一 TypeScript，npm/npx 负责分发，Instance 由显式 root 定位；pooled connection不能泄漏 Branch状态，stale daemon由OS lock仲裁恢复，新Instance默认使用KG OS official Jieba全文分词。早期 D44/D45/D51/D54/D55/D63/D72 等被后续决定替换的部分只保留历史依据。
+当前运行架构以 [D65 Go runtime](#d65-go-runtime)、[D66 SQL-only](#d66-lithograph-v030-sql-only)、[D75 TypeScript Client](#d75-typescript-client)、[D77 explicit Instance Root](#d77-explicit-instance-root)、[D78 operation-scoped Branch](#d78-operation-scoped-branch)、[D79 stale daemon recovery](#d79-stale-daemon-recovery)、[D80 official Jieba](#d80-official-jieba)、[D93 Unified MCP](#d93-kgosd-unified-mcp) 和 [D99 Docker-only](#d99-linux-amd64-docker-only-distribution) 为准：Go 保留 daemon / Kernel / Database Host，TypeScript SDK/Web 保留源码职责；此后官方只交付 Linux amd64 Docker，不再发布 npm/六平台 Runtime。新的 [D100 自描述文档](#d100-mcp-self-describing-docs) 和 [D101 Lithograph v0.3.1](#d101-lithograph-v031-upgrade) 分别规定下一阶段的 MCP 文档机制与当前依赖升级。D76 的 npm/npx 分发、D66 的初始 v0.3.0 artifact 版本，以及更早被取代的记录均保留历史依据，不再作为当前交付目标。
 
 ## 底层架构替换背景
 
-当前仓库尚无 KG OS 业务实现，因此本次是设计基线替换，不存在已经发布的 KG OS 数据格式需要兼容迁移。
+以下记录的是**早期底层架构替换时**的历史判断：当时 KG OS 尚无业务实现。这不代表当前源码或数据状态；当前已实现能力与交付基线仍以各 owner 的现行合同及 Development 证据为准。
 
 旧基线：
 
@@ -1017,3 +1017,22 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **Release**：只有用户明确授权 Tag/正式发布时才从已存在的 `v<version>` Tag 且位于 `main` 历史内的精确 revision 构建**一份** Linux amd64 镜像，在推送 GHCR 前用同一镜像完成隔离 Smoke；推送后核实架构、source revision、digest，再完成 GitHub Release。Release 不再执行 npm OIDC Publish、六平台 Registry smoke 或 npm artifacts 聚合；普通 PR/main CI 不执行 GHCR Push，Dev 部署和正式 Release 相互独立。
 - **替代关系与取舍**：D99 仅取代 [D76](#d76-npm-distribution) 的**当前 npm 分发承诺**、[D91](#d91-mcp-docker-only-delivery) 的「只有 MCP Docker-only、CLI/SDK/Runtime npm 仍发布」例外、[D94](#d94-openclaw-docker-development-and-ci) 的六平台 CI 并行条款及旧 npm Release 工作流；D75 的 SDK/CLI/Web 源码职责、D93 的 Go 单进程、D98 的 SDK Help/Tool 契约和业务 API 全部保留。大幅减少平台/发布维护成本，代价是无 Docker 或非 Linux amd64 的用户没有当前官方运行包；不以减少发行版为理由删除必要的安全、版本数据或业务集成校验。
 - 当前真源：[Client/交付边界](client.md#docker-only-交付)、[Runtime](runtime.md#native-runtime-package)、[MCP](mcp.md#docker-only-交付)、[Phase 21](../development/phases/21-docker-only-delivery.md)。
+
+<a id="d100-mcp-self-describing-docs"></a>
+
+### D100 MCP 通过自包含虚拟文档提供完整调用说明（2026-10-16）
+
+- **决定**：MCP 以 KG OS 自己拥有的 `docs.read(path)` 替代 Phase 20 的 `help(name?)`。在现有 `kgos_read` / `kgos_run` 中暴露只读 Markdown 读取辅助对象，不增加第五个 AI-facing 业务 Tool 或独立文档 HTTP API。提供 SDK 31 个实际可调用方法、完整类型、面向 MCP 的 Cypher 25 手册及操作指南；允许无需 Skill、外部 URL、文件权限或初始化 Client 的 AI 自主查阅。迁移完成前旧 Help 仍属真实实现；Phase 20 `done` 的历史验收不回写。
+- **真源**：SDK 方法/类型/注释来自 TypeScript SDK 与 TSDoc，TypeDoc 和最小 AST 映射自动生成 MCP 使用手册；MCP Sandbox 的真实权限白名单是可执行范围。Cypher 语言合同仍归 Lithograph，**KG OS 独立维护面向 MCP 调用者的使用手册**并跟随所装载版本同步更新、逐例验证；Guide 不定义新的业务语义。
+- **边界**：固定 Markdown 清单构建时嵌入 `kgosd`，只读读取且严格校验路径；不提供 `docs.list/write`、全文搜索、文件系统、持久化文档库或新的数据库 DSL。旧 Help 的 TypeScript/Go 双份生成物及描述在新文档验收后删除。四 Tool、Go read/write allowlist、JS 输出预算、取消与未知写结果保持原合同。
+- **依据/取舍**：单靠 Skill 的用户会受到客户端是否安装/激活的限制；仅提供 TypeScript HTTP Client 的方法文档会误导无需 Client/Token 的 MCP Sandbox。自描述、任务分章的 Markdown 能覆盖无 Skill 客户端，代价是 KG OS 必须负责版本对齐、完整示例与生成一致性门禁，而不能直接复制 Lithograph 的 SQLite 示例。
+- 当前合同：[MCP 自描述文档](mcp.md#mcp-tool-help)、[Client SDK](client.md#kgossdk)、[Phase 22](../development/phases/22-mcp-self-describing-docs.md)。此决定取代 [D98](#d98-mcp-sdk-help-prompt-contract) 的**未来 Help 读取机制**，不改变 D98 已完成的工具元数据修正和历史实现证据。
+
+<a id="d101-lithograph-v031-upgrade"></a>
+
+### D101 KG OS 官方 Lithograph 依赖升级为 v0.3.1（2026-10-16）
+
+- **决定**：KG OS 原生扩展与 Provider 统一锁定最新已核实正式发行版 **Lithograph v0.3.1**，保留 `CY25-2026.08` 兼容 Profile 与现有 SQL-only、streaming、versioning、Provider-owned cache 语义。构建/安装必须验证发行制品 SHA-256 和运行时 `lithograph_version()`；本地 fixture 和正式 Linux amd64 Docker 不能使用不同的 Lithograph 版本。现有原生 Runtime npm v0.2.1 仅可继续作为 Jieba/许可证等历史构建输入，Docker 要以经哈希校验的 v0.3.1 Release 主扩展和 Provider **替换**其中旧文件并更新 Runtime manifest 文件哈希。
+- **范围**：不重新引入 npm/native 分发、不 Fork SQLite、不修改 Graph/Cypher 语义。升级必须通过 Go/SQLite/Lithograph 集成、Schema/Ontology/Graph/Evolution 兼容回归和隔离 Docker 真装载验收；在验收前只是已授权源码改动，不等于 Dev/生产运行时已升级或当前 GitHub CI 通过。以 v0.3.1 为基线维护 D100 的 MCP Cypher 文档；后续升级仍应先核对实际 release、公开能力与现有 KG OS 映射。
+- **依据/取舍**：完整的上游 Cypher 使用手册及修复已随 v0.3.1 正式发布，而 KG OS 原本仍固定 v0.3.0；单纯改本地版本常量不会改变 Docker 中通过历史 Runtime npm 输入获取的原生扩展。升级制品不变更公共接口，但必须真实测试现有 Ontology Generated Schema 命名、Provider 加载、Full-text/Vector 与版本合同。
+- 当前合同：[Graph](graph.md#graph)、[Runtime](runtime.md)、[MCP 自描述文档](mcp.md#mcp-tool-help)、[Phase 22](../development/phases/22-mcp-self-describing-docs.md)。[D66](#d66-lithograph-v030-sql-only) 的 SQL-only 架构取舍保持有效；仅原生依赖版本由 D101 更新。

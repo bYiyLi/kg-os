@@ -185,7 +185,50 @@ kgosd --root <workspace-root> --host <address> --port <port>
 
 <a id="mcp-tool-help"></a>
 
-### MCP Tool 的模型可见合同与 SDK Help（Phase 20）
+### MCP 自描述文档（D100 / Phase 22 实施）
+
+**代码与交付状态分开**：[D100](decisions.md#d100-mcp-self-describing-docs) 决定通过只读虚拟文档取代 Phase 20 的 `help(name?)`；[Phase 22](../development/phases/22-mcp-self-describing-docs.md) 已在**当前未提交工作树**实现 `docs.read(path)`、内建 SDK/Cypher 文档及旧 Help 清理，并通过本地 MCP/类型/真实 Cypher 测试。**这不表示旧 Dev/发布镜像已经升级，也不代表 Phase 22 的 Linux Docker/最终 CI 验收已完成**。下一节保留 Phase 20 已发布的历史合同，不能再把它描述为当前未提交源码的接口。
+
+**独立可用性**：任何授权客户端只要能发现四个 MCP 业务 Tool，就应能通过 Tool Description 找到文档入口、阅读完整 MCP SDK 用法和 Cypher 25 手册、再调用实际允许的方法；不依赖 Skill、私人 Plugin、仓库文件、外部网站或额外文档服务。Skill 仍可选，用于工作流建议，而不是授权、接口文档或 Cypher 语义来源。不能凭静态 Tool Description 断言任何模型都会主动阅读。
+
+#### 唯一虚拟文档入口
+
+两个脚本 Tool `kgos_read` / `kgos_run` 内均提供：
+
+```ts
+docs.read(path: string): Promise<string>
+```
+
+- `docs.read("index.md")` 返回完整的 Markdown 根目录；路径严格为**构建期清单内存在的大小写匹配的 POSIX 相对 .md 路径**。输入必须为单个非空字符串；未知路径、绝对路径、`..`、反斜杠、URL、query/fragment、额外参数等返回安全的 `INVALID_ARGUMENT`，不回退目录或泄露宿主路径。
+- 返回值是**完整 Markdown 字符串**，调用方使用 `return await docs.read("sdk/index.md")`；现有 Tool 的成功结果 `{result: JsonValue}`、错误和取消合同不变。单页超出 Sandbox 已有输出上限则返回 `RESOURCE_ERROR`，不能截断；应通过多篇小文档实现渐进阅读。不提供 `docs.write()`、`docs.list()`、全文搜索、流式或隐式分页。
+- 文档构建时确定并嵌入 `kgosd`。运行期不读取任意宿主文件、Instance 数据库、用户 Knowledge、网络或 Token；没有独立文档数据库、HTTP API、新 MCP Tool、MCP Resource 或新增持久化。读取没有业务副作用，读写权限、JavaScript Invocation 和输出预算仍由 Go Sandbox 强制。
+- 四个业务 Tool（`kgos_preview`、`state_ancestry`、`kgos_read`、`kgos_run`）及 app-only UI 入口保持原样；`docs.read` 是辅助读方法，不计入 31 个业务方法。两个脚本 Tool 的英文 Description / `code` Schema 描述显式指向 `return await docs.read("index.md")`，不把全量方法文档或 Skill 复制进 Tool Description。
+
+#### 内容与唯一责任
+
+| 虚拟路径 | 内容 | 责任与来源 |
+| --- | --- | --- |
+| `index.md` | 方法与 Cypher 指引、四 Tool 使用边界、当前版本、文档目录 | MCP |
+| `sdk/index.md`、`sdk/<namespace>/<method>.md` | Sandbox 允许的 **15 Read + 16 Write = 31** 个方法，含权限、签名、参数、类型、返回值、错误/副作用与示例 | SDK TypeScript 方法/类型 + TSDoc；MCP 生成 |
+| `sdk/types/<Type>.md` | 上述方法实际引用的全部公共类型与嵌套字段 | SDK TypeScript 类型 + TSDoc |
+| `cypher/index.md`、`cypher/*.md` | KG OS 实际集成版本可执行的 Cypher 25 语言、函数/Procedure、限制与例子 | KG OS 自有用户手册；Lithograph 拥有数据库语义 |
+| `guides/index.md`、`guides/*.md` | State pin、Graph、Object Patch、Evolution/Merge、流式、错误/未知结果等组合任务 | KG OS MCP 使用指南；规则引用领域 owner |
+
+**SDK 文档构建**：从 `packages/sdk/src/client.ts` 的公开方法与 `types.ts` 的 Request/Result/类型及补齐的 TSDoc 注释自动生成 Markdown。TypeDoc 提取类型与注释，现有对象字面量/箭头函数 namespace 可使用最小 TypeScript AST 映射，不能假设 TypeDoc 默认会识别全部 31 个方法。生成器与 Go Sandbox 实际 read/write 白名单比对，强制覆盖全部 31 个方法、嵌套类型、每个输入/输出字段以及有约束的 Ref、Merge 等类型；缺字段说明、签名漂移或失效引用时 CI 拒绝。不要手抄第二份签名、Request/Result 或元数据目录。
+
+**MCP 视角而非 HTTP Client 视角**：每个示例都是可直接交给 `kgos_read` 或 `kgos_run` 的异步 JavaScript 函数体，直接使用 `ontology/object/graph/evolution`，明确 `return`，不要求 `new KGOSClient()`、`import`、Endpoint、Token 或 Node API。只为沙箱实际可调用的方法生成方法目录；外部 HTTP Client 的 `system`、`web`、Client 构造等不属于此目录。文档可以介绍写入方法，但 `kgos_read` 仍不能执行它。Ref / Merge 类型优化仅将现有服务端合同准确映射到 TypeScript，不重写 Kernel 校验。
+
+**Cypher 手册归属**：由 **KG OS** 编写、维护和验收适配 MCP 的独立使用手册，源码位于 `docs/guide/mcp-cypher/`，构建为虚拟 `cypher/`。参考固定版本 Lithograph 的 Cypher 25 文档、兼容矩阵及运行时函数/Procedure inventory，独立编写面向 `graph.query/execute/stream*` 的示例与限制；不直接复制整套上游文字、不创造 KG OS 方言、Parser 或执行白名单。覆盖实际可用的语法、Pattern/Path、类型/表达式、聚合、读写、Schema/Index、搜索、Procedure、版本与事务、错误及诊断，并准确区分底层 SQLite SQL、Cypher 和 JavaScript。Neo4j Server 管理命令、外部 Procedure 或未支持的功能不得误列为可用。
+
+**版本绑定**：手册标注且校验真实装载的 Lithograph 版本及 `CY25-2026.08` 等相应兼容 Profile。目前采用 [D101](decisions.md#d101-lithograph-v031-upgrade) 的 **v0.3.1** 作为升级目标；仅当 v0.3.1 实际加载通过时方可声称当前运行的是 v0.3.1。每次升级底层必须与 KG OS Cypher 手册、函数/Procedure、示例及验证**同一变更同步**；不因上游网站增加内容就默认为已经支持。Lithograph 仍是执行语义唯一真源；KG OS 手册只负责 MCP 用户说明。
+
+**指南与验证**：操作指南引用 Ontology/Object/Graph/Evolution 各 owner，不另立业务合同。单一构建流程生成只读 Markdown 清单并嵌入 Go，检查版本、31 方法/类型、文档链接、格式和 stale 产物；最终 Docker 不需要 Node/TypeDoc 或联网。全部 MCP JS 示例和 Cypher 示例在真实 Go/WASM + 对应 Lithograph 的**隔离临时 Instance** 验证结果/错误；测试路径穿越、未知文档、资源超限、权限拒绝和取消，不在长期 Dev 写测试数据。真实无 Skill 客户端需能仅通过 `tools/list` 找入口并按需读取；文档检查通过不等于已经证明模型工具选择效果。
+
+**完成后清理**：彻底移除 TypeScript / Go 两端的旧 `help(name?)`、双份 Help JSON、独立 Help 元数据、专属生成脚本、旧 Tool 提示和相应测试，统一使用 `docs.read`；保留 Phase 20 的已完成历史记录。HTTP SDK 业务方法、Go Kernel/Lithograph 执行以及四 Tool 权限合同不变。
+
+### Phase 20 SDK Help（已交付旧版本的历史合同）
+
+> 以下仅记录 Phase 20 对**旧发布/部署版本**的合同和验收事实。当前未提交的 Phase 22 工作树已切换为 `docs.read`，旧 `help()` 不再存在；正式发布前仍须完成 Docker/CI 验收。本节不再作为新代码的独立文档真源。
 
 - 四个业务 Tool 的英文 `title` / `description` 应准确说明**使用时机、操作类型、主要输入与限制**，不复制 31 个方法的完整定义；`kgos_workspace` 仅是 app-only UI 打开入口。JSON Schema 参数各自描述类型、必填性、缺省、范围及分页语义；与现行 Go 真实校验一致。只读 Tool 不标为 destructive，`kgos_run` 标记可能破坏，不能把 Tool 注解当权限强制机制。
 - `kgos_read`、`kgos_run` 的异步 JavaScript 函数体都提供**无前缀全局 `help(name?)`**，调用 `return await help()` 获取目录，调用 `return await help("evolution.state.create")` 获取方法详情。Help 只查询**当前 MCP 沙箱支持的 15 Read + 16 Write 公共方法**，包括写入方法的帮助信息；两种 Tool 都可以读取全部帮助，但 `kgos_read` 仍无法执行写入方法。Help 本身不接触数据库、不改变 State、不泄漏凭证或宿主内部实现，也不需要新 Tool / HTTP Route / 网络服务。

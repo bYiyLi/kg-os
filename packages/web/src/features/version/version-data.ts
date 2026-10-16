@@ -6,6 +6,7 @@ import type {
   EvolutionRefItem,
   EvolutionRefListResult,
   RequestOptions,
+  ResolvedState,
   StateSummary
 } from "@kgos/sdk";
 
@@ -30,7 +31,7 @@ export interface VersionBranch extends EvolutionRefItem {
 }
 
 interface VersionPage {
-  root: string;
+  root: ResolvedState;
   items: StateSummary[];
   cursor?: string;
 }
@@ -55,8 +56,12 @@ export interface VersionCommit extends StateSummary {
 const colors: readonly BranchColor[] = ["blue", "green", "violet", "orange"];
 const PAGE_SIZE = 20;
 
-export function stateRef(state: string): string {
-  return state.startsWith("commit/") ? state : "commit/" + state;
+export function stateRef(state: string): ResolvedState {
+  const resolved = state.startsWith("commit/") ? state : "commit/" + state;
+  if (!/^commit\/[0-9a-f]{64}$/.test(resolved)) {
+    throw new Error("Invalid resolved Commit reference");
+  }
+  return resolved as ResolvedState;
 }
 
 export function flattenCommits(
@@ -149,7 +154,7 @@ function validatedStates(items: StateSummary[]): StateSummary[] {
 
 async function page(
   reader: VersionReader,
-  root: string,
+  root: ResolvedState,
   cursor: string | undefined,
   signal: AbortSignal
 ): Promise<VersionPage> {

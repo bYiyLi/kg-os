@@ -1,43 +1,43 @@
 import { resolve } from "node:path";
 
-export const LITHOGRAPH_VERSION = "0.3.0";
+export const LITHOGRAPH_VERSION = "0.3.1";
 
 const artifacts = {
   "darwin-arm64": {
     archive: "lithograph-macos-arm64.tar.gz",
     library: "lithograph.dylib",
     providerLibrary: "lithograph-openai-compatible.dylib",
-    sha256: "ac3328caf35b928400a9138e23c1ef8c1bd3d465aa0daf1c14cb0ed805db26e5"
+    sha256: "27de06ef3528c477d3730274c525ca081bbad4f711f9dd32615811e97237c6fe"
   },
   "darwin-x64": {
     archive: "lithograph-macos-x64.tar.gz",
     library: "lithograph.dylib",
     providerLibrary: "lithograph-openai-compatible.dylib",
-    sha256: "b99fbc70c257687bfea18ba75c82721e7f05d22c6644d4628053b3e769ef961e"
+    sha256: "8ee1b0cb824d7f2c45101d1d84ed49c23378fdc95be621a2c0fa7994d918dd92"
   },
   "linux-arm64": {
     archive: "lithograph-linux-arm64.tar.gz",
     library: "lithograph.so",
     providerLibrary: "lithograph-openai-compatible.so",
-    sha256: "319ad0dc22a3f43b71d790a2bf4b43af37391dc229e53e065c14d73d236003ca"
+    sha256: "1f0081ce3478f69575153e1c0b9cf7a22922a21170bd22c0404a4a2692e95e80"
   },
   "linux-x64": {
     archive: "lithograph-linux-x64.tar.gz",
     library: "lithograph.so",
     providerLibrary: "lithograph-openai-compatible.so",
-    sha256: "0a14828ae87e1643d693fdb60306342bb45ad0eb2a79d5f98956c9bfd9b1450b"
+    sha256: "b4170e31a307e71f243365d4629b359f8e2e1c1fcf9703722c7f314b858a8d1d"
   },
   "win32-arm64": {
     archive: "lithograph-windows-arm64.zip",
     library: "lithograph.dll",
     providerLibrary: "lithograph-openai-compatible.dll",
-    sha256: "17fd8dd7367390e2e642b0cfb3952ced4b61b54d53f2a05a3c702aaf70b7cd78"
+    sha256: "d7ceb9eceeccb318099ed668a5d15b1a9aa165e9eaad72564782fe91dc0bbd43"
   },
   "win32-x64": {
     archive: "lithograph-windows-x64.zip",
     library: "lithograph.dll",
     providerLibrary: "lithograph-openai-compatible.dll",
-    sha256: "b9aa1013ebbd0063d769d5a96437d149456d3ae9c95cf46361a7ea064585e4ca"
+    sha256: "3efed000b48dabfa2ea8748900955b8db2af99bb33b6353acf36fa84ac92d1a9"
   }
 };
 
