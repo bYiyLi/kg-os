@@ -36,7 +36,7 @@ const help = [
   "",
   "pnpm dev:mcp setup        Prepare directories, configuration and protected token; no database init",
   "pnpm dev:mcp deploy       Sync current local source, build, activate, verify; rollback image on failure",
-  "pnpm dev:mcp check        Read-only: health, Instance/runtime doctor and four MCP Tools",
+  "pnpm dev:mcp check        Read-only: health, Instance/runtime doctor and five AI-facing MCP Tools",
   "pnpm dev:mcp status       Show the running Compose service, image and deployment record",
   "pnpm dev:mcp logs         Show last 100 MCP log lines",
   "pnpm dev:mcp logs-follow  Follow MCP logs (Ctrl+C exits only this command)",

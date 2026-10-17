@@ -70,7 +70,7 @@ func matrixGraphAndHistory(t *testing.T, calls *methodMatrix, origin, branch, me
 		t.Fatal("Test Branch mutated main")
 	}
 
-	first := matrixTool(t, calls, "kgos_preview", map[string]any{"offset": 0, "limit": 100})
+	first := matrixTool(t, calls, "kgos_ontology_overview", map[string]any{"offset": 0, "limit": 100})
 	total, ok := first["totalLines"].(float64)
 	if !ok || total < 100 {
 		t.Fatalf("Preview pagination fixture incomplete: %#v", first)
@@ -80,7 +80,7 @@ func matrixGraphAndHistory(t *testing.T, calls *methodMatrix, origin, branch, me
 	var document strings.Builder
 	document.WriteString(property(t, first, "preview"))
 	for received < int(total) {
-		next := matrixTool(t, calls, "kgos_preview", map[string]any{"offset": received, "limit": 100, "viewRevision": revision})
+		next := matrixTool(t, calls, "kgos_ontology_overview", map[string]any{"offset": received, "limit": 100, "viewRevision": revision})
 		if property(t, next, "viewRevision") != revision || next["totalLines"] != total {
 			t.Fatalf("Preview state changed: %#v", next)
 		}
@@ -94,18 +94,18 @@ func matrixGraphAndHistory(t *testing.T, calls *methodMatrix, origin, branch, me
 	if !strings.Contains(document.String(), "SdkMatrix") || !strings.Contains(document.String(), branch) {
 		t.Fatal("Preview missing Domain or Branch")
 	}
-	ancestry := matrixTool(t, calls, "state_ancestry", map[string]any{"root": "branch/" + branch, "limit": 100})
+	ancestry := matrixTool(t, calls, "kgos_commit_ancestry", map[string]any{"root": "branch/" + branch, "limit": 100})
 	if !strings.Contains(property(t, ancestry, "markdown"), mergedState) {
 		t.Fatal("Ancestry missing merged Commit")
 	}
 
-	denied := matrixRawTool(t, calls, "kgos_read", map[string]any{
+	denied := matrixRawTool(t, calls, "kgos_query", map[string]any{
 		"code": "return await evolution.branch.create({name:'read-must-not-write',from:" + stringifyString(origin) + "});",
 	})
 	if !denied.IsError || mcpText(t, denied)["code"] != "PERMISSION_DENIED" {
 		t.Fatalf("Read authorization failed: %#v", mcpText(t, denied))
 	}
-	missing := matrixRawTool(t, calls, "kgos_read", map[string]any{
+	missing := matrixRawTool(t, calls, "kgos_query", map[string]any{
 		"code": "return await evolution.get({state:'commit/" + strings.Repeat("0", 64) + "'});",
 	})
 	if !missing.IsError || mcpText(t, missing)["code"] != "STATE_NOT_FOUND" {

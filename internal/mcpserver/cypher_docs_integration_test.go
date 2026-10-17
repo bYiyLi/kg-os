@@ -5,6 +5,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -13,21 +14,15 @@ import (
 	"time"
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
-	"github.com/bYiyLi/kg-os/internal/mcpsandbox"
 )
 
 func phase22Manual(t *testing.T, path string) []string {
 	t.Helper()
-	arg, _ := json.Marshal("cypher/" + path)
-	raw, err := mcpsandbox.ReadDoc([]json.RawMessage{arg})
+	raw, err := fs.ReadFile(embeddedDocs, "docs/cypher/"+path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var body string
-	if err := json.Unmarshal(raw, &body); err != nil {
-		t.Fatal(err)
-	}
-	blocks := strings.Split(body, "```cypher\n")
+	blocks := strings.Split(string(raw), "```cypher\n")
 	if len(blocks) == 1 {
 		return nil
 	}
@@ -170,15 +165,11 @@ func TestPhase22MCPFunctionProcedureCatalogMatchesRuntime(t *testing.T) {
 			if len(names) != tc.expected {
 				t.Fatalf("Runtime catalog has %d names, want %d", len(names), tc.expected)
 			}
-			arg, _ := json.Marshal("cypher/" + tc.doc)
-			raw, err := mcpsandbox.ReadDoc([]json.RawMessage{arg})
+			raw, err := fs.ReadFile(embeddedDocs, "docs/cypher/"+tc.doc)
 			if err != nil {
 				t.Fatal(err)
 			}
-			var text string
-			if err := json.Unmarshal(raw, &text); err != nil {
-				t.Fatal(err)
-			}
+			text := string(raw)
 			for name := range names {
 				if !strings.Contains(text, "`"+name+"(") {
 					t.Errorf("Runtime %q missing from MCP %s", name, tc.doc)

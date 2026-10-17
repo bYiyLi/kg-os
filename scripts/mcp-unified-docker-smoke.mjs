@@ -178,12 +178,22 @@ async function connect(base) {
   const tools = (await mcpClient.listTools()).tools;
   const names = tools.map((tool) => tool.name).sort();
   assert.deepEqual(names, [
-    "kgos_preview",
-    "kgos_read",
-    "kgos_run",
-    "kgos_workspace",
-    "state_ancestry"
+    "kgos_commit_ancestry",
+    "kgos_docs",
+    "kgos_mutate",
+    "kgos_ontology_overview",
+    "kgos_query",
+    "kgos_workspace"
   ]);
+  for (const name of [
+    "kgos_docs",
+    "kgos_ontology_overview",
+    "kgos_query",
+    "kgos_commit_ancestry"
+  ]) {
+    assert.equal(tools.find((tool) => tool.name === name)?.annotations?.readOnlyHint, true);
+  }
+  assert.equal(tools.find((tool) => tool.name === "kgos_mutate")?.annotations?.readOnlyHint, false);
   const workspaceURI = "ui://kgos/workspace/v1";
   const workspace = tools.find((tool) => tool.name === "kgos_workspace");
   assert.equal(workspace?.annotations?.readOnlyHint, true);
@@ -311,40 +321,81 @@ try {
   await connect(endpoint);
   const rootDoc = toolValue(
     await mcpClient.callTool({
-      name: "kgos_read",
-      arguments: { code: 'return await docs.read("index.md")' }
+      name: "kgos_docs",
+      arguments: {}
     })
   );
-  assert.match(rootDoc.result, /sdk\/index\.md/);
+  assert.equal(rootDoc.documents[0].path, "index.md");
+  assert.match(rootDoc.documents[0].content, /guides\/ontology\.md/);
   const methodDoc = toolValue(
     await mcpClient.callTool({
-      name: "kgos_read",
-      arguments: { code: 'return await docs.read("sdk/evolution/state/create.md")' }
+      name: "kgos_docs",
+      arguments: { paths: ["sdk/evolution/state/create.md", "cypher/index.md"] }
     })
   );
-  assert.match(methodDoc.result, /StateCreateRequest/);
-  const cypherDoc = toolValue(
+  assert.deepEqual(
+    methodDoc.documents.map(({ path }) => path),
+    ["sdk/evolution/state/create.md", "cypher/index.md"]
+  );
+  assert.match(methodDoc.documents[0].content, /StateCreateRequest/);
+  assert.match(methodDoc.documents[1].content, /Cypher 25/);
+  const sameIndex = toolValue(
+    await mcpClient.callTool({ name: "kgos_docs", arguments: { paths: [] } })
+  );
+  assert.deepEqual(sameIndex, rootDoc);
+  const typesIndex = toolValue(
     await mcpClient.callTool({
-      name: "kgos_read",
-      arguments: { code: 'return await docs.read("cypher/index.md")' }
+      name: "kgos_docs",
+      arguments: { paths: ["sdk/types/index.md"] }
     })
+  ).documents[0].content;
+  const first32 = [...typesIndex.matchAll(/`(sdk\/types\/[^`]+\.md)`/g)]
+    .map((match) => match[1])
+    .slice(0, 32);
+  assert.equal(first32.length, 32, "MCP type directory must expose 32 distinct pages");
+  const pages32 = toolValue(
+    await mcpClient.callTool({ name: "kgos_docs", arguments: { paths: first32 } })
+  ).documents;
+  assert.deepEqual(
+    pages32.map((item) => item.path),
+    first32
   );
-  assert.match(cypherDoc.result, /Cypher 25/);
+  assert.ok(pages32.every((page) => typeof page.content === "string" && page.content.length > 20));
+  for (const args of [
+    { paths: null },
+    { paths: "index.md" },
+    { path: "index.md" },
+    { paths: ["index.md", "index.md"] },
+    { paths: ["index.md", "unknown.md"] },
+    { paths: ["index.md", "../index.md"] },
+    { paths: ["SDK/INDEX.md"] },
+    { paths: ["https://example.com/file.md"] },
+    { paths: [null] },
+    { paths: ["index.md", 17] },
+    { paths: Array(33).fill("index.md") },
+    { paths: [], unexpected: true }
+  ]) {
+    const rejected = await mcpClient.callTool({ name: "kgos_docs", arguments: args });
+    assert.equal(rejected.isError, true, "Invalid document batch must fail");
+    const error = JSON.parse(rejected.content[0].text);
+    assert.equal(error.code, "INVALID_ARGUMENT");
+    assert.equal(error.documents, undefined, "Partial documents escaped from rejected batch");
+  }
   const refused = await mcpClient.callTool({
-    name: "kgos_read",
+    name: "kgos_query",
     arguments: {
       code: 'return await evolution.branch.create({name:"forbidden",from:"branch/main"})'
     }
   });
   assert.equal(refused.isError, true, "Help did not preserve the read-only sandbox");
   const preview = toolValue(
-    await mcpClient.callTool({ name: "kgos_preview", arguments: { limit: 100 } })
+    await mcpClient.callTool({ name: "kgos_ontology_overview", arguments: { limit: 100 } })
   );
   assert.match(preview.preview, /main/);
   await verifyMcpSdkMatrix(mcpClient);
   const created = toolValue(
     await mcpClient.callTool({
-      name: "kgos_run",
+      name: "kgos_mutate",
       arguments: {
         code: 'const state=(await evolution.overview()).state; return await evolution.branch.create({name:"unified-persist",from:state});'
       }
@@ -363,7 +414,7 @@ try {
   await connect(await start());
   const saved = toolValue(
     await mcpClient.callTool({
-      name: "kgos_read",
+      name: "kgos_query",
       arguments: { code: "return (await evolution.branch.list()).items.map(x=>x.name)" }
     })
   );

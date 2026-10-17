@@ -118,7 +118,7 @@ func TestIndependentKernelOutcomesAndToolMetrics(t *testing.T) {
 	Business(ctx, BusinessResult{Operation: "evolution.branch.create", Outcome: "applied"})
 	Business(ctx, BusinessResult{Operation: "object.patch", Outcome: "unknown", ErrorCode: "IO_ERROR"})
 	o.ToolStart()
-	o.Tool(ctx, "kgos_run", "SCRIPT_ERROR", time.Millisecond)
+	o.Tool(ctx, "kgos_mutate", "SCRIPT_ERROR", time.Millisecond)
 	lines := parsedLines(t, output.String())
 	if len(lines) != 3 || lines[0]["operation_id"] == lines[1]["operation_id"] ||
 		lines[0]["request_id"] != lines[1]["request_id"] ||

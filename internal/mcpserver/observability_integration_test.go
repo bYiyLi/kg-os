@@ -67,7 +67,7 @@ await evolution.tag.create({name:"obs-private-tag",target:v.state});
 throw new Error("private-javascript-body");
 `
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "kgos_run", Arguments: map[string]any{"code": script},
+		Name: "kgos_mutate", Arguments: map[string]any{"code": script},
 	})
 	if err != nil || result == nil || !result.IsError {
 		t.Fatalf("expected a script failure after confirmed writes: %+v %v", result, err)
@@ -102,7 +102,7 @@ throw new Error("private-javascript-body");
 			}
 			eventIDs = append(eventIDs, record["request_id"].(string))
 		case "mcp.tool.finished":
-			if record["tool"] == "kgos_run" {
+			if record["tool"] == "kgos_mutate" {
 				toolID = record["request_id"].(string)
 				if record["outcome"] != "error" {
 					t.Fatalf("MCP Tool logical error lost: %+v", record)

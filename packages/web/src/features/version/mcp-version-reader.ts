@@ -31,7 +31,7 @@ export function createMcpVersionReader(
     let result: unknown;
     try {
       result = await app.callServerTool(
-        { name: "kgos_read", arguments: { code } },
+        { name: "kgos_query", arguments: { code } },
         options?.signal === undefined ? undefined : { signal: options.signal }
       );
     } catch (error) {

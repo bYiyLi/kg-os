@@ -1,6 +1,6 @@
 # 发现上下文、固定版本及批量读取
 
-用 `kgos_preview` 发现真实 Branch、Ontology、Definition/Property/Index，不要根据教学示例自动假定 `Person`、`Company` 已存在。Preview 分页按完整 Markdown 的绝对行偏移读取，并按返回的 `viewRevision` 固定同一视图。查看历史时调用 `state_ancestry` 并按 cursor 继续。
+用 `kgos_ontology_overview` 发现真实 Branch、Ontology、Definition/Property/Index，不要根据教学示例自动假定 `Person`、`Company` 已存在。Preview 分页按完整 Markdown 的绝对行偏移读取，并按返回的 `viewRevision` 固定同一视图。查看历史时调用 `kgos_commit_ancestry` 并按 cursor 继续。
 
 ## 同一 State 的多次读取
 

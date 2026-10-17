@@ -110,12 +110,12 @@ func TestRealKernelMCPToolsAndAuthentication(t *testing.T) {
 	for _, tool := range listed.Tools {
 		names[tool.Name] = true
 	}
-	for _, name := range []string{"kgos_read", "kgos_run", "kgos_preview", "state_ancestry"} {
+	for _, name := range []string{"kgos_query", "kgos_mutate", "kgos_ontology_overview", "kgos_commit_ancestry"} {
 		if !names[name] {
 			t.Fatalf("Tool %s absent: %#v", name, names)
 		}
 	}
-	if len(names) != 5 {
+	if len(names) != 6 {
 		t.Fatalf("wrong tool inventory %#v", names)
 	}
 	call := func(name string, args map[string]any) *mcp.CallToolResult {
@@ -126,22 +126,22 @@ func TestRealKernelMCPToolsAndAuthentication(t *testing.T) {
 		}
 		return result
 	}
-	read := call("kgos_read", map[string]any{"code": "const v=await evolution.overview();return v"})
+	read := call("kgos_query", map[string]any{"code": "const v=await evolution.overview();return v"})
 	if read.IsError {
 		t.Fatalf("read failed: %#v", mcpText(t, read))
 	}
 	if mcpText(t, read)["result"] == nil {
 		t.Fatalf("missing result %#v", read)
 	}
-	forged := call("kgos_read", map[string]any{"code": "return await evolution.branch.create({name:'illegal',from:'branch/main'})"})
+	forged := call("kgos_query", map[string]any{"code": "return await evolution.branch.create({name:'illegal',from:'branch/main'})"})
 	if !forged.IsError {
 		t.Fatalf("read tool permitted write %#v", forged)
 	}
-	create := call("kgos_run", map[string]any{"code": "const v=await evolution.overview();return await evolution.branch.create({name:'sandbox-proof',from:v.state})"})
+	create := call("kgos_mutate", map[string]any{"code": "const v=await evolution.overview();return await evolution.branch.create({name:'sandbox-proof',from:v.state})"})
 	if create.IsError {
 		t.Fatalf("write tool failed %#v", mcpText(t, create))
 	}
-	preview := call("kgos_preview", map[string]any{"offset": 0, "limit": 100})
+	preview := call("kgos_ontology_overview", map[string]any{"offset": 0, "limit": 100})
 	if preview.IsError {
 		t.Fatalf("preview error %#v", mcpText(t, preview))
 	}
@@ -149,7 +149,7 @@ func TestRealKernelMCPToolsAndAuthentication(t *testing.T) {
 	if page["viewRevision"] == nil || !strings.Contains(page["preview"].(string), "sandbox-proof") {
 		t.Fatalf("preview incomplete %#v", page)
 	}
-	ancestry := call("state_ancestry", map[string]any{"root": "branch/main", "limit": 10})
+	ancestry := call("kgos_commit_ancestry", map[string]any{"root": "branch/main", "limit": 10})
 	if ancestry.IsError {
 		t.Fatalf("ancestry error %#v", mcpText(t, ancestry))
 	}

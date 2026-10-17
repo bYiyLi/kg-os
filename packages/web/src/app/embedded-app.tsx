@@ -69,7 +69,7 @@ function EmbeddedWorkspace() {
     setConnection({ status: "loading" });
     try {
       const result = await app.callServerTool({
-        name: "kgos_read",
+        name: "kgos_query",
         arguments: { code: overviewCode }
       });
       const data = readOverview(result);

@@ -1,6 +1,6 @@
 # 内置函数及值转换
 
-**冻结范围**：Lithograph v0.3.1 / CY25-2026.08 的 scalar、aggregation、predicate、list、string、numeric、temporal/duration、spatial、vector、UUID 等当前图函数。**全部 169 个函数名、172 条准确签名与返回类型**已内置于 `docs.read("cypher/functions-reference.md")`，不需要外部网页；null 传播与具体错误行为应结合相应类型规则使用。运行时也可查询 `SHOW FUNCTIONS` 核实。不可因为其他 Neo4j 版本提供同名函数就认定本版本支持。
+**冻结范围**：Lithograph v0.3.1 / CY25-2026.08 的 scalar、aggregation、predicate、list、string、numeric、temporal/duration、spatial、vector、UUID 等当前图函数。**全部 169 个函数名、172 条准确签名与返回类型**可使用独立 MCP Tool `kgos_docs` 读取，参数是 `{"paths":["cypher/functions-reference.md"]}`，不需要外部网页或 JavaScript 文档方法；null 传播与具体错误行为应结合相应类型规则使用。运行时也可查询 `SHOW FUNCTIONS` 核实。不可因为其他 Neo4j 版本提供同名函数就认定本版本支持。
 
 | 类别 | 常用入口与用途 |
 | --- | --- |

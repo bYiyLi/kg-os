@@ -51,7 +51,7 @@ function createCalls(client) {
     const argumentText = args === undefined ? "" : JSON.stringify(args);
     const code = "return await " + method + "(" + argumentText + ");";
     const response = await client.callTool({
-      name: write ? "kgos_run" : "kgos_read",
+      name: write ? "kgos_mutate" : "kgos_query",
       arguments: { code }
     });
     const value = resultValue(response);
@@ -66,7 +66,7 @@ function createCalls(client) {
       JSON.stringify(args) +
       ")) { items.push(event); } return items;";
     const response = await client.callTool({
-      name: write ? "kgos_run" : "kgos_read",
+      name: write ? "kgos_mutate" : "kgos_query",
       arguments: { code }
     });
     const value = resultValue(response);
@@ -317,12 +317,12 @@ async function verifyPreviewAndHistory(client, branch, state) {
     assert.notEqual(response.isError, true, "MCP " + name + " failed");
     return JSON.parse(response.content[0].text);
   };
-  const first = await tool("kgos_preview", { offset: 0, limit: 100 });
+  const first = await tool("kgos_ontology_overview", { offset: 0, limit: 100 });
   assert.ok(first.totalLines > 100, "The multi-Branch fixture must exercise Preview pagination");
   let received = first.lineCount;
   const pages = [first.preview];
   while (received < first.totalLines) {
-    const next = await tool("kgos_preview", {
+    const next = await tool("kgos_ontology_overview", {
       offset: received,
       limit: 100,
       viewRevision: first.viewRevision
@@ -336,14 +336,14 @@ async function verifyPreviewAndHistory(client, branch, state) {
   assert.equal(received, first.totalLines);
   assert.ok(pages.join("\n").includes("SdkMatrix"), "Preview must show the populated Ontology");
   assert.ok(pages.join("\n").includes(branch), "Preview must include the test Branch");
-  const history = await tool("state_ancestry", { root: "branch/" + branch, limit: 100 });
+  const history = await tool("kgos_commit_ancestry", { root: "branch/" + branch, limit: 100 });
   assert.ok(history.count >= 3);
   assert.ok(history.markdown.includes(state));
 }
 
 async function verifyReadOnlyIsolation(client, mainState) {
   const forbidden = await client.callTool({
-    name: "kgos_read",
+    name: "kgos_query",
     arguments: {
       code:
         'return await evolution.branch.create({name:"mcp-read-must-not-write",from:' +
@@ -354,7 +354,7 @@ async function verifyReadOnlyIsolation(client, mainState) {
   assert.equal(forbidden.isError, true);
   assert.equal(JSON.parse(forbidden.content[0].text).code, "PERMISSION_DENIED");
   const missing = await client.callTool({
-    name: "kgos_read",
+    name: "kgos_query",
     arguments: {
       code: 'return await evolution.get({state:"commit/' + "0".repeat(64) + '"});'
     }

@@ -147,14 +147,14 @@ it("loads the existing read-only tool through the bridge with no Web login", asy
   expect(host.querySelector('input[type="password"]')).toBeNull();
   expect(bridge.connect).toHaveBeenCalledTimes(1);
   expect(bridge.callServerTool).toHaveBeenCalledWith({
-    name: "kgos_read",
+    name: "kgos_query",
     arguments: { code: "return await evolution.overview()" }
   });
   expect(overviewCalls()).toBe(1);
   expect(host.querySelector(".version-branch-count")?.textContent).toBe("2/2");
   expect(host.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
   expect(host.textContent).toContain("Shared history");
-  expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_read")).toBe(
+  expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_query")).toBe(
     true
   );
   expect(bridge.addEventListener).toHaveBeenCalledWith("hostcontextchanged", expect.any(Function));
@@ -189,7 +189,7 @@ it("filters embedded Branch history and reads the selected Commit through MCP", 
       request.arguments.code.startsWith("const item = await evolution.get(")
     )
   ).toBe(true);
-  expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_read")).toBe(
+  expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_query")).toBe(
     true
   );
 });

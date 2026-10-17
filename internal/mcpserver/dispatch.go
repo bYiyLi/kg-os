@@ -47,9 +47,6 @@ func noArgs[Res any](ctx context.Context, args []json.RawMessage, op func(contex
 	return json.Marshal(result)
 }
 func (a Adapter) Invoke(ctx context.Context, method string, args []json.RawMessage) (json.RawMessage, error) {
-	if method == "docs.read" {
-		return mcpsandbox.ReadDoc(args)
-	}
 	k := a.Kernel
 	switch method {
 	case "ontology.read":

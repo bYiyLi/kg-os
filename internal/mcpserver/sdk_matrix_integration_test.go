@@ -40,9 +40,9 @@ func (m *methodMatrix) script(method string, arg any, write, stream bool) any {
 	if stream {
 		code = "const items=[];for await(const event of " + expr + "){items.push(event)}return items;"
 	}
-	toolName := "kgos_read"
+	toolName := "kgos_query"
 	if write {
-		toolName = "kgos_run"
+		toolName = "kgos_mutate"
 	}
 	reply, err := m.session.CallTool(m.ctx, &mcp.CallToolParams{Name: toolName, Arguments: map[string]any{"code": code}})
 	if err != nil {

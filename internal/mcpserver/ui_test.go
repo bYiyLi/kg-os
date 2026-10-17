@@ -61,8 +61,8 @@ func TestWorkspaceMCPToolAndResource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 5 {
-		t.Fatalf("expected four business tools and one UI entry, got %d", len(tools.Tools))
+	if len(tools.Tools) != 6 {
+		t.Fatalf("expected five AI-facing tools and one UI entry, got %d", len(tools.Tools))
 	}
 	var workspace *mcp.Tool
 	for _, tool := range tools.Tools {

@@ -51,11 +51,11 @@ func TestDiagnosticLevelsCountersAndSecurityDecisions(t *testing.T) {
 	o.HTTPStart()
 	o.HTTPEnd(http.StatusUnauthorized, 700*time.Millisecond)
 	o.ToolStart()
-	o.Tool(ctx, "kgos_read", "RESOURCE_ERROR", time.Millisecond)
+	o.Tool(ctx, "kgos_query", "RESOURCE_ERROR", time.Millisecond)
 	o.ToolStart()
-	o.Tool(ctx, "kgos_run", "TIMEOUT", time.Second)
+	o.Tool(ctx, "kgos_mutate", "TIMEOUT", time.Second)
 	o.ToolStart()
-	o.Tool(ctx, "kgos_run", "CANCELLED", time.Millisecond)
+	o.Tool(ctx, "kgos_mutate", "CANCELLED", time.Millisecond)
 	if o.Snapshot().Sandbox.ResourceLimitsTotal != 0 {
 		t.Fatal("Tool RESOURCE_ERROR must not impersonate a sandbox budget limit")
 	}

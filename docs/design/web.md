@@ -99,7 +99,9 @@ packages/web
 
 **分阶段真实数据**：Phase 18 首次经 Bridge 调用已有 `kgos_read`，以固定安全脚本读取 `evolution.overview()` 证明连接与版本状态。后续 Phase 14 的紧凑版本导航直接复用 Web 的 `VersionReader`、扁平 Commit 列表、多分支筛选和分页：普通浏览器接 HTTP SDK，ChatGPT 内嵌入口仅适配为宿主 `callServerTool(kgos_read)`，分别读取 `evolution.branch.list / tag.list / ancestry / get`；所有请求仍由 Go MCP 服务端授权。Script 方法名固定、参数 JSON 编码、取消信号传给 Bridge；普通 MCP 工具错误在列表内提示重试，宿主拒绝调用或服务端明确返回认证 / 授权失败码则使内嵌连接失效并清除过期版本数据。选中 Commit 仅回读已解析 State ID，不通过 Bridge 传输整个 Snapshot 正文。当前只读选择仍属版本导航本地状态，未接入右侧图谱/查询上下文。其余查询、图谱、Ontology/Knowledge 编辑、History、Diff、Merge 等仍由 [Phase 14](../development/phases/14-web.md) 开发、验收。不得预建全部 HTTP API → JavaScript 字符串的通用网关或重复 Graph/Object/Evolution 语义；到实际 Feature 再按输入、typed 结果、流式、取消及写入语义选择最小适配。宿主不支持某能力时显示不可用，而非绕过认证。
 
-**布局、状态与降级**：复用响应式 Shell，遵守宿主实际视口，主题、English/简体中文均可用，但不假定 iframe 存储与独立站点共享；支持时读取宿主提供的 theme/locale，缺失时沿用 Web 已有选择与回退规则。`global` 与每个 `thread` 有各自的选择、暂存输入和当前页面状态，**不保证实时同步**；同一 Instance 的实际知识由服务端共享。外部 AI 修改 Branch 时不自动切换 pinned State，用户明确刷新再读取。宿主没有入口或不支持 MCP Apps 时，原有四个业务 MCP Tool 和独立 Web 保持可用；不退回直接嵌套整站 iframe 或跨站 Cookie。官方规范对 classic ChatGPT 网页端和 Work/桌面端支持范围有区别，真实验收见 [Phase 18](../development/phases/18-chatgpt-embedded-web.md)。
+**D102 / Phase 23 迁移目标（未实现）**：上述 Phase 18 `kgos_read` 是**已完成版本的调用证据**；后续 MCP Tool 正式更名时，Web MCP Apps Bridge 只需将固定的只读 Tool 名称替换为 `kgos_query`，保留原 `code` 参数、只读执行、用户身份、typed 响应及取消/错误合同，不增设通用 HTTP↔MCP 网关。未来写入调用对应 `kgos_mutate`；`kgos_workspace` 与 `ui://kgos/workspace/v1` 不更名。迁移范围与验收见 [Phase 23](../development/phases/23-mcp-tool-taxonomy-and-docs.md)，Tool 真源见 [MCP D102](mcp.md#mcp-tool-help)。
+
+**布局、状态与降级**：复用响应式 Shell，遵守宿主实际视口，主题、English/简体中文均可用，但不假定 iframe 存储与独立站点共享；支持时读取宿主提供的 theme/locale，缺失时沿用 Web 已有选择与回退规则。`global` 与每个 `thread` 有各自的选择、暂存输入和当前页面状态，**不保证实时同步**；同一 Instance 的实际知识由服务端共享。外部 AI 修改 Branch 时不自动切换 pinned State，用户明确刷新再读取。宿主没有入口或不支持 MCP Apps 时，仍保留目标版本的五个 AI-facing MCP Tool（Phase 22 旧版为四个）与独立 Web；不退回直接嵌套整站 iframe 或跨站 Cookie。官方规范对 classic ChatGPT 网页端和 Work/桌面端支持范围有区别，真实验收见 [Phase 18](../development/phases/18-chatgpt-embedded-web.md)。
 
 ### 国际化与语言偏好
 

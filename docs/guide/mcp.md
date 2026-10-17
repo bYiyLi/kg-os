@@ -82,36 +82,41 @@ curl -i http://127.0.0.1:3777/api/v1/evolution/overview
 
 ## 3. MCP Tool 和 JavaScript
 
-MCP 提供以下四个 **AI-facing 业务 Tool**；另有一个只用于 ChatGPT 工作区入口的 app-only `kgos_workspace`，因此标准 MCP `tools/list` 可以返回五项。
+MCP 提供五个 **AI-facing Tool**；另有一个用于 ChatGPT 工作区入口的 app-only `kgos_workspace`，因此标准 MCP `tools/list` 返回六项。
 
 | Tool | 输入与用途 |
 | --- | --- |
-| `kgos_preview` | `offset?`、`limit?`（默认 300、允许 100–500）、`viewRevision?`；读取全部分支与完整 pinned Ontology 的稳定 Markdown 行窗口 |
-| `state_ancestry` | `root`、`limit?`（默认 20、允许 1–1000）、`cursor?`；读取 Commit DAG 和完整原始 Message |
-| `kgos_read` | `code`；仅允许 15 个 SDK 只读方法 |
-| `kgos_run` | `code`；允许 15 Read + 16 Write SDK 方法 |
+| `kgos_docs` | `paths?: string[]`：无参数或空数组返回任务总目录；最多 32 个精确虚拟 Markdown 路径，按顺序完整读取 |
+| `kgos_ontology_overview` | `offset?`、`limit?`（默认 300、允许 100–500）、`viewRevision?`：全部 Branch 的 pinned Ontology 行窗口 |
+| `kgos_commit_ancestry` | `root`、`limit?`（默认 20、允许 1–1000）、`cursor?`：Commit DAG 与原始 Message |
+| `kgos_query` | `code`：15 个 SDK 只读方法；不只是 Cypher 查询 |
+| `kgos_mutate` | `code`：15 Read + 16 Write SDK 方法，只在授权后执行修改 |
 
-在 `kgos_read` / `kgos_run` 的 `code` 中编写 **async JavaScript 函数体**，直接使用 `ontology`、`object`、`graph`、`evolution` 四个无前缀命名空间，无需创建 SDK Client 或 HTTP 连接；必须显式 `return` JSON-compatible 值：
+### 首次连接：直接批量阅读文档
 
-Phase 22 的 MCP 内建文档已经通过 `docs.read(path)` 提供，无须安装 Skill、访问外部网站，也不需要创建 HTTP SDK Client。首次连接时，建议先在**只读的** `kgos_read` 中阅读文档目录：
+文档由独立 Go Handler `kgos_docs` 提供，无须安装 Skill、执行 JavaScript、联网或创建 HTTP SDK Client。向 **`kgos_docs`** 提交空参数即可获取任务导航总目录：
 
-```js
-return await docs.read("index.md");
+```json
+{}
 ```
 
-再按需阅读具体方法的请求、返回类型与可执行示例：
+也可传 `{"paths":[]}`；两者都返回一份 `index.md`，结构始终为 `{"documents":[{"path":"index.md","content":"..."}]}`。按任务一次阅读多篇文档，例如从空 Ontology 建模：
 
-```js
-return await docs.read("sdk/evolution/state/create.md");
+```json
+{"paths":["guides/ontology.md","guides/objects.md","sdk/ontology/patch.md","sdk/types/PatchRequest.md"]}
 ```
 
-Cypher 25 的完整 MCP 使用说明也从同一入口获取：
+Graph 查询与 Cypher 25：
 
-```js
-return await docs.read("cypher/index.md");
+```json
+{"paths":["guides/graph.md","cypher/index.md","sdk/graph/query.md"]}
 ```
 
-还可通过 `docs.read("guides/index.md")` 查看多个 SDK 方法如何组合。MCP 中只暴露原有的 15 个只读和 16 个写入方法；阅读写入方法的文档**不会授予写权限**。文档由 TypeScript SDK 类型、TSDoc 和 KG OS 对应版本的 Cypher 手册构建并嵌入 `kgosd`；`docs.read()` 是 Sandbox 内的只读虚拟文件访问，不是额外的 SDK HTTP 方法，不增加第五个业务 Tool。示例中的目标、Revision、Branch 等实际值必须根据已授权的知识库读取后填写；不能直接执行含占位符的写入代码。
+`index.md` 和 `guides/index.md` 提供更多任务→路径数组。每篇 Markdown 完整返回；只允许构建期内嵌的确切路径，禁止任意主机文件或网络访问；最多 32 个互不重复的路径，整个序列化 JSON 最多 4 MiB，超限为 `RESOURCE_ERROR`，应按目录拆分批次。不返回截断或部分成功的文档。
+
+### 使用 SDK JavaScript
+
+在 `kgos_query` / `kgos_mutate` 的 `code` 中编写 **async JavaScript 函数体**，直接使用 `ontology`、`object`、`graph`、`evolution` 四个无前缀命名空间，无需创建 SDK Client 或 HTTP 连接，必须显式 `return` JSON-compatible 值。阅读文档不会授予写入权限；**Sandbox 不再提供 `docs.read` 全局方法**。实际 Branch、State/Revision 需从授权 Instance 读取，不得执行尚未替换占位符的修改示例。
 
 ```js
 const { state } = await evolution.overview();
@@ -124,7 +129,7 @@ return { state, model, graphData };
 
 支持 `async/await`、真正并发的 `Promise.all` 和逐条 `for await...of` Graph Stream；受控 Guest 不提供 Node.js、文件、网络、环境变量或任意宿主方法。脚本中的多次写入**不组成一个事务**：如果后续调用失败、超时或断线，之前的 State、Branch、Tag、Merge 变更可能已生效，先读回真实状态再决定是否继续，**不要盲目重试**。
 
-Preview 的 `viewRevision` 属于进程内有界缓存；过期后返回 `VIEW_EXPIRED`，重新从 `offset=0` 获取新视图。索引中的 Offset/Lines 是整个 Markdown 文档的**绝对行号**，不是本页相对行号。详细 AI 使用方法见 [官方 KG OS Skill](../../plugins/kgos/skills/kgos/SKILL.md)。
+Ontology 预览的 `viewRevision` 属于进程内有界缓存；过期后返回 `VIEW_EXPIRED`，重新从 `offset=0` 获取新视图。索引中的 Offset/Lines 是整个 Markdown 文档的**绝对行号**，不是本页相对行号。详细 AI 使用方法见 [官方 KG OS Skill](../../plugins/kgos/skills/kgos/SKILL.md)。
 
 ## 4. ChatGPT OAuth 与私人 Plugin
 
@@ -132,7 +137,7 @@ Preview 的 `viewRevision` 属于进程内有界缓存；过期后返回 `VIEW_E
 
 ChatGPT 连接使用受限 CIMD 客户端与 OAuth Authorization Code + PKCE S256。Go 校验后将浏览器跳转到**现有 KG OS Web**；已登录直接显示连接授权弹窗，未登录先执行 Web 原有登录，随后明确允许或拒绝。OAuth Code/Access/Refresh 由 Go 管理，对用户透明。当前 Web 的跨页面登录状态尚由另一开发任务负责，不能借此声称无重复登录已验收。请求 5 分钟有效，重启后 OAuth 凭证失效；不能绕过认证。
 
-官方 [私人 Plugin AI 安装手册](../../plugins/kgos/INSTALL.md)说明 ChatGPT 连接、四 Tool 验证和私人 Plugin 安装。**旧 Phase 15 的实际 OAuth 成功不能代表新 Go MCP 已通过真实 ChatGPT 验收**。官方模板不携带用户 Token、Root 或动态 Connection ID。
+官方 [私人 Plugin AI 安装手册](../../plugins/kgos/INSTALL.md)说明 ChatGPT 连接、五个 AI-facing Tool 验证和私人 Plugin 安装。**旧 Phase 15 的实际 OAuth 成功不能代表新 Go MCP 已通过真实 ChatGPT 验收**。官方模板不携带用户 Token、Root 或动态 Connection ID。
 
 ## 5. 开发验收与正式发布
 
@@ -143,4 +148,4 @@ pnpm install --frozen-lockfile --ignore-scripts
 pnpm test:docker:unified
 ```
 
-该命令**只在 OpenClaw/CI Linux 主机运行**，临时创建并清理隔离测试镜像与 Volume；验证非 root / 无 Node、初始化、Web/API/MCP、四 Tool、31/31 方法以及重启持久化。不要对长期 Dev Instance 执行写入测试。实际环境运行见 [OpenClaw Dev Runbook](dev-environment.md)，完成证据归 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)。CI、测试脚本和本指南存在不代表当前镜像已经正式发布。
+该命令**只在 OpenClaw/CI Linux 主机运行**，临时创建并清理隔离测试镜像与 Volume；验证非 root / 无 Node、初始化、Web/API/MCP、五个 AI-facing Tool、31/31 方法以及重启持久化。不要对长期 Dev Instance 执行写入测试。实际环境运行见 [OpenClaw Dev Runbook](dev-environment.md)，完成证据归 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)。CI、测试脚本和本指南存在不代表当前镜像已经正式发布。

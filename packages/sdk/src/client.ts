@@ -288,7 +288,9 @@ export class KGOSClient {
      * @remarks Use the observed baseState and canonical editable Object text to construct the patch.
      * @example
      * ```js
-     * const {state} = await evolution.overview(); return await ontology.patch({ branch: "<target-branch>", baseState: state, patch: "<git-extended-diff>" });
+     * const branch = "<authorized-target-branch>";
+     * const {state} = await evolution.get({ state: `branch/${branch}` });
+     * return await ontology.patch({ branch, baseState: state, patch: "<git-extended-diff>" });
      * ```
      */
     patch: (request: PatchRequest, options?: RequestOptions) =>
@@ -319,7 +321,9 @@ export class KGOSClient {
      * @remarks Use the observed baseState and canonical editable Object text to construct the patch.
      * @example
      * ```js
-     * const {state} = await evolution.overview(); return await object.patch({ branch: "<target-branch>", baseState: state, patch: "<git-extended-diff>" });
+     * const branch = "<authorized-target-branch>";
+     * const {state} = await evolution.get({ state: `branch/${branch}` });
+     * return await object.patch({ branch, baseState: state, patch: "<git-extended-diff>" });
      * ```
      */
     patch: (request: PatchRequest, options?: RequestOptions) =>
@@ -428,20 +432,23 @@ export class KGOSClient {
         this.post<StateCreateResult>("/api/v1/evolution/state/create", request, options),
       /**
        * Replace the mutable JSON State Data on an existing State; no new Commit.
-       * @remarks State Data is a mutable annotation, not part of the versioned Knowledge/Ontology graph.
+       * @remarks State Data is a mutable annotation keyed by Commit, shared by all Branches pointing at it. Change only a Commit exclusively created for this purpose; do not modify a shared/default Branch Commit for testing.
        * @example
        * ```js
-       * return await evolution.state.setData({ state: "branch/main", data: { note: "reviewed" } });
+       * const {state} = await evolution.state.create({ branch: "<isolated-test-branch>", message: "Create test-only state" });
+       * return await evolution.state.setData({ state, data: { note: "reviewed" } });
        * ```
        */
       setData: (request: StateSetDataRequest, options?: RequestOptions) =>
         this.post<StateSetDataResult>("/api/v1/evolution/state/set-data", request, options),
       /**
        * Remove a State's mutable Data annotation; no new Commit.
-       * @remarks State Data is a mutable annotation, not part of the versioned Knowledge/Ontology graph.
+       * @remarks Only clear Data on a Commit exclusively created for this purpose; shared/default Branch Commits may carry State Data used elsewhere.
        * @example
        * ```js
-       * return await evolution.state.clearData({ state: "branch/main" });
+       * const {state} = await evolution.state.create({ branch: "<isolated-test-branch>", message: "Create test-only state" });
+       * await evolution.state.setData({ state, data: { note: "temporary" } });
+       * return await evolution.state.clearData({ state });
        * ```
        */
       clearData: (request: StateClearDataRequest, options?: RequestOptions) =>

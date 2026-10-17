@@ -227,7 +227,7 @@ func TestEmptyMCPToolScriptCannotExecute(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer session.Close()
-	for _, name := range []string{"kgos_read", "kgos_run"} {
+	for _, name := range []string{"kgos_query", "kgos_mutate"} {
 		result, err := session.CallTool(ctx, &mcp.CallToolParams{
 			Name: name, Arguments: map[string]any{"code": ""},
 		})

@@ -143,7 +143,7 @@ var writeMethods = map[string]bool{
 }
 
 func (i *invocation) allowed(method string) bool {
-	return method == "docs.read" || readMethods[method] || (!i.readOnly && writeMethods[method])
+	return readMethods[method] || (!i.readOnly && writeMethods[method])
 }
 func (i *invocation) send(response callResponse) {
 	select {

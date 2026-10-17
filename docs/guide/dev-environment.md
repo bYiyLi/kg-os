@@ -14,6 +14,10 @@
 
 **2026-10-15 Phase 19 Dev 部署成功**：从提交 `0bc47ee` 的**独立干净 worktree** 调用正式部署入口，不同步 Mac 正在编辑的 Web 文件。SQLite 一致性备份后，Linux amd64 统一镜像 `sha256:9b409ec1090e4099cc236805a9057e4e651b6ecaa8500e6656438268fd24369a` 更新成功；UTC 记录为 `2026-10-15T06:19:26Z`，`pnpm dev:mcp check` 验证 `healthy`、统一 Web/API/MCP、认证隔离、OAuth 与 UI Resource。现有 Bearer 调用受保护诊断 API 为 200，无凭证请求为 401；请求 ID、指标字段、Docker `json-file` 10 MiB × 5 保留配置均通过。长期 Instance 未作验收写入，隔离 Docker SDK 31/31 与重启持久化独立验证；GitHub CI 另行取证。
 
+**2026-10-17 Phase 23 Dev 部署验收**：Mac `main@96c2bc8` 的 `dirty` 工作树通过现有 `pnpm dev:mcp setup` 同步到 OpenClaw；成功创建私有 SQLite 一致性备份（`20261016T171749Z-BIIiE009`）并将已通过隔离验证的 Linux amd64 镜像 `sha256:a3daf38c8afe0e72068f0d097bf6220044c2ef8345d0c8c7b20c9afd1c19a67e` 切换到 Dev。旧镜像保留作回退，真实运行镜像以部署记录为准。新容器 `healthy`，本机只读 MCP/OAuth/五个 AI-facing + app-only UI、目录和批量文档及公网 HTTPS 状态通过；对本次部署镜像在独立临时 Volume 复验 **31/31 SDK** 与重启持久化成功。不向长期 Dev 知识库写入测试数据。镜像构建复用了经验证的相同 Go 1.27.2 与 Node/pnpm 缓存构建阶段，**未完成原样 `Dockerfile.unified` 构建**；尚未提交推送或验收新 SHA CI 与真实 ChatGPT 新会话，不能将阶段标记为 `done`。
+
+**2026-10-17 Phase 23 文档修复后 Dev 更新**：修复隔离测试 Branch 与 `STALE_BASE_STATE` 指南错误；部署前创建私有 SQLite 一致性备份 `/data/apps/KgosDev/data/backups/20261017T024119Z-mCiJdcYa`（含凭证，禁止公开）。OpenClaw 经同版本缓存构建阶段的临时 Linux amd64 Dockerfile 编译当前源码，**并非原样 `Dockerfile.unified` 构建**；独立 Volume 的 31/31 SDK/重启 Smoke 通过后切换镜像为 `sha256:bd06c022043006d2fed05cbc2cb29499e2d316ed1ba8e095e3c4614b84602f2f`，UTC 记录 `2026-10-17T02:46:41Z`，`kgos-dev-mcp-1` 为 `healthy`。只读 Web/API/MCP/OAuth/五 Tool + app-only UI Resource 验收通过，运行中的 `kgos_docs` 已返回修复后的 Ontology/Object/Patch 指南；默认 `main` Head 在部署前后不变，旧镜像保留供回退。首次切换因定制校验脚本误要求 MCP 成功响应含 `isError:false` 而触发自动回退，验证旧容器健康后纠正脚本重新部署成功；这是验收脚本问题，未发现新服务缺陷。本轮仅 Dev 更新，未提交、推送、正式发布或执行修复后的真实 ChatGPT 客户端回归；Phase 23 仍为 `in_progress`。
+
 ## 1. 固定环境与职责
 
 | 项目 | 值 |
@@ -89,7 +93,7 @@ docker compose --env-file /data/apps/KgosDev/config/compose.env -f compose.dev.y
 3. Idempotent `setup` 检查目录权限和 Compose 配置；不重置 Instance Token 或 DB。只有先前已初始化的 Instance 可以部署 MCP。
 4. 把**当前运行容器的真实镜像 ID**保存为 `kgos-dev-mcp:previous`，并在构建前创建**SQLite 在线一致性备份**；备份失败直接停止，旧容器仍运行。
 5. `docker compose build mcp` 在原服务仍运行时编译当前 Web、Go `kgosd` 并校验固定版本原生扩展和 Runtime manifest；成功后 `up -d --no-build --force-recreate mcp` 只替换 `kgos-dev` 服务。
-6. 验收容器 `healthy`，确认新镜像 PID 1 为单一 `kgosd`、Dev 身份为 UID 1000、HTTP 3777 无凭证 MCP 返回 **401** 且声明 OAuth metadata。在 **OpenClaw 宿主**的只读客户端上，从当前 Instance 私有 `.kgos/auth.json` 读取唯一认证凭证，验证 Web/API/MCP 路由、OAuth metadata、认证隔离、四个业务 Tool（Phase 18 新镜像还必须验证 UI Tool/Resource）、Preview、State 和 Ancestry；**不把 Node.js 安装进最终镜像，也不做长期 Dev 写入测试**。此前 Phase 15 的 Node `doctor` 仅作为旧镜像回退验收。
+6. 验收容器 `healthy`，确认新镜像 PID 1 为单一 `kgosd`、Dev 身份为 UID 1000、HTTP 3777 无凭证 MCP 返回 **401** 且声明 OAuth metadata。在 **OpenClaw 宿主**的只读客户端上，从当前 Instance 私有 `.kgos/auth.json` 读取唯一认证凭证，验证 Web/API/MCP 路由、OAuth metadata、认证隔离、五个 AI-facing Tool（含 `kgos_docs` 目录及批量读取）、app-only UI Tool/Resource、Preview、State 和 Ancestry；**不把 Node.js 安装进最终镜像，也不做长期 Dev 写入测试**。此前 Phase 15 的 Node `doctor` 仅作为旧镜像回退验收。
 7. 全部通过后追加 `config/deployments.tsv`（UTC、revision、dirty/clean、镜像 ID）；新镜像验收失败时恢复 `previous` 并复验，仍以失败退出，不将失败发布伪装成成功。
 
 **镜像回退不等于数据库回退。** `rollback` 只改变运行镜像，不会偷偷把新版本可能写入的数据库恢复为旧状态；数据恢复必须在停止服务后，由操作者明确选择已检查过的备份执行。仅在根本不存在先前镜像时，首次部署失败会保持未部署状态。
@@ -143,6 +147,6 @@ KGOS_UNIFIED_DOCKER_SMOKE_IMAGE=kgos-dev-mcp:local \
   node scripts/mcp-unified-docker-smoke.mjs
 ```
 
-脚本使用当前镜像创建并清理**临时 Volume**，在真实 MCP → Go QuickJS/WASM → Kernel → Lithograph 链路验收四个业务 Tool + Phase 18 UI Tool/Resource、31/31 方法和持久化重启。它与长期 Dev 的只读 `check` **分别验收**。构建失败先检查 OpenClaw 的基础镜像、代理、Go 和冻结依赖，不通过 Mac Docker 或旧 Node 双进程测试替代。
+脚本使用当前镜像创建并清理**临时 Volume**，在真实 MCP → Go QuickJS/WASM → Kernel → Lithograph 链路验收五个 AI-facing Tool、独立文档批量读取、app-only UI Tool/Resource、31/31 方法和持久化重启。它与长期 Dev 的只读 `check` **分别验收**。构建失败先检查 OpenClaw 的基础镜像、代理、Go 和冻结依赖，不通过 Mac Docker 或旧 Node 双进程测试替代。
 
 准备关闭 Phase 16 时记录源码 Revision/dirty 状态、Dev 部署镜像 ID、只读 `check`、隔离 31-method Smoke、HTTPS/真实 ChatGPT 调用、`pnpm validate` 和 Review 的**实际结果**。最终 Git Commit/Push 的普通 CI 验收、真实私人 Plugin/Skill 安装与旧版清理也须符合 [Phase 16 完成条件](../development/phases/16-kgosd-unified-mcp.md#完成条件)。正式 Release Tag、GHCR 和生产部署继续独立授权；**仅 Dev 已部署不代表 Phase 自动成为 `done`**。

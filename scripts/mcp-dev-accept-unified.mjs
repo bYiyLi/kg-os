@@ -119,7 +119,13 @@ const hello = await rpc("initialize", {
 });
 assert.equal(hello.serverInfo?.name, "kgos");
 const tools = (await rpc("tools/list")).tools;
-const businessTools = ["kgos_preview", "kgos_read", "kgos_run", "state_ancestry"];
+const businessTools = [
+  "kgos_commit_ancestry",
+  "kgos_docs",
+  "kgos_mutate",
+  "kgos_ontology_overview",
+  "kgos_query"
+];
 const names = tools.map((tool) => tool.name).sort();
 const withWorkspace = [...businessTools, "kgos_workspace"].sort();
 const hasWorkspace = names.includes("kgos_workspace");
@@ -127,7 +133,7 @@ if (process.env.KGOS_DEV_REQUIRE_UI === "1") {
   assert.deepEqual(
     names,
     withWorkspace,
-    "Phase 18 Dev must expose all four business Tools and the app-only workspace Tool"
+    "KG OS Dev must expose five AI-facing Tools and the app-only workspace Tool"
   );
 } else {
   assert.deepEqual(
@@ -136,10 +142,10 @@ if (process.env.KGOS_DEV_REQUIRE_UI === "1") {
     "Unexpected MCP Tool inventory"
   );
 }
-for (const name of ["kgos_preview", "kgos_read", "state_ancestry"]) {
+for (const name of ["kgos_docs", "kgos_ontology_overview", "kgos_query", "kgos_commit_ancestry"]) {
   assert.equal(tools.find((tool) => tool.name === name)?.annotations?.readOnlyHint, true);
 }
-assert.equal(tools.find((tool) => tool.name === "kgos_run")?.annotations?.readOnlyHint, false);
+assert.equal(tools.find((tool) => tool.name === "kgos_mutate")?.annotations?.readOnlyHint, false);
 if (hasWorkspace) {
   const workspaceURI = "ui://kgos/workspace/v1";
   const workspace = tools.find((tool) => tool.name === "kgos_workspace");
@@ -169,26 +175,35 @@ if (hasWorkspace) {
 
 const readTool = async (name, args) =>
   toolValue(await rpc("tools/call", { name, arguments: args }));
-const preview = await readTool("kgos_preview", { limit: 100 });
+const index = await readTool("kgos_docs", {});
+assert.equal(index.documents?.length, 1);
+assert.equal(index.documents[0].path, "index.md");
+assert.match(index.documents[0].content, /guides\/ontology\.md/);
+const pages = await readTool("kgos_docs", {
+  paths: ["guides/ontology.md", "guides/objects.md"]
+});
+assert.deepEqual(
+  pages.documents.map(({ path }) => path),
+  ["guides/ontology.md", "guides/objects.md"]
+);
+const preview = await readTool("kgos_ontology_overview", { limit: 100 });
 assert.ok(preview.preview?.length > 0 && preview.viewRevision);
 const state = (
-  await readTool("kgos_read", {
+  await readTool("kgos_query", {
     code: "return (await evolution.overview()).state;"
   })
 ).result;
 assert.ok(typeof state === "string" && state.startsWith("commit/"));
 const branches = (
-  await readTool("kgos_read", {
+  await readTool("kgos_query", {
     code: "return (await evolution.branch.list()).items.map(x => x.name);"
   })
 ).result;
 assert.ok(Array.isArray(branches) && branches.length > 0);
-const ancestry = await readTool("state_ancestry", { root: state });
+const ancestry = await readTool("kgos_commit_ancestry", { root: state });
 assert.ok(Number.isInteger(ancestry.count) && ancestry.count > 0);
 process.stdout.write(
   "KG OS Dev verified: unified Web/API/MCP, Instance Bearer, OAuth discovery, " +
-    (hasWorkspace
-      ? "4 business Tools + workspace UI Resource"
-      : "4 business Tools (previous image)") +
+    (hasWorkspace ? "5 AI-facing Tools + workspace UI Resource" : "5 AI-facing Tools") +
     ", Preview, State, ancestry (read-only)\n"
 );

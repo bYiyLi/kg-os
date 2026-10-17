@@ -1036,3 +1036,13 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **范围**：不重新引入 npm/native 分发、不 Fork SQLite、不修改 Graph/Cypher 语义。升级必须通过 Go/SQLite/Lithograph 集成、Schema/Ontology/Graph/Evolution 兼容回归和隔离 Docker 真装载验收；在验收前只是已授权源码改动，不等于 Dev/生产运行时已升级或当前 GitHub CI 通过。以 v0.3.1 为基线维护 D100 的 MCP Cypher 文档；后续升级仍应先核对实际 release、公开能力与现有 KG OS 映射。
 - **依据/取舍**：完整的上游 Cypher 使用手册及修复已随 v0.3.1 正式发布，而 KG OS 原本仍固定 v0.3.0；单纯改本地版本常量不会改变 Docker 中通过历史 Runtime npm 输入获取的原生扩展。升级制品不变更公共接口，但必须真实测试现有 Ontology Generated Schema 命名、Provider 加载、Full-text/Vector 与版本合同。
 - 当前合同：[Graph](graph.md#graph)、[Runtime](runtime.md)、[MCP 自描述文档](mcp.md#mcp-tool-help)、[Phase 22](../development/phases/22-mcp-self-describing-docs.md)。[D66](#d66-lithograph-v030-sql-only) 的 SQL-only 架构取舍保持有效；仅原生依赖版本由 D101 更新。
+
+<a id="d102-mcp-tool-taxonomy-and-batch-docs"></a>
+
+### D102 MCP 工具按 AI 意图命名，文档独立批量读取（2026-10-16）
+
+- **决定**：AI-facing MCP 工具统一为 `kgos_docs`（目录及单/多文件 Markdown）、`kgos_ontology_overview`（全 Branch Ontology 预览）、`kgos_query`（受限 JavaScript 只读 SDK）、`kgos_mutate`（可读写 JavaScript SDK）和 `kgos_commit_ancestry`（分页 Commit DAG）；保留 app-only `kgos_workspace`。`kgos_docs` 只接收可选 `paths: string[]`，省略或空数组返回任务导向总目录，非空数组按输入顺序返回完整的路径与 Markdown 内容。不新增单方法 MCP Tool，也不改变 15 Read / 16 Write SDK、Kernel、Cypher、Evolution 或 Web 数据语义。
+- **文档所有权**：继续复用 D100 的 SDK TypeScript/TSDoc → TypeDoc/AST、KG OS Cypher 手册、MCP Guides 与构建期内嵌静态白名单；只调整发布入口与导航，增加从空 Ontology 建模和 canonical Git Extended Diff 的真实示例。总目录按任务推荐可批量阅读的相关路径，各页面给出准确的前置和后续链接；AI 可以不安装 Skill 就直接使用 `kgos_docs`，不需要先进入 JavaScript Sandbox。
+- **迁移与安全**：新工具名是有意的 MCP 公开合同破坏性调整，实施后不注册旧名称兼容别名；移除旧 Sandbox `docs.read(path)`，不保留第二条文档读取路径。现有 Instance/OAuth 认证、Tool 级 read/write 宿主校验、预览窗口与祖先游标、UI Resource/可见性保持不变；`kgos_docs` 对固定只读 Markdown 清单做严格路径/数量/总响应预算校验，不允许任意宿主文件、网络、Token 或 Knowledge 访问，非法或超限批次整体失败且不截断。必须验证 ChatGPT 重新发现/刷新 Tool 描述，不能以旧连接的缓存视图作为当前服务端证据。
+- **取舍与替代**：拒绝继续通过 `kgos_query` 执行 `docs.read`，因为阅读调用说明不应依赖先掌握脚本；拒绝同时支持单路径字符串/多路径数组、保留旧名别名或新增 docs.list/search/HTTP 文档服务，避免多套接口及版本漂移。代价是现有 MCP Client/Plugin/Skill、Web MCP Apps Bridge、静态说明、工具名测试和客户端缓存都必须随同一版本迁移；Phase 20、22 的历史实现与 CI 完成证据保留，不倒改其既有交付事实。
+- **当前真源与实施**：[MCP Tool 与 Docs 合同](mcp.md#mcp-tool-help)、[Ontology](ontology.md#公共可编辑格式)、[Object Patch](object.md#object-公共调用合同)、[Phase 23](../development/phases/23-mcp-tool-taxonomy-and-docs.md)。D102 取代 D85/D93/D96 中旧 AI-facing Tool 名称与 D100 的 `docs.read` 读取通道，不取代那些决定的 Sandbox、OAuth、UI、Graph、Evolution 或版本固定文档机制。

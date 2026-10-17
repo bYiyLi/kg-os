@@ -6,4 +6,4 @@ KG OS 的 Ontology 定义与 Knowledge 实例不同：Ontology 高层 API 负责
 
 可使用查询 `SHOW INDEXES`、`SHOW CONSTRAINTS`、`SHOW CURRENT GRAPH TYPE` 了解当前图的 Schema。Index 类型包括 Lookup、Range、Text、Point、Full-text、Vector。功能支持不代表所有 Index 配置在 KG OS 高层 Ontology 的简化配置中都可编辑。
 
-在 KG OS 上定义业务模型优先参考 `sdk/ontology/read.md`、`sdk/ontology/patch.md` 和 `guides/objects.md`；直接 Cypher DDL 应仅在用户明确要求数据库级操作时使用 `kgos_run`。
+在 KG OS 上定义业务模型优先参考 `sdk/ontology/read.md`、`sdk/ontology/patch.md` 和 `guides/objects.md`；直接 Cypher DDL 应仅在用户明确要求数据库级操作时使用 `kgos_mutate`。

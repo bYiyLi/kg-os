@@ -85,6 +85,7 @@ func TestMCPToolErrorMappingKeepsPublicContract(t *testing.T) {
 		{fmt.Errorf("SCRIPT_RESULT_ERROR: invalid value"), "SCRIPT_RESULT_ERROR", false},
 		{fmt.Errorf("SCRIPT_ERROR: runtime exception"), "SCRIPT_ERROR", false},
 		{context.Canceled, "CANCELLED", false},
+		{context.DeadlineExceeded, "TIMEOUT", false},
 		{&kernel.PublicError{Code: "STATE_NOT_FOUND", Message: "Requested State is unavailable", Details: details}, "STATE_NOT_FOUND", true},
 		{&mcpsandbox.ScriptError{Code: "OBJECT_NOT_FOUND", Message: "Requested Object not found",
 			Details: json.RawMessage("{\"ref\":\"object:missing\"}")}, "OBJECT_NOT_FOUND", true},

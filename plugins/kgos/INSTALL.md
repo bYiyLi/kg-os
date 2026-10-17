@@ -12,8 +12,8 @@
 
 - 只在用户明确授权的 Workspace、ChatGPT 账户和安装目标内操作。AI 能通过已授权的文件/命令工具或 Plugin Creator 完成的步骤可以代办；无法访问的 ChatGPT 页面、组织授权、Tunnel 控制台、认证交互与服务部署，给用户**当前一步**的明确操作，不假装已经完成。
 - **不要索要用户将 Token、OAuth Secret、Runtime API Key、`.kgos/auth.json` 或私钥粘贴到聊天**。由用户在受信任的配置文件、密钥管理器、环境变量或 ChatGPT 正式认证流程中完成输入。不得把凭证写入 Plugin 包、示例、公开仓库、输出日志或 MCP URL。
-- 初次安装**只执行读取测试**。`kgos_run` 可修改/删除知识，除非用户另外授权具体写入及目标 Branch，不得用真实知识写入当成安装探针。
-- 完成标准分层：① MCP 服务实际运行；② **ChatGPT 自身**通过用户选定的远程地址/通道完成支持的认证、发现四个 Tool 并读取成功；③ 私人 Plugin 在目标账户/Workspace 已安装，**新的会话**能选择并调用。只有满足全部适用条件才能报告“Plugin 安装成功”；Skill 启用另行验证，不和安装完成混为一谈。
+- 初次安装**只执行读取测试**。`kgos_mutate` 可修改/删除知识，除非用户另外授权具体写入及目标 Branch，不得用真实知识写入当成安装探针。
+- 完成标准分层：① MCP 服务实际运行；② **ChatGPT 自身**通过用户选定的远程地址/通道完成支持的认证、发现五个 AI-facing Tool 并读取成功；③ 私人 Plugin 在目标账户/Workspace 已安装，**新的会话**能选择并调用。只有满足全部适用条件才能报告“Plugin 安装成功”；Skill 启用另行验证，不和安装完成混为一谈。
 
 ## 1. 识别现状：避免重复部署
 
@@ -22,7 +22,7 @@
 | 用户已具备 | AI 下一步 |
 | --- | --- |
 | 已注册并安装私人 KG OS Plugin | 跳到[安装后验收](#5-安装后验收)，不要重复创建 |
-| 已在 ChatGPT 注册 KG OS MCP Connection，但 Plugin 尚未安装 | 先核对该连接的认证及四个 Tool，再按[注册并安装](#3-在-chatgpt-注册并安装基础私人-plugin)中的安装步骤启用已有 Plugin；**不再重复注册**，私人包仅按需创建 |
+| 已在 ChatGPT 注册 KG OS MCP Connection，但 Plugin 尚未安装 | 先核对该连接的认证及五个 AI-facing Tool，再按[注册并安装](#3-在-chatgpt-注册并安装基础私人-plugin)中的安装步骤启用已有 Plugin；**不再重复注册**，私人包仅按需创建 |
 | 已有可从 ChatGPT 使用的 HTTPS MCP 地址或 Tunnel | 跳到[认证与远端连通](#2-认证与远端连通) |
 | 只有运行中的本机 MCP 或已有 KG OS Instance | 指向[通用 MCP 安装指南](../../docs/guide/mcp.md)，请用户确定自己的网络接入方式；不强制 Tunnel |
 | 尚未部署 KG OS | 先按[KG OS MCP 部署合同](../../docs/design/mcp.md#部署交付与运行合同)与[通用 MCP 安装指南](../../docs/guide/mcp.md)进行 Linux amd64 Docker 部署；不要编造未发布的镜像名称、版本或不能运行的 CLI 参数 |
@@ -39,7 +39,7 @@ AI 在继续前确认：用户所选 Instance 已初始化、MCP 服务实际监
 2. 公网 HTTPS 入口不仅需要代理 `/mcp`、OAuth discovery、`/oauth/authorize` 和 `/oauth/token`，还必须保留同源 **Web `/`、静态资源、Web 登录入口、`/oauth/request` 和 `/oauth/decision`**、原始 POST 与 Authorization header。OAuth 使用 ChatGPT CIMD + PKCE S256 + `none` public-client，不要求额外 Client Secret 或外部 OAuth 服务。
 3. 在 ChatGPT 中选择 **OAuth**，浏览器跳到**已有 KG OS Web**，复用 Web 登录后显示 ChatGPT 连接授权弹窗；用户明确同意或拒绝，Go 后台签发 OAuth Token，ChatGPT **不获得 Instance Token**。当前 Web 跨标签复用登录状态仍待其他开发任务验收；不应要求用户填写第二套 MCP 管理员 Token。普通可信 MCP 客户端可直接使用 Instance Bearer。
 4. 网络与 TLS / Tunnel / 反向代理由用户自行决定和配置；MCP OAuth 只解决身份认证，不自动使本地端口可公网访问。此前本地自动化 OAuth 验证不是 ChatGPT Web/Desktop 真实联通证据。无法完成真实 OAuth 授权时记录 `BLOCKED_AUTH_COMPATIBILITY` 或具体网络/代理错误，禁止通过“无认证”绕过安全边界。
-5. MCP 工具应当**恰好**为 `kgos_preview`、`state_ancestry`、`kgos_read`、`kgos_run`。如果工具缺失、显示其他 Instance、认证失败、证书失败、协议不兼容或连接来源不可信，先停止注册并修复对应层，不能用伪造示例替代结果。
+5. MCP 应当提供五个 AI-facing Tool：`kgos_docs`、`kgos_ontology_overview`、`kgos_commit_ancestry`、`kgos_query`、`kgos_mutate`；另有 app-only `kgos_workspace`。如果工具缺失、显示其他 Instance、认证失败、证书失败、协议不兼容或连接来源不可信，先停止注册并修复对应层，不能用伪造示例替代结果。
 
 ## 3. 在 ChatGPT 注册并安装基础私人 Plugin
 
@@ -48,7 +48,7 @@ AI 在继续前确认：用户所选 Instance 已初始化、MCP 服务实际监
 1. 进入 [ChatGPT Plugins](https://chatgpt.com)，选择 `+` → **Add custom MCP server**。如客户端文字、权限与官方说明不同，以当前正式 UI 为准；Workspace 策略不允许时让用户联系管理员，不绕过。
 2. 填写便于用户识别的连接名称（如 `KG OS`）。选择 **Server URL** 并提供真实完整的 HTTPS MCP URL，或选择 **Tunnel** 并使用已经授权且可用的真实 `tunnel_id`；不选择或创建用户未授权的远程接入方式。
 3. 选择客户端**实际支持且与服务器一致**的认证，按正式交互完成登录 / 授权；必须在发现工具之前解决任何认证不兼容。阅读风险提示，交由用户确认 **I understand and want to continue**，再选择 **Create as a plugin**。
-4. 检查 ChatGPT 返回的真实连接及 Tool 元数据；确认四个工具的名称、读写标记与预期 Instance，检查 `kgos_run` 是写入工具。若工具列表未刷新，使用连接管理页的 **Refresh**，并开启新会话重新验证。
+4. 检查 ChatGPT 返回的真实连接及 Tool 元数据；确认五个 AI-facing Tool 的名称、读写标记与预期 Instance，检查 `kgos_mutate` 是写入工具。若工具列表未刷新，使用连接管理页的 **Refresh**，并开启新会话重新验证。
 5. 在所属的**个人或 Workspace Plugins** 页面找到刚创建的 Plugin，实际执行 **Install / Enable**。安装完成后才能在新对话输入 `@` 并选择该 Plugin；**Create as a plugin 本身不代表已经在会话启用**。
 
 这条流程已能创建一个**MCP-only 基础私人 Plugin**，不需要先打包官方 Skill、重复注册 MCP，也不需要发布到公共目录。用户仅需要知识库工具时，直接进入验收即可。
@@ -73,10 +73,11 @@ AI 在继续前确认：用户所选 Instance 已初始化、MCP 服务实际监
 | --- | --- |
 | 安装 | Plugin 显示在当前用户/Workspace，已启用且会话可选择 |
 | 认证 | 从当前会话经真实远程地址或 Tunnel 完成认证，无重复/循环授权 |
-| 工具 | 四个 Tool 均可发现，读写权限标注与实际一致 |
-| Preview | `kgos_preview` 返回真实 Branch / Head / Ontology（非示例文字） |
-| SDK | `kgos_read` 使用 `return await evolution.overview();` 能取得当前 Instance 的真实数据 |
-| 写能力 | `kgos_run` 被识别为可能写入；**只有用户明确授权具体测试写入时**才运行并核对 State，否则标记“未执行写入测试” |
+| 工具 | 五个 AI-facing Tool 均可发现，另有 app-only UI 工具；读写权限标注与实际一致 |
+| 文档 | 不依赖 Skill，`kgos_docs({})` 返回目录，`paths` 批量完整读取 |
+| Preview | `kgos_ontology_overview` 返回真实 Branch / Head / Ontology（非示例文字） |
+| SDK | `kgos_query` 使用 `return await evolution.overview();` 能取得当前 Instance 的真实数据 |
+| 写能力 | `kgos_mutate` 被识别为可能写入；**只有用户明确授权具体测试写入时**才运行并核对 State，否则标记“未执行写入测试” |
 | Skill（可选） | 仅在确实打包并安装 Skill 后检验激活，不能由目录存在推断成功 |
 
 不能从 Preview 内容独立证明宿主 Workspace 路径；应把返回的数据库/Branch 实际特征与用户预期比对。任何写入都由真实数据库合同决定；脚本错误不表示此前写入全部回滚。MCP 本地 Inspector 通过、静态 Manifest 解析成功、Plugin 出现在目录里，均不能替代这次**ChatGPT 实际调用**。
@@ -88,7 +89,7 @@ AI 在继续前确认：用户所选 Instance 已初始化、MCP 服务实际监
 | MCP 尚未发布/不可启动 | 使用当前源码构建 Linux amd64 Docker 镜像或真实可用的 OCI 产物验证；不能编造已经发布的 Docker Image |
 | 本机可读，ChatGPT 不可访问 | 分别检查 HTTPS / Tunnel、实际 path、证书、网络和目标 Workspace 权限 |
 | ChatGPT OAuth 连接失败 | 检查 `--mcp-oauth-issuer` 是否与实际 HTTPS origin 一致，metadata 是否可达、是否选择 OAuth、代理是否透传 OAuth 路径与 Header；失败不得切换无认证 |
-| 连接已创建但没有四 Tool | 检查 MCP `tools/list`、服务端返回与 ChatGPT 连接 **Refresh** |
+| 连接已创建但没有五个 AI-facing Tool | 检查 MCP `tools/list`、服务端返回与 ChatGPT 连接 **Refresh** |
 | 有连接 ID 但私有包失败 | 核对 ID 来自实际连接、`.app.json` 真实生成、Manifest 指向正确文件和当前 schema |
 | Plugin 安装但调用错误 Instance | 停止写入，回到 MCP Workspace 绑定及认证核对；不要自动更换目标 Root |
 | 只读成功、写入不确定 | 先读 Branch/State/History 核实，不重放有副作用的命令 |
@@ -102,7 +103,7 @@ Remote route         HTTPS / Tunnel / 未提供
 ChatGPT auth         已验证 / BLOCKED_AUTH_COMPATIBILITY / 待验证
 ChatGPT connection   已注册（真实 ID）/ 未注册
 Private Plugin       已安装并启用 / 仅模板 / 未完成
-4 Tools              已发现 / 不完整 / 未验证
+5 AI-facing Tools     已发现 / 不完整 / 未验证
 Read smoke           已成功 / 失败 / 未运行
 Write smoke          已授权并成功 / 未授权未运行 / 结果待核实
 下一步                最小必要操作或准确阻塞原因

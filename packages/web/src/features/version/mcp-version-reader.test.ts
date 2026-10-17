@@ -54,7 +54,7 @@ function fixture() {
   return { callServerTool, onTransportFailure, reader };
 }
 
-it("uses only kgos_read for Branch/Tag/Ancestry/Get and forwards cancellation", async () => {
+it("uses only kgos_query for Branch/Tag/Ancestry/Get and forwards cancellation", async () => {
   const { callServerTool, reader, onTransportFailure } = fixture();
   const controller = new AbortController();
   const snapshot = await loadVersions(reader, controller.signal);
@@ -62,7 +62,7 @@ it("uses only kgos_read for Branch/Tag/Ancestry/Get and forwards cancellation", 
   expect(snapshot.tags).toEqual([{ name: "v1", state: shared }]);
   expect(snapshot.pages["experiment"]?.items.at(-1)?.parents).toEqual([]);
   expect(callServerTool).toHaveBeenCalledTimes(4);
-  expect(callServerTool.mock.calls.every(([params]) => params.name === "kgos_read")).toBe(true);
+  expect(callServerTool.mock.calls.every(([params]) => params.name === "kgos_query")).toBe(true);
   expect(
     callServerTool.mock.calls.every(([, options]) => options?.signal === controller.signal)
   ).toBe(true);
@@ -82,7 +82,7 @@ it("serializes opaque cursor and untrusted StateRef safely without code executio
   await reader.ancestry(request);
   expect(callServerTool).toHaveBeenCalledWith(
     {
-      name: "kgos_read",
+      name: "kgos_query",
       arguments: { code: `return await evolution.ancestry(${JSON.stringify(request)})` }
     },
     undefined
