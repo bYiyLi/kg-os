@@ -4,7 +4,7 @@
 
 ## 目标、现状与范围
 
-**状态：`in_progress`（2026-10-17，客户端核心回归、Mac 全量验证和 OpenClaw 原样 Dockerfile/31 SDK 隔离 Smoke 均已通过；最终修复 SHA 的 GitHub CI 尚待完成）**。
+**状态：`done`（2026-10-17）**。MCP 五个 AI-facing Tool、独立批量 `kgos_docs`、133 篇文档和 31 SDK 方法已通过 Mac、OpenClaw 原样 Dockerfile/31 SDK 隔离 Smoke、真实 ChatGPT 核心链路及最终实现 SHA 的 GitHub CI 两项验收；证据见文末阶段关闭记录。
 
 遵循 [D102](../../design/decisions.md#d102-mcp-tool-taxonomy-and-batch-docs) 与 [MCP 当前目标合同](../../design/mcp.md#mcp-tool-help)，把 Phase 22 已验证的内建文档从 JavaScript `docs.read(path)` 迁移为独立 `kgos_docs` MCP Tool，支持**空输入获取 AI 任务目录、单篇与多篇批量读取**；将现有业务 Tool 精确更名为 `kgos_ontology_overview`、`kgos_query`、`kgos_mutate`、`kgos_commit_ancestry`，保留 app-only `kgos_workspace`。同时把 AI 自主验收发现的 Ontology 从零建模、canonical Git Extended Diff 使用说明补齐为可运行的内置 Guides。
 
@@ -96,3 +96,11 @@
 
 - 2026-10-17 **OpenClaw 原样 Dockerfile 门禁恢复并通过**：核对宿主已配置的出站代理可访问 npm tarball，改用标准 Docker `--build-arg HTTP_PROXY/HTTPS_PROXY/ALL_PROXY`（含小写变量）明确向构建阶段传递宿主代理，仍使用仓库**未改动的 `Dockerfile.unified`**，基础镜像采用已缓存的同版本 Node 24.15.0/Debian bookworm 镜像来源。Linux amd64 `docker build --network=host ... -f Dockerfile.unified` **exit 0**，产物 `sha256:3bf623b99854224934a6ac6c5d8101bf840c0a77d5e9aafc16a7234b2f372b46`，运行 UID/GID `10001:10001`。在**独立临时 Volume/Instance** 上对该正式 Dockerfile 产物执行 `scripts/mcp-unified-docker-smoke.mjs`，**exit 0，31/31 SDK、五个 AI-facing + app-only UI、Web/API/MCP/OAuth、单进程、非 root、无 Node 运行时、持久化重启全部通过**。先前 OpenClaw npm 网络 BLOCKED 已按本次新证据解除；它不替代最终新 SHA GitHub CI 验收，也未修改长期 Dev 容器或数据库。
 - 2026-10-17 Mac 最终修复树 `pnpm validate` **exit 0**（Go Race/coverage、TS、Playwright、文档生成、格式、拼写与安全等门禁），且 `go test -race` 的七段实操隔离回归全部成功；单项 90→300 秒超时调整不会改变 MCP/SDK 产品合同。当前需将文档证据与修复提交推送，核查该精确 SHA 的 Ubuntu Validate + Unified Docker / Linux amd64 两 Job 均 success；随后复核最终 diff 与文档状态才能将 Phase 标记为 `done`。
+
+## 阶段关闭记录（2026-10-17）
+
+- **已实现、已提交、已推送**：主线实施提交 [`9cec011`](https://github.com/bYiyLi/kg-os/commit/9cec011faf30ff5acb9c651ae150825e1e440328)，Go Race 集成测试 90 秒整体预算的最小修复提交 [`cfa3917`](https://github.com/bYiyLi/kg-os/commit/cfa39173020523b127982f196fd54f7b64905f04)，均已推送 `origin/main`；原四工具不保留兼容别名，新五工具 + app-only `kgos_workspace` 按设计注册，`kgos_docs` 静态 Go embed 包含 31 SDK 方法、75 类型、133 篇文档。SDK 业务语义、Kernel/Lithograph、Web 认证与 UI Resource URI 不变。
+- **Mac 全量与回归**：当前实现 `pnpm validate` **exit 0**，含 Go Race/coverage、TS/Web/Playwright、生成文档、格式、拼写、安全及质量检查；真实 MCP → QuickJS → Go → Lithograph 的七段文档示例全部通过，新增 Branch Head 守卫确认测试 Branch 推进而 `main` 不变；Go Race 定向测试七段全部通过，300 秒有界测试预算没有降低断言。提交前 `lefthook`、`git diff --check` 通过。
+- **OpenClaw 原样 Linux amd64 Docker 验收**：宿主通过 Docker 标准代理构建参数解决外部 npm tarball 下载阻塞，使用仓库**未修改的 `Dockerfile.unified`** 构建成功（镜像 `sha256:3bf623b99854224934a6ac6c5d8101bf840c0a77d5e9aafc16a7234b2f372b46`），在独立临时 Volume 中执行 `scripts/mcp-unified-docker-smoke.mjs` **exit 0、31/31 SDK、OAuth/Web/API/MCP/UI Resource、non-root、Node-free、重启持久化通过**。开发 Dev 已部署较早的已验证修复镜像 `sha256:bd06c022043006d2fed05cbc2cb29499e2d316ed1ba8e095e3c4614b84602f2f`，保持 `healthy`，没有把原样隔离测试错误描述为新一次长期 Dev 部署。
+- **真实客户端验收边界**：用户提供的修复后 ChatGPT 桌面 MCP 端到端报告，五 Tool/31 SDK 实际调用、Ontology → Knowledge → Patch → Graph → Evolution/Merge、权限与恢复均有证据，默认 `main` Head 未变；前次 P23-DOC-01/02 已修复且本轮未再现。用户报告的总体标签为 `PARTIAL`，主要因为一次未经目录确认的无效文档路径（后自行纠正）、未做破坏性 4 MiB 负载、外部 Provider / Search 条件、和 app-only UI 实际打开。这些不冒充客户端完整 PASS；4 MiB 服务端资源边界、UI Tool/Resource 则由独立 Go MCP/Docker 验证，不把非本阶段的外部 Provider 或 UI 主动交互要求新增为当前 Phase 的完成门槛。
+- **GitHub CI 完成**：最终实现提交 **[`cfa39173020523b127982f196fd54f7b64905f04`](https://github.com/bYiyLi/kg-os/commit/cfa39173020523b127982f196fd54f7b64905f04)** 的 [CI Run #39001850377](https://github.com/bYiyLi/kg-os/actions/runs/39001850377) 已逐 Job 确认 **Ubuntu Validate success + Unified Docker / Linux amd64 success（2/2）**，其中 Docker Job 按原样 `Dockerfile.unified` 构建并完成完整隔离 Smoke。旧失败的 [CI Run #38996756140](https://github.com/bYiyLi/kg-os/actions/runs/38996756140) 保留为超时修复前历史，不当作本版本失败。正式 Tag、GHCR 发布及生产部署均未执行，亦不属于本次 Phase 关闭。

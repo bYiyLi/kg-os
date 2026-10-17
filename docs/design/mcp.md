@@ -4,7 +4,7 @@
 
 本文件是 KG OS **Go 原生 MCP、Tool 命名与文档接口、受控 JavaScript 执行、私人 OpenAI Plugin / Skill 与 Markdown Preview / Ancestry** 的设计真源。KG OS 业务语义不由 MCP 定义：Ontology、Object / Patch、Graph / Cypher、Evolution 分别由其设计 owner 负责；统一监听与 Instance 生命周期见 [Runtime](runtime.md)，公开 TypeScript SDK 的逻辑合同见 [Client](client.md)。
 
-**已验收基线与当前工作树（2026-10-16）**：`kgosd` 同一 Go 进程提供 Web / HTTP API / MCP，[Phase 16](../development/phases/16-kgosd-unified-mcp.md) 的 Go/QuickJS Sandbox、[Phase 17](../development/phases/17-mcp-web-authorization.md) 的统一认证、[Phase 18](../development/phases/18-chatgpt-embedded-web.md) 的 UI Tool 及 [Phase 22](../development/phases/22-mcp-self-describing-docs.md) 的 `docs.read` 已分别完成阶段验收，Phase 22 最终 CI 与 Dev 部署取得真实证据。**D102 / Phase 23 的独立 `kgos_docs` 和新 Tool 名已在 `main@9cec011` 实现并部署 Dev；五 Tool、隔离 31/31 SDK、Branch/State 修复已在真实 ChatGPT 客户端重新验收（用户报告 `PARTIAL`，未发现新的 SDK 产品缺陷），原样 Docker CI Job 成功，但 Ubuntu Validate Job 因集成用例整体 90 秒超时失败，修复后 CI 尚待重新验收**；远端已验收实例仍以其自身运行的镜像版本为准。历史 Phase 15 `packages/mcp/` / Node.js Worker 的 Dev/ChatGPT 结果是迁移对照，不替代 Go 原生 MCP 证据。已发行 v0.2.1 npm 包不包含新的 Docker MCP 交付；私人 Plugin 可选，标准 MCP Client 可直接连接 `kgosd`。
+**已验收基线与当前实现（2026-10-17）**：`kgosd` 同一 Go 进程提供 Web / HTTP API / MCP，[Phase 16](../development/phases/16-kgosd-unified-mcp.md) 的 Go/QuickJS Sandbox、[Phase 17](../development/phases/17-mcp-web-authorization.md) 的统一认证、[Phase 18](../development/phases/18-chatgpt-embedded-web.md) 的 UI Tool 及 [Phase 22](../development/phases/22-mcp-self-describing-docs.md) 的 `docs.read` 已分别完成阶段验收，Phase 22 最终 CI 与 Dev 部署取得真实证据。**D102 / Phase 23 的独立 `kgos_docs`、五 Tool 与文档指南已在 `main@9cec011` 实现并部署 Dev，分支安全及 CI Race 超时回归由 `cfa3917` 修复；用户报告的真实 ChatGPT 核心链路五 Tool/31 SDK 成功（完整客户端覆盖为 `PARTIAL`），Mac 与 OpenClaw 原样 Docker 构建/31 SDK 隔离成功，最终实现 SHA 的 GitHub CI Run #39001850377 两 Job 2/2 success，Phase 23 `done`**；远端已验收实例仍以其自身运行的镜像版本为准。历史 Phase 15 `packages/mcp/` / Node.js Worker 的 Dev/ChatGPT 结果是迁移对照，不替代 Go 原生 MCP 证据。已发行 v0.2.1 npm 包不包含新的 Docker MCP 交付；私人 Plugin 可选，标准 MCP Client 可直接连接 `kgosd`。
 
 **2026-10-14 MCP 认证目标调整（[D95](decisions.md#d95-unified-mcp-web-authorization)、[Phase 17](../development/phases/17-mcp-web-authorization.md) `done`（用户验收例外））**：MCP 不再拥有独立管理员 Token，使用同一个 Instance 认证真源；ChatGPT 的 OAuth 授权转入现有 KG OS Web，通过其登录状态及连接授权弹窗完成。**Go OAuth 路由、Web 授权弹窗和持久 Web Session 已实现并经过本地测试，相关代码现已进入 `main@8e7bf56`；2026-10-14 新版 Dev 曾完成正式 Docker 构建部署，用户确认 ChatGPT 重新授权测试成功。Phase 17 关闭时远端 GitHub CI / 最新完整隔离矩阵未执行，用户批准带例外关闭，不代表 CI 通过**。Web 登录状态由 Web/Runtime owner 负责，本文件只定义 MCP 的对接与安全合同。
 
@@ -163,7 +163,7 @@ kgosd --root <workspace-root> --host <address> --port <port>
 
 - 初版资源 URI 为 `ui://kgos/workspace/v1`，`resources/read` 返回 `text/html;profile=mcp-app` 的自包含 HTML（含从 `packages/web` 构建的脚本与样式）。改变不兼容 UI 内容时更新 URI 版本以避免旧缓存误用。
 - 一个专用 `kgos_workspace` Tool 的入参必须允许空对象 `{}`；`_meta.ui.resourceUri` 指向上述资源，`_meta["openai/ui"].entrypoints` 同时声明 `{"type":"global"}` 与 `{"type":"thread"}`。用户从左侧主导航或会话内容标签打开的都是同一 UI，实现上分别创建自己的宿主实例；不能承诺宿主固定采用左右分屏。Tool 具备可读 Title、合规单色图标和真实只读注解。
-- `kgos_workspace` 的 `_meta.ui.visibility=["app"]` 限制它只服务应用入口；OpenAI MCP Extensions 规定入口触发时不受通常的模型可见性限制。**本地 Phase 23 工作树** 的 `tools/list` 注册五个 AI-facing（含 `kgos_docs`）+ 一个 app-only UI Tool，共六项；Phase 22 历史部署镜像曾为四个 AI-facing + 一个 app-only，不能混为同一运行版本。无法解释该扩展的普通 MCP Client 仍能使用五个新 AI-facing Tool，但不应错误地把工作区 UI Tool 当作业务操作。
+- `kgos_workspace` 的 `_meta.ui.visibility=["app"]` 限制它只服务应用入口；OpenAI MCP Extensions 规定入口触发时不受通常的模型可见性限制。**Phase 23 已交付版本** 的 `tools/list` 注册五个 AI-facing（含 `kgos_docs`）+ 一个 app-only UI Tool，共六项；Phase 22 历史部署镜像曾为四个 AI-facing + 一个 app-only，不能混为同一运行版本。无法解释该扩展的普通 MCP Client 仍能使用五个新 AI-facing Tool，但不应错误地把工作区 UI Tool 当作业务操作。
 
 **接入与安全**：
 
@@ -174,7 +174,7 @@ kgosd --root <workspace-root> --host <address> --port <port>
 
 ## MCP 工具边界
 
-**D102 / Phase 23 合同（本地已实施，阶段验收尚未关闭）**：Tool 公开名称按 AI 的意图统一，文档读取从 Sandbox 分离。单个 `kgosd` 的 `tools/list` 对 AI 展示**五个** Tool，另保留一个 app-only UI Tool；不改变四个原有业务操作的输入、结果和底层执行语义。
+**D102 / Phase 23 已交付合同**：Tool 公开名称按 AI 的意图统一，文档读取从 Sandbox 分离。单个 `kgosd` 的 `tools/list` 对 AI 展示**五个** Tool，另保留一个 app-only UI Tool；不改变四个原有业务操作的输入、结果和底层执行语义。
 
 | 新 Tool | 原 Tool | 输入 | 职责与权限 |
 | --- | --- | --- | --- |
@@ -194,7 +194,7 @@ kgosd --root <workspace-root> --host <address> --port <port>
 
 ### MCP 统一自描述文档（D102 / Phase 23 目标）
 
-**历史发布与当前实现分离**：Phase 22 已在提交 [`96c2bc8`](https://github.com/bYiyLi/kg-os/commit/96c2bc81abfda19aaf957fa1bdb904ef3010e2fb) 中以 `docs.read(path)` 交付 31 方法、类型、Cypher 25 与 Guides，且最终 Docker CI 2/2 通过；Dev 已完成该版本部署。**本节的 D102 新合同现已在本地工作树实现，已在新版 Dev 经只读验收，用户提供的真实 ChatGPT 测试已覆盖五 Tool/31 SDK；其发现的跨 Branch 示例缺陷已修复待重新部署复验，最终 CI 仍未执行**；不能以 Phase 22 的旧镜像验收代替新接口实证。[Phase 22](../development/phases/22-mcp-self-describing-docs.md) 和 D100 保留原始完成证据。
+**历史发布与当前实现分离**：Phase 22 已在提交 [`96c2bc8`](https://github.com/bYiyLi/kg-os/commit/96c2bc81abfda19aaf957fa1bdb904ef3010e2fb) 中以 `docs.read(path)` 交付 31 方法、类型、Cypher 25 与 Guides，且最终 Docker CI 2/2 通过；Dev 已完成该版本部署。**本节 D102 合同已在 Phase 23 交付：新版 Dev 自描述文档与只读认证验收、用户报告的修复后真实客户端五 Tool/31 SDK 核心链路、OpenClaw 原样 Docker 隔离测试及最终实现 SHA 的 GitHub CI 2/2 均已核实**；不能以 Phase 22 的旧镜像验收代替新接口实证。[Phase 22](../development/phases/22-mcp-self-describing-docs.md) 和 D100 保留原始完成证据。
 
 **独立可用性**：任何已认证、可发现 MCP Tool 的客户端，无需 Skill、私人 Plugin、仓库文件或外部网站，直接使用 `kgos_docs` 读取完整 SDK/Cypher/Guides 文档，再使用相应业务 Tool。文档由 Go Handler 直接读取构建期内嵌清单，不调用 JavaScript Sandbox、Kernel 或 HTTP SDK；文档既不是任意主机文件，也不是 Knowledge 数据。Skill 只可选提供外部工作流建议。
 
@@ -659,7 +659,7 @@ KG OS 官方 Skill 应指导 AI 根据任务使用 `kgos_docs`、`kgos_ontology_
 ## 对照与验收边界
 
 - **已验收旧镜像**：`@kgos/sdk` 的 Ontology/Object/Graph/Evolution 公共方法、单 `kgosd`/Instance 的安全 Go MCP/QuickJS、原四个 AI-facing Tool、app-only Web UI Resource，以及 Phase 22 的 `docs.read`/固定文档与 Lithograph v0.3.1。旧 Tool/Docs 在 Dev 的成功不证明 D102 已部署；证据见 [Phase 22](../development/phases/22-mcp-self-describing-docs.md)。
-- **Phase 23 已提交实现 / 待最终门禁**：五个新 AI-facing Tool、直接批量 `kgos_docs`、旧 JavaScript `docs.read` 删除、Web Bridge 和私人 Skill/Plugin 提示同步、AI-first 从零 Ontology/Patch Guides 已在 `main@9cec011` 提交并部署 Dev；只读与隔离 31/31 SDK Smoke 通过。用户提供的修复后真实 ChatGPT 报告确认五 Tool、31/31 SDK、隔离写入与错误恢复，不再出现 P23-DOC-01/02，客户端 `PARTIAL` 的其余覆盖缺口不等于已证实 SDK 缺陷。首个 pushed SHA 的原样 Docker CI 成功，Ubuntu Validate 因集成测试 90 秒预算不足失败；超时修复、新 SHA CI 与 OpenClaw 原样构建的结果由 [Phase 23](../development/phases/23-mcp-tool-taxonomy-and-docs.md) 负责跟踪。
+- **Phase 23 `done`**：五个 AI-facing Tool、独立批量 `kgos_docs`、旧 JavaScript `docs.read` 删除、Web Bridge、私人 Skill/Plugin 与 Ontology/Patch Guides 已实施并部署 Dev；修复分支安全文档问题后，用户报告的真实 ChatGPT 客户端五 Tool/31 SDK、隔离写入和错误恢复通过（总体覆盖标记 `PARTIAL`，不等于 SDK 缺陷）。Mac 全量质量、OpenClaw 原样 Docker/31 SDK 隔离、最终实现提交 `cfa3917` 的 [GitHub CI 2/2](https://github.com/bYiyLi/kg-os/actions/runs/39001850377) 全部成功。详情和客户端未覆盖项见 [Phase 23](../development/phases/23-mcp-tool-taxonomy-and-docs.md#阶段关闭记录2026-10-17)。
 - 实现验收需要覆盖多个分支的不同 Head、两分支指向同一 Commit、Branch 并发前进、历史 Commit、Preview 分页拼接/过期、Ancestry 游标稳定与多父 DAG / 跨页父结点、完整原始 Message / 嵌套代码围栏与无 Message、Domain 循环、多重成员、`null` 端点、跨 Definition 共享 Index、canonical YAML 完整往返、长文本及 Markdown 注入、渲染后绝对行号、无法解释的 Snapshot、大型 Ontology 资源限制、安全沙箱逃逸、错误与取消后写入状态未知、真实 ChatGPT 认证/Plugin 流程。没有这些证据不能宣称 MCP 或 ChatGPT Web / Desktop 集成已经完成。
 
 协议与安全依据（核对日期：2026-10-11）：
