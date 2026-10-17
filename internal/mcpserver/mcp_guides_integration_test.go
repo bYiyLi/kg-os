@@ -42,7 +42,10 @@ func TestDocumentedOntologyAndObjectLifecycle(t *testing.T) {
 	}
 	server := httptest.NewServer(svc.Handler())
 	defer server.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	// Under -race on Ubuntu the seven real MCP/QuickJS/Lithograph writes and
+	// independent Branch checks can exceed 90 seconds in aggregate. Keep a
+	// bounded suite deadline without coupling it to a fast local run.
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 	client := mcp.NewClient(&mcp.Implementation{Name: "guide-integration", Version: "1"}, nil)
 	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{
