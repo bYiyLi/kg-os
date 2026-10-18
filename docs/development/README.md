@@ -102,7 +102,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 23 MCP Tool Taxonomy & Batch Docs 已为 `done`（2026-10-17）。** [D102](../design/decisions.md#d102-mcp-tool-taxonomy-and-batch-docs) 五个 AI-facing Tool + app-only `kgos_workspace`、独立批量 `kgos_docs` 与 31 方法/75 类型/133 篇内嵌文档均已实现；隔离 Branch/State 文档缺陷已修复。Mac 完整 `pnpm validate`、OpenClaw 原样 `Dockerfile.unified` 构建与隔离 31/31 SDK/持久化 Smoke 均成功，用户提交的无 Skill ChatGPT 客户端核心验收确认五 Tool/31 SDK（报告总体 `PARTIAL`，未覆盖 UI 主动交互/外部 Provider 等非本阶段门禁）。实施提交 `9cec011` 与修复提交 [`cfa3917`](https://github.com/bYiyLi/kg-os/commit/cfa39173020523b127982f196fd54f7b64905f04) 已推送；最终实现 SHA 的 [GitHub CI Run #39001850377](https://github.com/bYiyLi/kg-os/actions/runs/39001850377) 两 Job **2/2 success**。Dev 已部署并通过验收，正式 Tag/GHCR/生产发布未执行。详见 [Phase 23 阶段关闭记录](phases/23-mcp-tool-taxonomy-and-docs.md#阶段关闭记录2026-10-17)。
 
-**Phase 24 Lithograph v0.3.3 Upgrade 当前为 `in_progress`（2026-10-19）。** 按 [D103](../design/decisions.md#d103-lithograph-v033-upgrade)已对齐主扩展/Provider、本机与 Docker 版本校验、MCP Cypher 手册和固定上游链接；真实旧库兼容、Mac 完整质量与 OpenClaw 隔离镜像 31/31 SDK、重启及清理验收通过，Review 发现的取消测试假阳性与 Smoke 清理错误已修复并复验。新增上游 execution options 没有进入现有 Graph 请求。用户已授权提交、推送到 `main` 并跟进 CI 直到两个 Job 全部通过后关闭阶段，同时保留原有 Plugin 改动。实际证据与剩余门禁见 [Phase 24](phases/24-lithograph-v033-upgrade.md)；当前没有新 SHA 的远程 CI、长期 Dev 部署或正式发行证据。
+**Phase 24 Lithograph v0.3.3 Upgrade 已为 `done`（2026-10-19）。** 按 [D103](../design/decisions.md#d103-lithograph-v033-upgrade)已对齐主扩展/Provider、本机与 Docker 版本校验、MCP Cypher 手册和固定上游链接；真实旧库兼容、Mac 完整质量与 OpenClaw 隔离镜像 31/31 SDK、重启及清理验收通过，Review 发现的取消测试假阳性与 Smoke 清理错误已修复并复验。实施提交 [`bbcd091`](https://github.com/bYiyLi/kg-os/commit/bbcd0915af1d996c674781e6d1b853b4d36b2891) 已推送到 `main`，确切 SHA 的 [CI Run 39149281181](https://github.com/bYiyLi/kg-os/actions/runs/39149281181) 两个 Job **2/2 success**；原有 Plugin 改动未纳入提交。新增上游 execution options 没有进入现有 Graph 请求，长期 Dev、新 Tag/GHCR 与生产部署未执行。详见 [Phase 24 关闭记录](phases/24-lithograph-v033-upgrade.md#阶段关闭记录2026-10-19)。
 
 ## 5. 路线总览
 
@@ -132,7 +132,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [21 Docker-only Distribution & CI Simplification](phases/21-docker-only-delivery.md) | `done` | 全产品 Linux amd64 Docker-only、两 Job CI 2/2、单镜像 Release workflow、npm-only 交付链清理；GHCR 正式发行独立授权 | [D99](../design/decisions.md#d99-linux-amd64-docker-only-distribution)、[Docker-only Client](../design/client.md#docker-only-交付) |
 | [22 MCP Self-Describing Docs & Lithograph v0.3.1](phases/22-mcp-self-describing-docs.md) | `done` | v0.3.1 主扩展与 Provider 版本对齐；MCP `docs.read()` + 31 方法/75 类型/132 页源码生成文档 + KG OS Cypher 25 手册和组合 Guides；隔离 Docker/Ubuntu Validate [CI 2/2](https://github.com/bYiyLi/kg-os/actions/runs/38874967382) 验收完成 | [D100](../design/decisions.md#d100-mcp-self-describing-docs)、[D101](../design/decisions.md#d101-lithograph-v031-upgrade)、[MCP](../design/mcp.md#mcp-tool-help) |
 | [23 MCP Tool Taxonomy & Batch Docs](phases/23-mcp-tool-taxonomy-and-docs.md) | `done` | 五个 AI Tool + app-only UI、批量 Docs/133 篇指南、31 SDK；Mac 全量、OpenClaw 原样 Docker/31 SDK、客户端核心、最终 SHA [CI 2/2](https://github.com/bYiyLi/kg-os/actions/runs/39001850377) 通过；客户端非本阶段范围保留实测限制 | [D102](../design/decisions.md#d102-mcp-tool-taxonomy-and-batch-docs)、[MCP](../design/mcp.md#mcp-tool-help) |
-| [24 Lithograph v0.3.3 Upgrade](phases/24-lithograph-v033-upgrade.md) | `in_progress` | v0.3.3 制品/手册、真实旧库兼容、Mac 完整质量、OpenClaw 隔离镜像 31/31 SDK 与重启/清理均通过；已授权提交/推送并跟进最终 SHA CI，未部署/发布 | [D103](../design/decisions.md#d103-lithograph-v033-upgrade)、[Graph](../design/graph.md#graph)、[Runtime](../design/runtime.md#lithograph-调用入口) |
+| [24 Lithograph v0.3.3 Upgrade](phases/24-lithograph-v033-upgrade.md) | `done` | v0.3.3 制品/手册、真实旧库兼容、Mac 完整质量、OpenClaw 隔离镜像 31/31 SDK 与重启/清理，以及最终实施 SHA [CI 2/2](https://github.com/bYiyLi/kg-os/actions/runs/39149281181) 均通过；未部署/发布 | [D103](../design/decisions.md#d103-lithograph-v033-upgrade)、[Graph](../design/graph.md#graph)、[Runtime](../design/runtime.md#lithograph-调用入口) |
 
 当前实现依赖顺序：
 
@@ -185,7 +185,7 @@ Go Engineering Foundation
        Phase 23: MCP Tool Taxonomy & Batch Docs [done; D102]
          (five AI-facing Tool names → independent batch kgos_docs →
           AI task navigation/Ontology/Patch guides → real MCP/AI + Docker CI)
-       Phase 24: Lithograph v0.3.3 Upgrade [in_progress; D103]
+       Phase 24: Lithograph v0.3.3 Upgrade [done; D103]
          (same-version artifacts/manual → compatibility + cancellation →
           Mac quality + OpenClaw isolated Docker → final SHA CI)
 ```
