@@ -324,7 +324,7 @@ func TestHostContextCancellation(t *testing.T) {
 		ctx,
 		QueryRequest{
 			At:     "branch/main",
-			Cypher: "UNWIND range(1,1000000000) AS value RETURN value",
+			Cypher: "UNWIND range(1,1000) AS x UNWIND range(1,1000) AS y RETURN x * 1000 + y AS value",
 		},
 		func(string, Event) error { return nil },
 	)
@@ -1094,7 +1094,7 @@ func TestHostCloseCancelsActiveWorkAndAbortsIdleTransaction(t *testing.T) {
 			context.Background(),
 			QueryRequest{
 				At:     "branch/main",
-				Cypher: "UNWIND range(1,1000000000) AS value RETURN value",
+				Cypher: "UNWIND range(1,1000) AS x UNWIND range(1,1000) AS y RETURN x * 1000 + y AS value",
 			},
 			func(_ string, event Event) error {
 				if event.Type == "columns" {

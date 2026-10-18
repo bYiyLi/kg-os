@@ -122,7 +122,7 @@ func TestPhase22CypherExamplesAgainstRealKGOSLithograph(t *testing.T) {
 						t.Fatalf("%s example %d should fail only for its absent index %q: %v", page, i, item.missing, err)
 					}
 				} else if err != nil {
-					t.Fatalf("%s example %d failed against Lithograph v0.3.1: %v\n%s", page, i, err, sql)
+					t.Fatalf("%s example %d failed against pinned Lithograph: %v\n%s", page, i, err, sql)
 				} else if len(rows) == 0 && page != "mutations.md" && page != "diagnostics.md" && page != "search.md" {
 					t.Logf("Valid empty result in %s example %d", page, i)
 				}
@@ -131,7 +131,7 @@ func TestPhase22CypherExamplesAgainstRealKGOSLithograph(t *testing.T) {
 		})
 	}
 	if count != 0 {
-		t.Logf("Verified %d executed Cypher manual snippets against KG OS / Lithograph v0.3.1", count)
+		t.Logf("Verified %d executed Cypher manual snippets against KG OS / pinned Lithograph", count)
 	}
 }
 

@@ -541,12 +541,17 @@ func TestPhase05GraphStreamingCancellationAndDurability(t *testing.T) {
 	err := runtime.Kernel.StreamGraphQuery(
 		ctx,
 		kernel.GraphQueryRequest{
-			At: "branch/main", Cypher: "UNWIND range(1,1000000000) AS value RETURN value",
+			At: "branch/main", Cypher: "UNWIND range(1,1000) AS x UNWIND range(1,1000) AS y RETURN x * 1000 + y AS value",
 		},
 		func(kernel.GraphStreamEvent) error { return nil },
 	)
 	if err == nil {
 		t.Fatal("Graph query stream ignored context cancellation")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) &&
+		!errors.Is(err, context.Canceled) &&
+		!strings.Contains(strings.ToLower(err.Error()), "interrupt") {
+		t.Fatalf("Graph query stream cancellation error = %v", err)
 	}
 	if _, queryErr := runtime.Kernel.QueryGraph(context.Background(), kernel.GraphQueryRequest{
 		At: "branch/main", Cypher: "RETURN 1 AS value",

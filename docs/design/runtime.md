@@ -266,11 +266,11 @@ Graph `execute` 使用本次 operation 独占的读写 connection。进入用户
 
 Bearer token 仍是实例的统一认证。通过认证的调用方可使用 Lithograph 支持的 Cypher；KG OS 不额外禁止 `LOAD CSV` 等文件 / 网络能力。实际文件路径位于运行 `kgosd` 的主机，访问权限由宿主进程和 Lithograph 决定；只读是数据库执行边界，不是无外部 I/O 模式。这里没有开放 raw SQL 或改变 extension 的 startup-only 加载合同。
 
-Lithograph v0.3.1 的 Managed Semantic read 不再要求写 `kgos.db` 来发布 text -> Vector cache，因此 Graph `query` 可以使用物理只读 `main` connection。Provider 若启用自己的独立 cache database，仍可以按 providerConfig 写该 cache；这个写入不改变 Lithograph graph/schema/history/ref，也不把只读 Graph 入口升级成读写 connection。Phase 01 已用真实 Go driver + release artifact 完成 read-only/write connection、Provider readiness/cache mapping 与 cancellation 的 host-level integration 验证；公共 Graph HTTP surface 实现后仍须按 [Implementation](implementation.md#managed-semantic-integration-readiness) 做端到端验证。
+Lithograph v0.3.3 的 Managed Semantic read 不再要求写 `kgos.db` 来发布 text -> Vector cache，因此 Graph `query` 可以使用物理只读 `main` connection。Provider 若启用自己的独立 cache database，仍可以按 providerConfig 写该 cache；这个写入不改变 Lithograph graph/schema/history/ref，也不把只读 Graph 入口升级成读写 connection。Phase 01 的真实 Go driver / release artifact 验证保留为历史 host-level 基线；每次依赖升级仍须按 [Implementation](implementation.md#managed-semantic-integration-readiness) 与 [当前升级阶段](../development/phases/24-lithograph-v033-upgrade.md)重新验证只读/读写、Provider cache、取消及公共 Graph 端到端行为。
 
 ### Embedding result cache
 
-KG OS 不实现 text -> Vector cache，也不调用 Lithograph cache procedure。Lithograph v0.3.1 把 persistent embedding result cache 交给具体 Embedding Provider；KG OS 的 `[cache]` 只是**创建 / 因业务定义变化必须重建 OpenAI-compatible Semantic Index 时的默认 providerConfig mapping**。
+KG OS 不实现 text -> Vector cache，也不调用 Lithograph cache procedure。Lithograph v0.3.3 把 persistent embedding result cache 交给具体 Embedding Provider；KG OS 的 `[cache]` 只是**创建 / 因业务定义变化必须重建 OpenAI-compatible Semantic Index 时的默认 providerConfig mapping**。
 
 配置入口：
 
@@ -287,6 +287,8 @@ max_size_mb = 4096
 - compiler 固定写入 `providerConfig.cache.enabled=true`；KG OS 不公开 disable/skip cache 的安装配置。Provider cache hit/miss 对 Lithograph 与 KG OS correctness 不可见，删除 cache 只会增加后续 Provider 调用。
 - `[cache]` 是 Semantic Index 创建 / replace 时使用的 provider cache 配置；已经存在及历史 IndexDefinition 继续保留它们 versioned 的 providerConfig。KG OS 不扫描、迁移或改写历史配置。
 - `db.index.semantic.rebuild` 仍是 Lithograph TEMP Semantic/HNSW maintenance，不是填充 Provider-owned embedding cache 的入口；KG OS 不新增预热 CLI/API、后台 scheduler 或第二套 cache service。
+
+v0.3.2 已修复 Provider cache 对同一空路径的首次多进程初始化竞争，v0.3.3 继承该修复；旧 v0.3.1 的串行预热规避只适用于其历史版本。本次升级保持 Provider cache 的配置、独立文件与 ownership，不新增 KG OS 预热流程。固定版本依据见上游 [v0.3.2 发布说明](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/releases/v0.3.2.md#provider-cache-首次并发初始化修复)与 [Known Issues](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/reference/known-issues.md#provider-cache-first-use)。
 
 Provider cache database 是 runtime/derived data，不属于 State、Commit、Branch、Lithograph storage format 或 Knowledge Base correctness source。relative `path` 可以显式配置为 `cache/openai-compatible.db` 并解析到 `<workspace-root>/.kgos/cache/`；absolute path 也允许位于 Instance Directory 外。由于写入 IndexDefinition 的 cache path 是 versioned absolute path，移动/复制 Workspace / Instance **不会**自动重写既有索引的 recorded path；v1 不提供 cache-path migration。查询旧索引时仍使用该索引自己的 recorded config，cache路径不可创建/打开时按 Provider公开 I/O/config错误失败。
 
@@ -362,7 +364,7 @@ KG OS 的多语句单-State mutation（例如 Object Patch 与 bootstrap）通�
 
 Object Patch 的 strict base、no-op、单-State 与 fail-closed 规则仍由 [Object](object.md#object-公共调用合同)拥有。KG OS 不在 `tx_begin/commit` 外另套 SQLite `BEGIN/COMMIT`，不提供 `tx_execute` adapter，也不复制 Lithograph transaction state machine。一次 active transaction 的 connection 在 terminal operation 前保持独占。
 
-公共 Graph 同样只使用 SQL surface：非 streaming 使用 `lithograph()`，streaming 使用 `lithograph_rows()`。后者是真正的 Lithograph execution stream，可承载 read/write、external I/O 与 transaction subquery；KG OS 不再需要 Native Graph adapter。Go integration 必须用真实 v0.3.1 extension 验证 streaming、`context.Context` cancellation、early close、partial/durable batch 语义与错误映射，见 [工程待办](implementation.md#go-运行时与数据库接入)。
+公共 Graph 同样只使用 SQL surface：非 streaming 使用 `lithograph()`，streaming 使用 `lithograph_rows()`。后者是真正的 Lithograph execution stream，可承载 read/write、external I/O 与 transaction subquery；KG OS 不再需要 Native Graph adapter。Go integration 必须用真实 v0.3.3 extension 验证 streaming、`context.Context` cancellation、early close、partial/durable batch 语义与错误映射，见 [工程待办](implementation.md#go-运行时与数据库接入)。
 
 ### Full-text 全局配置
 

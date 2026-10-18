@@ -1,6 +1,6 @@
 # KG OS Cypher 25 — Function Signatures
 
-This static reference is part of KG OS MCP. It covers **169 built-in functions and 172 overload signatures**, frozen to Lithograph v0.3.1 / CY25-2026.08. For null semantics, tagged JSON values and usage, read `cypher/expressions.md` and `cypher/functions.md`.
+This static reference is part of KG OS MCP. It covers **169 built-in functions and 172 overload signatures**, frozen to Lithograph v0.3.3 / CY25-2026.08. For null semantics, tagged JSON values and usage, read `cypher/expressions.md` and `cypher/functions.md`.
 
 | Signature                                                                                                                                                                  | Category      | Deprecated / replacement |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------ |

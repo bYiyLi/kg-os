@@ -85,13 +85,13 @@ v0.2.1 已发布的 `@kgos/sdk`、`@kgos/cli` 和六个 `@kgos/runtime-*` 属于
 Linux amd64 Docker / OCI (one official runtime artifact)
   └── kgosd (Go; non-root; no Node.js runtime)
         ├── HTTP API + Web (built from packages/sdk + packages/web)
-        ├── MCP / SDK self-documentation (D100 / Phase 22 target)
+        ├── MCP / SDK self-documentation (D102 / Phase 23)
         ├── Lithograph + Provider + official Jieba extensions
         └── <workspace>/.kgos persistent Instance
 ```
 
 - 唯一当前官方镜像为 `ghcr.io/<owner 小写>/kgos:v<version>`，只支持 Linux amd64；一次 Tag Release 发布且验证同一 Docker image，不再发布新 npm 包。镜像构建时的 TS/Node 是开发工具，不作为镜像运行时能力。
-- `packages/sdk` 保持 TypeScript API 合同真源，是 Web 和未来 MCP SDK Reference 生成的必要源码；不因为不对外发布 npm 而删除 SDK 类型定义、API 错误/流式约束或必要测试。当前镜像仍使用 Phase 20 的旧 Help，Phase 22 验收后才切换到内建文档。
-- [D101](decisions.md#d101-lithograph-v031-upgrade) 规定 Docker 构建中的 Lithograph 主扩展及 Provider 使用经过 SHA-256 校验的 **v0.3.1** Release 制品；历史 `@kgos/runtime-linux-x64@0.2.1` 仅保留 Jieba/许可等 build-only 输入，所含旧 Lithograph/Provider 必须被替换且 Runtime manifest 摘要重算。构建阶段重新编译 `kgosd`；历史 npm 版本独立于 KG OS 镜像 Tag，不构成 npm 发行承诺。完整原生扩展安装、Instance/materialization、网络和安全规则仍由 [Runtime](runtime.md#native-runtime-package)、[MCP Docker](mcp.md#docker-only-交付) 拥有；正式镜像升级状态由实际 Docker 测试证明。
+- `packages/sdk` 保持 TypeScript API 合同真源，是 Web 和 MCP SDK Reference 生成的必要源码；不因为不对外发布 npm 而删除 SDK 类型定义、API 错误/流式约束或必要测试。当前内建文档沿用 D100 的构建期生成机制，按 D102 通过独立批量 `kgos_docs` 读取；Phase 20 旧 Help 和 Phase 22 `docs.read` 只保留历史证据。
+- [D103](decisions.md#d103-lithograph-v033-upgrade) 规定 Docker 构建中的 Lithograph 主扩展及 Provider 使用经过 SHA-256 校验的 **v0.3.3** Release 制品；历史 `@kgos/runtime-linux-x64@0.2.1` 仅保留 Jieba/许可等 build-only 输入，所含旧 Lithograph/Provider 必须被替换且 Runtime manifest 摘要重算。构建阶段重新编译 `kgosd`；历史 npm 版本独立于 KG OS 镜像 Tag，不构成 npm 发行承诺。完整原生扩展安装、Instance/materialization、网络和安全规则仍由 [Runtime](runtime.md#native-runtime-package)、[MCP Docker](mcp.md#docker-only-交付) 拥有；正式镜像升级状态由实际 Docker 测试证明。
 - 验证只对单一交付目标做 Ubuntu/Linux amd64 源码质量门禁与 Linux amd64 Docker 隔离 Smoke。镜像中的原生扩展及 Go/JS/WASM 实际行为必须测试；旧 npm packaging/六平台 runner 不是这条链上的门禁。
 - Tag、镜像 digest、GHCR 发布、Dev 部署/生产部署互相独立；未执行的动作不得写成已成功。详见 [D99](decisions.md#d99-linux-amd64-docker-only-distribution) 和 [Phase 21](../development/phases/21-docker-only-delivery.md)。

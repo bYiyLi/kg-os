@@ -80,8 +80,8 @@ const lithographArtifacts = await readFile(
   resolve(root, "scripts/lithograph-artifacts.mjs"),
   "utf8"
 );
-if (!lithographArtifacts.includes('LITHOGRAPH_VERSION = "0.3.1"')) {
-  throw new Error("Lithograph fixture must remain pinned to v0.3.1");
+if (!lithographArtifacts.includes('LITHOGRAPH_VERSION = "0.3.3"')) {
+  throw new Error("Lithograph fixture must remain pinned to v0.3.3");
 }
 const linuxArtifactSha = lithographArtifacts.match(
   /"linux-x64": \{[\s\S]*?sha256: "([0-9a-f]{64})"/

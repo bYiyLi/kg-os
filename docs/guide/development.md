@@ -28,7 +28,7 @@ pnpm check:quick
 pnpm dev
 ```
 
-`pnpm dev` 复用原有**内部开发**流程：编译当前 Go daemon、从当前本机支持的历史 native package manifest 装配测试用扩展，启动临时 `.kgos-dev` Instance，再启动 Vite 开发页面 `http://127.0.0.1:5173`。它不是另一种官方运行产物；不支持本机 Docker 就不在 Mac 运行 Docker。
+`pnpm dev` 复用原有**内部开发**流程：编译当前 Go daemon、准备当前平台的固定 Lithograph Release 与 official Jieba 测试扩展并生成匹配的 Runtime manifest，启动临时 `.kgos-dev` Instance，再启动 Vite 开发页面 `http://127.0.0.1:5173`。当前 Lithograph 主扩展与 Provider 统一锁定 **v0.3.3**，下载与装配均校验 SHA-256；设计与升级验收见 [D103](../design/decisions.md#d103-lithograph-v033-upgrade) / [Phase 24](../development/phases/24-lithograph-v033-upgrade.md)。它不是另一种官方运行产物；不支持本机 Docker 就不在 Mac 运行 Docker。
 
 只调前端可执行 `pnpm --filter @kgos/web dev`（127.0.0.1:5174）；构建与测试时：
 
@@ -44,7 +44,7 @@ pnpm test:e2e
 | 命令 | 验证内容 |
 | --- | --- |
 | `pnpm check:quick` | Go 单测/静态检查、TS 类型、Lint、Vitest；pre-commit |
-| `pnpm validate` | Go race、真实 Lithograph/Kernel coverage（>=90%）、govulncheck、TS/Web tests、Playwright、SDK Help 同步、依赖/License/安全和 diff |
+| `pnpm validate` | Go race、真实 Lithograph/Kernel coverage（>=90%）、govulncheck、TS/Web tests、Playwright、MCP 自描述文档同步、依赖/License/安全和 diff |
 | `pnpm test:go` | Go Unit / Integration、SQLite FTS5 |
 | `pnpm test:go:race` | 带 race 的真实 native Kernel / MCP 集成 |
 | `pnpm test:go:coverage` | 真实 Lithograph 路径与整个 Go 项目覆盖率 |
@@ -52,7 +52,7 @@ pnpm test:e2e
 | `pnpm test:coverage` | SDK/Web V8 覆盖率 |
 | `pnpm test:e2e` | 重建并执行真实浏览器 E2E |
 | `pnpm test:docker:unified` | **仅在 Linux amd64 OpenClaw/CI 执行**，隔离真实镜像与持久化数据测试 |
-| `pnpm check:help` | 校验 31 个 MCP SDK Help 合同与生成物 |
+| `pnpm check:docs` | 校验 31 个 MCP SDK 方法、类型、Cypher/Guides 与内嵌文档生成物 |
 
 `pnpm validate` 不调用 Mac Docker，也不再打包 npm release tarball、检查旧多平台 native npm 候选或执行 registry 验证；**不能因此取消 Go/Web/MCP 读写权限、真实 State 与隔离容器测试**。Web 或 MCP UI 修改后优先 `pnpm test:e2e`；直接调用 Playwright 时，确认已从当前源码 `pnpm build` 过，不应读取陈旧页面。
 
@@ -67,7 +67,7 @@ pnpm dev:mcp check   # 只读核对长期 Dev
 
 Dev 部署必须获得单独授权；已授权后使用 `pnpm dev:mcp deploy`，它会在 OpenClaw 自动备份、构建、切换并验证，不能对长期用户 Instance 做写入 Smoke。
 
-需要测试一次真正的 Docker 镜像时，在 OpenClaw 的**独立临时源码目录**用当前 `Dockerfile.unified` 构建 Linux amd64 镜像，然后以环境变量 `KGOS_UNIFIED_DOCKER_SMOKE_IMAGE` 指向**该新镜像**执行 `pnpm test:docker:unified`。它创建、清理独立 Volume，验收单 `kgosd`、非 root/无 Node、Web/API/MCP、四业务工具与 UI、OAuth/认证、31/31 SDK、读写权限、重启持久化。普通 GitHub PR/main CI 只包含 Ubuntu Validate 和 Linux amd64 Docker 两个 Job；源码本地通过不能替代实际 Docker CI。
+需要测试一次真正的 Docker 镜像时，在 OpenClaw 的**独立临时源码目录**用当前 `Dockerfile.unified` 构建 Linux amd64 镜像，然后以环境变量 `KGOS_UNIFIED_DOCKER_SMOKE_IMAGE` 指向**该新镜像**执行 `pnpm test:docker:unified`。它创建、清理独立 Volume，验收单 `kgosd`、非 root/无 Node、Web/API/MCP、五个 AI-facing Tool 与 app-only UI、OAuth/认证、31/31 SDK、读写权限、重启持久化。普通 GitHub PR/main CI 只包含 Ubuntu Validate 和 Linux amd64 Docker 两个 Job；源码本地通过不能替代实际 Docker CI。
 
 ## 正式 Release 边界
 

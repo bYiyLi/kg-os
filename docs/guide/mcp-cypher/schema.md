@@ -1,6 +1,6 @@
 # Graph Type、Schema、Constraint 和 Index
 
-Cypher 25 当前图语法支持 Graph Type 的 `SET` / `EXTEND` / `ALTER` / `SHOW` / `DROP`，以及键、唯一性、存在性/类型约束和多种 Index 定义。具体语法与名称以 **Lithograph v0.3.1** 冻结兼容 Profile 为准。
+Cypher 25 当前图语法支持 Graph Type 的 `SET` / `EXTEND` / `ALTER` / `SHOW` / `DROP`，以及键、唯一性、存在性/类型约束和多种 Index 定义。具体语法与名称以 **Lithograph v0.3.3** 冻结兼容 Profile 为准。
 
 KG OS 的 Ontology 定义与 Knowledge 实例不同：Ontology 高层 API 负责模型聚合和 canonical Patch；Cypher DDL 则通过 Lithograph 直接修改底层 Schema。**直接修改 KG OS 内部 Schema/Binding 可能造成高层 Ontology 无法解释的 Snapshot**。不能凭 `graph.execute` 成功就认定所有高层模型仍一致。
 

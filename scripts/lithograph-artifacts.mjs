@@ -1,43 +1,43 @@
 import { resolve } from "node:path";
 
-export const LITHOGRAPH_VERSION = "0.3.1";
+export const LITHOGRAPH_VERSION = "0.3.3";
 
 const artifacts = {
   "darwin-arm64": {
     archive: "lithograph-macos-arm64.tar.gz",
     library: "lithograph.dylib",
     providerLibrary: "lithograph-openai-compatible.dylib",
-    sha256: "27de06ef3528c477d3730274c525ca081bbad4f711f9dd32615811e97237c6fe"
+    sha256: "ba8fd08bd84d3516c9c2e6e8168f507b83de6b8cb6eea2c66cff65760b1ce997"
   },
   "darwin-x64": {
     archive: "lithograph-macos-x64.tar.gz",
     library: "lithograph.dylib",
     providerLibrary: "lithograph-openai-compatible.dylib",
-    sha256: "8ee1b0cb824d7f2c45101d1d84ed49c23378fdc95be621a2c0fa7994d918dd92"
+    sha256: "507359aaea081fd2bac975a93d977d3e0345eb1c08ef7c04327449e34d05bf9f"
   },
   "linux-arm64": {
     archive: "lithograph-linux-arm64.tar.gz",
     library: "lithograph.so",
     providerLibrary: "lithograph-openai-compatible.so",
-    sha256: "1f0081ce3478f69575153e1c0b9cf7a22922a21170bd22c0404a4a2692e95e80"
+    sha256: "65fe4ac6ce8c481dd6108a67a744da1e66a1c7d3e2091f11bbb7eb7d2e6ccd89"
   },
   "linux-x64": {
     archive: "lithograph-linux-x64.tar.gz",
     library: "lithograph.so",
     providerLibrary: "lithograph-openai-compatible.so",
-    sha256: "b4170e31a307e71f243365d4629b359f8e2e1c1fcf9703722c7f314b858a8d1d"
+    sha256: "7340c320e9b99c075271dcff5a3177f6997382e6c957dcd62dacdd48516236f5"
   },
   "win32-arm64": {
     archive: "lithograph-windows-arm64.zip",
     library: "lithograph.dll",
     providerLibrary: "lithograph-openai-compatible.dll",
-    sha256: "d7ceb9eceeccb318099ed668a5d15b1a9aa165e9eaad72564782fe91dc0bbd43"
+    sha256: "b820308d5265ac8673c6ebf4c60efab1dfef4bf39d153c586d63df02a6aeb57c"
   },
   "win32-x64": {
     archive: "lithograph-windows-x64.zip",
     library: "lithograph.dll",
     providerLibrary: "lithograph-openai-compatible.dll",
-    sha256: "3efed000b48dabfa2ea8748900955b8db2af99bb33b6353acf36fa84ac92d1a9"
+    sha256: "4bd404168a1e60cc6ae8cf18e888f65b36f14221d90ea106cc709945344baaf1"
   }
 };
 

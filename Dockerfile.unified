@@ -19,8 +19,8 @@ FROM ${NODE_IMAGE} AS native-builder
 ARG NATIVE_RUNTIME_VERSION=0.2.1
 RUN npm install --prefix /tmp/native --omit=dev --ignore-scripts --no-audit --no-fund \
     @kgos/runtime-linux-x64@${NATIVE_RUNTIME_VERSION}
-ARG LITHOGRAPH_VERSION=0.3.1
-ARG LITHOGRAPH_LINUX_X64_SHA256=b4170e31a307e71f243365d4629b359f8e2e1c1fcf9703722c7f314b858a8d1d
+ARG LITHOGRAPH_VERSION=0.3.3
+ARG LITHOGRAPH_LINUX_X64_SHA256=7340c320e9b99c075271dcff5a3177f6997382e6c957dcd62dacdd48516236f5
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*

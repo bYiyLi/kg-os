@@ -48,6 +48,7 @@ let container;
 let session;
 let mcpClient;
 let volumeCreated = false;
+const failures = [];
 
 async function docker(...args) {
   return (await runCapture("docker", args, { cwd: root })).stdout.trim();
@@ -299,8 +300,21 @@ async function stop() {
   mcpClient = undefined;
   session = undefined;
   if (container) {
-    await docker("stop", "--time", "15", container);
-    container = undefined;
+    let stopError;
+    await docker("stop", "--time", "15", container).catch((error) => {
+      stopError = error;
+    });
+    // --rm removal can finish after docker stop returns. Keep the container
+    // identity until Docker confirms it no longer holds the test volume.
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      if ((await docker("ps", "-aq", "--filter", "id=" + container)) === "") {
+        container = undefined;
+        return;
+      }
+      if (stopError) throw stopError;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("Timed out waiting for the unified smoke container to be removed");
   }
 }
 
@@ -419,11 +433,22 @@ try {
     })
   );
   assert.ok(saved.result.includes("unified-persist"), "Docker volume lost committed data");
-  process.stdout.write(
-    "Unified Docker: non-root, Node-free, one kgosd, Web/API/MCP, 31/31 SDK, restart passed\n"
-  );
+} catch (error) {
+  failures.push(error);
 } finally {
-  await stop().catch(() => undefined);
-  if (volumeCreated) await docker("volume", "rm", "-f", volume).catch(() => undefined);
-  if (ownsImage) await docker("image", "rm", "-f", image).catch(() => undefined);
+  await stop().catch((error) => failures.push(error));
+  if (volumeCreated)
+    await docker("volume", "rm", "-f", volume).catch((error) => failures.push(error));
+  if (ownsImage)
+    await docker("image", "ls", "-q", image)
+      .then(async (existing) => {
+        if (existing) await docker("image", "rm", "-f", image);
+      })
+      .catch((error) => failures.push(error));
 }
+if (failures.length === 1) throw failures[0];
+if (failures.length > 1)
+  throw new AggregateError(failures, "Unified Docker smoke or cleanup failed");
+process.stdout.write(
+  "Unified Docker: non-root, Node-free, one kgosd, Web/API/MCP, 31/31 SDK, restart and cleanup passed\n"
+);

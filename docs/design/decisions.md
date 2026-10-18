@@ -4,7 +4,7 @@
 
 本文件记录 KG OS 架构决策的**决定、依据、备选、取舍与被替换基线**。具体运行行为仍由对应职责设计文件拥有；本文件不建立第二份操作合同。
 
-当前运行架构以 [D65 Go runtime](#d65-go-runtime)、[D66 SQL-only](#d66-lithograph-v030-sql-only)、[D75 TypeScript Client](#d75-typescript-client)、[D77 explicit Instance Root](#d77-explicit-instance-root)、[D78 operation-scoped Branch](#d78-operation-scoped-branch)、[D79 stale daemon recovery](#d79-stale-daemon-recovery)、[D80 official Jieba](#d80-official-jieba)、[D93 Unified MCP](#d93-kgosd-unified-mcp) 和 [D99 Docker-only](#d99-linux-amd64-docker-only-distribution) 为准：Go 保留 daemon / Kernel / Database Host，TypeScript SDK/Web 保留源码职责；此后官方只交付 Linux amd64 Docker，不再发布 npm/六平台 Runtime。新的 [D100 自描述文档](#d100-mcp-self-describing-docs) 和 [D101 Lithograph v0.3.1](#d101-lithograph-v031-upgrade) 分别规定下一阶段的 MCP 文档机制与当前依赖升级。D76 的 npm/npx 分发、D66 的初始 v0.3.0 artifact 版本，以及更早被取代的记录均保留历史依据，不再作为当前交付目标。
+当前运行架构以 [D65 Go runtime](#d65-go-runtime)、[D66 SQL-only](#d66-lithograph-v030-sql-only)、[D75 TypeScript Client](#d75-typescript-client)、[D77 explicit Instance Root](#d77-explicit-instance-root)、[D78 operation-scoped Branch](#d78-operation-scoped-branch)、[D79 stale daemon recovery](#d79-stale-daemon-recovery)、[D80 official Jieba](#d80-official-jieba)、[D93 Unified MCP](#d93-kgosd-unified-mcp) 和 [D99 Docker-only](#d99-linux-amd64-docker-only-distribution) 为准：Go 保留 daemon / Kernel / Database Host，TypeScript SDK/Web 保留源码职责；此后官方只交付 Linux amd64 Docker，不再发布 npm/六平台 Runtime。[D100 自描述文档](#d100-mcp-self-describing-docs) 的版本固定机制由 [D102](#d102-mcp-tool-taxonomy-and-batch-docs) 调整为独立批量 `kgos_docs`，当前 Lithograph 依赖按 [D103 v0.3.3](#d103-lithograph-v033-upgrade) 对齐。D76 的 npm/npx 分发、D66 的初始 v0.3.0 artifact 版本、D101 的 v0.3.1 升级及其验收均保留历史依据，不再作为当前交付目标。
 
 ## 底层架构替换背景
 
@@ -1032,6 +1032,8 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D101 KG OS 官方 Lithograph 依赖升级为 v0.3.1（2026-10-16）
 
+> 后续调整：[D103](#d103-lithograph-v033-upgrade) 将当前依赖推进至 v0.3.3；本条与 Phase 22 保留 v0.3.1 当时的决定与验收证据。
+
 - **决定**：KG OS 原生扩展与 Provider 统一锁定最新已核实正式发行版 **Lithograph v0.3.1**，保留 `CY25-2026.08` 兼容 Profile 与现有 SQL-only、streaming、versioning、Provider-owned cache 语义。构建/安装必须验证发行制品 SHA-256 和运行时 `lithograph_version()`；本地 fixture 和正式 Linux amd64 Docker 不能使用不同的 Lithograph 版本。现有原生 Runtime npm v0.2.1 仅可继续作为 Jieba/许可证等历史构建输入，Docker 要以经哈希校验的 v0.3.1 Release 主扩展和 Provider **替换**其中旧文件并更新 Runtime manifest 文件哈希。
 - **范围**：不重新引入 npm/native 分发、不 Fork SQLite、不修改 Graph/Cypher 语义。升级必须通过 Go/SQLite/Lithograph 集成、Schema/Ontology/Graph/Evolution 兼容回归和隔离 Docker 真装载验收；在验收前只是已授权源码改动，不等于 Dev/生产运行时已升级或当前 GitHub CI 通过。以 v0.3.1 为基线维护 D100 的 MCP Cypher 文档；后续升级仍应先核对实际 release、公开能力与现有 KG OS 映射。
 - **依据/取舍**：完整的上游 Cypher 使用手册及修复已随 v0.3.1 正式发布，而 KG OS 原本仍固定 v0.3.0；单纯改本地版本常量不会改变 Docker 中通过历史 Runtime npm 输入获取的原生扩展。升级制品不变更公共接口，但必须真实测试现有 Ontology Generated Schema 命名、Provider 加载、Full-text/Vector 与版本合同。
@@ -1046,3 +1048,13 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **迁移与安全**：新工具名是有意的 MCP 公开合同破坏性调整，实施后不注册旧名称兼容别名；移除旧 Sandbox `docs.read(path)`，不保留第二条文档读取路径。现有 Instance/OAuth 认证、Tool 级 read/write 宿主校验、预览窗口与祖先游标、UI Resource/可见性保持不变；`kgos_docs` 对固定只读 Markdown 清单做严格路径/数量/总响应预算校验，不允许任意宿主文件、网络、Token 或 Knowledge 访问，非法或超限批次整体失败且不截断。必须验证 ChatGPT 重新发现/刷新 Tool 描述，不能以旧连接的缓存视图作为当前服务端证据。
 - **取舍与替代**：拒绝继续通过 `kgos_query` 执行 `docs.read`，因为阅读调用说明不应依赖先掌握脚本；拒绝同时支持单路径字符串/多路径数组、保留旧名别名或新增 docs.list/search/HTTP 文档服务，避免多套接口及版本漂移。代价是现有 MCP Client/Plugin/Skill、Web MCP Apps Bridge、静态说明、工具名测试和客户端缓存都必须随同一版本迁移；Phase 20、22 的历史实现与 CI 完成证据保留，不倒改其既有交付事实。
 - **当前真源与实施**：[MCP Tool 与 Docs 合同](mcp.md#mcp-tool-help)、[Ontology](ontology.md#公共可编辑格式)、[Object Patch](object.md#object-公共调用合同)、[Phase 23](../development/phases/23-mcp-tool-taxonomy-and-docs.md)。D102 取代 D85/D93/D96 中旧 AI-facing Tool 名称与 D100 的 `docs.read` 读取通道，不取代那些决定的 Sandbox、OAuth、UI、Graph、Evolution 或版本固定文档机制。
+
+<a id="d103-lithograph-v033-upgrade"></a>
+
+### D103 KG OS 官方 Lithograph 依赖升级为 v0.3.3（2026-10-19）
+
+- **决定**：按用户本次升级授权，将 KG OS 主扩展与 OpenAI-compatible Provider 从 v0.3.1 统一推进至已核实的最新正式发行版 **Lithograph v0.3.3**。沿用 D101 的同版 archive、SHA-256、`VERSION` / `lithograph_version()`、本地 fixture 与 Linux amd64 Docker 对齐及 Runtime manifest 重算合同；MCP 手册和固定上游链接随同一变更更新。
+- **兼容边界**：保留 SQL-only、`CY25-2026.08`、storage format **3**、既有 Commit identity 与 `EmbeddingProviderV1`。v0.3.1 → v0.3.3 不需要新的图存储迁移；仍须用旧版本创建的 KG OS 数据验证升级后读取、继续写入与重启。历史 format 4 仍不支持直接迁移或降级，不能手改 marker。
+- **能力边界**：上游新增 `readAccess` / `writeAccess` 与 `memoryLimitBytes` 是 SQL execution options；现有 KG OS Graph 请求不暴露这些字段，本次升级不增加公共字段、不自动启用内存配额、不改变 Graph 的只读/读写及外部 I/O 合同。省略新选项继续使用现有执行行为；内存预算即使由宿主另行显式启用，也不是进程 RSS 硬上限。
+- **依据与取舍**：上游 [v0.3.2 发布说明](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/releases/v0.3.2.md)修复 canonical 状态、插值/作用域与 Provider cache 首次并发初始化；[v0.3.3 发布说明](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/releases/v0.3.3.md)修复静态反引号名称、传播长表达式取消并提供显式预算。本次直接消费官方制品与已有兼容合同，不为可选底层能力扩展 KG OS 产品面；Procedure metadata 与 `SHOW INDEXES.createStatement` 完整性限制仍按同版 [Known Issues](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/reference/known-issues.md)处理。旧 v0.3.1 cache 串行预热规避不再作为当前版本前置要求。
+- **验证与交付**：现有 Go/SQLite/Lithograph、Ontology/Graph/Evolution/MCP、真实升级兼容、当前函数/Procedure 库存、取消/连接清理和 OpenClaw 隔离 Docker 均需重新验证。最终 SHA 的远程两 Job CI 是 Phase 关闭条件；本地通过不等于长期 Dev 已部署或当前 CI 已通过。实际状态与证据只由 [Phase 24](../development/phases/24-lithograph-v033-upgrade.md)维护；Commit、Push、Dev 部署、Tag/GHCR 与生产部署分别取得授权。
