@@ -219,3 +219,30 @@ it("safely indexes legally named branches without prototype pollution", async ()
   expect(next.pages["__proto__"]?.items).toHaveLength(2);
   expect(flattenCommits(next, new Set(["__proto__"]))).toHaveLength(2);
 });
+
+it("does not invent history for deselected branches or pages that have not loaded", async () => {
+  const api = reader();
+  const signal = new AbortController().signal;
+  const snapshot = await loadVersions(api, signal);
+  expect(flattenCommits(snapshot, new Set())).toEqual([]);
+
+  const missingPages = { ...snapshot, pages: Object.create(null) as typeof snapshot.pages };
+  expect(flattenCommits(missingPages, new Set(["main"]))).toEqual([]);
+  expect(hasMore(missingPages, new Set(["main"]))).toBe(false);
+  const next = await loadMoreVersions(api, missingPages, new Set(["main"]), signal);
+  expect(Object.keys(next.pages)).toEqual([]);
+  expect(api.ancestry).toHaveBeenCalledTimes(3);
+  expect(() => stateRef("commit/" + "G".repeat(64))).toThrow("Invalid resolved Commit reference");
+});
+
+it("treats an empty ancestry continuation cursor as the last page", async () => {
+  const api = reader();
+  vi.mocked(api.ancestry).mockResolvedValueOnce({
+    root,
+    items: [entry(root, 0, [])],
+    cursor: ""
+  });
+  const snapshot = await loadVersions(api, new AbortController().signal);
+  expect(snapshot.pages["main"]?.cursor).toBeUndefined();
+  expect(hasMore(snapshot, new Set(["main"]))).toBe(false);
+});
