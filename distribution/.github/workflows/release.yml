@@ -164,6 +164,38 @@ jobs:
           esac
           printf 'digest_ref=%s\n' "$DIGEST_REF" >> "$GITHUB_OUTPUT"
 
+      - name: Package complete official Plugin and Skills
+        env:
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          set -euo pipefail
+          PLUGIN_VERSION=$(python3 -c 'import json; print(json.load(open("plugins/kgos/plugin.json"))["version"])')
+          test "$TAG" = "v$PLUGIN_VERSION"
+          test -f INSTALL.md
+          test -f LICENSE
+          test -f COMMERCIAL-LICENSE.md
+          test ! -e plugins/kgos/INSTALL.md
+          test ! -e plugins/kgos/.app.json
+          test ! -e plugins/kgos/skills/kgos
+          EXPECTED='kgos-branch-standards kgos-doctor kgos-knowledge-standards kgos-maintenance-standards kgos-ontology-standards kgos-retrieval-standards kgos-vlog-standards'
+          ACTUAL=$(find plugins/kgos/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | tr '\n' ' ' | sed 's/ $//')
+          test "$ACTUAL" = "$EXPECTED"
+          for skill in $EXPECTED; do
+            test -f "plugins/kgos/skills/$skill/SKILL.md"
+          done
+          PACKAGE_DIR="$RUNNER_TEMP/kgos-plugin-content"
+          mkdir -p "$PACKAGE_DIR"
+          cp -R plugins/kgos/. "$PACKAGE_DIR/"
+          cp INSTALL.md LICENSE COMMERCIAL-LICENSE.md "$PACKAGE_DIR/"
+          ARCHIVE="$RUNNER_TEMP/kgos-plugin-$TAG.zip"
+          (cd "$PACKAGE_DIR" && zip -q -r "$ARCHIVE" .)
+          if unzip -Z -1 "$ARCHIVE" | grep -E '(^|/)\.app\.json$|(^|/)skills/kgos/|(^|/)plugins/kgos/'; then
+            echo "::error::Private connection config, legacy Skill or nested Plugin root in archive"
+            exit 1
+          fi
+          test "$(unzip -Z -1 "$ARCHIVE" | grep -c -E '(^|/)INSTALL\.md$')" = 1
+          echo "Plugin archive root contains Manifest, one INSTALL.md and seven Skill resources"
+
       - name: Publish public GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -185,9 +217,12 @@ jobs:
               printf 'Linux amd64 Docker image: \`%s\`\n\n' "$IMAGE"
               printf 'Verified image digest: \`%s\`\n\n' "$DIGEST_REF"
               printf 'Private source commit SHA: \`%s\`\n\n' "$REVISION"
+              echo "Plugin archive: kgos-plugin-$TAG.zip (includes the sole INSTALL.md and seven Skills)"
               echo "The public release tag belongs to this distribution repository, not the private source."
             } > "$RUNNER_TEMP/kgos-release-notes.md"
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --title "KG OS $TAG" \
               --notes-file "$RUNNER_TEMP/kgos-release-notes.md"
           fi
+          gh release upload "$TAG" "$RUNNER_TEMP/kgos-plugin-$TAG.zip" \
+            --repo "$GITHUB_REPOSITORY" --clobber

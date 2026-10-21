@@ -4,11 +4,11 @@
 
 | Private `bYiyLi/kg-os` | Public `bYiyLi/kg-releases` |
 | --- | --- |
-| All source, tests, design, workflows and `distribution/` templates | Only files generated from the private `distribution/` templates |
+| Source, tests, design, CI templates, Plugin, seven Skills and unique installer | Only the generated runtime entrypoint, installer, Plugin, seven Skills and release CI/CD |
 | Private `main` and authorized source `v*` tags | Generated manifest on `main`, mirrored public `v*` release tags |
 | A minimal automatic synchronization workflow | Full CI, Linux amd64 Docker smoke, GHCR and GitHub Releases |
 
-**Never edit `kg-releases` directly.** Edit `kg-os/distribution/` or `kg-os/scripts/render-kg-releases.mjs` in the private repository and push that change to private `main`. The private sync workflow exports a small, explicit allowlist; all application source, tests and full Git history remain private. The public workflows never push changes back to private KG OS.
+**Never edit `kg-releases` directly.** Edit `kg-os/distribution/`, `kg-os/plugins/kgos/` or `kg-os/scripts/render-kg-releases.mjs` in the private repository and push to private `main`. **`kg-os/plugins/kgos/INSTALL.md` is the only maintained installation guide**; the generator maps it to public `kg-releases/INSTALL.md` without creating a second maintained installer. The private sync workflow exports only allowlisted public files and the seven named Skill directories, with all their Markdown references/assets, excluding the legacy generic Skill and any runtime `.app.json`. It also exports the product licensing documents. All application source, tests and Git history remain private. Public workflows never push back to private KG OS.
 
 ## One-time setup
 
@@ -24,7 +24,7 @@
 
 ## CI
 
-On every private `main` push, the sync workflow updates the generated public `source.json` and CI/CD templates in `kg-releases/main`. That public push automatically runs CI against the **pinned private revision**, verifies private main ancestry, installs dependencies, runs `pnpm validate`, builds the Linux amd64 image and runs the real unified Docker smoke test. A release tag calls the same CI jobs before publishing.
+On every private `main` push, the sync workflow updates public `source.json`, the sole generated `INSTALL.md`, the Plugin/Skill tree and CI/CD templates in `kg-releases/main`. That public push automatically runs CI against the **pinned private revision**, verifies private main ancestry, installs dependencies, runs `pnpm validate`, builds the Linux amd64 image and runs the real unified Docker smoke test. A release tag calls the same CI jobs before publishing.
 
 To protect source confidentiality, verbose build/test output is kept only inside the ephemeral runner; the public workflow intentionally does not upload logs, caches, coverage or test artifacts. Reproduce failures in the private development or Linux Docker test environment.
 
@@ -34,8 +34,8 @@ Release occurs **only when an authorized version tag is pushed in private `kg-os
 
 1. Set `package.json` to the planned version and confirm permission to distribute that version.
 2. Create and push `vX.Y.Z` in the private source repository, pointing at a commit on private `main`.
-3. The private sync workflow exports the exact tag manifest and creates the **same tag name in the public distribution repository**. Public CI validates and smoke-tests the pinned commit, and the Release job verifies the tag, private main ancestry, platform, revision and image digest.
-4. If `KGOS_BINARY_DISTRIBUTION_APPROVED=true`, the Release job automatically pushes `ghcr.io/byiyli/kgos:vX.Y.Z`, verifies anonymous pull and creates the public GitHub Release. Otherwise it skips the publishing step; no binary or GitHub Release should be claimed.
+3. The private sync workflow exports the exact tag manifest and creates the **same tag name in the public distribution repository**. Public CI runs the source checks, official Plugin/export validation and isolated Linux amd64 Docker Smoke. The Release job verifies private main ancestry, tag, version, image revision, platform and digest.
+4. If `KGOS_BINARY_DISTRIBUTION_APPROVED=true`, Release pushes `ghcr.io/byiyli/kgos:vX.Y.Z`, verifies anonymous pull, generates `kgos-plugin-vX.Y.Z.zip` with **root-level `plugin.json`, one `INSTALL.md`, licenses and exactly seven `skills/` directories** (plus the connection template), then creates the GitHub Release with this Plugin archive. Otherwise it skips formal publishing; no binary, Plugin Release asset or GitHub Release should be claimed.
 5. If the GHCR package is inaccessible or private, fix the package settings and rerun the failed public Release workflow. A registry push alone does not prove successful public distribution.
 
 The resulting GitHub Release public tag points to a commit in this distribution repository; private source identity is recorded by full SHA in the release notes and image label.

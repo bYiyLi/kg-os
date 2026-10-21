@@ -1,27 +1,34 @@
-# KG OS — Releases
+# KG OS
 
-This is **kg-releases**, the automatically generated **public distribution repository** for KG OS, an AI-first programmable knowledge graph infrastructure.
+**AI-first programmable knowledge graph infrastructure.** KG OS provides a graph-based external knowledge world that an authorized AI can query and update through MCP; humans inspect and manage it through the built-in Web interface. Knowledge models are defined by the caller, not hard-coded into the Kernel.
 
-The KG OS source repository is maintained privately. **No application source code or source history is mirrored here.** This repository provides release automation, publicly accessible release notes, installation instructions, and a place to report distribution issues. All files are generated from the private source repository; do not edit this repository directly.
+This is the **official public distribution repository**. The private `bYiyLi/kg-os` repository is the **only** place where the product, Plugin, seven Skills, installer and CI/CD templates are developed. Every file here is generated from that source; **do not edit this repository directly**.
 
-## Install
+## Get KG OS
 
-Official new runtime releases target **Linux amd64 Docker** only. The image name is:
+Start with **[INSTALL.md](INSTALL.md)**, the **single installation guide** for the runtime, ChatGPT/other supported MCP clients, the Plugin, seven Skills, and optional global AI guidance. You do not need private source access.
 
-```text
-ghcr.io/byiyli/kgos:v<version>
+- **Docker runtime**: `ghcr.io/byiyli/kgos:v<version>` (Linux amd64), providing Web, HTTP API and MCP in one process. Only use image tags that are actually [published in Releases](https://github.com/bYiyLi/kg-releases/releases) and anonymously pullable from GHCR.
+- **Plugin**: [`plugins/kgos/plugin.json`](plugins/kgos/plugin.json) and [connection template](plugins/kgos/.app.json.example). User-specific `.app.json` is created privately during installation and is never published.
+- **Seven Skills**: [`plugins/kgos/skills/`](plugins/kgos/skills/) contains `kgos-doctor`, `kgos-ontology-standards`, `kgos-knowledge-standards`, `kgos-retrieval-standards`, `kgos-branch-standards`, `kgos-maintenance-standards`, and `kgos-vlog-standards`. Each Skill includes its full references and assets; the legacy generic `kgos` Skill is **not distributed**.
+
+To retrieve this repository for installation:
+
+```sh
+git clone https://github.com/bYiyLi/kg-releases.git
+cd kg-releases
 ```
 
-Only use tags that have actually been published. See [INSTALL.md](INSTALL.md) for installation, persistent storage, configuration, and first-run instructions.
+Choose an actual published `vX.Y.Z` tag for a version-pinned installation. The `main` branch may contain candidate material awaiting final runtime/Plugin acceptance; mere presence of files does **not** prove an official release or successful client activation.
 
-## CI and releases
+## Versioned delivery and CI/CD
 
-- **On private `main` push:** KG OS generates this repository's public files and a manifest identifying the exact private source commit. The push to this repository automatically starts full validation and isolated Docker smoke tests.
-- **On private `vX.Y.Z` tag:** KG OS generates a matching public distribution tag. That tag runs full CI, then builds and smoke-tests the exact Linux amd64 image. Publishing to GHCR and creating a Release are enabled only after the maintainer explicitly confirms valid binary-distribution rights in repository settings.
-- A repository-scoped read-only SSH deploy key allows these workflows to check out the exact private commit. Public pull requests do not trigger these workflows.
+Every private `kg-os/main` push synchronizes only allowlisted, non-secret public distribution files and a `source.json` reference to the exact private commit. Public GitHub Actions then execute source validation and an isolated Linux amd64 Docker smoke test. A separately authorized private `v*` tag generates a corresponding public tag, triggers full CI, and—only when the binary distribution-rights gate is enabled—publishes the tested image and Plugin archive with the public GitHub Release.
 
-Maintainers: see [MAINTAINING.md](MAINTAINING.md) for the one-time key and publishing settings. For documentation or workflow changes, edit `kg-os/distribution/` and push the private source repository; this repository is not an independent development project.
+Private application source, history, authentication credentials, local connection IDs, test reports and caches are not included. Maintainer-only setup and responsibilities are documented in [MAINTAINING.md](MAINTAINING.md).
 
-The public release notes identify the private source revision and immutable image digest. A Git tag in this **distribution** repository refers to the distribution workflow revision, not a copy of a private source commit.
+## Licensing and feedback
 
-Issues about installation or published images can be reported in this repository.
+The exported Plugin/Skill resources carry KG OS's [AGPL-3.0-only license](LICENSE), subject to any per-file exceptions; separate commercial terms require an individual agreement as described in [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md). A public Docker image is **not** published until its applicable distribution rights are confirmed.
+
+Use this repository's Issues for installation and distribution problems.

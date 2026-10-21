@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
-import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,10 +11,29 @@ const generatedFiles = [
   ".github/workflows/ci.yml",
   ".github/workflows/release.yml",
   ".gitignore",
-  "INSTALL.md",
   "MAINTAINING.md",
-  "README.md"
+  "README.md",
+  "INSTALL.md",
+  "LICENSE",
+  "COMMERCIAL-LICENSE.md",
+  "plugins/kgos/plugin.json",
+  "plugins/kgos/.app.json.example"
 ];
+const officialSkills = [
+  "kgos-ontology-standards",
+  "kgos-knowledge-standards",
+  "kgos-retrieval-standards",
+  "kgos-branch-standards",
+  "kgos-maintenance-standards",
+  "kgos-vlog-standards",
+  "kgos-doctor"
+];
+const rootOwnedFiles = new Set([
+  "LICENSE",
+  "COMMERCIAL-LICENSE.md",
+  "plugins/kgos/plugin.json",
+  "plugins/kgos/.app.json.example"
+]);
 
 function git(directory, ...args) {
   return execFileSync("git", ["-C", directory, ...args], {
@@ -70,6 +89,34 @@ async function collectFiles(root, prefix = "") {
   return paths;
 }
 
+async function publicFiles() {
+  const paths = [...generatedFiles];
+  for (const skill of officialSkills) {
+    const directory = `plugins/kgos/skills/${skill}`;
+    const files = await collectFiles(sourceRoot, directory);
+    if (!files.includes(`${directory}/SKILL.md`)) {
+      throw new Error(`Missing official Skill entrypoint: ${directory}`);
+    }
+    for (const file of files) {
+      if (!file.endsWith(".md")) {
+        throw new Error(`Unexpected file in official Skill resources: ${file}`);
+      }
+    }
+    paths.push(...files);
+  }
+  return paths;
+}
+
+function sourceFile(path) {
+  if (path === "INSTALL.md") {
+    return "plugins/kgos/INSTALL.md";
+  }
+  if (rootOwnedFiles.has(path) || path.startsWith("plugins/kgos/skills/")) {
+    return path;
+  }
+  return `distribution/${path}`;
+}
+
 export async function render({ output, ref, revision }) {
   const kind = sourceRefKind(ref);
   if (!/^[0-9a-f]{40}$/.test(revision)) {
@@ -120,7 +167,18 @@ export async function render({ output, ref, revision }) {
     }
   }
 
-  const expected = new Set([...generatedFiles, "source.json"]);
+  const files = await publicFiles();
+  const expected = new Set([...files, "source.json"]);
+  if (expected.size !== files.length + 1) {
+    throw new Error("Duplicate public distribution path");
+  }
+  const packageData = JSON.parse(await readFile(join(sourceRoot, "package.json"), "utf8"));
+  const pluginData = JSON.parse(
+    await readFile(join(sourceRoot, "plugins/kgos/plugin.json"), "utf8")
+  );
+  if (pluginData.version !== packageData.version) {
+    throw new Error("Official Plugin version must match the KG OS product version");
+  }
   const tracked = new Set(trackedFiles(canonicalTarget));
   const existing = await collectFiles(canonicalTarget);
   for (const path of existing) {
@@ -133,8 +191,12 @@ export async function render({ output, ref, revision }) {
       await rm(join(canonicalTarget, path));
     }
   }
-  for (const path of generatedFiles) {
-    const template = join(sourceRoot, "distribution", path);
+  for (const path of files) {
+    const template = join(sourceRoot, sourceFile(path));
+    const info = await lstat(template);
+    if (!info.isFile() || info.size > 1024 * 1024) {
+      throw new Error(`Invalid public distribution source: ${path}`);
+    }
     const content = await readFile(template);
     const dest = join(canonicalTarget, path);
     await mkdir(dirname(dest), { recursive: true });

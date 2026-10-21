@@ -22,12 +22,12 @@ const taskCommands = {
   validate: [
     ["check:install"],
     ["check:dependencies"],
-    ["check:go"],
     ["typecheck"],
     ["lint"],
-    // Phase 16 daemon integration tests exercise the embedded Web homepage.
-    // Build the assets before running Go race/coverage on a clean CI checkout.
+    // Go integration tests now serve the embedded Web Setup pages.
+    // Build real Web assets before any Go tests on a clean checkout.
     ["build"],
+    ["check:go"],
     ["test:go:race"],
     ["test:go:coverage"],
     ["check:go:security"],

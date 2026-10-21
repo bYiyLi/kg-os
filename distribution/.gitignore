@@ -4,3 +4,6 @@
 *.pem
 *.key
 id_ed25519*
+
+# User-specific MCP app IDs must never be committed.
+/plugins/kgos/.app.json

@@ -95,6 +95,17 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm exec playwright install --with-deps --only-shell chromium
 
+      - name: Verify official Plugin and single installer source
+        working-directory: source
+        run: |
+          set -euo pipefail
+          if node --test tests/render-kg-releases.node-test.mjs > "$RUNNER_TEMP/kgos-distribution-tests.log" 2>&1; then
+            echo "Official Plugin distribution and single installer validated"
+          else
+            echo "::error::Distribution export checks failed; details are suppressed on public runners"
+            exit 1
+          fi
+
       - name: Validate without publishing source-derived logs
         working-directory: source
         run: |
@@ -108,7 +119,6 @@ jobs:
 
   docker-unified:
     name: Docker Linux amd64 integration
-    needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:

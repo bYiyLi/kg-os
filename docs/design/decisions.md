@@ -1112,3 +1112,13 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **单一开发真源**：公开工作流、文案和同步白名单都在 `kg-os/distribution/` 与 `scripts/render-kg-releases.mjs` 维护；更改后只提交私有仓库。**用户后续明确收紧：私有 GitHub Actions 只负责同步，原私有 CI/Release 必须停用并从源码删除，私有 Sync 不执行生成器单测或其它质量门禁；全部源码质量、Docker 和 Release 只在公开仓库运行。** 旧私有 CI/Release 的历史运行仍可查证，但不代表新公开 CI 已验收成功。
 - **许可证与发布门禁**：原仓库 AGPL-3.0-only 与双授权文本、历史公开发布及已授予许可不因变为私有而自动撤销。公开二进制交付须先明确遵守对应源码提供要求或具有有效的重新授权依据；公开 Release 的镜像推送由仓库变量 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 显式解锁，默认关闭。GHCR 公开可拉取、镜像平台/revision/digest 和 GitHub Release 是实际发布验收的一部分，非私有 Git Tag Push 的自动推定结果。
 - **取舍与验收**：用两个独立、定向的 Deploy Key 换取统一开发体验和公开 CI/CD 可见性；公开 GitHub Actions 的执行日志本身仍可见，须抑制源码相关命令输出并禁止外部工作流执行。仓库管理、权限、CI、Tag、镜像与用户安装要分别实际验证，未部署或未完成的动作不标记为完成。实施见 [Client Docker 交付](client.md#docker-only-交付)、[Phase 30](../development/phases/30-private-source-public-releases.md) 和 [公开模板维护说明](../../distribution/MAINTAINING.md)。
+
+<a id="d109-single-public-distribution-and-installer"></a>
+
+### D109 kg-releases 是单一产品分发入口，安装指南只维护一份（2026-10-21）
+
+- **产品入口**：公开 `bYiyLi/kg-releases` 提供用户实际所需的 Docker/OCI 镜像与 GHCR 链接、GitHub Release、Plugin、七个官方目标 Skill、完整安装指引及公开 CI/CD；外部用户无需读取或克隆私有 `kg-os` 源码。继续保留 D108 的“只有私有仓库维护、公开仓库自动生成”边界，不复制 Kernel/Web/SDK 源码或完整 Git 历史。
+- **唯一安装真源**：私有 `plugins/kgos/INSTALL.md` 是唯一可编辑的安装说明，完整解释公开镜像安装、MCP OAuth、用户 Plugin/七 Skill 和可选引导词；同步生成到 `kg-releases/INSTALL.md`。删除 `distribution/INSTALL.md`，不在公开 Plugin 目录或两仓库分别维护第二套独立安装流程。Skill 的 `SKILL.md` 与参考资料属于可安装资源，不是另一份安装指南。
+- **Plugin/Skill 同步**：只公开 `plugins/kgos/plugin.json`、不含用户凭证的 `.app.json.example` 和七个目标 Skill 的所有必要 Markdown 资源，同时公开适用许可文本。Plugin Manifest 版本须与 KG OS 产品包版本相同。源码仍保留的过渡通用 `skills/kgos` 不进入公开候选包；旧私人 Plugin 不自动更新或移除，真实七 Skill/Doctor 客户端验收仍按 Phase 25/27/28 独立完成，不能以文件导出代替。
+- **发布**：普通 Private `main` Push 只同步公开候选内容，公开 CI 执行测试；获得独立授权的 Private `v*` Tag 对应公开同名版本，正式 Release 除 Docker 外必须提供包含一份 `INSTALL.md`、Plugin Manifest、无凭证配置样例、七个 Skill 与许可的归档。AGPL 与商业双授权的二进制发布合规前置和 `KGOS_BINARY_DISTRIBUTION_APPROVED` 门禁继续有效；不把尚未发行的 GHCR Tag 当作用户可安装镜像。
+- **验证归属**：渲染白名单、拒绝秘密/额外 Skill、单安装文档、产品版本一致性及归档完整性属于当前发布链可验证合同，维护于 [Client](client.md#私有源码与公开分发仓库)、[MCP Plugin](mcp.md#最终官方-skill-清单与通用-skill-退役d107目标方案) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。不为这些文件建立第二套技术或设计真源。

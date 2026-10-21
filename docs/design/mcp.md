@@ -658,6 +658,8 @@ flowchart TD
 
 <a id="kgos-seven-skills"></a>
 
+**公开安装与分发职责（D109）**：Plugin/Skill 内容真源保留在私有 `plugins/kgos/`，`kg-releases` 只接受生成器公开的 `plugin.json`、`.app.json.example` 和七个目标 Skill 的完整 Markdown 资源；源码内旧通用 `kgos` 不进入新的公开候选包，但尚未自动从已安装的私人 Plugin 中删除。`plugins/kgos/INSTALL.md` 是**唯一安装指南真源**，发布为 `kg-releases/INSTALL.md`（公开仓库只有这一份），完整覆盖 Docker、MCP、Plugin、Skill 与全局引导词。正式发行时 Plugin 归档与 GHCR 镜像跟随同一个经授权的产品 Tag，`.app.json` 中的用户连接 ID 必须由用户私下配置；公开候选资料不等于 Phase 25/27/28 的完整客户端验收。详见 [D109](decisions.md#d109-single-public-distribution-and-installer) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。
+
 ### 最终官方 Skill 清单与通用 Skill 退役（D107：目标方案）
 
 **最终官方 Skill 集合固定为七个**：下文 [六个规范 Skill](#kgos-standards-skill-suite)（Knowledge、Ontology、Retrieval、Branch、VLog、Maintenance）加上独立只读诊断 [`kgos-doctor`](#kgos-doctor-v1)。七个 Skill 分别指导外部 AI 的知识工作或诊断；KG OS MCP 负责确定性能力与自描述操作手册，外部 AI 负责任务理解、执行与结果核实。**不再规划**通用 `kgos`、额外执行 Skill、总规范 Skill、自动分发 Router 或其它官方 Skill 作为最终集合的一部分。官方全局引导提示词是独立提示词资产，**不计入 Skill 数量**。

@@ -98,10 +98,12 @@ Linux amd64 Docker / OCI (one official runtime artifact)
 
 ### 私有源码与公开分发仓库
 
-按 [D108](decisions.md#d108-private-source-public-releases)，`bYiyLi/kg-os` 是唯一私有开发真源，`bYiyLi/kg-releases` 只提供由该真源生成的公开 README、安装说明、CI/CD 和 Release，不复制源码或 Git 历史。源码修改、公开工作流修改和发布文案修改均在 KG OS 完成：
+按 [D108](decisions.md#d108-private-source-public-releases) 和 [D109](decisions.md#d109-single-public-distribution-and-installer)，`bYiyLi/kg-os` 是唯一私有开发真源，`bYiyLi/kg-releases` 统一提供自动生成的 Docker 镜像/Release 入口、Plugin、七个目标 Skill、唯一安装指南和公开 CI/CD，不复制私有程序源码或 Git 历史。所有内容均只在私有 KG OS 开发：
 
 1. `kg-os/main` Push 由 `.github/workflows/sync-kg-releases.yml` 检查确切来源 revision，调用 `scripts/render-kg-releases.mjs` 输出 `distribution/` 中的白名单内容和 `source.json`，使用仅授权公开仓库的可写 Deploy Key 推送 `kg-releases/main`；公开 CI 自动对 `source.json` 固定的私有 revision 执行 Validate 与 Linux amd64 Docker 隔离 Smoke。
 2. 经授权创建并 Push 的私有 `v<version>` Tag 生成匹配的公开 Tag；公开 Release 先通过完整 CI，再针对该 Tag 的确切私有 SHA 构建、隔离 Smoke、核对 GHCR 平台/revision/digest/匿名拉取并创建公开 GitHub Release。一般 `main` Push 不发布镜像。
 3. 公开 runner 只能通过单独的私有源码**只读** Deploy Key 读取，不能把源码、完整历史、测试报告或缓存发布到公开仓库；Public PR 不触发含该密钥的工作流。镜像正式公开前仍须满足源代码许可义务或具备合法替代授权；公开仓库设置 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 才允许二进制发布。
+4. `plugins/kgos/INSTALL.md` 是**唯一可编辑的完整安装指南**，生成器将其发布为公开仓库根目录的唯一 `INSTALL.md`；不保留另一份 `distribution/INSTALL.md`，也不在 Plugin 目录重复一份。发布白名单包含 `plugins/kgos/plugin.json`、无凭证连接模板、准确七个目标 Skill 的 Markdown 资源、许可证，不包括源码内仍在过渡的通用 `kgos` Skill、实际用户 `.app.json`、Token 或数据库。Plugin Manifest 的版本必须与产品包版本一致。
+5. 正式公开 `v*` Release 除经许可发布的 Linux amd64 Docker 镜像外，还在同一版本的 GitHub Release 附带带唯一 `INSTALL.md` 和七 Skill 的 Plugin 压缩包；普通 `main` 仅是自动更新的公开候选内容，不代表 Plugin 的真实宿主/客户端验收已完成。
 
 该架构正在 [Phase 30](../development/phases/30-private-source-public-releases.md) 验收。私有仓库只保留有限的自动同步工作流，不再运行源码 Validate、Docker 或 Release；全部远端质量门禁归 `kg-releases`，公开 CI 是否通过必须以其真实 Run 为准。生成器、工作流及一次性仓库/密钥配置的唯一维护说明见 [`distribution/MAINTAINING.md`](../../distribution/MAINTAINING.md)。

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -16,7 +16,41 @@ test("only whitelisted public files are generated, deterministically", async () 
     execFileSync("git", ["init", "-q", "-b", "main"], { cwd: directory });
     const first = await render({ output: directory, revision, ref: "refs/heads/main" });
     const manifest = JSON.parse(await readFile(join(directory, "source.json"), "utf8"));
-    assert.equal(first.files.length, 7);
+    assert.ok(first.files.length > 50);
+    assert.deepEqual(
+      first.files.filter((path) => /^plugins\/kgos\/skills\/[^/]+\/SKILL\.md$/.test(path)).length,
+      7
+    );
+    assert.equal(first.files.filter((path) => path === "INSTALL.md").length, 1);
+    assert.ok(!first.files.includes("plugins/kgos/INSTALL.md"));
+    assert.ok(!first.files.includes("plugins/kgos/skills/kgos/SKILL.md"));
+    assert.ok(!first.files.includes("plugins/kgos/.app.json"));
+    assert.deepEqual(
+      (await readdir(join(directory, "plugins/kgos/skills"))).sort(),
+      [
+        "kgos-branch-standards",
+        "kgos-doctor",
+        "kgos-knowledge-standards",
+        "kgos-maintenance-standards",
+        "kgos-ontology-standards",
+        "kgos-retrieval-standards",
+        "kgos-vlog-standards"
+      ].sort()
+    );
+    assert.equal(
+      await readFile(join(directory, "INSTALL.md"), "utf8"),
+      await readFile(join(root, "plugins/kgos/INSTALL.md"), "utf8")
+    );
+    assert.equal(
+      (await readFile(join(directory, "LICENSE"), "utf8")).includes(
+        "GNU AFFERO GENERAL PUBLIC LICENSE"
+      ),
+      true
+    );
+    assert.equal(
+      JSON.parse(await readFile(join(directory, "plugins/kgos/plugin.json"), "utf8")).version,
+      JSON.parse(await readFile(join(root, "package.json"), "utf8")).version
+    );
     assert.deepEqual(manifest, {
       schema: 1,
       repository: "bYiyLi/kg-os",
