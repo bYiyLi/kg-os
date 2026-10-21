@@ -238,7 +238,7 @@ it("does not invent history for deselected branches or pages that have not loade
 it("treats an empty ancestry continuation cursor as the last page", async () => {
   const api = reader();
   vi.mocked(api.ancestry).mockResolvedValueOnce({
-    root,
+    root: stateRef(root),
     items: [entry(root, 0, [])],
     cursor: ""
   });
