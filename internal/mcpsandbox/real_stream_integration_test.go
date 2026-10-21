@@ -48,7 +48,9 @@ func realRuntime(t *testing.T) *runtimehost.Runtime {
 }
 func TestPhase16TrueGraphStreamFromKernel(t *testing.T) {
 	rt := realRuntime(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// Race instrumentation and the real SQLite extensions can make the two
+	// consecutive streaming calls exceed a 15-second shared deadline on CI.
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	if _, err := rt.Kernel.ExecuteGraph(ctx, kernel.GraphExecuteRequest{Branch: "main", Cypher: "CREATE (:Phase16 {id:1}), (:Phase16 {id:2}), (:Phase16 {id:3})"}); err != nil {
 		t.Fatal(err)
