@@ -831,26 +831,196 @@
   }
 }
 
-.setup-review dl {
-  margin: 0;
-}
-
-.setup-review dl > div {
+.setup-review-grid {
   display: grid;
-  grid-template-columns: minmax(130px, 32%) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--setup-line);
 }
 
-.setup-review dt {
+.setup-review-card {
+  padding: 17px 16px;
+}
+
+.setup-review-card-header,
+.setup-review-basics h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--setup-text);
+  font-size: 14px;
+  font-weight: 610;
+}
+
+.setup-review-card-header {
+  margin-bottom: 16px;
+}
+
+.setup-review-card-header svg,
+.setup-review-basics h2 svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--color-primary);
+}
+
+.setup-review-main,
+.setup-review-detail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.setup-review-label {
+  display: block;
   color: var(--setup-dimmed);
+  font-size: 11.5px;
+  font-weight: 450;
 }
 
-.setup-review dd {
+.setup-review-main strong {
+  color: var(--setup-text);
+  font-size: 13.5px;
+  font-weight: 590;
+}
+
+.setup-review-url {
+  overflow-wrap: anywhere;
+}
+
+.setup-review-detail,
+.setup-review-stats {
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid var(--setup-line);
+}
+
+.setup-review-detail .setup-review-url {
+  color: var(--setup-text);
+  font-size: 12px;
+}
+
+.setup-review-secondary {
+  color: var(--setup-muted);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.setup-review-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.setup-review-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.setup-review-stats strong {
+  color: var(--setup-text);
+  font-size: 12.5px;
+  font-weight: 580;
+}
+
+.setup-review-verified {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 15px;
+  color: var(--color-primary);
+  font-size: 12px;
+}
+
+.setup-review-verified svg {
+  width: 15px;
+  height: 15px;
+}
+
+.setup-review-local-note {
+  margin-top: 13px;
+  color: var(--setup-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.setup-review-basics {
+  margin-top: 20px;
+}
+
+.setup-review-basics dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 13px 0 0;
+}
+
+.setup-review-basics dl > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 6px;
+  padding-top: 11px;
+  border-top: 1px solid var(--setup-line);
+}
+
+.setup-review-basics dt {
+  color: var(--setup-dimmed);
+  font-size: 11.5px;
+}
+
+.setup-review-basics dd {
   min-width: 0;
   margin: 0;
+  color: var(--setup-text);
+  font-size: 12.5px;
   overflow-wrap: anywhere;
+}
+
+.setup-review-advice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 17px;
+  padding: 12px 0;
+  border-top: 1px solid var(--setup-line);
+  color: var(--setup-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.setup-review-advice svg,
+.setup-review-state-error svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  margin-top: 1px;
+  color: var(--color-primary);
+}
+
+.setup-review-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--setup-border);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--setup-control) 72%, transparent);
+}
+
+.setup-review-state strong {
+  color: var(--setup-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.setup-review-state p {
+  margin-top: 8px;
+  color: var(--setup-muted);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .setup-footer {
@@ -933,7 +1103,8 @@
 }
 
 @media (max-width: 720px) {
-  .setup-vector-grid {
+  .setup-vector-grid,
+  .setup-review-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1029,6 +1200,11 @@
   .setup-vector-params {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+  }
+
+  .setup-review-basics dl {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .setup-field input,

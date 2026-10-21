@@ -90,79 +90,18 @@ verify() {
   status=$(curl --noproxy '*' --silent --max-time 5 --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$port/mcp") || fail "MCP HTTP not reachable"
   [ "$status" = 401 ] || fail "MCP without a credential must return 401, got $status"
 
-  # Phase 16: the deployed image contains only Go kgosd. The external
-  # read-only client runs on OpenClaw and never enters the production image.
-  # Keep the legacy verifier ONLY so an unsuccessful migration can roll back
-  # to the previously verified Node MCP image without touching Instance data.
+  # Dev and its retained rollback image both use Go kgosd. The external
+  # read-only verifier runs on OpenClaw, never inside the runtime image.
   process=$(docker exec "$cid" /bin/cat /proc/1/comm | tr -d '\r\n')
-  if [ "$process" = kgosd ]; then
-    [ "$(docker exec "$cid" /usr/bin/id -u)" = 1000 ] || fail "Unified Dev must preserve existing Workspace UID 1000"
-    legacy_file=
-    if docker exec "$cid" /opt/kgos/kgosd --help 2>/dev/null | grep -q -- '--mcp-token-file'; then
-      legacy_file="$base/data/secrets/mcp-token"
-      [ -f "$legacy_file" ] && [ ! -L "$legacy_file" ] ||
-        fail "Legacy MCP verifier needs its preserved Secret file"
-      [ "$(stat -c '%u:%a' "$legacy_file")" = "1000:400" ] ||
-        fail "Legacy MCP Secret must be owned by UID 1000 and mode 0400"
-    fi
-    KGOS_DEV_ENDPOINT="http://127.0.0.1:$port" \
-      KGOS_DEV_AUTH_FILE="$workspace/.kgos/auth.json" \
-      KGOS_DEV_LEGACY_MCP_TOKEN_FILE="$legacy_file" \
-      KGOS_DEV_OAUTH_ISSUER="${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}" \
-      KGOS_DEV_REQUIRE_UI="$require_ui" \
-      node "$source_dir/scripts/mcp-dev-accept-unified.mjs" ||
-        fail "Authenticated unified MCP read-only acceptance failed"
-    return 0
-  fi
-
-  compose exec -T mcp node --input-type=module -e '
-    const issuer = process.env.KGOS_MCP_OAUTH_ISSUER;
-    if (!issuer) throw new Error("KG OS Dev OAuth issuer is missing");
-    const base = "http://127.0.0.1:3777";
-    const resourcePaths = [
-      "/.well-known/oauth-protected-resource",
-      "/.well-known/oauth-protected-resource/mcp"
-    ];
-    for (const path of resourcePaths) {
-      const response = await fetch(base + path);
-      if (!response.ok) throw new Error("OAuth resource metadata unavailable: " + path);
-      const metadata = await response.json();
-      if (metadata.resource !== issuer || !metadata.authorization_servers?.includes(issuer)) {
-        throw new Error("OAuth resource metadata does not match public issuer");
-      }
-    }
-    const response = await fetch(base + "/.well-known/oauth-authorization-server");
-    if (!response.ok) throw new Error("OAuth authorization server metadata unavailable");
-    const metadata = await response.json();
-    if (metadata.issuer !== issuer ||
-      metadata.authorization_endpoint !== issuer + "/oauth/authorize" ||
-      metadata.token_endpoint !== issuer + "/oauth/token" ||
-      !metadata.code_challenge_methods_supported?.includes("S256") ||
-      !metadata.token_endpoint_auth_methods_supported?.includes("none") ||
-      metadata.client_id_metadata_document_supported !== true) {
-      throw new Error("OAuth authorization metadata is incompatible");
-    }
-    const challenge = await fetch(base + "/mcp");
-    if (challenge.status !== 401 ||
-      !challenge.headers.get("www-authenticate")?.includes(issuer + "/.well-known/oauth-protected-resource/mcp")) {
-      throw new Error("OAuth resource_metadata challenge unavailable");
-    }
-    console.log("OAuth discovery: issuer, metadata and 401 challenge ready");
-  ' || fail "KG OS Dev OAuth discovery failed"
-
-  compose exec -T mcp node /opt/kgos/node_modules/@kgos/mcp/dist/bin.js doctor --json |
-    node -e '
-      let input = "";
-      process.stdin.on("data", chunk => { input += chunk; });
-      process.stdin.on("end", () => {
-        const report = JSON.parse(input);
-        if (report.ready !== true) process.exit(1);
-        console.log("Instance, runtime and MCP doctor: ready");
-      });
-    ' || fail "KG OS daemon or native Runtime not ready"
-
-  compose exec -T mcp node --input-type=module - < "$source_dir/scripts/mcp-dev-accept.mjs" ||
-    fail "Authenticated MCP read-only acceptance failed"
+  [ "$process" = kgosd ] || fail "Unsupported Dev image: expected the unified Go kgosd process"
+  [ "$(docker exec "$cid" /usr/bin/id -u)" = 1000 ] ||
+    fail "Unified Dev must preserve existing Workspace UID 1000"
+  KGOS_DEV_ENDPOINT="http://127.0.0.1:$port" \
+    KGOS_DEV_AUTH_FILE="$workspace/.kgos/auth.json" \
+    KGOS_DEV_OAUTH_ISSUER="${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}" \
+    KGOS_DEV_REQUIRE_UI="$require_ui" \
+    node "$source_dir/scripts/mcp-dev-accept-unified.mjs" ||
+      fail "Authenticated unified MCP read-only acceptance failed"
 }
 
 record() {
@@ -177,37 +116,10 @@ record() {
 
 rollback_image() {
   docker image inspect "$previous" >/dev/null 2>&1 || fail "No previous verified image; data was not changed"
+  entry=$(docker image inspect "$previous" --format '{{index .Config.Entrypoint 0}}')
+  [ "$entry" = /opt/kgos/kgosd ] ||
+    fail "Unsupported rollback image: expected the unified Go kgosd entrypoint"
   docker image tag "$previous" "$image"
-  # A Phase 16 Go image needs the legacy MCP administrator Secret, whereas
-  # Phase 17 rejects that configuration. Supply it ONLY to the rollback image.
-  if docker run --rm --entrypoint /opt/kgos/kgosd "$previous" --help 2>/dev/null | grep -q -- '--mcp-token-file'; then
-    legacy_secret="$base/data/secrets/mcp-token"
-    [ -f "$legacy_secret" ] && [ ! -L "$legacy_secret" ] ||
-      fail "Legacy rollback needs its preserved MCP Secret file"
-    [ "$(stat -c '%u:%a' "$legacy_secret")" = "1000:400" ] ||
-      fail "Legacy rollback Secret must have UID 1000 and mode 0400"
-    override=$(mktemp "$base/config/legacy-rollback.XXXXXXXX.yaml") ||
-      fail "Cannot prepare legacy rollback override"
-    cat > "$override" <<'YAML'
-services:
-  mcp:
-    environment:
-      KGOS_MCP_TOKEN_FILE: /run/secrets/kgos-mcp-token
-    volumes:
-      - type: bind
-        source: /data/apps/KgosDev/data/secrets/mcp-token
-        target: /run/secrets/kgos-mcp-token
-        read_only: true
-YAML
-    if docker compose --env-file "$env_file" -f "$compose_file" -f "$override" up -d --no-build --force-recreate mcp; then
-      rm -f "$override"
-    else
-      rm -f "$override"
-      fail "Legacy rollback container could not start"
-    fi
-    verify
-    return
-  fi
   compose up -d --no-build --force-recreate mcp
   verify
 }

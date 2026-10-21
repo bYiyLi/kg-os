@@ -15,10 +15,16 @@ function firstStep(state: SetupStatus["state"]) {
   return 0;
 }
 
-export function useSetupFlow(initialStatus: SetupStatus, previewOnly: boolean) {
+export function useSetupFlow(
+  initialStatus: SetupStatus,
+  previewOnly: boolean,
+  previewStep?: number
+) {
   const { t } = useTranslation();
   const session = useSetupSession(initialStatus, previewOnly);
-  const [step, setStep] = useState(firstStep(initialStatus.state));
+  const [step, setStep] = useState(
+    previewOnly && previewStep === 4 ? 4 : firstStep(initialStatus.state)
+  );
   const [draft, setDraft] = useState(() => ({
     ...initialDraft,
     publicOrigin: window.location.origin

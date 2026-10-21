@@ -1,0 +1,323 @@
+---
+import WorkspacePreview from "./WorkspacePreview.astro";
+import AiInstall from "./AiInstall.astro";
+import { copy, type Locale } from "../lib/content";
+import "../styles/site.css";
+
+interface Props {
+  locale: Locale;
+}
+
+const locale = Astro.props.locale;
+const t = copy[locale];
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const pageUrl = new URL(`${base}${locale}/`, Astro.site).href;
+const englishUrl = new URL(`${base}en/`, Astro.site).href;
+const chineseUrl = new URL(`${base}zh/`, Astro.site).href;
+const publicRepository = "https://github.com/bYiyLi/kg-releases";
+---
+
+<!doctype html>
+<html lang={t.htmlLang} data-theme="system">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="description" content={t.seo.description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={t.seo.title} />
+    <meta property="og:description" content={t.seo.description} />
+    <meta property="og:url" content={pageUrl} />
+    <meta name="twitter:card" content="summary" />
+    <link rel="canonical" href={pageUrl} />
+    <link rel="alternate" hreflang="en" href={englishUrl} />
+    <link rel="alternate" hreflang="zh-CN" href={chineseUrl} />
+    <link rel="alternate" hreflang="x-default" href={new URL(base, Astro.site).href} />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <title>{t.seo.title}</title>
+    <script is:inline>
+      // Apply a saved manual choice before painting. Missing/invalid means system.
+      try {
+        const value = localStorage.getItem("kgos.site.theme");
+        if (value === "light" || value === "dark") {
+          document.documentElement.dataset.theme = value;
+        }
+      } catch {
+        // Preferences remain usable for this page when storage is unavailable.
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#overview">{t.skip}</a>
+    <header class="site-header wrapper">
+      <a class="logo" href="#top" aria-label="KG OS">
+        <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <path d="M24 3.5 44.5 24 24 44.5 3.5 24 24 3.5Z" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" />
+          <path d="m24 14-7 10 7 10 7-10-7-10Z" fill="currentColor" />
+          <circle cx="24" cy="24" r="2.7" fill="var(--page)" />
+        </svg>
+        <span>KG OS</span>
+      </a>
+      <nav class="desktop-links" aria-label="Sections">
+        <a href="#overview">{t.nav[0]}</a>
+        <a href="#how">{t.nav[1]}</a>
+        <a href="#capabilities">{t.nav[2]}</a>
+        <a href="#architecture">{t.nav[3]}</a>
+        <a href="#get-started">{t.nav[4]}</a>
+      </nav>
+      <div class="header-controls">
+        <nav class="language-switch" aria-label={t.language}>
+          <a href={`${base}zh/`} lang="zh-CN" aria-current={locale === "zh" ? "page" : undefined}>中</a>
+          <span aria-hidden="true">/</span>
+          <a href={`${base}en/`} lang="en" aria-current={locale === "en" ? "page" : undefined}>EN</a>
+        </nav>
+        <div class="theme-switch" role="group" aria-label={t.theme.label}>
+          <button type="button" data-theme-choice="system" aria-label={t.theme.system} title={t.theme.system} aria-pressed="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 22h8M12 18v4"/></svg>
+          </button>
+          <button type="button" data-theme-choice="light" aria-label={t.theme.light} title={t.theme.light} aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          </button>
+          <button type="button" data-theme-choice="dark" aria-label={t.theme.dark} title={t.theme.dark} aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 15.4A9 9 0 0 1 8.6 3.2 9 9 0 1 0 20.8 15.4Z"/></svg>
+          </button>
+        </div>
+        <a class="github-link" href={publicRepository} target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .9a11.1 11.1 0 0 0-3.5 21.6c.56.1.76-.24.76-.54v-2.08c-3.07.67-3.71-1.3-3.71-1.3-.5-1.3-1.24-1.64-1.24-1.64-1-.69.08-.67.08-.67 1.11.08 1.69 1.14 1.69 1.14.98 1.69 2.58 1.21 3.21.92.1-.72.39-1.21.71-1.49-2.46-.27-5.05-1.23-5.05-5.49 0-1.21.44-2.2 1.14-2.99-.11-.28-.5-1.41.11-2.94 0 0 .93-.3 3.05 1.13a10.57 10.57 0 0 1 5.57 0c2.12-1.43 3.05-1.13 3.05-1.13.6 1.53.22 2.66.11 2.94.71.79 1.14 1.78 1.14 2.99 0 4.27-2.6 5.21-5.07 5.49.4.35.76 1.02.76 2.07v3.07c0 .3.2.64.77.54A11.1 11.1 0 0 0 12 .9Z"/></svg>
+          <span>{t.github}</span><span aria-hidden="true">↗</span>
+        </a>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero wrapper" id="overview">
+        <div class="hero-glow" aria-hidden="true"></div>
+        <p class="hero-eyebrow"><span class="signal" aria-hidden="true"></span>{t.hero.eyebrow}</p>
+        <h1><span>{t.hero.title1}</span><span class="emphasis">{t.hero.title2}</span></h1>
+        <p class="hero-description">{t.hero.description}</p>
+        <div class="actions">
+          <a class="button-primary" href="#get-started">{t.hero.primary}<span aria-hidden="true">↗</span></a>
+          <a class="button-secondary" href="#how">{t.hero.secondary}<span aria-hidden="true">→</span></a>
+        </div>
+        <ul class="hero-properties">
+          {t.hero.properties.map((property) => <li>{property}</li>)}
+        </ul>
+      </section>
+
+      <div class="wrapper">
+        <WorkspacePreview locale={locale} />
+      </div>
+
+      <section class="section section-bordered" id="why">
+        <div class="wrapper">
+          <div class="section-heading split-heading">
+            <div>
+              <p class="eyeline">{t.why.label}</p>
+              <h2 class="multiline">{t.why.heading}</h2>
+            </div>
+            <p class="section-aside">{t.why.aside}</p>
+          </div>
+          <div class="problem-grid">
+            <article class="problem-card">
+              <h3><span>01</span>{t.why.cards[0].heading}</h3>
+              <div class="fragment-illustration" aria-hidden="true">
+                {["document_01.md", "document_02.md", "document_03.md"].map((filename, i) => (
+                  <div class:list={["fragment", `fragment-${i}`]}>
+                    <small>{filename} / result</small>
+                    <i></i><i></i><i></i>
+                  </div>
+                ))}
+              </div>
+              <p>{t.why.cards[0].description}</p>
+            </article>
+            <article class="problem-card">
+              <h3><span>02</span>{t.why.cards[1].heading}</h3>
+              <div class="comparison-illustration">
+                <svg viewBox="0 0 400 185" role="img" aria-label={t.why.cards[1].heading}>
+                  <path class="diagram-link" d="M202 55L96 126M202 55L307 126M96 126L307 126" />
+                  <g transform="translate(140,18)">
+                    <rect class="diagram-node highlight" width="125" height="58" rx="8"/>
+                    <circle cx="17" cy="18" r="4" fill="var(--primary)"/>
+                    <text class="diagram-kind" x="29" y="21">Decision</text>
+                    <text class="diagram-title" x="12" y="43">{t.why.graphLabels[0]}</text>
+                  </g>
+                  <g transform="translate(38,111)">
+                    <rect class="diagram-node" width="128" height="55" rx="8"/>
+                    <circle cx="17" cy="19" r="4" fill="var(--graph-blue)"/>
+                    <text class="diagram-kind" x="29" y="22">Module</text>
+                    <text class="diagram-title" x="12" y="42">{t.why.graphLabels[1]}</text>
+                  </g>
+                  <g transform="translate(245,111)">
+                    <rect class="diagram-node" width="128" height="55" rx="8"/>
+                    <circle cx="17" cy="19" r="4" fill="var(--graph-green)"/>
+                    <text class="diagram-kind" x="29" y="22">Evidence</text>
+                    <text class="diagram-title" x="12" y="42">{t.why.graphLabels[2]}</text>
+                  </g>
+                  <rect class="diagram-tag" x="93" y="82" width="69" height="19" rx="4"/>
+                  <text class="diagram-tag-label" x="127" y="95" text-anchor="middle">AFFECTS</text>
+                  <rect class="diagram-tag" x="255" y="83" width="90" height="19" rx="4"/>
+                  <text class="diagram-tag-label" x="300" y="96" text-anchor="middle">SUPPORTED_BY</text>
+                </svg>
+              </div>
+              <p>{t.why.cards[1].description}</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-bordered" id="how">
+        <div class="wrapper">
+          <div class="section-heading">
+            <p class="eyeline">{t.how.label}</p>
+            <h2>{t.how.heading}</h2>
+            <p>{t.how.description}</p>
+          </div>
+          <div class="steps-grid">
+            {t.how.steps.map((step, index) => (
+              <article class="step">
+                <div class="step-illustration">
+                  {index === 0 && (
+                    <svg viewBox="0 0 200 116" aria-hidden="true">
+                      <path class="diagram-link" d="M100 42L48 85M100 42L151 85"/>
+                      <rect class="diagram-node" x="62" y="11" width="76" height="38" rx="7"/><text class="diagram-kind" x="100" y="34" text-anchor="middle">Model</text>
+                      <rect class="diagram-node" x="8" y="75" width="79" height="35" rx="7"/><text class="diagram-kind" x="47" y="97" text-anchor="middle">Node</text>
+                      <rect class="diagram-node" x="113" y="75" width="79" height="35" rx="7"/><text class="diagram-kind" x="152" y="97" text-anchor="middle">Relation</text>
+                    </svg>
+                  )}
+                  {index === 1 && (
+                    <svg viewBox="0 0 200 116" aria-hidden="true">
+                      <path class="diagram-link" d="M48 36L151 36L100 91L48 36"/>
+                      <circle class="diagram-circle" cx="48" cy="36" r="16" stroke="var(--primary)"/>
+                      <circle class="diagram-circle" cx="151" cy="36" r="16" stroke="var(--graph-blue)"/>
+                      <circle class="diagram-circle" cx="100" cy="91" r="16" stroke="var(--graph-green)"/>
+                      <text class="diagram-kind" x="48" y="40" text-anchor="middle">D</text><text class="diagram-kind" x="151" y="40" text-anchor="middle">M</text><text class="diagram-kind" x="100" y="95" text-anchor="middle">E</text>
+                    </svg>
+                  )}
+                  {index === 2 && (
+                    <svg viewBox="0 0 200 116" aria-hidden="true">
+                      <rect class="diagram-node" x="12" y="13" width="176" height="90" rx="9"/>
+                      <circle cx="26" cy="27" r="3" fill="var(--primary)"/><circle cx="37" cy="27" r="3" fill="var(--border)"/>
+                      <text class="code-svg keyword" x="25" y="54">MATCH</text><text class="code-svg" x="75" y="54">(d)-[r]-(m)</text>
+                      <text class="code-svg keyword" x="25" y="77">RETURN</text><text class="code-svg" x="87" y="77">d, m</text>
+                    </svg>
+                  )}
+                  {index === 3 && (
+                    <svg viewBox="0 0 200 116" aria-hidden="true">
+                      <path d="M47 11V104" stroke="var(--primary)" stroke-width="2"/>
+                      <path d="M47 44C47 66 119 52 119 82V104" fill="none" stroke="var(--graph-blue)" stroke-width="2"/>
+                      <g class="diagram-circles"><circle cx="47" cy="24" r="6"/><circle cx="47" cy="44" r="6"/><circle cx="47" cy="101" r="6"/><circle cx="119" cy="82" r="6"/><circle cx="119" cy="101" r="6"/></g>
+                      <text class="diagram-kind" x="62" y="27">commit</text><text class="diagram-kind" x="62" y="47">main</text><text class="diagram-kind" x="133" y="85">branch</text>
+                    </svg>
+                  )}
+                </div>
+                <div class="step-content">
+                  <p class="step-count">{String(index + 1).padStart(2, "0")} / {step.code}</p>
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div class="agent-feature">
+            <div class="agent-text">
+              <p class="eyeline">{t.how.aiLabel}</p>
+              <h3>{t.how.aiTitle}</h3>
+              <p>{t.how.aiDescription}</p>
+              <ul><li>MCP</li><li>Skills</li><li>Cypher</li><li>Web</li></ul>
+            </div>
+            <div class="agent-code">
+              <div><span>AI / QUERY EXAMPLE</span><span>READ-ONLY</span></div>
+              <pre><code>{`// KG OS MCP\nkgos_query({\n  code: "return await evolution.overview();"\n})\n\n// Query the real, pinned state\n// through the KG OS SDK bridge.`}</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-bordered" id="capabilities">
+        <div class="wrapper">
+          <div class="section-heading">
+            <p class="eyeline">{t.capabilities.label}</p>
+            <h2>{t.capabilities.heading}</h2>
+            <p>{t.capabilities.description}</p>
+          </div>
+          <div class="capability-grid">
+            {t.capabilities.cards.map((card, index) => (
+              <article class="capability">
+                <div class="capability-top">
+                  <span>{String(index + 1).padStart(2, "0")} / {card.code}</span>
+                  {index === 0 && <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="5" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="19" r="2"/><path d="M7 5l10 1M6 7l5 10M18 8l-5 9"/></svg>}
+                  {index === 1 && <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M7 10h6M10 7v6"/></svg>}
+                  {index === 2 && <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="4" r="2"/><circle cx="5" cy="20" r="2"/><circle cx="19" cy="12" r="2"/><path d="M5 6v12M7 5c8 0 12 2 12 5M7 19c8 0 12-2 12-5"/></svg>}
+                  {index === 3 && <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 10 3 2-3 2M13 15h4"/></svg>}
+                </div>
+                <h3>{card.title}</h3>
+                <p>{card.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section class="architecture-section" id="architecture">
+        <div class="wrapper">
+          <div class="section-heading">
+            <p class="eyeline">{t.architecture.label}</p>
+            <h2>{t.architecture.heading}</h2>
+            <p>{t.architecture.description}</p>
+          </div>
+          <div class="architecture-flow">
+            {t.architecture.layers.map((layer, index) => (
+              <>
+                {index > 0 && <span class="architecture-arrow" aria-hidden="true">→</span>}
+                <div class:list={["architecture-layer", { focus: index === 1 }]}>
+                  <small>{layer.eyebrow}</small>
+                  <strong>{layer.title}</strong>
+                  <p>{layer.detail}</p>
+                </div>
+              </>
+            ))}
+          </div>
+          <p class="architecture-note">{t.architecture.note}</p>
+        </div>
+      </section>
+
+      <AiInstall locale={locale} />
+    </main>
+
+    <footer class="site-footer wrapper">
+      <div><strong>KG OS</strong><span>Knowledge Graph Operating System</span></div>
+      <nav aria-label="Footer">
+        <a href="#overview">{t.nav[0]}</a>
+        <a href="#architecture">{t.nav[3]}</a>
+        <a href="#get-started">{t.nav[4]}</a>
+        <a href={publicRepository} target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+      </nav>
+    </footer>
+    <script>
+      const themeKey = "kgos.site.theme";
+      const root = document.documentElement;
+      const options = document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]");
+      function updateTheme(value: string) {
+        const theme = value === "light" || value === "dark" ? value : "system";
+        root.dataset.theme = theme;
+        for (const option of options) {
+          option.setAttribute("aria-pressed", String(option.dataset.themeChoice === theme));
+        }
+      }
+      updateTheme(root.dataset.theme ?? "system");
+      for (const option of options) {
+        option.addEventListener("click", () => {
+          const theme = option.dataset.themeChoice ?? "system";
+          updateTheme(theme);
+          try {
+            if (theme === "system") localStorage.removeItem(themeKey);
+            else localStorage.setItem(themeKey, theme);
+          } catch {
+            // Keep the explicit selection in the current page.
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

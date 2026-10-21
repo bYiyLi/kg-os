@@ -4,7 +4,7 @@
 
 - [D108：私有 KG OS 真源与自动生成的公开 kg-releases](../../design/decisions.md#d108-private-source-public-releases)
 - [Client：Docker-only 发布架构](../../design/client.md#私有源码与公开分发仓库)
-- [公开发布模板与密钥配置真源](../../../distribution/MAINTAINING.md)
+- [公开发布模板与密钥配置真源](../../guide/distribution-maintenance.md)
 
 ## 当前状态
 
@@ -13,7 +13,7 @@
 ## Scope
 
 1. **仓库分离**：现有 `bYiyLi/kg-os` 变为 Private，创建公开 `bYiyLi/kg-releases`；保留本地和远端源代码历史、旧公开 Fork 事实、原工作树中无关未提交修改；Lithograph 不变。
-2. **单一真源**：KG OS 的 `distribution/` 保存公开主页和 CI/CD 模板，`plugins/kgos/INSTALL.md` 是唯一安装指南真源；`scripts/render-kg-releases.mjs` 按受限白名单复制根安装指南、Plugin Manifest、无凭证配置样例、七个 Skill 与 Markdown 参考资源、许可证及私有确切 SHA/ref 的 `source.json`。公开仓库不能独立编辑，也不复制完整应用源码、仓库历史、Secret、私有日志或本地状态；保留私有源码中仍在使用的过渡通用 Skill，不将其作为第八项公开。
+2. **单一真源**：KG OS 的 `distribution/` 保存公开主页和 CI/CD 模板，`plugins/kgos/INSTALL.md` 是唯一安装指南真源；`scripts/render-kg-releases.mjs` 按受限白名单复制根安装指南、Plugin Manifest、无凭证配置样例、七个 Skill 与 Markdown 参考资源、许可证及私有确切 SHA/ref 的 `source.json`。公开仓库不能独立编辑，也不复制完整应用源码、仓库历史、Secret、私有日志或本地状态；历史通用 `kgos` 已按 [Phase 28](28-official-skill-roster.md) 从私有源码清理，不作为第八项公开。
 3. **自动同步**：私有 `main` 与获授权 `v*` Tag Push 启动源仓库的最小 Sync 工作流；两个不同 Deploy Key 分别授予源→公开写权限与公开 CI→源只读权限。重复推送/Tag 重跑保持幂等，不强推公开 Tag。
 4. **公开完整 CI/CD**：公开 `main` Push 自动执行源代码质量、单安装指南/Plugin/Skill 完整性验证与 Linux amd64 Docker 隔离 Smoke；公开 Tag 触发 Release，先通过同一完整 CI，再对精确 Tag 源码构建/Smoke、推送 GHCR、验证匿名拉取和 digest，最后随 GitHub Release 提供版本一致的 Plugin ZIP（包含唯一安装指南与全部七 Skill）。普通 Push 不发布镜像/正式 Plugin Release。
 5. **安全和合规**：明确公开日志、fork、历史 AGPL 与双授权边界；正式二进制发布由公共仓库 `KGOS_BINARY_DISTRIBUTION_APPROVED` 门禁控制，在授权未解决前不能声明可发布。按用户最新决定，私有 GitHub Actions 只允许同步，不保留并行 CI/Release；公开失败由公开 CI/CD 处理。

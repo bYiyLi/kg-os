@@ -1,34 +1,55 @@
 # KG OS
 
-**AI-first programmable knowledge graph infrastructure.** KG OS provides a graph-based external knowledge world that an authorized AI can query and update through MCP; humans inspect and manage it through the built-in Web interface. Knowledge models are defined by the caller, not hard-coded into the Kernel.
+**Give your AI a knowledge graph it can query, update, and revisit.**
 
-This is the **official public distribution repository**. The private `bYiyLi/kg-os` repository is the **only** place where the product, Plugin, seven Skills, installer and CI/CD templates are developed. Every file here is generated from that source; **do not edit this repository directly**.
+English · [简体中文](README.zh-CN.md)
 
-## Get KG OS
+KG OS is programmable knowledge graph infrastructure for AI. Define the information and relationships that matter to your work, connect your AI through MCP, and keep a history of how that knowledge changes. You choose where to run it and which models to use; KG OS works with your Agent rather than replacing it.
 
-Start with **[INSTALL.md](INSTALL.md)**, the **single installation guide** for the runtime, ChatGPT/other supported MCP clients, the Plugin, seven Skills, and optional global AI guidance. You do not need private source access.
+[Product website](https://www.y2l.top/kg-releases/en/) · [Releases](https://github.com/bYiyLi/kg-releases/releases) · [Get help](https://github.com/bYiyLi/kg-releases/issues)
 
-- **Docker runtime**: `ghcr.io/byiyli/kgos:v<version>` (Linux amd64), providing Web, HTTP API and MCP in one process. Only use image tags that are actually [published in Releases](https://github.com/bYiyLi/kg-releases/releases) and anonymously pullable from GHCR.
-- **Plugin**: [`plugins/kgos/plugin.json`](plugins/kgos/plugin.json) and [connection template](plugins/kgos/.app.json.example). User-specific `.app.json` is created privately during installation and is never published.
-- **Seven Skills**: [`plugins/kgos/skills/`](plugins/kgos/skills/) contains `kgos-doctor`, `kgos-ontology-standards`, `kgos-knowledge-standards`, `kgos-retrieval-standards`, `kgos-branch-standards`, `kgos-maintenance-standards`, and `kgos-vlog-standards`. Each Skill includes its full references and assets; the legacy generic `kgos` Skill is **not distributed**.
+## What you can do
 
-To retrieve this repository for installation:
+| Your goal | How KG OS helps |
+| --- | --- |
+| Organize knowledge around your work | Define your own entities, relationships, properties, and constraints instead of fitting a fixed business template. |
+| Find answers and their context | Combine graph queries, full-text search, and semantic retrieval to explore information and its connections. |
+| Understand what changed | Track models and data together, compare versions, and manage changes with branches and merges. |
+| Use knowledge with your AI | Connect a compatible MCP client. Official Skills guide modeling, knowledge creation, retrieval, versioning, maintenance, activity records, and diagnosis. |
 
-```sh
-git clone https://github.com/bYiyLi/kg-releases.git
-cd kg-releases
+For example, a project knowledge graph can connect a technical decision to the components it affects and the evidence behind it. Ask your AI to inspect those relationships before proposing a change.
+
+## Install with your AI Agent
+
+Copy this prompt into an AI Agent that can access your chosen installation environment:
+
+```text
+Help me install KG OS using its official installation guide:
+https://raw.githubusercontent.com/bYiyLi/kg-releases/main/INSTALL.md
+
+Read the guide first, check my existing setup and available published releases, then complete and verify the authorized installation steps. Reuse working connections and preserve existing data. Tell me which login or approval actions require my participation. Do not ask me to paste credentials into the conversation.
 ```
 
-Choose an actual published `vX.Y.Z` tag for a version-pinned installation. The `main` branch may contain candidate material awaiting final runtime/Plugin acceptance; mere presence of files does **not** prove an official release or successful client activation.
+The Agent uses [INSTALL.md](INSTALL.md) to set up the runtime when needed, connect your MCP client, and install the seven official Skills and knowledge-discovery guidance where your client supports them. An existing KG OS instance can be reused; an MCP-only connection is also supported. You do not need to follow a separate set of manual installation commands.
 
-## Versioned delivery and CI/CD
+### Before you begin
 
-Every private `kg-os/main` push synchronizes only allowlisted, non-secret public distribution files and a `source.json` reference to the exact private commit. Public GitHub Actions then execute source validation and an isolated Linux amd64 Docker smoke test. A separately authorized private `v*` tag generates a corresponding public tag, triggers full CI, and—only when the binary distribution-rights gate is enabled—publishes the tested image and Plugin archive with the public GitHub Release.
+You need an existing KG OS instance or a **Linux amd64 host with Docker** for a new installation, plus an Agent with permission to operate that environment. The Agent will check persistent storage, the embedding service configuration, and a compatible MCP client. Remote connections also need a trusted HTTPS endpoint or a supported secure tunnel.
 
-Private application source, history, authentication credentials, local connection IDs, test reports and caches are not included. Maintainer-only setup and responsibilities are documented in [MAINTAINING.md](MAINTAINING.md).
+Use a version listed in **Releases** with an available runtime image and matching Plugin resources. Files on `main` may be ahead of a released version. If no suitable release is available, the Agent should explain what is missing rather than attempt an installation with a placeholder version.
 
-## Licensing and feedback
+Keep administrator tokens, API keys, and other credentials out of chat and public issues. Complete sensitive login or approval steps in the trusted interface indicated by the Agent.
 
-The exported Plugin/Skill resources carry KG OS's [AGPL-3.0-only license](LICENSE), subject to any per-file exceptions; separate commercial terms require an individual agreement as described in [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md). A public Docker image is **not** published until its applicable distribution rights are confirmed.
+## After installation
 
-Use this repository's Issues for installation and distribution problems.
+Ask your AI: “Read my KG OS knowledge model and version overview, then explain what is available. Do not change any data.” The Agent should verify the actual connection and report which parts of the installation are ready, unavailable, or still need your action.
+
+Use the Web address of **your installed instance** for setup and connection authorization. The product website introduces KG OS; it is not your knowledge workspace. The [official Skills](plugins/kgos/skills/) help your AI work with your knowledge, and `kgos-doctor` provides on-demand, read-only checks when something is not working.
+
+## Get help
+
+Ask your Agent to diagnose the problem without changing data. If it remains unresolved, open an [issue](https://github.com/bYiyLi/kg-releases/issues) with the KG OS version, client, host platform, failed step, and a redacted error message. Do not attach credentials, private connection configuration, or knowledge-base data.
+
+## License
+
+See [LICENSE](LICENSE) for the applicable AGPL-3.0-only terms and [Commercial licensing](COMMERCIAL-LICENSE.md#english) for information about a separate commercial agreement. Keep any license notices included with the resources you use.

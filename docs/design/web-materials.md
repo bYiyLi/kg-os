@@ -65,4 +65,4 @@ PNG 按原字节保存，未裁切、重画或重编码。每项 Library 来源�
 
 Q1 当前主图返回 Lumen-7B 的出向 TRAINED_ON / EVALUATED_ON 子集，显示 **7 Node / 6 Relationship**；另一帧为 S2 下的 Paper 查询。它们不代表整个 18 / 22 样例子图，图内 JSON 不替代正式 Graph 响应编码。基准数据与版本场景见[一致评审样例](web-examples.md#结果帧样例)。
 
-原有 `query-workspace.png` 与 `overlay-drawer-review.png` 文件保持原位置与原字节。本入口只按功能组织本轮材料，旧合集 PDF 与多轮稿件不混入正式图集。
+本入口按功能组织当前材料，旧稿不进入正式图册。历史稿件若需追溯可从对应 Git 提交恢复，不作为现行 Web 设计依据。

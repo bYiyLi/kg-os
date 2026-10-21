@@ -12,17 +12,10 @@ if (!base || !authFile || !issuer) {
 }
 const instanceToken = JSON.parse(readFileSync(authFile, "utf8")).token;
 assert.ok(instanceToken, "Instance credential missing");
-// This optional file is used ONLY when verifying a previously deployed Phase
-// 16 image during rollback. Phase 17 always uses the Instance credential.
-const legacyTokenFile = process.env.KGOS_DEV_LEGACY_MCP_TOKEN_FILE;
-const mcpToken = legacyTokenFile
-  ? readFileSync(legacyTokenFile, "utf8").replace(/\r?\n$/, "")
-  : instanceToken;
-assert.ok(mcpToken, "MCP verification credential missing");
 
 const mcpURL = base + "/mcp";
 const headers = {
-  Authorization: "Bearer " + mcpToken,
+  Authorization: "Bearer " + instanceToken,
   Accept: "application/json, text/event-stream",
   "Content-Type": "application/json",
   "MCP-Protocol-Version": "2025-03-26"
@@ -107,8 +100,8 @@ const wrongMCP = await fetch(mcpURL, {
 });
 assert.equal(
   wrongMCP.status,
-  legacyTokenFile ? 401 : 405,
-  "MCP authentication did not match the verified image's credential model"
+  405,
+  "Current Go MCP must authorize the Instance Bearer and reject unsupported GET"
 );
 await wrongMCP.body?.cancel();
 

@@ -1,6 +1,6 @@
 {
   "name": "kgos",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "KG OS monorepo",
   "license": "AGPL-3.0-only",
@@ -14,7 +14,7 @@
     "build": "node scripts/build.mjs",
     "check": "pnpm validate",
     "check:dedupe": "pnpm dedupe --check",
-    "check:dependencies": "node scripts/check-dependency-versions.mjs",
+    "check:dependencies": "node scripts/check-dependency-versions.mjs && node --test tests/runtime-bundle.node-test.mjs",
     "check:diff": "node scripts/check-diff.mjs",
     "check:duplicates": "jscpd packages scripts tests cmd internal --format typescript,javascript,json,go --min-lines 8 --min-tokens 80 --threshold 0 --reporters console --ignore \"**/node_modules/**,**/dist/**,**/coverage/**,**/*_test.go,**/*.test.ts,**/*.test.tsx,**/*.spec.ts\" --no-tips",
     "check:go": "node scripts/go-task.mjs check",

@@ -36,7 +36,8 @@ const config = [
   "max_size_mb = 16",
   "",
   "[fulltext]",
-  'analyzer = "unicode61"',
+  // Exercise the source-built official Jieba tokenizer in the real Docker image.
+  'analyzer = "jieba"',
   "",
   "[embedding]",
   'base_url = "https://example.invalid/v1"',

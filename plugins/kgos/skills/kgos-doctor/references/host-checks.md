@@ -23,7 +23,7 @@
 
 ## D3：官方 Skill 环境
 
-目标清单为 `kgos-ontology-standards`、`kgos-knowledge-standards`、`kgos-retrieval-standards`、`kgos-branch-standards`、`kgos-maintenance-standards`、`kgos-vlog-standards`、`kgos-doctor`。它是**目标集合**，不是已经安装的证据；过渡通用 `kgos` 仍存在也不自动构成故障，不在诊断中卸载它。
+目标清单为 `kgos-ontology-standards`、`kgos-knowledge-standards`、`kgos-retrieval-standards`、`kgos-branch-standards`、`kgos-maintenance-standards`、`kgos-vlog-standards`、`kgos-doctor`。它是**目标集合**，不是已经安装的证据。
 
 对可观察的各项分别记录：宿主安装记录；当前会话能否发现和选择；正文是否实际可读取；所见版本与可信官方基线；所引用工具/方法与该连接 `kgos_docs` 是否兼容；真实使用轨迹。文件存在不证明已安装，名称可见不证明正文加载，加载不证明正确运用，当前 Doctor 被选用不证明其它六项存在。
 

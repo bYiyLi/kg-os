@@ -9,10 +9,11 @@ const publicRepository = "bYiyLi/kg-releases";
 const sourceRepository = "bYiyLi/kg-os";
 const generatedFiles = [
   ".github/workflows/ci.yml",
+  ".github/workflows/pages.yml",
   ".github/workflows/release.yml",
   ".gitignore",
-  "MAINTAINING.md",
   "README.md",
+  "README.zh-CN.md",
   "INSTALL.md",
   "LICENSE",
   "COMMERCIAL-LICENSE.md",
@@ -27,6 +28,22 @@ const officialSkills = [
   "kgos-maintenance-standards",
   "kgos-vlog-standards",
   "kgos-doctor"
+];
+const siteFiles = [
+  "site/astro.config.mjs",
+  "site/package.json",
+  "site/pnpm-lock.yaml",
+  "site/pnpm-workspace.yaml",
+  "site/public/favicon.svg",
+  "site/src/components/AiInstall.astro",
+  "site/src/components/Homepage.astro",
+  "site/src/components/WorkspacePreview.astro",
+  "site/src/lib/content.ts",
+  "site/src/pages/en/index.astro",
+  "site/src/pages/index.astro",
+  "site/src/pages/zh/index.astro",
+  "site/src/styles/site.css",
+  "site/tsconfig.json"
 ];
 const rootOwnedFiles = new Set([
   "LICENSE",
@@ -77,6 +94,13 @@ async function collectFiles(root, prefix = "") {
     if (prefix === "" && entry.name === ".git") {
       continue;
     }
+    if (
+      prefix === "distribution/site" &&
+      entry.isDirectory() &&
+      ["node_modules", "dist", ".astro"].includes(entry.name)
+    ) {
+      continue;
+    }
     const path = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) {
       paths.push(...(await collectFiles(root, path)));
@@ -104,6 +128,21 @@ async function publicFiles() {
     }
     paths.push(...files);
   }
+  const actualSiteFiles = (await collectFiles(sourceRoot, "distribution/site")).map((file) =>
+    file.slice("distribution/".length)
+  );
+  const expectedSiteFiles = new Set(siteFiles);
+  for (const file of actualSiteFiles) {
+    if (!expectedSiteFiles.has(file)) {
+      throw new Error(`Unexpected public website source file: ${file}`);
+    }
+  }
+  for (const file of siteFiles) {
+    if (!actualSiteFiles.includes(file)) {
+      throw new Error(`Missing public website source file: ${file}`);
+    }
+  }
+  paths.push(...siteFiles);
   return paths;
 }
 

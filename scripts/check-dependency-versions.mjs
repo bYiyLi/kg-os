@@ -96,3 +96,18 @@ if (
 ) {
   throw new Error("Go Host, native Docker release and Lithograph fixture pins differ");
 }
+
+if (
+  dockerfile.includes("@kgos/runtime-") ||
+  Object.keys(packages[2].optionalDependencies ?? {}).some((name) =>
+    name.startsWith("@kgos/runtime-")
+  ) ||
+  !dockerfile.includes("COPY native/jieba /src/native/jieba") ||
+  !dockerfile.includes(
+    "cargo build --manifest-path /src/native/jieba/Cargo.toml --release --locked"
+  ) ||
+  !dockerfile.includes("go1.27.3.linux-amd64.tar.gz") ||
+  !dockerfile.includes("COPY --from=native-builder /out/runtime/ /out/runtime/")
+) {
+  throw new Error("Docker/local build must use source-built Jieba and not retired npm runtimes");
+}

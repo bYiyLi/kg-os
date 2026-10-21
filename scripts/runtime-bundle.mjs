@@ -18,7 +18,7 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-export function currentRuntimeTarget() {
+function currentRuntimeTarget() {
   const target = process.platform + "-" + process.arch;
   if (!supportedTargets.has(target)) {
     throw new Error("Unsupported KG OS Runtime target: " + target);
@@ -26,33 +26,25 @@ export function currentRuntimeTarget() {
   return target;
 }
 
-export async function buildCurrentRuntimePackage({ root, daemon, output: explicitOutput }) {
+export function currentRuntimeBundle(root) {
+  return resolve(root, "artifacts", "runtime", currentRuntimeTarget());
+}
+
+export async function buildCurrentRuntimeBundle({ root, daemon, output: explicitOutput }) {
   const target = currentRuntimeTarget();
   const [platform, arch] = target.split("-");
-  const source = resolve(root, "packages", "runtime-" + target);
-  const output = explicitOutput ?? resolve(root, "artifacts", "npm", "runtime-" + target);
-  const packageJSON = JSON.parse(await readFile(resolve(source, "package.json"), "utf8"));
+  const output = explicitOutput ?? currentRuntimeBundle(root);
   const rootPackage = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
   const artifact = currentLithographArtifact(root);
   if (artifact.key !== target) {
     throw new Error("Lithograph artifact target does not match Runtime target");
   }
-  if (
-    packageJSON.name !== "@kgos/runtime-" + target ||
-    packageJSON.version !== rootPackage.version ||
-    packageJSON.os?.[0] !== platform ||
-    packageJSON.cpu?.[0] !== arch
-  ) {
-    throw new Error("Runtime package metadata does not match current target/version");
-  }
-  if (platform === "linux" && packageJSON.libc?.[0] !== "glibc") {
-    throw new Error("Linux Runtime package must declare libc=glibc");
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(rootPackage.version)) {
+    throw new Error("KG OS runtime bundle requires a valid product version");
   }
 
   await rm(output, { force: true, recursive: true });
   await mkdir(resolve(output, "extensions"), { recursive: true });
-  await cp(resolve(source, "package.json"), resolve(output, "package.json"));
-  await cp(resolve(root, "LICENSE"), resolve(output, "LICENSE"));
   const daemonName = platform === "win32" ? "kgosd.exe" : "kgosd";
   const suffix = platform === "darwin" ? ".dylib" : platform === "win32" ? ".dll" : ".so";
   const daemonTarget = resolve(output, daemonName);
@@ -128,6 +120,6 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
     "build",
     process.platform === "win32" ? "kgosd.exe" : "kgosd"
   );
-  const built = await buildCurrentRuntimePackage({ root, daemon });
-  process.stdout.write("Built " + built.target + " Runtime package: " + built.output + "\n");
+  const built = await buildCurrentRuntimeBundle({ root, daemon });
+  process.stdout.write("Built " + built.target + " local runtime bundle: " + built.output + "\n");
 }

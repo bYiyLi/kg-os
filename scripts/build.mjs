@@ -2,7 +2,7 @@ import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { run } from "./process.mjs";
-import { buildCurrentRuntimePackage } from "./runtime-package.mjs";
+import { buildCurrentRuntimeBundle } from "./runtime-bundle.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const webOutput = resolve(root, "packages/web/dist");
@@ -40,7 +40,7 @@ await run(
   ["build", "-tags=sqlite_fts5", "-o", resolve(buildOutput, daemonName), "./cmd/kgosd"],
   { cwd: root, env: goEnv }
 );
-await buildCurrentRuntimePackage({
+await buildCurrentRuntimeBundle({
   root,
   daemon: resolve(buildOutput, daemonName)
 });

@@ -1,4 +1,6 @@
-# Maintainer guide
+# Distribution maintainer guide
+
+Internal release operations only. This guide is not exported to `kg-releases`. Public entrypoints are the English and Simplified Chinese READMEs; `INSTALL.md` remains the single-language installation guide for Agents.
 
 ## Repository responsibilities
 
@@ -8,7 +10,13 @@
 | Private `main` and authorized source `v*` tags | Generated manifest on `main`, mirrored public `v*` release tags |
 | A minimal automatic synchronization workflow | Full CI, Linux amd64 Docker smoke, GHCR and GitHub Releases |
 
-**Never edit `kg-releases` directly.** Edit `kg-os/distribution/`, `kg-os/plugins/kgos/` or `kg-os/scripts/render-kg-releases.mjs` in the private repository and push to private `main`. **`kg-os/plugins/kgos/INSTALL.md` is the only maintained installation guide**; the generator maps it to public `kg-releases/INSTALL.md` without creating a second maintained installer. The private sync workflow exports only allowlisted public files and the seven named Skill directories, with all their Markdown references/assets, excluding the legacy generic Skill and any runtime `.app.json`. It also exports the product licensing documents. All application source, tests and Git history remain private. Public workflows never push back to private KG OS.
+**Never edit `kg-releases` directly.** Edit `kg-os/distribution/`, `kg-os/plugins/kgos/` or `kg-os/scripts/render-kg-releases.mjs` in the private repository and push to private `main`. **`kg-os/plugins/kgos/INSTALL.md` is the only maintained installation guide**; the generator maps it to public `kg-releases/INSTALL.md` without creating a second maintained installer. The private sync workflow exports only allowlisted public files and the seven named Skill directories, with all their Markdown references/assets; the legacy generic Skill has been removed from private source. Runtime `.app.json` is never exported. It also exports the product licensing documents. All application source, tests and Git history remain private. Public workflows never push back to private KG OS.
+
+## Product website
+
+The V4 product website is developed **only** under private `kg-os/distribution/site/` as an independent Astro static site. The same generator exports its checked source files and pinned `pnpm-lock.yaml` into public `kg-releases/site/`. Locally generated `node_modules/`, `dist/` and `.astro/` are not exported. The website does not use KG OS Kernel/Web/SDK source, private Deploy Keys, credentials, or any API endpoint.
+
+The generated public `.github/workflows/pages.yml` builds `site/` from a public checkout and deploys `site/dist` to GitHub Pages **independently** of source Validate, Docker CI and Release. Pages is configured to use **GitHub Actions** on `kg-releases`; this account has an existing custom Pages domain, so the actual project URL is `https://www.y2l.top/kg-releases/`. It serves `/en/` and `/zh/` under that base path, chooses a browser-language default at the root, and supports light/dark/system themes. No private-source SSH key is available to the Pages workflow. Pushing or generating files alone does not prove that Pages deployment succeeded.
 
 ## One-time setup
 

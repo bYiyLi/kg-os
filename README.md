@@ -27,53 +27,25 @@ Node / Relationship Definition 一起表达字段、约束和索引。单字段�
 
 托管语义检索由 Lithograph 执行。KG OS 把全局 embedding / Provider cache 配置和 Ontology 的文本字段声明编译成 Semantic Index；调用方传普通查询字符串。KG OS 不生成内部向量 Property，不在保存或合并正文时调用模型，也不实现 text→Vector cache。OpenAI-compatible Provider 可以按 versioned `providerConfig.cache` 使用独立 SQLite cache database，与 `kgos.db` 隔离。Embedding credential 只通过显式 `api_key_env` 字段引用环境变量，实际凭证不进入索引历史。
 
-KG OS v1 的语言边界是：`kgosd`、Kernel、Lithograph Host 和 Go 原生 MCP 使用 Go；`@kgos/sdk`、`@kgos/cli` 与浏览器 Web 使用 TypeScript。**`kgosd` 统一承载 Web、HTTP API 和 MCP**：Web 静态资源与 API 已内嵌；Phase 16 已实现并提交同进程 Go MCP + QuickJS-NG/wazero 受控脚本，**当前长期 Dev 已切换到新单进程 Go 镜像**，并通过真实 ChatGPT 四 Tool 读取、隔离 31/31 SDK 方法和重启持久化测试。旧 TypeScript MCP Server、Node Worker 与双进程镜像源码已清理，仅保留 Phase 15 Git 历史与 Dev 受控回退镜像；最终 CI 8/8、真实 ChatGPT OAuth 重连和测试 Branch 写入、Codex Skill 主动加载均已验收，Phase 16 = `done`；正式 GHCR/生产部署未执行。设计与实际状态分别见 [架构](docs/design/architecture.md#v1-运行时与技术分层)、[Runtime](docs/design/runtime.md#统一-http--mcp-hostingphase-16-目标)、[MCP](docs/design/mcp.md)。
-
-**此后 KG OS 唯一官方新运行产物是 `ghcr.io/<owner 小写>/kgos:v<version>` 的 Linux amd64 Docker 镜像**，单进程提供 Web + HTTP API + MCP；不再新增 CLI/SDK/Runtime npm 或六平台 Native 发布。旧 `npx --yes @kgos/cli@<version>` 是已发行 v0.2.1 的历史入口，不代表后续 Docker 新版。此前 npm 最终公开版本为 **v0.2.1**：它在 v0.2.0 的 Workspace Root / `.kgos` / complete init/readiness 基线上正式交付 Phase 13 的 D84 late-bound Embedding credential、改进后的 init wizard 与 doctor non-blocking credential 诊断。八个 npm package 均已发布为 `0.2.1` / `latest`，macOS、Linux glibc、Windows arm64/x64 六平台 public-registry `npx` smoke 与 GitHub Release 均已完成；v0.2.0 与 v0.1.1 继续保留为对应历史发布事实。
+KG OS 的 `kgosd`、Kernel、Lithograph Host 和原生 MCP 使用 Go；浏览器 Web 与共享 HTTP `@kgos/sdk` 使用 TypeScript，历史 CLI 只保留内部开发用途。**单一 `kgosd` 进程提供 Web、HTTP API 和 MCP**，通过 QuickJS-NG/wazero 执行受控 SDK 脚本。服务、认证、SDK 和兼容性现状以 [架构](docs/design/architecture.md#v1-运行时与技术分层)、[Runtime](docs/design/runtime.md) 与 [MCP](docs/design/mcp.md) 为准；已退役的 Node MCP、旧四 Tool 和历史 npm 发布只保留对应阶段证据。
 
 配置、模型与调用示例，以及设计职责索引，统一从 [设计入口](docs/design.md)进入。本文只维护产品定义，具体配置、数据和接口规则由各 owner 文档维护。
 
 ## 当前状态
 
-**Phase 15 MCP & Private Plugin 已为 `done`。** 旧独立 TypeScript MCP、四 Tool、QuickJS Worker、Linux amd64 Docker-only、官方 Skill 文件与 MCP-only 私人 Plugin 已实现，Dev/真实 ChatGPT 已验收；提交 [`ea37ddf`](https://github.com/bYiyLi/kg-os/commit/ea37ddfca8c69bc701de0bb41d10d465f92c6b64) 的 [CI Run #65](https://github.com/bYiyLi/kg-os/actions/runs/38261156640) **7/7 全绿**。正式 GHCR 镜像、生产部署未执行。新的 `kgosd` Go 原生单进程 MCP、QuickJS-NG/wazero 和 Skill 客户端验收已按 [D93](docs/design/decisions.md#d93-kgosd-unified-mcp) 于 [Phase 16](docs/development/phases/16-kgosd-unified-mcp.md) `done` 收口；Mac 不运行 Docker，OpenClaw 开发验收和 GitHub Actions Docker CI 按 [D94](docs/design/decisions.md#d94-openclaw-docker-development-and-ci) 分工，不影响旧阶段关闭。
+**当前实现**：KG OS 已采用 Go `kgosd` 单进程承载 Web、API 和五个 AI-facing MCP Tool（另有 app-only 工作区 Tool），并通过 `kgos_docs` 为 AI 提供 SDK/Cypher/操作指南。底层 Ontology、Knowledge/Graph、Evolution、认证和原生扩展能力的实现及验收，按[开发计划](docs/development/README.md)和各 Phase 文件核实。
 
-**Phase 00–13 均已完成；当前公开版本为 v0.2.1。** 发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` Validate + 六平台 native/package matrix 全绿，`v0.2.1` tag 精确指向该 revision。首次 Release Run `36510797281` 在六平台 immutable candidate / aggregate 成功后因 npm registry propagation timeout 停在部分发布；Recovery Run `36514243605` 复用同一 verified `release-set`，完成缺失 SDK/CLI、八包 exact-version/`latest=0.2.1` verification、六平台 public-registry `npx` smoke 与 GitHub Release `KG OS v0.2.1`。
+**当前交付**：新版本只面向 Linux amd64 Docker。私有 `kg-os` 维护源码，公开 [`kg-releases`](https://github.com/bYiyLi/kg-releases) 分发运行时、Plugin、七个官方 Skill 和唯一安装手册；是否已经正式发行取决于实际 Release、许可门禁及 CI 结果。
 
-**Phase 13 当前为 `done`，并已随后作为 v0.2.1 正式发布。** 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 已推送到 `main`；主工作树完整 validation、独立 fresh-source、packed no-key smoke、macOS arm64 中英文 repo-out TTY first-run，以及 CI Run `36505717058` 的 Validate + darwin/linux/win32 arm64/x64 六平台 native/package matrix 全部成功。阶段关闭时发布不属于其完成条件；后续独立 release 授权将版本提升至 `0.2.1`，发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 与 Recovery Release Run `36514243605` 已完成正式公开发布。完整范围与证据见[Phase 13](docs/development/phases/13-init-wizard-credential-boundary.md)。
-
-**Phase 00 已完成。** Go Engineering Foundation 实现提交 `b4046d3a9a9e8941e74ef0af93e47818b4e94dee` 已推送到 `main`，本地 macOS arm64 全量验收与 Ubuntu 24.04 x64 GitHub Actions run `35672012795` 均成功，Phase Review 与历史旧代码清理也已闭环。实际可执行的安装、Go/Web 开发、测试、构建与本地打包步骤见[开发指南](docs/guide/development.md)，完整验收证据与历史基线见[阶段计划](docs/development/phases/00-engineering-foundation.md)。
-
-**Phase 01 已完成。** Runtime & Lithograph Host 实现提交 `f7f679e0601c7ecd16f5409f58c9c3483796948f` 已推送到 `main`，本地完整 validation / fresh-source validation 与 Ubuntu 24.04 x64 GitHub Actions run `35687991251` 均成功；P1-01–P1-10 和 Phase Review 已闭环。
-
-**Phase 02 Ontology 当前为 `done`。** Knowledge Base bootstrap、KG OS Internal Graph / Binding、Ontology read/edit/Patch、Schema/Constraint/Index compiler、authenticated HTTP 与正式 `kg ontology` CLI均已实现；P2-01–P2-12 全部取得真实验收证据。实现提交 `8e776043337bcda24a271f84af1c04fc0da515cc` 已推送到 `main`，主工作树完整 `pnpm validate`、独立 fresh-source setup + full validation、forced pre-commit、final diff/review 与真实 Lithograph v0.3.0 native suite均已通过，Ubuntu 24.04 x64 GitHub Actions run `35804756510` / Validate job `107002937680` 成功。Knowledge Object、Graph 与 Evolution Core 后续已分别在 Phase 04 / 05 / 06 完成；SDK/Web/Skill仍在后续。
-
-**Phase 03 Installation & Runtime Onboarding 当前为 `done`。** `kg doctor -> kg install -> kg ontology ...` 首次流程、正式 package artifact discovery/integrity、完整显式配置、中英文交互、本机 credential fallback 与并发安全的 Runtime auto-start 已实现并完成本地/远端验收。实现提交 `c15a6c062ea457c7a72c90a59f46b77b4ae5c053` 已推送到 `main`；最终主工作树 validation、独立 fresh-source、真实 PTY、真实 Lithograph 首次/并发 auto-start 与 Ubuntu 24.04 x64 GitHub Actions run `35834430037` / Validate job `107094383436` 均成功。
-
-**Phase 04 General Object Read & Patch 当前为 `done`。** 通用 Object surface 只保留 batch `read` 与 batch `patch`：一次 read 接受 1..100 个明确 Ref并固定同一 State；CLI支持 positional text、refs file与stdin；一个 Git Extended Diff可原子修改多个 Ontology / Knowledge Object，并支持 inline patch、patch file与stdin。实现提交 `d1b4d8ccd792d009496596141520e0a930ae9ef3` 已推送到 `main`；主树和独立 fresh-source `pnpm validate` 均通过，Go statement coverage **90.2%**、jscpd 0 clones，Ubuntu 24.04 x64 GitHub Actions run `35870467442` / Validate job `107212896176` 成功。
-
-**Phase 05 Graph Query & Execute 当前为 `done`。** `kg graph query` / `kg graph execute`、authenticated Graph HTTP、non-stream JSON、真正增量 NDJSON、Full-text / Semantic / Lithograph JSON passthrough、Runtime auto-start、client disconnect / daemon shutdown / transaction partial-durability 等实现与 Review 已闭环。实现提交 `324fa67358ca6c2cbdc558ac8df6f60bf64bfaf7` 已推送到 `main`；主工作树与独立 fresh-source `pnpm validate` 均通过，Go statement coverage 为 **90.0%**、jscpd 为 0 clones，Ubuntu 24.04 x64 GitHub Actions run `35893218908` / Validate job `107290569875` 成功；完整证据见[阶段计划](docs/development/phases/05-graph.md)。
-
-**Phase 06 Evolution Core 当前为 `done`。** State / State Data、Branch / Tag、Overview / Get / Ancestry、History / Diff、authenticated HTTP 与正式 `kg evolution` Core CLI 已完成实现与 Review。实现提交 `2c2f4cb914a45b7a09d719a88008f0b5dc854df9` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均通过，Go statement coverage **90.0%**、jscpd 0 clones，真实 bundled Lithograph v0.3.0、daemon 与 CLI E2E 均成功；Ubuntu 24.04 x64 GitHub Actions run `35951315990` / Validate job `107480271083` 成功。Merge Session 明确不属于本阶段。完整范围和 Acceptance 见[阶段计划](docs/development/phases/06-evolution-core.md)。
-
-**Phase 07 Evolution Merge Session 当前为 `done`。** `merge start/list/get/conflicts/resolve/finalize/abort`、公共 conflict 双向投影、exact-revision candidate consistency validation、authenticated HTTP 与正式 `kg evolution merge` CLI 已完成实现与多轮 Review hardening。实现提交 `bd31b748359f85ae95cca919c7deffb62f3c7a0c` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh Git checkout 的 `pnpm run setup && pnpm validate` 均通过，Go statement coverage **90.1%**、race、govulncheck、Playwright、真实 Lithograph v0.3.0 native suite、package/license/audit/diff gates 全绿。Review 已闭环 aggregate Property path、Definition rename continuity、shared Index 单侧展示 Ref、末页 conflict cursor、CLI resolutions strict JSON 与 explicit null/absence JSON contract 等边界；Ubuntu 24.04 x64 GitHub Actions run `35982570257` / Validate job `107577711342` 成功。完整范围和 Acceptance 见[阶段计划](docs/development/phases/07-evolution-merge.md)。
-
-**Phase 08 TypeScript Client & npm Runtime Distribution 当前为 `done`。** SDK/CLI/root/runtime/npm candidate/Go CLI cleanup 已完成：实现提交 `aaf249a1f4862887e1fd16bfc44f47cebd6fb5e6` 已推送到 `main`；主工作树完整 `pnpm validate` 与独立 fresh-source `pnpm run setup && pnpm validate` 均通过，Go statement coverage **90.0%**、TypeScript statements/lines/functions **100%**、jscpd **0 clones**，race/govulncheck/Playwright/native/packed npm/license/audit/diff gates 全绿。GitHub Actions run `36103842748` 的 Validate job `107971924426`、macOS x64 `107971924614`、Linux arm64 `107971924657`、macOS arm64 `107971924688`、Linux x64 `107971924773` 全部成功，final review 无剩余 task-affecting finding。npm registry publish 未执行，也不属于本 Phase 完成动作。完整范围与 Acceptance 见[Phase 08](docs/development/phases/08-typescript-client-npm-runtime.md)。
-
-**Phase 09 MVP Release Closure 当前为 `done`。** Release Run `36219384704` 已成功完成六包 registry verification、macOS arm64/x64 + Linux arm64/x64 public-registry `npx` smoke 与 GitHub Release finalization；Phase 09 验收时六个 package 均为 `0.1.0` 且 `latest=0.1.0`，`v0.1.0` 仍指向原 release revision `d35e254`。六包已配置 `bYiyLi/kg-os` / `release.yml` Trusted Publisher，并收紧为必须 2FA、禁止 bypass token；GitHub `NPM_TOKEN` secret 与 npm bootstrap token均已删除。长期 OIDC publish workflow closure 提交 `26fd22f26967ee429ec982c37e5871e7dbc12f5b` 已推送到 `main`，GitHub Actions CI Run `36226930183` 的 Validate 与四个平台 Native Runtime jobs 全部成功。完整状态与 Acceptance 见[Phase 09](docs/development/phases/09-mvp-release-closure.md)。
-
-**Phase 10 Runtime & CLI Hardening 当前为 `done`。** pooled write connection 清理、official `jieba` Runtime artifact与默认值、CLI help / JSON `--pretty`、Provider 诊断修正及真实用户回归已完成。实现提交 `f138d41c15ba16578e76829af452458a2321be7e` 已推送到 `main`；macOS arm64 主工作树 `pnpm validate`、独立 fresh-source `pnpm run setup && pnpm validate`、仓库外 packed Ontology→中文 Full-text→真实外部 Semantic 查询及 GitHub Actions run `36256273631` 的 Validate + macOS arm64/x64 + Linux glibc arm64/x64 native/package matrix 均通过。Phase 10 结束时公开版本为 v0.1.0，本阶段没有执行新的 npm publish、Git tag 或 GitHub Release。完整状态与 Acceptance 见[Phase 10](docs/development/phases/10-runtime-cli-hardening.md)。
-
-**Phase 11 Windows Runtime CI 验收与六平台发布当前为 `done`。** 发布源码 `1509eaf` 的 Validate 与六平台 native/package CI 已通过；`v0.1.1` 的八包、六平台 public-registry smoke 与 GitHub Release 已完成。两个 Windows package 的 Trusted Publisher、严格 publishing access 与短期首发凭据清理均已完成；长期发布工作流已移除 bootstrap token 路径。完整证据与后续 OIDC 实际发布边界见[Phase 11](docs/development/phases/11-windows-runtime-acceptance.md)。
-
-**Phase 12 First-Run & CLI Productization 当前为 `done`，并已作为 v0.2.0 正式发布。** Workspace Root→`.kgos`、`--root > KGOS_ROOT`、完整 init/readiness/recovery、additional extension setup、doctor 与分层高信息密度 help 已实现并完成多轮 review。阶段实现 CI Run `36399393826` 全绿；后续独立发布授权将版本提升至 `0.2.0`，发布 revision `ac5eda19cc6d7cc849f8036419143c80c1b6427d` 的 CI Run `36407257662` 与 Release Run `36410721397` 均成功。v0.2.0 发布完成时八个 npm package 的 `latest` 均为 `0.2.0`，六平台 public-registry fresh-user smoke 与 GitHub Release `KG OS v0.2.0` 已完成；当前 `latest` 已由后续 v0.2.1 发布推进。
+**历史版本**：最后一组 npm / 六平台原生发行版本为 `v0.2.1`；相关提交、CI、发布及恢复证据由 [Phase 00–13 历史验收](docs/development/README.md)和对应阶段文件保存，不在产品 README 复制第二套阶段日志。新镜像的进度不能从历史 npm Release 推断。
 
 首版语义索引只支持单字段；Go/Lithograph Runtime Host 的基础接入已经进入 Phase 01 完成基线。检索范围、Client迁移、工程待办与 Web 设计状态见 [设计状态导航](docs/design.md#设计状态导航)，不把已确认决定继续列为待确认。
 
-相关当前决定见 [D59 Cypher 原样执行](docs/design/decisions.md#d59-cypher-passthrough)、[D61 首版单字段语义索引](docs/design/decisions.md#d61-single-field-semantic)、[D65 Go Runtime](docs/design/decisions.md#d65-go-runtime)、[D66 Lithograph v0.3.0 SQL-only / Provider-owned cache](docs/design/decisions.md#d66-lithograph-v030-sql-only)、D67–D74，以及 [D75 TypeScript Client](docs/design/decisions.md#d75-typescript-client)、[D76 npm distribution](docs/design/decisions.md#d76-npm-distribution)、[D77 explicit Instance Root](docs/design/decisions.md#d77-explicit-instance-root)、[D78 operation-scoped Branch](docs/design/decisions.md#d78-operation-scoped-branch)、[D79 stale daemon recovery](docs/design/decisions.md#d79-stale-daemon-recovery) 与 [D80 official Jieba](docs/design/decisions.md#d80-official-jieba)、[D81 Workspace Root](docs/design/decisions.md#d81-workspace-root)、[D82 Init readiness](docs/design/decisions.md#d82-init-readiness)、[D83 CLI progressive disclosure](docs/design/decisions.md#d83-cli-progressive-disclosure)。D81–D83 supersede D77 的 root-is-Instance / lazy init 行为，但不追溯改写 v0.1.1 的已发布事实。协作规则只在 [AGENTS.md](AGENTS.md) 维护。
+当前有效设计、历次决定与替换关系均由 [设计职责导航](docs/design.md) 和 [Decisions 真源](docs/design/decisions.md)维护；协作规则仅在 [AGENTS.md](AGENTS.md)维护。
 
 ## 开发环境
 
-源码真源在 Mac `/Users/yi/Code/KGOS`；长期 Linux Docker 集成 Dev 环境通过 `ssh openclaw` 连接，独立部署于 `/data/apps/KgosDev`，MCP 宿主监听 `0.0.0.0:3777`，开发机地址为 `http://10.168.155.123:3777/mcp`（普通 HTTP 不提供 Token 传输加密）。日常使用 `pnpm dev:mcp deploy` 更新、`pnpm dev:mcp check` 验证、`pnpm dev:mcp status` 查看状态。源码镜像、配置、Token、持久化数据库、备份均有独立职责；部署失败保留数据并可回退运行镜像。完整规范见 [远程开发环境](docs/guide/dev-environment.md)。这是开发环境，不代表 MCP 已公开发布或 Phase 15 全部验收完成。
+源码真源在 Mac `/Users/yi/Code/KGOS`；Linux Docker 集成 Dev 环境经 `ssh openclaw` 连接，部署在 `/data/apps/KgosDev`。日常使用 `pnpm dev:mcp deploy`、`pnpm dev:mcp check` 和 `pnpm dev:mcp status`，并按 [远程开发环境](docs/guide/dev-environment.md) 的备份、回退与数据保护规则执行。Dev 运行成功不等于正式 GHCR/Plugin 已发布。
 
 ## License
 
@@ -92,20 +64,6 @@ KG OS 采用双许可模式：
 - [背景](docs/background.md)：为什么会有 KG OS，以及方向如何形成。
 - [设计](docs/design.md)：设计总入口与职责导航；详细规则按职责位于 `docs/design/`。
 - [开发计划](docs/development/README.md)：开发路线、阶段状态、共同完成条件与阶段入口。
-- [Phase 00 计划](docs/development/phases/00-engineering-foundation.md)：工程基础的范围、Feature、验收项、Review 和证据。
-- [Phase 01 计划](docs/development/phases/01-runtime-lithograph-host.md)：本地 Runtime / Lithograph Host 的范围、Feature、验收与当前状态。
-- [Phase 02 计划](docs/development/phases/02-ontology.md)：Knowledge Base bootstrap 与完整 Ontology 能力的范围、Feature、验收和 Review。
-- [Phase 03 计划](docs/development/phases/03-installation-runtime-onboarding.md)：doctor / install、完整配置、i18n、本机认证与 Runtime auto-start 的范围和验收。
-- [Phase 04 计划](docs/development/phases/04-object.md)：通用 Object batch read、Knowledge Node/Relationship 与 batch Patch 的范围和验收。
-- [Phase 05 计划](docs/development/phases/05-graph.md)：Graph query/execute、authenticated HTTP、NDJSON streaming、Full-text / Semantic公共路径与 transport/cancellation 验收。
-- [Phase 06 计划](docs/development/phases/06-evolution-core.md)：Evolution Core 的 State / State Data、Branch / Tag、History / Diff、HTTP 与 CLI 范围和验收。
-- [Phase 07 计划](docs/development/phases/07-evolution-merge.md)：Evolution Merge Session 的冲突投影、渐进 resolution、candidate validation、finalize/abort、HTTP 与 CLI 范围和验收。
-- [Phase 08 计划](docs/development/phases/08-typescript-client-npm-runtime.md)：TypeScript SDK/CLI、npm native Runtime distribution、explicit Instance Root 与 Go CLI迁移范围和验收。
-- [Phase 09 计划](docs/development/phases/09-mvp-release-closure.md)：首个公开 MVP Release 的 version closure、npm publish/recovery、registry npx matrix、Git tag / GitHub Release与发布状态闭环。
-- [Phase 10 计划](docs/development/phases/10-runtime-cli-hardening.md)：Runtime connection state isolation、stale daemon recovery、official Jieba default、CLI help/pretty、Provider diagnostics、Node baseline与真实用户回归。
-- [Phase 11 计划](docs/development/phases/11-windows-runtime-acceptance.md)：Windows x64/arm64 native package、六平台 CI、`0.1.1` 发布与 registry smoke。
-- [Phase 12 计划](docs/development/phases/12-first-run-cli-productization.md)：Workspace Root / `.kgos`、`KGOS_ROOT`、完整 init readiness、extension setup、分层高信息密度 help 与 fresh-user 验收。
-- [Phase 13 计划](docs/development/phases/13-init-wizard-credential-boundary.md)：Init Wizard UX、custom SQLite extension 输入恢复、late-bound Embedding credential 与 doctor non-blocking 诊断的范围和验收。
 - [开发指南](docs/guide/development.md)：安装、启动、调试、检查、测试、构建和本地打包。
 - [远程 Dev 环境](docs/guide/dev-environment.md)：固定 Linux Docker 开发部署、`dev:mcp` 管理命令、备份与回退边界。
 - [行业与技术研究](docs/research/industry-landscape.md)：外部产品和技术调研记录。

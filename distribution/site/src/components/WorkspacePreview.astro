@@ -1,0 +1,119 @@
+---
+import { copy, type Locale } from "../lib/content";
+
+interface Props {
+  locale: Locale;
+}
+
+const t = copy[Astro.props.locale].demo;
+---
+
+<section class="product-demo" aria-labelledby="demo-heading">
+  <div class="demo-intro">
+    <div>
+      <p class="eyeline">{t.label}</p>
+      <h2 id="demo-heading">{t.question}</h2>
+    </div>
+    <span class="demo-status">{t.illustrative}</span>
+  </div>
+
+  <div class="app-preview">
+    <div class="app-titlebar" aria-hidden="true">
+      <span class="traffic-lights"><i></i><i></i><i></i></span>
+      <span>KG OS / KNOWLEDGE WORKSPACE</span>
+      <span>branch/main</span>
+    </div>
+    <div class="app-main">
+      <aside class="preview-sidebar" aria-label={t.version}>
+        <div class="preview-logo">
+          <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M24 4 44 24 24 44 4 24Z" stroke="currentColor" stroke-width="4" />
+            <path d="m24 14-7 10 7 10 7-10Z" fill="currentColor" />
+          </svg>
+          KG OS
+        </div>
+        <p class="preview-sidebar-label">{t.version}</p>
+        <div class="preview-branch">{t.branches}<span aria-hidden="true">⌄</span></div>
+        <div class="preview-search"><span aria-hidden="true">⌕</span> {t.search}</div>
+        {t.commits.map((commit, index) => (
+          <div class:list={["preview-commit", { active: index === 0 }]}>
+            <span class:list={["commit-indicator", `commit-${index}`]}></span>
+            <div>
+              <strong>{commit}</strong>
+              <small>{["c42a81 · main", "9a20c1 · main", "1bd731 · main"][index]}</small>
+            </div>
+          </div>
+        ))}
+        <div class="preview-sidebar-foot">◈ {t.workspace}</div>
+      </aside>
+      <div class="preview-workspace">
+        <div class="preview-toolbar"><strong>{t.title}</strong><span>STATE / c42a81</span></div>
+        <div class="preview-tabs">
+          {t.tabs.map((tab, index) => (
+            <span class:list={["preview-tab", { selected: index === 0 }]}>{tab}</span>
+          ))}
+        </div>
+        <div class="graph-area">
+          <svg viewBox="0 0 700 350" role="img" aria-label={t.question} preserveAspectRatio="xMidYMid meet">
+            <path class="graph-link graph-blue" d="M344 153C277 102 244 90 183 89" />
+            <path class="graph-link" d="M344 153C421 99 456 91 522 90" />
+            <path class="graph-link graph-green" d="M344 183C287 230 251 253 184 261" />
+            <path class="graph-link" d="M344 183C412 232 460 253 524 261" />
+            <path class="graph-link graph-blue graph-secondary" d="M183 89C326 15 387 14 522 90" />
+            <g transform="translate(97,60)">
+              <rect class="graph-box" width="165" height="58" rx="8" />
+              <circle cx="16" cy="19" r="5" fill="var(--graph-blue)" />
+              <text class="graph-kind" x="28" y="23">Module</text>
+              <text class="graph-title" x="15" y="44">{t.nodeNames[0]}</text>
+            </g>
+            <g transform="translate(446,61)">
+              <rect class="graph-box" width="161" height="58" rx="8" />
+              <circle cx="16" cy="19" r="5" fill="var(--graph-blue)" />
+              <text class="graph-kind" x="28" y="23">Module</text>
+              <text class="graph-title" x="15" y="44">{t.nodeNames[1]}</text>
+            </g>
+            <g transform="translate(266,130)">
+              <rect class="graph-selected-ring" x="-3" y="-3" width="176" height="77" rx="10" />
+              <rect class="graph-box" width="170" height="71" rx="8" />
+              <circle cx="16" cy="20" r="5" fill="var(--primary)" />
+              <text class="graph-kind" x="28" y="24">Decision</text>
+              <text class="graph-title" x="16" y="48">{t.nodeNames[2]}</text>
+            </g>
+            <g transform="translate(96,237)">
+              <rect class="graph-box" width="164" height="58" rx="8" />
+              <circle cx="16" cy="19" r="5" fill="var(--graph-green)" />
+              <text class="graph-kind" x="28" y="23">Evidence</text>
+              <text class="graph-title" x="15" y="44">{t.nodeNames[3]}</text>
+            </g>
+            <g transform="translate(447,237)">
+              <rect class="graph-box" width="161" height="58" rx="8" />
+              <circle cx="16" cy="19" r="5" fill="var(--graph-orange)" />
+              <text class="graph-kind" x="28" y="23">Document</text>
+              <text class="graph-title" x="15" y="44">{t.nodeNames[4]}</text>
+            </g>
+            <g>
+              <rect class="graph-edge-tag" x="217" y="132" width="64" height="20" rx="4" />
+              <text class="graph-edge-label" x="249" y="146" text-anchor="middle">AFFECTS</text>
+              <rect class="graph-edge-tag" x="390" y="132" width="64" height="20" rx="4" />
+              <text class="graph-edge-label" x="422" y="146" text-anchor="middle">AFFECTS</text>
+              <rect class="graph-edge-tag" x="223" y="213" width="81" height="20" rx="4" />
+              <text class="graph-edge-label" x="263" y="226" text-anchor="middle">SUPPORTED_BY</text>
+            </g>
+          </svg>
+          <div class="graph-inspector">
+            <p class="inspector-label">{t.inspector}</p>
+            <strong>{t.nodeNames[2]}</strong>
+            <div class="inspector-separator"></div>
+            <div class="inspector-field"><span>{t.affected}</span><b>2</b></div>
+            <div class="inspector-field"><span>{t.evidence}</span><b>1</b></div>
+            <div class="inspector-field"><span>{t.branch}</span><b>main</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="demo-caption">
+    <span>{t.caption}</span>
+    <span>FIG 01 / KNOWLEDGE GRAPH</span>
+  </p>
+</section>

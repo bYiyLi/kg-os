@@ -36,6 +36,29 @@ export const en = {
       auth: "The access token is the administrator credential for this KG OS Instance—like a master key to your knowledge base. Use it to sign in to the Web interface and authorize protected API or client operations on knowledge and configuration. Anyone holding it may act as an administrator, so keep it private and never share it publicly.",
       initialize: "Check your configuration, then prepare your knowledge base."
     },
+    review: {
+      title: "Review settings and initialize",
+      tagline: "Everything is ready to set up your KG OS knowledge base",
+      description:
+        "Review your settings before you begin. KG OS will save the configuration, prepare its components, create the knowledge base, and check service readiness.",
+      accessTitle: "Service access",
+      semanticTitle: "Semantic search",
+      basicsTitle: "Basic settings",
+      mcpLabel: "MCP connection URL",
+      localOnly: "This is a local address. ChatGPT Cloud cannot connect to it directly.",
+      verified: "Vector service verified",
+      jieba: "Jieba (Chinese tokenizer)",
+      beforeStart:
+        "Need to make a change? Go back to an earlier step. Initialization will not automatically overwrite existing knowledge.",
+      runningTitle: "Preparing your KG OS",
+      runningTagline: "Initialization is underway",
+      runningDescription:
+        "KG OS is saving the settings, preparing components, and creating the knowledge base. You can enter the workspace once the service is ready.",
+      failedTitle: "Initialization is not complete",
+      failedTagline: "Some initialization steps did not finish",
+      failedDescription:
+        "Existing configuration and data are preserved. Review the error, resolve the issue, then continue initialization."
+    },
     vector: {
       tagline: "Find knowledge by meaning, not just by connections",
       intro:

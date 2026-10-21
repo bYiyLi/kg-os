@@ -43,7 +43,7 @@ it("treats missing, invalid and inaccessible saved appearances as automatic", ()
 });
 
 it("follows live system changes, remembers a manual choice, and can resume automatic mode", () => {
-  let systemIsDark = false;
+  let systemIsDark = true;
   const listeners = new Set<() => void>();
   vi.stubGlobal("matchMedia", () => ({
     get matches() {
@@ -68,16 +68,16 @@ it("follows live system changes, remembers a manual choice, and can resume autom
   act(() => {
     root?.render(<Probe />);
   });
-  expect(current?.theme).toBe("light");
+  expect(current?.theme).toBe("dark");
   expect(current?.preference).toBe("system");
-  expect(document.documentElement.classList.contains("theme-light")).toBe(true);
+  expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
 
   act(() => {
-    systemIsDark = true;
+    systemIsDark = false;
     for (const callback of listeners) callback();
   });
-  expect(current?.theme).toBe("dark");
-  expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
+  expect(current?.theme).toBe("light");
+  expect(document.documentElement.classList.contains("theme-light")).toBe(true);
 
   act(() => {
     current?.selectTheme("light");
@@ -100,4 +100,23 @@ it("follows live system changes, remembers a manual choice, and can resume autom
     root?.render(<Probe />);
   });
   expect(current?.theme).toBe("light"); // Browser OS fallback resumes.
+});
+
+it("falls back to system dark when browser media queries are inaccessible", () => {
+  vi.stubGlobal("matchMedia", () => {
+    throw new Error("Media queries blocked");
+  });
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+
+  function Probe() {
+    const { theme, preference } = useThemePreference();
+    return <span>{theme + ":" + preference}</span>;
+  }
+  act(() => {
+    root?.render(<Probe />);
+  });
+  expect(container.textContent).toBe("dark:system");
 });

@@ -23,8 +23,8 @@ let endpoint: string;
 async function startDaemon(root: string): Promise<{ child: ChildProcess; url: string }> {
   const bin = resolve(
     "artifacts",
-    "npm",
-    "runtime-" + process.platform + "-" + process.arch,
+    "runtime",
+    process.platform + "-" + process.arch,
     process.platform === "win32" ? "kgosd.exe" : "kgosd"
   );
   const child = spawn(bin, ["--root", root], { stdio: "ignore" });
@@ -316,7 +316,10 @@ test("Web wizard claims administrator token and bootstraps the real database", a
   const issuedToken = await regenerateAndCheckOldToken(page, request, endpoint);
   await expect(page.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Initialize knowledge base" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Review settings and initialize" })).toBeVisible();
+  await expect(page.locator(".setup-review-card")).toHaveCount(2);
+  await expect(page.locator(".setup-review-basics dl > div")).toHaveCount(3);
+  await expect(page.locator(".setup-review-verified")).toContainText("Vector service verified");
   await page.getByRole("button", { name: "Initialize knowledge base", exact: true }).click();
 
   await expect
@@ -338,10 +341,8 @@ test("Web wizard claims administrator token and bootstraps the real database", a
   expect(receipt.version).toBe(1);
   await expectPersistedOriginAndOAuth(request, endpoint, workspace);
   await stat(join(workspace, ".kgos", "kgos.db"));
-  const locked = await request.post(endpoint + "/api/v1/setup/claim");
-  expect(locked.status()).toBe(409);
-  const lockedRotation = await request.post(endpoint + "/api/v1/setup/rotate-token");
-  expect(lockedRotation.status()).toBe(409);
+  expect((await request.post(endpoint + "/api/v1/setup/claim")).status()).toBe(409);
+  expect((await request.post(endpoint + "/api/v1/setup/rotate-token")).status()).toBe(409);
   const authorized = await request.post(endpoint + "/api/v1/evolution/overview", {
     headers: { Authorization: "Bearer " + issuedToken },
     data: {}

@@ -1,13 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreDependencies": ["@secretlint/secretlint-rule-preset-recommend", "secretlint", "lefthook"],
+  "ignoreDependencies": ["@secretlint/secretlint-rule-preset-recommend", "secretlint"],
   "workspaces": {
     ".": {
       "entry": [
         "scripts/prepare-lithograph.mjs",
         "scripts/prepare-jieba.mjs",
-        "scripts/mcp-dev-accept-unified.mjs",
-        "scripts/mcp-dev-accept.mjs"
+        "scripts/mcp-dev-accept-unified.mjs"
       ],
       "project": ["config/test/*.ts", "scripts/*.mjs", "tests/**/*.ts"]
     },

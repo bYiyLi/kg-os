@@ -645,28 +645,28 @@ flowchart TD
 
 ## 官方 Skill 与私人 Plugin
 
-**过渡通用 Skill**：`plugins/kgos/skills/kgos/SKILL.md` 在迁移验收前继续保留。它指导 AI 根据任务使用 `kgos_docs`、`kgos_ontology_overview`、`kgos_commit_ancestry`、`kgos_query` 与 `kgos_mutate`，处理 SDK 命名空间、State pin、Object Patch、Cypher、分页、Merge 与 Commit Message。这些**工具使用说明的长期真源是 MCP 自描述 `kgos_docs`**，不是另一份通用 Skill；新任务按需阅读文档与当前 State，不把整个 Ontology/Commit DAG 无界加载。Skill 不是认证或 MCP 可用的前置条件，也不能保证 ChatGPT 在每个会话自动调用。新规范 Skill 的源码与实际验收状态由 Phase 27 记录，不能由通用 Skill 的存在推断新规范尚未创建或已经安装。
+**官方 Skill 源码已收敛为七个**：旧通用 `plugins/kgos/skills/kgos/SKILL.md` 已依用户明确清理要求从源码移除。它原先指导的 `kgos_docs`、`kgos_ontology_overview`、`kgos_commit_ancestry`、`kgos_query`、`kgos_mutate`、SDK 命名空间、State pin、Object Patch、Cypher、分页、Merge、Commit Message 与失败恢复，由 MCP 自描述 `kgos_docs` 和相应 Guide/SDK 合同承接。新任务按需读取文档与当前 State，不把完整 Ontology/Commit DAG 无界加载；没有 Skill 也能调用已授权 MCP。**仓库源码清理不证明私人 Plugin 已自动更新或七个 Skill 已通过目标客户端验收**，对应缺口仍归 Phase 25/27/28。
 
 私人安装流程目标：
 
 1. 用户在自己的电脑或受控主机初始化 KG OS，运行统一 `kgosd`；目标方案中 MCP 由现有 Instance 凭证保护，用户自行配置受保护的 HTTPS MCP 入口与统一 `[server].public_origin`，无需独立 MCP Server 或管理员 Token。
 2. 用户在 ChatGPT 侧手工添加**自己的**自定义 MCP Connection，验证工具真实可调用并取得连接自身的注册 ID。
-3. 根据官方 `plugins/kgos/` 模板与 AI-facing `INSTALL.md`，由 ChatGPT / Plugin Creator 优先生成**用户私有** Plugin；模板中的连接映射引用该用户真实注册的 MCP App ID。**现有模板**仍携带 `skills/kgos/SKILL.md`；**最终交付目标**仅包含下文七个官方 Skill，需在过渡验收后更新模板及私人安装指南，不能把当前包当成目标版本。没有 Creator 时，可在符合当时客户端合同的前提下手工生成兼容包并私有安装。
+3. 根据官方 `plugins/kgos/` 模板与 AI-facing `INSTALL.md`，由 ChatGPT / Plugin Creator 优先生成**用户私有** Plugin；模板中的连接映射引用该用户真实注册的 MCP App ID。当前源码与公开候选包只含下文七个官方 Skill；既有私人 Plugin 可能仍安装早期通用 Skill，须按实际客户端能力与授权另行更新，不得推断已同步。没有 Creator 时，可在符合当时客户端合同的前提下手工生成兼容包并私有安装。
 4. 在 ChatGPT Web / Desktop 分别验证 Plugin 的工具发现、**实际打包的** Skill 激活、受保护连接、只读/写入区分，以及真实 `kgos_docs`、`kgos_ontology_overview` 和 JS 组合操作；账户与 Workspace 功能可用性以实际连接测试为准。
 
 通用 Plugin 模板不是可直接指向所有用户同一 MCP 地址的公共插件；不把动态连接 ID、Bearer Token、OAuth secret 或本地根目录写死进公开包。优先按 OpenAI 当前支持的 **注册 MCP Connection → 私有 Plugin 的 `.app.json` 引用 + 官方 Skill** 路径生成；`mcp.json` 可在需要便携 MCP 配置时单独选用，不与用户已有连接配置重复。`plugin.json`、`.app.json` 与 Skill 等具体文件布局按安装时的插件规范验证，**不把一种开发样例格式误当成所有客户端永远不变的产品合同**。
 
 <a id="kgos-seven-skills"></a>
 
-**公开安装与分发职责（D109）**：Plugin/Skill 内容真源保留在私有 `plugins/kgos/`，`kg-releases` 只接受生成器公开的 `plugin.json`、`.app.json.example` 和七个目标 Skill 的完整 Markdown 资源；源码内旧通用 `kgos` 不进入新的公开候选包，但尚未自动从已安装的私人 Plugin 中删除。`plugins/kgos/INSTALL.md` 是**唯一安装指南真源**，发布为 `kg-releases/INSTALL.md`（公开仓库只有这一份），完整覆盖 Docker、MCP、Plugin、Skill 与全局引导词。正式发行时 Plugin 归档与 GHCR 镜像跟随同一个经授权的产品 Tag，`.app.json` 中的用户连接 ID 必须由用户私下配置；公开候选资料不等于 Phase 25/27/28 的完整客户端验收。详见 [D109](decisions.md#d109-single-public-distribution-and-installer) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。
+**公开安装与分发职责（D109）**：Plugin/Skill 内容真源保留在私有 `plugins/kgos/`，`kg-releases` 只接受生成器公开的 `plugin.json`、`.app.json.example` 和七个目标 Skill 的完整 Markdown 资源；私有源码内旧通用 `kgos` 已清理，但不会自动从用户已安装的私人 Plugin 中删除。`plugins/kgos/INSTALL.md` 是**唯一安装指南真源**，发布为 `kg-releases/INSTALL.md`（公开仓库只有这一份），完整覆盖 Docker、MCP、Plugin、Skill 与全局引导词。正式发行时 Plugin 归档与 GHCR 镜像跟随同一个经授权的产品 Tag，`.app.json` 中的用户连接 ID 必须由用户私下配置；公开候选资料不等于 Phase 25/27/28 的完整客户端验收。详见 [D109](decisions.md#d109-single-public-distribution-and-installer) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。
 
 ### 最终官方 Skill 清单与通用 Skill 退役（D107：目标方案）
 
 **最终官方 Skill 集合固定为七个**：下文 [六个规范 Skill](#kgos-standards-skill-suite)（Knowledge、Ontology、Retrieval、Branch、VLog、Maintenance）加上独立只读诊断 [`kgos-doctor`](#kgos-doctor-v1)。七个 Skill 分别指导外部 AI 的知识工作或诊断；KG OS MCP 负责确定性能力与自描述操作手册，外部 AI 负责任务理解、执行与结果核实。**不再规划**通用 `kgos`、额外执行 Skill、总规范 Skill、自动分发 Router 或其它官方 Skill 作为最终集合的一部分。官方全局引导提示词是独立提示词资产，**不计入 Skill 数量**。
 
-**过渡与退役边界**：当前仓库和已有私人 Plugin 中的通用 `kgos` 是**仍可使用的过渡 Skill**，不是已被删除的功能，也不属于最终七个。它负责的 MCP Tool 用法、31 个 SDK 方法的说明、State/Branch/分页/写入中断等必要操作知识，必须先逐项核对已由现行 `kgos_docs` 和真实 MCP 合同覆盖；七个目标 Skill 的实际安装、选择、只读与授权写入行为，以及无通用 Skill 的核心查询/修改/版本操作，均须在受控真实客户端验证。**只有这些验收通过且得到相应实施授权后**，才从未来官方 Plugin 模板移除 `skills/kgos/SKILL.md` 并更新安装指南、引用与测试；已安装在用户账户内的私人 Plugin 不会因为仓库文件变化而自动更新或移除，不得悄悄修改它们。
+**退役与客户端边界**：旧通用 Skill 在仓库源码中的退役已经执行，原有操作知识已逐项映射到现行 `kgos_docs` / MCP Guide/SDK，并补齐了缺失的沙箱及错误说明。用户明确授权的是**源码清理**，不是更新其账户里已有的私人 Plugin 或豁免剩余阶段验收。七个目标 Skill 的实际安装、自动选择、只读与获授权写入，以及无旧 Skill 的客户端查询/修改/版本路径仍须在受控真实客户端验证。既有私人 Plugin 不会自动随源码删除而改变，更新/移除需单独得到授权并回读确认，不得冒充已完成。
 
-**设计与交付分离**：目标计数为 **6 + 1 = 7**；D107 制定时只有过渡通用 Skill，新增目标 Skill 的实际进度分别由 [Phase 25](../development/phases/25-kgos-doctor.md)（Doctor）和 [Phase 27](../development/phases/27-knowledge-standards-skills.md)（六个规范）维护。在两者交付、现行 MCP 文档覆盖核实后，[Phase 28](../development/phases/28-official-skill-roster.md)负责最终七个 Skill 的打包清单收敛及通用 `kgos` 的受控退役。源码创建不等于私人客户端已安装或最终七 Skill 已交付。
+**设计与交付分离**：目标计数为 **6 + 1 = 7**；D107 制定时只有过渡通用 Skill，现七个目标源码与清单均已齐备。七个 Skill 的实际交付进度分别由 [Phase 25](../development/phases/25-kgos-doctor.md)（Doctor）和 [Phase 27](../development/phases/27-knowledge-standards-skills.md)（六个规范）维护；[Phase 28](../development/phases/28-official-skill-roster.md)记录源码清理与尚未关闭的客户端迁移验收。源码已收敛不等于私人客户端已安装或最终七 Skill 已完成交付。
 
 <a id="kgos-standards-skill-suite"></a>
 

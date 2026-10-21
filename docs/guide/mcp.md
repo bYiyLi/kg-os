@@ -6,79 +6,19 @@ KG OS 的当前目标是**一个 Go `kgosd` 进程、一个 HTTP listener**，�
 
 **发行说明**：按 [D99](../design/decisions.md#d99-linux-amd64-docker-only-distribution)，当前 Docker-only 交付覆盖整个 KG OS 的 Web/API/MCP，不再为后续版本发布独立 npm CLI/SDK/多平台 Native Runtime；下文历史 Dev 认证与 OAuth 验收不等于正式 GHCR 镜像已发布。
 
-**当前状态**：Phase 16 为 `done`。2026-10-14 Phase 17 统一 Instance + Web 授权流程已通过正式 `Dockerfile.unified` 构建部署到 `https://kgos-dev.y2l.top` 的 Dev 实例，自动只读四 Tool / OAuth metadata 验收成功；用户已实际重新完成 ChatGPT OAuth 授权并确认测试正常；Phase 17 已按用户批准的 CI / 完整隔离矩阵例外关闭为 `done`，并不表示相关 CI 已运行。Go 单进程 Linux amd64 镜像已在 OpenClaw 开发环境构建并部署、隔离 31/31 SDK Smoke 成功；现有 ChatGPT 私人连接已调用新版四 Tool，官方 Skill 已保存到私人 Plugin v1.0.1。**最终实现提交 `813bff4` 的 GitHub CI 8/8、真实 ChatGPT OAuth/隔离写入以及 Codex Skill 新会话加载均已通过；尚未正式发布 GHCR**。旧 `Dockerfile.mcp` / `packages/mcp` 的源码已移除，历史仅保留 Git 记录，不再是服务端部署入口。
+**当前能力**：统一 Go `kgosd` 已实现 Web/API/MCP 同源服务；[Phase 23](../development/phases/23-mcp-tool-taxonomy-and-docs.md) 确认五个 AI-facing Tool、独立 `kgos_docs` 与 31 个 SDK 方法，旧四 Tool/独立 Node MCP 只属于历史版本。实际 Docker / Plugin 发布与 Dev 部署状态分别以 [开发计划](../development/README.md)及 [OpenClaw Dev](dev-environment.md) 的最新验证为准。
 
-## 1. 镜像与首次初始化
+## 1. 安装与初始化入口
 
-镜像目标名称为 `ghcr.io/byiyli/kgos:v<version>`，只有在对应版本确实发布且可拉取时才可使用。Linux amd64 开发构建在 **OpenClaw**（`ssh openclaw`）执行，**不要在 Mac 上运行 Docker**。GitHub Actions CI 会独立构建与测试。若从已取得的 Phase 16 源码构建：
+**唯一完整 AI 安装手册**位于 [KG OS INSTALL.md](../../plugins/kgos/INSTALL.md)，并由私有仓库自动生成到公开 [kg-releases/INSTALL.md](https://github.com/bYiyLi/kg-releases/blob/main/INSTALL.md)。安装 Docker、MCP OAuth、私人 Plugin、七个官方 Skill 与首次初始化，以该版本的手册和实际已发布镜像能力为准。这里不再维护另一套历史 Docker 命令、静态测试 TOML 或手工首次启动流程。
 
-```sh
-docker build --platform linux/amd64 -f Dockerfile.unified -t kgos-unified:local .
-docker volume create kgos-workspace
-```
+历史版本需要先提供已有完整 `config.toml`、运行 `kgosd init`；支持 Web-first Setup 的镜像按其实际初始化流程处理。**Phase 26 Web-first Setup 仍在独立验收**，不能由设计草案推断任意旧镜像已经支持无配置自动初始化。不能从测试示例复制凭证、Provider 或持久化路径到真实 Instance。
 
-容器中的 Workspace Root 固定为 `/workspace`，Instance 目录为 `/workspace/.kgos`。第一次启动必须由用户**显式提供完整**的现有 `config.toml`；不要把示例配置自动用作生产配置。配置文件写入持久 Volume 的 `/workspace/.kgos/config.toml`，运行文件归容器 UID/GID **10001:10001**，敏感文件保持受保护的权限。仅用于隔离测试的配置结构示例：
+## 2. 统一服务和认证边界
 
-```toml
-[cache]
-path = "cache/openai-compatible.db"
-max_size_mb = 4096
+正式目标为单个 `kgosd` HTTP listener，承载 Web、`/api/v1/*` 与 `/mcp`。Instance 级认证、OAuth 入口及 `[server].public_origin` 配置的精确定义由 [Runtime](../design/runtime.md)和 [MCP 设计](../design/mcp.md)维护；历史独立 MCP Token、Node Worker 及其启动方式已经退役。
 
-[fulltext]
-analyzer = "unicode61"
-
-[embedding]
-base_url = "https://example.invalid/v1"
-model = "replace-with-real-model"
-dimensions = 1536
-similarity = "cosine"
-api_key_env = "OPENAI_API_KEY"
-```
-
-`example.invalid` 不是可用的 Embedding Provider。只在配置文件准备完成后执行：
-
-```sh
-docker run --rm --platform linux/amd64 \
-  -v kgos-workspace:/workspace \
-  kgos-unified:local init --root /workspace
-```
-
-`init` 是**同一 Go 二进制**的一次性入口：必须完成原生扩展、Knowledge Base bootstrap 和带 Instance Bearer 的 API readiness，成功后才写入 `.kgos/initialized.json`；再次执行会检查已完成的 Instance，不假装失败的初始化已经成功。重新创建容器时复用同一 Volume，以保留 `kgos.db`、`auth.json`、已提交的 State / Branch。
-
-## 2. 启动、配置与认证
-
-Phase 17 使用现有 `.kgos/auth.json` Instance Token，不再要求独立的 MCP 管理员凭证。需要 ChatGPT 时，请在首次 Web 初始化填写对外 HTTPS 根地址，或在已有实例的 `.kgos/config.toml` 中添加 `[server]` 分组并填写 `public_origin = "https://your-actual-domain.example"`，随后重启 `kgosd`。该地址是 Web/API/MCP/OAuth 的唯一对外地址来源。旧 `KGOS_MCP_OAUTH_ISSUER` / `--mcp-oauth-issuer` 已停止接受，升级时应先迁移配置、再移除旧值。不要把凭证写入聊天、URL 或公开配置。
-
-```sh
-docker run -d --name kgos-unified --platform linux/amd64 \
-  --env-file /secure/path/kgos.env \
-  -v kgos-workspace:/workspace \
-  -p 127.0.0.1:3777:3777 \
-  kgos-unified:local
-```
-
-镜像默认执行 `kgosd --root /workspace --host 0.0.0.0 --port 3777`。用户可以覆盖 ENTRYPOINT 的命令参数，但必须显式指定 Root。例如 `docker run ... kgos-unified:local --root /workspace --host 0.0.0.0 --port 3777 --mcp-path /mcp`。`kgosd --help` 显示当前全部参数；常用选项：
-
-| 类别 | CLI | 环境变量 |
-| --- | --- | --- |
-| 统一监听 | `--host`, `--port` | `KGOSD_HOST`, `KGOSD_PORT` |
-| TLS | `--tls-cert`, `--tls-key`（须成对） | `KGOSD_TLS_CERT`, `KGOSD_TLS_KEY` |
-| MCP 路径 | `--mcp-path` | `KGOS_MCP_PATH` |
-| OAuth 对外地址 | 无单独参数 | `.kgos/config.toml` 的 `[server].public_origin` |
-
-请求超时、并发、大小、Sandbox 时间/内存/调用量/流数量及 Preview 缓存预算的完整参数见 [MCP 运行配置](../design/mcp.md#部署交付与运行合同)。有效 Instance 会开放认证保护下的 MCP 工具；独立 MCP Token 的旧参数/环境变量不再接受，路径冲突和无效 OAuth 配置必须拒绝。服务本身不创建公网 URL、Tunnel、用户账户或外部身份系统。
-
-`/api/v1/*` 继续使用 Instance Bearer，`/mcp` 可接受同一 Instance Bearer（仅供可信自管客户端）或仅限 MCP 的 OAuth Access Token。ChatGPT 必须使用 OAuth，不能取得 Instance Token；Web 静态页面不提供任何业务认证旁路。
-
-本地验证：
-
-```sh
-curl -i http://127.0.0.1:3777/
-curl -i http://127.0.0.1:3777/mcp
-curl -i http://127.0.0.1:3777/api/v1/evolution/overview
-```
-
-未授权 MCP/API 请求必须被拒绝；真正的 MCP 工具发现和业务读写通过受认证的标准 Streamable HTTP 客户端进行。上述回环端口映射只用于 Linux Docker 宿主本机；远程连接需用户配置实际可信 HTTPS / Tunnel / 代理，保留原始 Path、HTTP Method 与 Authorization Header，**不可通过明文公网传输凭证**。
+`/api/v1/*` 使用受授权的 Instance / Web 会话身份，ChatGPT 的 MCP 访问通过 OAuth 授权，不向其交付管理员 Token。部署时须通过可信 HTTPS / Tunnel 提供正确同源 OAuth/Web 路由，不能将受保护的本地 HTTP 或未完成的首次配置暴露到不可信公网。实际安装、版本、只读验收及异常恢复均依上方唯一安装手册，不通过本指南绕开授权或重复初始化。
 
 ## 3. MCP Tool 和 JavaScript
 
@@ -129,7 +69,7 @@ return { state, model, graphData };
 
 支持 `async/await`、真正并发的 `Promise.all` 和逐条 `for await...of` Graph Stream；受控 Guest 不提供 Node.js、文件、网络、环境变量或任意宿主方法。脚本中的多次写入**不组成一个事务**：如果后续调用失败、超时或断线，之前的 State、Branch、Tag、Merge 变更可能已生效，先读回真实状态再决定是否继续，**不要盲目重试**。
 
-Ontology 预览的 `viewRevision` 属于进程内有界缓存；过期后返回 `VIEW_EXPIRED`，重新从 `offset=0` 获取新视图。索引中的 Offset/Lines 是整个 Markdown 文档的**绝对行号**，不是本页相对行号。详细 AI 使用方法见 [官方 KG OS Skill](../../plugins/kgos/skills/kgos/SKILL.md)。
+Ontology 预览的 `viewRevision` 属于进程内有界缓存；过期后返回 `VIEW_EXPIRED`，重新从 `offset=0` 获取新视图。索引中的 Offset/Lines 是整个 Markdown 文档的**绝对行号**，不是本页相对行号。详细 AI 操作方法以 [MCP 任务指南](mcp-guides/index.md)、[状态读取](mcp-guides/reading.md)、[错误恢复](mcp-guides/errors.md) 和当前连接的 `kgos_docs` 为准，不再依赖历史通用 Skill。
 
 ## 4. ChatGPT OAuth 与私人 Plugin
 
@@ -141,7 +81,7 @@ ChatGPT 连接使用受限 CIMD 客户端与 OAuth Authorization Code + PKCE S25
 
 ## 5. 开发验收与正式发布
 
-Mac 负责源码、Go/TypeScript 测试和 `pnpm validate`；**Docker 开发测试只在 OpenClaw Linux amd64 执行**，普通 GitHub Actions CI 会在 Linux runner 独立构建并测试；正式 Release CI 在获独立授权后构建、验证并推送精确版本的 GHCR 镜像。完整隔离 Docker Smoke：
+Mac 负责源码、Go/TypeScript 测试和 `pnpm validate`；**Docker 开发测试只在 OpenClaw Linux amd64 执行**，私有 `kg-os` 只同步分发内容，公开 `kg-releases` 的 GitHub Actions 才运行 Linux 源码 Validate 和 Docker 隔离 Smoke；正式 Release 经另行授权及许可门禁后才发布 GHCR 镜像。完整隔离 Docker Smoke：
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts

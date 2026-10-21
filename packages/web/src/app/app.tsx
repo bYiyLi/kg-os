@@ -25,9 +25,10 @@ export function App() {
 }
 
 function InitialRoute() {
+  const params = new URLSearchParams(window.location.search);
   const preview =
     (import.meta as unknown as { env: { DEV: boolean } }).env.DEV &&
-    new URLSearchParams(window.location.search).get("preview") === "setup";
+    params.get("preview") === "setup";
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -45,6 +46,7 @@ function InitialRoute() {
       <SetupWizard
         initialStatus={{ state: "setup_required", credentialConfigured: false }}
         previewOnly
+        previewStep={params.get("step") === "initialize" ? 4 : 0}
         languageControl={<LanguageSwitcher />}
       />
     );

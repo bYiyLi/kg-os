@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { run, spawnCommand } from "./process.mjs";
 import { waitForRuntimeEndpoint } from "./runtime-locator.mjs";
 import { markRuntimeProfileInitialized, prepareRuntimeProfile } from "./runtime-profile.mjs";
-import { currentRuntimeTarget } from "./runtime-package.mjs";
+import { currentRuntimeBundle } from "./runtime-bundle.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const workspaceRoot = resolve(root, ".kgos-dev");
@@ -12,7 +12,7 @@ const workspaceRoot = resolve(root, ".kgos-dev");
 await run("pnpm", ["build"], { cwd: root });
 await prepareRuntimeProfile({ workspaceRoot });
 
-const runtimeRoot = resolve(root, "artifacts", "npm", "runtime-" + currentRuntimeTarget());
+const runtimeRoot = currentRuntimeBundle(root);
 const daemon = spawn(
   resolve(runtimeRoot, process.platform === "win32" ? "kgosd.exe" : "kgosd"),
   ["--root", workspaceRoot],

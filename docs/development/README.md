@@ -110,7 +110,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 27 KG OS Knowledge Standards Skills 当前为 `in_progress`（2026-10-21）。** 六项规范均已分别创作，本轮将 `kgos-vlog-standards` 升至 `v1.1.0`，补充单一可选 `VLogEntry` 推荐本体模型并通过定向真实引擎验证，符合调用方按实际Ontology定义模型的方向，**不建立官方固定VLog Schema**。本轮证据见 [VLog可选模型](phases/27-knowledge-standards-skills.md#p27-05-vlog-model-v11)，此前Maintenance的单项证据见 [P27-06](phases/27-knowledge-standards-skills.md#p27-06-maintenance-evidence)。Doctor的实际多模型只读识别、私人Plugin六规范安装及真实客户端整体验收仍未完成；单项源码不关闭阶段，不影响Phase25/26。
 
-**Phase 28 官方七 Skill 清单收敛与通用 Skill 退役当前为 `planned`（2026-10-20）。** [D107](../design/decisions.md#d107-final-seven-official-skills) 将最终官方 Skill 固定为 Phase 27 的六规范 + Phase 25 的 `kgos-doctor`，合计七个；现有 `skills/kgos/SKILL.md` 属过渡版本，需先验证 `kgos_docs` 操作指南覆盖、目标七 Skill 的真实客户端使用与私人 Plugin 迁移后才能移除。**六规范与 Doctor 的目标七 Skill 源码现已齐备，但真实安装与整体验收仍未完成；本迁移阶段未实施，未移除旧 Skill 或更新用户私人 Plugin。** 详见 [Phase 28](phases/28-official-skill-roster.md)。
+**Phase 28 官方七 Skill 清单收敛与旧通用 Skill 退役当前为 `in_progress`（2026-10-21）。** [D107](../design/decisions.md#d107-final-seven-official-skills) 将最终官方 Skill 固定为 Phase 27 的六规范 + Phase 25 的 `kgos-doctor`，合计七个。用户明确授权后，源码中旧 `skills/kgos/SKILL.md` 已删除，旧操作说明映射到 `kgos_docs` 并补齐少量 Guide 缺口，官方源码与公开候选包均只有七个。**私人 Plugin 未自动更新，七 Skill 的真实客户端选用/读写及完整阶段验收仍未完成**；不能因源码清理就标记 `done`。详见 [Phase 28](phases/28-official-skill-roster.md)。
 
 ## 5. 路线总览
 
@@ -144,7 +144,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [25 KG OS Doctor v1](phases/25-kgos-doctor.md) | `in_progress` | Doctor v1.0.0 与引导词对照资产已创作，单项审核/本地验证；真实宿主安装、激活与完整阶段验收待完成 | [D104](../design/decisions.md#d104-kgos-doctor-v1-and-vlog)、[MCP Doctor v1](../design/mcp.md#kgos-doctor-v1) |
 | [26 Web-first Setup & Runtime Bootstrap](phases/26-web-first-run-bootstrap.md) | `in_progress` | 已实现真实 Web-first Setup/受限 Runtime、认证门禁与数据库 Bootstrap；Mac 完整 validate、Playwright 33/33、Go 90.1% 覆盖率、最新隔离 Docker 31/31 SDK 通过；最终 pushed SHA CI 待验收 | [D105](../design/decisions.md#d105-web-first-run-and-runtime-bootstrap)、[Runtime](../design/runtime.md#web-first-run-bootstrap)、[Web](../design/web.md#web-first-run-setup)、[Setup 错误](../design/contracts.md#初始化门禁与-setup-错误) |
 | [27 KG OS Knowledge Standards Skills](phases/27-knowledge-standards-skills.md) | `in_progress` | 六规范源码已创作，VLog补充单一可选建模参考；Doctor衔接、六规范整包安装及真实客户端验收未完成，无固定官方VLog模型要求 | [D106](../design/decisions.md#d106-six-kgos-standards-skills)、[MCP规范体系](../design/mcp.md#kgos-standards-skill-suite) |
-| [28 Official Seven Skills & Legacy kgos Retirement](phases/28-official-skill-roster.md) | `planned` | 最终官方七 Skill 清单收敛、MCP 自描述说明覆盖与通用 `kgos` 受控退役；依赖 Phase 25/27 实际交付，尚未执行 | [D107](../design/decisions.md#d107-final-seven-official-skills)、[最终七 Skill](../design/mcp.md#kgos-seven-skills) |
+| [28 Official Seven Skills & Legacy kgos Retirement](phases/28-official-skill-roster.md) | `in_progress` | 源码已收敛七个、旧通用 Skill 已清理、MCP 指南已补缺；私人 Plugin 更新、真实客户端选用/写入和最终阶段验收待完成 | [D107](../design/decisions.md#d107-final-seven-official-skills)、[最终七 Skill](../design/mcp.md#kgos-seven-skills) |
 | [29 Web shadcn/ui Migration](phases/29-web-shadcn-ui.md) | `in_progress` | 组件迁移已实现，39 项 Web E2E 与本地视觉验收通过；整仓质量门禁及已有开发依赖审计问题见 Phase 29，未执行提交或部署 | [Web UI 体系](../design/web.md#通用-ui-组件体系) |
 
 当前实现依赖顺序：
@@ -266,5 +266,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 27：官方知识规范 Skill 体系](phases/27-knowledge-standards-skills.md)
 - [Phase 28：官方七 Skill 清单收敛与通用 Skill 退役](phases/28-official-skill-roster.md)
 - [Phase 30：私有代码真源与自动生成的公开 kg-releases](phases/30-private-source-public-releases.md)
+- [Phase 31：KG OS 公开产品官网与 GitHub Pages](phases/31-public-product-website.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

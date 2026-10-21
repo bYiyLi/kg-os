@@ -1,5 +1,5 @@
 # cspell:words healthcheck
-# The historical Compose service name 'mcp' is kept for image-only rollback.
+# The Compose service name 'mcp' is retained for existing Dev deployment/rollback commands.
 # This container now runs ONE Go kgosd process for Web, API and MCP.
 name: kgos-dev
 
@@ -12,6 +12,9 @@ services:
       dockerfile: Dockerfile.unified
       args:
         NODE_IMAGE: ${KGOS_DEV_NODE_IMAGE:-node:24.15.0-bookworm-slim}
+        RUST_IMAGE: ${KGOS_DEV_RUST_IMAGE:-docker.y2l.top/rust:1.97-slim-bookworm}
+        GO_BUILDER_IMAGE: ${KGOS_DEV_GO_BUILDER_IMAGE:-docker.y2l.top/golang:1.27.2-bookworm}
+        GO_ARCHIVE_URL: ${KGOS_DEV_GO_ARCHIVE_URL:-https://go.dev/dl/go1.27.3.linux-amd64.tar.gz}
         DEBIAN_IMAGE: ${KGOS_DEV_DEBIAN_IMAGE:-docker.y2l.top/debian:bookworm-slim}
         HTTP_PROXY: ${HTTP_PROXY:-}
         HTTPS_PROXY: ${HTTPS_PROXY:-}
@@ -32,8 +35,6 @@ services:
       KGOS_MCP_HOST: 0.0.0.0
       KGOS_MCP_PORT: "3777"
       KGOS_MCP_OAUTH_ISSUER: ${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}
-      # Old Node MCP env is temporarily retained for safe image-only rollback.
-      NODE_USE_ENV_PROXY: "1"
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       NO_PROXY: 127.0.0.1,localhost

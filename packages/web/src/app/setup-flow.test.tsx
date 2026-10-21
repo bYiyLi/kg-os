@@ -315,7 +315,7 @@ it("claims a root Token once, reviews the supplied settings and submits with Web
   await press("Hide secret");
   expect(issued?.type).toBe("password");
   await press("Next");
-  expect(host.querySelector("h1")?.textContent).toBe(INITIALIZE);
+  expect(host.querySelector("h1")?.textContent).toBe("Review settings and initialize");
   expect(host.textContent).toContain("API key configured");
   await press(INITIALIZE);
   expect(vi.mocked(submitSetup)).toHaveBeenCalledWith(
@@ -506,7 +506,7 @@ it("does not offer a fresh administrator claim for a damaged existing Instance",
 
 it("shows the real initialization phase and blocks duplicate submission", async () => {
   await render({ state: "initializing", credentialConfigured: true, phase: "database" });
-  expect(host.querySelector("h1")?.textContent).toBe(INITIALIZE);
+  expect(host.querySelector("h1")?.textContent).toBe("Preparing your KG OS");
   expect(host.textContent).toContain("Preparing your knowledge base");
   expect(host.textContent).toContain("Database");
   expect(button("Back").disabled).toBe(true);

@@ -21,7 +21,41 @@ test("only whitelisted public files are generated, deterministically", async () 
       first.files.filter((path) => /^plugins\/kgos\/skills\/[^/]+\/SKILL\.md$/.test(path)).length,
       7
     );
-    assert.equal(first.files.filter((path) => path === "INSTALL.md").length, 1);
+    assert.deepEqual(
+      first.files.filter((path) => /(?:^|\/)INSTALL(?:[.-].*)?\.md$/i.test(path)),
+      ["INSTALL.md"]
+    );
+    assert.ok(first.files.includes("README.md"));
+    assert.ok(first.files.includes("README.zh-CN.md"));
+    assert.ok(!first.files.includes("MAINTAINING.md"));
+    assert.ok(!first.files.some((path) => path.startsWith("docs/")));
+    assert.ok(first.files.includes(".github/workflows/pages.yml"));
+    assert.ok(first.files.includes("site/astro.config.mjs"));
+    assert.ok(first.files.includes("site/pnpm-lock.yaml"));
+    assert.ok(first.files.includes("site/src/pages/en/index.astro"));
+    assert.ok(first.files.includes("site/src/pages/zh/index.astro"));
+    assert.ok(first.files.includes("site/public/favicon.svg"));
+    assert.ok(!first.files.some((path) => path.startsWith("site/dist/")));
+    assert.ok(!first.files.some((path) => path.startsWith("site/node_modules/")));
+    assert.deepEqual(
+      first.files.filter((path) => path.startsWith("site/")).sort(),
+      [
+        "site/astro.config.mjs",
+        "site/package.json",
+        "site/pnpm-lock.yaml",
+        "site/pnpm-workspace.yaml",
+        "site/public/favicon.svg",
+        "site/src/components/AiInstall.astro",
+        "site/src/components/Homepage.astro",
+        "site/src/components/WorkspacePreview.astro",
+        "site/src/lib/content.ts",
+        "site/src/pages/en/index.astro",
+        "site/src/pages/index.astro",
+        "site/src/pages/zh/index.astro",
+        "site/src/styles/site.css",
+        "site/tsconfig.json"
+      ].sort()
+    );
     assert.ok(!first.files.includes("plugins/kgos/INSTALL.md"));
     assert.ok(!first.files.includes("plugins/kgos/skills/kgos/SKILL.md"));
     assert.ok(!first.files.includes("plugins/kgos/.app.json"));
@@ -36,6 +70,17 @@ test("only whitelisted public files are generated, deterministically", async () 
         "kgos-retrieval-standards",
         "kgos-vlog-standards"
       ].sort()
+    );
+    const sourceSkillDirs = (
+      await readdir(join(root, "plugins/kgos/skills"), { withFileTypes: true })
+    )
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+    assert.deepEqual(
+      sourceSkillDirs,
+      (await readdir(join(directory, "plugins/kgos/skills"))).sort(),
+      "Private source must contain exactly the seven official Skills; do not retain a legacy generic Skill"
     );
     assert.equal(
       await readFile(join(directory, "INSTALL.md"), "utf8"),
@@ -64,6 +109,18 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.equal(
       (await readFile(join(directory, "README.md"), "utf8")).includes("kg-releases"),
       true
+    );
+    assert.match(
+      await readFile(join(directory, "site/src/lib/content.ts"), "utf8"),
+      /Make knowledge operable/
+    );
+    assert.match(
+      await readFile(join(directory, "site/src/components/AiInstall.astro"), "utf8"),
+      /https:\/\/raw\.githubusercontent\.com\/bYiyLi\/kg-releases\/main\/INSTALL\.md/
+    );
+    assert.match(
+      await readFile(join(directory, ".github/workflows/pages.yml"), "utf8"),
+      /path: site\/dist/
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -99,10 +156,13 @@ test("removes previously tracked files outside the export allowlist", async () =
     execFileSync("git", ["config", "user.name", "Release Test"], { cwd: directory });
     execFileSync("git", ["config", "user.email", "test@example.invalid"], { cwd: directory });
     await writeFile(join(directory, "legacy-public-file.txt"), "obsolete");
+    await writeFile(join(directory, "MAINTAINING.md"), "internal operations");
     execFileSync("git", ["add", "."], { cwd: directory });
     execFileSync("git", ["commit", "-qm", "seed"], { cwd: directory });
     await render({ output: directory, revision, ref: "refs/heads/main" });
     await assert.rejects(readFile(join(directory, "legacy-public-file.txt")), /ENOENT/);
+    await assert.rejects(readFile(join(directory, "MAINTAINING.md")), /ENOENT/);
+    assert.ok((await readFile(join(directory, "README.zh-CN.md"), "utf8")).length > 0);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -119,5 +179,42 @@ test("refuses rendering into the KG OS source and rejects unknown release tags",
       revision,
       ref: "refs/tags/v999.999.999"
     })
+  );
+});
+
+test("user-facing documentation is bilingual without exposing maintainer operations", async () => {
+  const english = await readFile(join(root, "distribution/README.md"), "utf8");
+  const chinese = await readFile(join(root, "distribution/README.zh-CN.md"), "utf8");
+  const installer = await readFile(join(root, "plugins/kgos/INSTALL.md"), "utf8");
+  const commercial = await readFile(join(root, "COMMERCIAL-LICENSE.md"), "utf8");
+  assert.match(english, /\[简体中文\]\(README\.zh-CN\.md\)/);
+  assert.match(chinese, /\[English\]\(README\.md\)/);
+  assert.match(english, /\[INSTALL\.md\]\(INSTALL\.md\)/);
+  assert.match(chinese, /\[INSTALL\.md\]\(INSTALL\.md\)/);
+  assert.match(commercial, /^## English$/m);
+  assert.match(commercial, /^## 简体中文$/m);
+  for (const document of [english, chinese, installer, commercial]) {
+    assert.doesNotMatch(
+      document,
+      /bYiyLi\/kg-os|KG_RELEASES_WRITE_KEY|KGOS_SOURCE_DEPLOY_KEY|KGOS_BINARY_DISTRIBUTION_APPROVED|MAINTAINING\.md/
+    );
+  }
+});
+
+test("agent installer has one installation flow and preserves official guidance", async () => {
+  const installer = await readFile(join(root, "plugins/kgos/INSTALL.md"), "utf8");
+  assert.doesNotMatch(installer, /^## (?:English|简体中文)$/m);
+  assert.deepEqual(
+    [...installer.matchAll(/^## ([1-6])\. /gm)].map((match) => match[1]),
+    ["1", "2", "3", "4", "5", "6"]
+  );
+  const guidance = await readFile(
+    join(root, "plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance-v1.md"),
+    "utf8"
+  );
+  const block = /\[KGOS_GUIDANCE_BEGIN:v1\][\s\S]*?\[KGOS_GUIDANCE_END:v1\]/g;
+  assert.deepEqual(
+    [...installer.matchAll(block)].map((match) => match[0]),
+    [guidance.match(block)[0]]
   );
 });

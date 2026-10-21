@@ -2,7 +2,9 @@
 
 <!-- cspell:words asdk Streamable PKCE -->
 
-**执行目标**：本文件是 KG OS **唯一可编辑的安装说明真源**，位于私有源码的 `plugins/kgos/INSTALL.md`，自动生成到公开 <https://github.com/bYiyLi/kg-releases> 的根目录 `INSTALL.md`。AI 只阅读本文件即可确定安装动作、所需参数、验证及失败恢复，**不需要再阅读其他安装说明 Markdown**。交付包中的七个 `SKILL.md` 及引用资源是 Skill 内容，不是第二份安装指南。产物、宿主界面或授权不可访问时，报告准确阻塞，不虚构安装成功。
+本手册供 AI Agent 执行安装：检查现有环境，补齐缺项，再验证实际结果。用户不需要另外手动执行一套命令；需要本人登录、保存凭证或授权时，由 Agent 指明具体操作。
+
+本文件包含安装动作、参数、验证及失败处理，无需另读其他安装说明。七个 Skill 的文件及引用资源是要安装的内容，需要从官方交付资源取得，不能凭安装说明重新生成。产物、宿主界面或授权不可访问时，说明准确阻塞，不声称已安装。
 
 默认完成 **KG OS MCP + 七个官方 Skill + Global AI Guidance v1**；用户明确只要 MCP 时只完成连接与只读验收。遵循**查现状 → 补齐缺项 → 验证 → 汇报**，不重复部署或注册已有资源。
 
@@ -13,11 +15,11 @@
 - 先核对用户现有 KG OS Instance、MCP Connection、私人 Plugin Release、七个 Skill、持久引导词的**实际**状态。已有有效 MCP 则直接从第 3 节验证；已有正确 Plugin 则跳过第 4 节装包；已有正确引导词则跳过第 5 节设置。多个 Instance/连接逐个核实，不以同名或同 Commit 证明是同一个库。
 - 需要部署时由用户选定 Linux amd64 Docker 主机、持久存储及可信的远程 HTTPS 或安全 Tunnel。不能在本机无法运行 Docker 的机器上假装已部署，也不自动修改代理、账户策略或公开发布。
 
-**公开包范围**：`kg-releases/plugins/kgos/skills/` 只分发下述七个目标 Skill，不包含私有源码中仍在过渡的通用 `kgos` Skill。七个 Skill 的文件可用，不等于已经通过真实 ChatGPT/Plugin 整包验收；正式发行版本和安装状态须以公开 Release 与真实客户端核实。
+**版本与更新**：使用实际发布的镜像和同版 Plugin 资源；仓库中存在文件，不代表该版本已经发布或在目标客户端启用。已有安装的升级与旧 Skill 清理见第 6 节。
 
 ## 2. 必要时启动 KG OS（已有可用实例可跳过）
 
-**仅在用户要求部署且能核实已发布 Linux amd64 Docker 镜像时执行。** 先查看 <https://github.com/bYiyLi/kg-releases/releases> 和对应 `ghcr.io/byiyli/kgos:v<version>` 的实际可拉取性与平台。公开使用者不需要、也不能依赖私有 `kg-os` 的源码或 `Dockerfile.unified`。尚未正式发布可用镜像时，不假设占位符可用，准确报告运行时部署尚不可完成。
+**仅在用户要求部署且能核实已发布 Linux amd64 Docker 镜像时执行。** 先查看 <https://github.com/bYiyLi/kg-releases/releases> 和对应 `ghcr.io/byiyli/kgos:v<version>` 的实际可拉取性与平台。使用公开发行镜像，无需从源代码构建。尚未正式发布可用镜像时，不假设占位符可用，准确报告运行时部署尚不可完成。
 
 1. 检查目标容器与 Volume 是否已经存在，确认其归属；**不删除、覆盖、重新初始化现有 Instance**。为全新实例选择未使用的持久 Volume，例如 `kgos-workspace`，将 `vX.Y.Z` 替换为真实已发布版本并拉取镜像：
 
@@ -38,7 +40,7 @@
      "$KGOS_IMAGE"
    ```
 
-   在 Docker 主机本地浏览器访问 `http://127.0.0.1:3777/setup`；若浏览器不在该主机，先使用经授权的 SSH 本地端口转发。先核实实际镜像版本是否支持 Web-first Setup；支持时通过 Web 引导完成向量服务参数设置/验证、管理员 Token 首次认领与保存，以及配置初始化。Token 只会展示一次，用户在受信任的位置保存，不发送给 AI。通过 `GET /api/v1/setup/status` 实际确认 `state=ready` 才允许对外开放 MCP；仅 `setup_required`、`initializing` 或错误都不是业务可用。当前源码的 Web Setup 未必存在于已发布的旧镜像，不能据此断定旧服务损坏。
+   在 Docker 主机本地浏览器访问 `http://127.0.0.1:3777/setup`；若浏览器不在该主机，先使用经授权的 SSH 本地端口转发。先核实实际镜像版本是否支持 Web-first Setup；支持时通过 Web 引导完成向量服务参数设置/验证、管理员 Token 首次认领与保存，以及配置初始化。Token 只会展示一次，用户在受信任的位置保存，不发送给 AI。通过 `GET /api/v1/setup/status` 实际确认 `state=ready` 才允许对外开放 MCP；仅 `setup_required`、`initializing` 或错误都不是业务可用。较早的镜像可能不含 Web Setup，不能仅据此断定已有服务损坏。
 
 3. 为 **ChatGPT 远程 OAuth** 在持久 `.kgos/config.toml` 中设置用户真实可达的 HTTPS Origin。例如 MCP URL 为 `https://kgos.example.com/mcp` 时，配置为：
 
@@ -86,7 +88,7 @@
 
 **前提**：已确认目标 MCP 可读，并且安装 AI 能访问同一公开仓库 `plugins/kgos/skills/` 及其所有子资源。先获取 <https://github.com/bYiyLi/kg-releases> 内容或对应正式 Release 的 Plugin 压缩包。只有孤立的 `INSTALL.md`、没有 Skill 资源时，不能凭空生成官方内容。
 
-七个且仅七个目标目录：`kgos-ontology-standards`、`kgos-knowledge-standards`、`kgos-retrieval-standards`、`kgos-branch-standards`、`kgos-maintenance-standards`、`kgos-vlog-standards`、`kgos-doctor`。每个目录包含 `SKILL.md` 及自身所需资源。过渡版 `skills/kgos` **不得进入七 Skill 候选包**，但现有真实安装在验收前不得删除。
+七个且仅七个目标目录：`kgos-ontology-standards`、`kgos-knowledge-standards`、`kgos-retrieval-standards`、`kgos-branch-standards`、`kgos-maintenance-standards`、`kgos-vlog-standards`、`kgos-doctor`。每个目录包含 `SKILL.md` 及自身所需资源。不得从旧私人 Plugin 复制已退役的 `skills/kgos` 到新候选包；原有真实安装须在验证新包与获得授权后再处理。
 
 1. 在用户授权的**私人工作目录**准备新候选包（下列变量必须替换为实际路径；若目标已存在，不得覆盖）：
 
@@ -103,7 +105,7 @@
    done
    ```
 
-   要核对所有引用的 `references/`、`assets/` 确实随包复制。路径以用户实际可访问的源文件位置为准；仓库中的未提交 Skill 不自动出现在任何远端 Release 中。
+   要核对所有引用的 `references/`、`assets/` 确实随包复制。`SOURCE` 指向同时包含 `plugin.json` 和 `skills/` 的实际目录：仓库中为 `plugins/kgos/`，Release 压缩包解压后为包根目录。文件齐全不代表客户端已经安装或启用。
 
 2. **选择与当前安装工具匹配的 Manifest，不混用**：
 
@@ -142,7 +144,7 @@
 
    A 的 App ID 以当前 Plugin Creator 连接元数据为准（如 `asdk_app_`、`connector_`）；B 的本地 Creator 官方流程会从 ChatGPT Plugins 已注册连接的浏览器 URL 提取 `plugin_asdk_app...`。两条路径**不得按前缀猜测、拼接或互换 ID**；只有 Plugin ID、名称或 URL 时先实际核实正确绑定，无法确认则停止本步骤。不要写密钥、MCP Token 或重复注册同一服务器。
 
-4. 验证 Manifest 是合法 JSON、`.app.json` 指向真实已有连接，目录内**只有七个 Skill**，引用资源全部可读取。A 将**完整候选包**打成单插件 ZIP/tar.gz，通过获授权的 Plugin Creator 保存到当前账户/Workspace，检查真实安装目标；B 优先使用 `@plugin-creator` 生成本地 Marketplace。**没有 Creator 时**也能手工完成 B：把候选包放在用户个人 `~/.codex/plugins/kgos-candidate/`（已存在先审查，不覆盖），在 `~/.agents/plugins/marketplace.json` 中保留现有条目并加入以下插件项；文件不存在才创建。`source.path` 相对个人目录而不是 `.agents/plugins/`：
+4. 验证 Manifest 是合法 JSON、`.app.json` 指向真实已有连接，目录内**只有七个 Skill**，引用资源全部可读取。A 将**完整候选包**打成单插件 ZIP/tar.gz，通过获授权的 Plugin Creator 保存到当前账户/Workspace，检查真实安装目标；B 优先通过宿主的 Plugin Creator 生成本地 Marketplace：ChatGPT Work 使用 `@plugin-creator`，Codex 使用 `$plugin-creator`。**没有 Creator 时**也能手工完成 B：把候选包放在用户个人 `~/.codex/plugins/kgos-candidate/`（已存在先审查，不覆盖），在 `~/.agents/plugins/marketplace.json` 中保留现有条目并加入以下插件项；文件不存在才创建。`source.path` 相对个人目录而不是 `.agents/plugins/`：
 
    ```json
    {
@@ -165,7 +167,7 @@
 
 ## 5. 配置全局 AI 引导词 v1
 
-这是一份**宿主持久指令**，不是第八个 Skill，也不能由 `plugin.json` 的 `defaultPrompt` 替代。**直接复制下面两个特殊标签及其间的全部正文**到目标 ChatGPT 的持久自定义指令位置，不必再打开其他 Markdown。此处是已确认官方 v1 正文的安装副本，不得改写、删节或加入额外说明；官方版本变更需保持此处安装副本同步。
+这是一份**宿主持久指令**，帮助 AI 默认发现可用知识，不是第八个 Skill，也不能由 `plugin.json` 的 `defaultPrompt` 替代。经授权后，将下方两个标签及其间的全部正文保存到目标客户端实际支持的持久指令位置。**安装时保持官方 v1 区块原文，不翻译、不删节，也不附加说明。**
 
 ```markdown
 [KGOS_GUIDANCE_BEGIN:v1]

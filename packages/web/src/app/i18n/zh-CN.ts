@@ -40,6 +40,27 @@ export const zhCN = {
       auth: "管理员访问令牌相当于当前 KG OS 实例的主钥匙。您可以用它登录 Web 管理界面，并授权受保护的 API 和客户端操作知识与配置。持有令牌的人可能拥有实例管理权限，请像保管密码一样妥善保管，切勿公开分享。",
       initialize: "确认配置，完成知识库初始化，随后就可以使用了。"
     },
+    review: {
+      title: "确认配置，开始初始化",
+      tagline: "一切准备就绪，即将开启您的 KG OS 知识世界",
+      description:
+        "请最后确认以下配置。KG OS 将保存实例设置、准备必要组件、创建知识库并检查服务状态。完成后即可开始使用。",
+      accessTitle: "服务访问",
+      semanticTitle: "语义检索",
+      basicsTitle: "基础设置",
+      mcpLabel: "MCP 连接地址",
+      localOnly: "当前为本机地址，ChatGPT 云端无法直接连接。",
+      verified: "向量服务已验证",
+      jieba: "Jieba（中文分词）",
+      beforeStart: "需要修改配置？可以返回之前的步骤。初始化不会自动覆盖现有知识库数据。",
+      runningTitle: "正在准备您的 KG OS",
+      runningTagline: "正在完成初始化，请查看当前阶段",
+      runningDescription:
+        "系统正在保存配置、准备组件并创建知识库。完成服务就绪检查后即可进入工作区。",
+      failedTitle: "初始化尚未完成",
+      failedTagline: "部分初始化步骤未能完成",
+      failedDescription: "已有配置和数据将被保留。请查看错误原因，修复问题后继续初始化。"
+    },
     vector: {
       tagline: "让知识不仅能够被连接，也能够被发现",
       intro:

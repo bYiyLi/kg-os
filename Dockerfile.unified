@@ -3,6 +3,8 @@
 # The final image contains neither Node.js nor the old TypeScript MCP service.
 ARG NODE_IMAGE=node:24.15.0-bookworm-slim
 ARG DEBIAN_IMAGE=debian:bookworm-slim
+ARG RUST_IMAGE=rust:1.97.1-bookworm
+ARG GO_BUILDER_IMAGE=golang:1.27.3-bookworm
 
 FROM ${NODE_IMAGE} AS web-builder
 WORKDIR /src
@@ -12,13 +14,18 @@ RUN pnpm install --frozen-lockfile --ignore-scripts \
     && pnpm check:docs \
     && pnpm --filter @kgos/web build
 
-# Reuse the historical v0.2.1 Runtime only for KG OS Jieba/licenses.
-# Replace Lithograph and its Provider with the pinned release below.
-# No Node.js or npm is required in the final running container.
-FROM ${NODE_IMAGE} AS native-builder
-ARG NATIVE_RUNTIME_VERSION=0.2.1
-RUN npm install --prefix /tmp/native --omit=dev --ignore-scripts --no-audit --no-fund \
-    @kgos/runtime-linux-x64@${NATIVE_RUNTIME_VERSION}
+# Build Jieba from its pinned Rust sources rather than downloading a retired
+# six-platform npm Runtime package. Only the Linux amd64 release is delivered.
+FROM ${RUST_IMAGE} AS native-builder
+COPY native/jieba /src/native/jieba
+RUN rustc --version | grep -q '^rustc 1.97.1 ' \
+    && CARGO_TARGET_DIR=/tmp/kgos-jieba-build \
+    cargo build --manifest-path /src/native/jieba/Cargo.toml --release --locked \
+    && test -s /tmp/kgos-jieba-build/release/libkgos_jieba.so \
+    && mkdir -p /out/runtime/extensions /out/runtime/licenses \
+    && cp /tmp/kgos-jieba-build/release/libkgos_jieba.so /out/runtime/extensions/kgos-jieba.so \
+    && cp /src/native/jieba/NOTICE.md /out/runtime/JIEBA-NOTICE.md \
+    && cp /src/native/jieba/licenses/*.txt /out/runtime/licenses/
 ARG LITHOGRAPH_VERSION=0.3.3
 ARG LITHOGRAPH_LINUX_X64_SHA256=7340c320e9b99c075271dcff5a3177f6997382e6c957dcd62dacdd48516236f5
 RUN apt-get update \
@@ -31,21 +38,24 @@ RUN set -eu; \
     printf '%s  /tmp/lithograph.tar.gz\n' "${LITHOGRAPH_LINUX_X64_SHA256}" | sha256sum --check; \
     mkdir -p /tmp/lithograph; \
     tar -xzf /tmp/lithograph.tar.gz -C /tmp/lithograph; \
-    test "$(cat /tmp/lithograph/VERSION)" = "${LITHOGRAPH_VERSION}"
-RUN node -e 'const fs=require("node:fs"),crypto=require("node:crypto"); const base="/tmp/native/node_modules/@kgos/runtime-linux-x64",p=base+"/manifest.json",m=JSON.parse(fs.readFileSync(p,"utf8")); for(const file of ["lithograph.so","lithograph-openai-compatible.so"]){const source="/tmp/lithograph/"+file,target=base+"/extensions/"+file; fs.copyFileSync(source,target); const entry=m.files.find(x=>x.file==="extensions/"+file); if(!entry)throw Error("Missing native manifest entry: "+file); entry.sha256=crypto.createHash("sha256").update(fs.readFileSync(target)).digest("hex");} fs.writeFileSync(p,JSON.stringify(m,null,2)+"\n");'
+    test "$(cat /tmp/lithograph/VERSION)" = "${LITHOGRAPH_VERSION}"; \
+    cp /tmp/lithograph/lithograph.so /tmp/lithograph/lithograph-openai-compatible.so /out/runtime/extensions/
 
-FROM ${NODE_IMAGE} AS daemon-builder
-ARG NATIVE_RUNTIME_VERSION=0.2.1
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y ca-certificates curl gcc libc6-dev \
-    && rm -rf /var/lib/apt/lists/*
+FROM ${GO_BUILDER_IMAGE} AS daemon-builder
+# The Go builder supplies libc/gcc and curl without a mutable apt install.
+# Copy only the build-time Node executable for the immutable runtime manifest.
+COPY --from=web-builder /usr/local/bin/node /usr/local/bin/node
+RUN command -v gcc && command -v curl && node --version | grep -q '^v24.15.0$'
+ARG GO_ARCHIVE_URL=https://go.dev/dl/go1.27.3.linux-amd64.tar.gz
 RUN curl --fail --location --retry 5 --retry-all-errors --output /tmp/go.tar.gz \
-      https://go.dev/dl/go1.27.3.linux-amd64.tar.gz \
+      "${GO_ARCHIVE_URL}" \
     && printf '%s  /tmp/go.tar.gz\n' \
       '65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40' \
       | sha256sum --check \
+    && rm -rf /usr/local/go \
     && tar -C /usr/local -xzf /tmp/go.tar.gz \
-    && rm /tmp/go.tar.gz
+    && rm /tmp/go.tar.gz \
+    && go version | grep -q 'go1.27.3 linux/amd64'
 ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOTOOLCHAIN=local
 WORKDIR /src
@@ -57,8 +67,9 @@ COPY --from=web-builder /src/packages/web/dist ./internal/webui/dist
 RUN mkdir -p /out && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
     go build -tags=sqlite_fts5 -trimpath -o /out/kgosd ./cmd/kgosd
 
-COPY --from=native-builder /tmp/native/node_modules/@kgos/runtime-linux-x64/ /out/runtime/
-RUN NATIVE_RUNTIME_VERSION="${NATIVE_RUNTIME_VERSION}" node -e 'const fs=require("node:fs"),crypto=require("node:crypto"); const base="/out/runtime",p=base+"/manifest.json"; const m=JSON.parse(fs.readFileSync(p,"utf8")); if(m.platform!=="linux"||m.arch!=="x64"||m.version!==process.env.NATIVE_RUNTIME_VERSION)throw Error("Native Runtime mismatch"); const daemon=m.files.find(item=>item.file==="kgosd"); if(!daemon)throw Error("Missing kgosd"); fs.copyFileSync("/out/kgosd",base+"/kgosd"); fs.chmodSync(base+"/kgosd",0o755); daemon.sha256=crypto.createHash("sha256").update(fs.readFileSync(base+"/kgosd")).digest("hex"); m.version=JSON.parse(fs.readFileSync("/src/package.json","utf8")).version; if(!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(m.version))throw Error("Invalid KG OS Docker version"); fs.writeFileSync(p,JSON.stringify(m,null,2)+"\n");'
+COPY --from=native-builder /out/runtime/ /out/runtime/
+COPY LICENSE /out/runtime/LICENSE
+RUN node -e 'const fs=require("node:fs"),crypto=require("node:crypto"),path=require("node:path"); const base="/out/runtime"; fs.copyFileSync("/out/kgosd",base+"/kgosd"); fs.chmodSync(base+"/kgosd",0o755); const files=["kgosd","extensions/lithograph.so","extensions/lithograph-openai-compatible.so","extensions/kgos-jieba.so","JIEBA-NOTICE.md","licenses/sqlite-simple-tokenizer-MIT.txt","licenses/jieba-rs-MIT.txt"].map(file=>({file,sha256:crypto.createHash("sha256").update(fs.readFileSync(path.join(base,file))).digest("hex")})); const version=JSON.parse(fs.readFileSync("/src/package.json","utf8")).version; if(!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version))throw Error("Invalid KG OS Docker version"); fs.writeFileSync(base+"/manifest.json",JSON.stringify({arch:"x64",files,platform:"linux",version},null,2)+"\n");'
 RUN set -eu; \
     modules="$(go env GOPATH)/pkg/mod"; \
     mkdir -p /out/notices; \

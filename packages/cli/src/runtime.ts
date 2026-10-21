@@ -3,15 +3,14 @@ import { createHash } from "node:crypto";
 import { closeSync, constants, fchmodSync, lstatSync, openSync } from "node:fs";
 import { access, mkdir, readFile, stat } from "node:fs/promises";
 import { connect } from "node:net";
-import { dirname, join } from "node:path";
-import { createRequire } from "node:module";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { KGOSClient, KGOS_VERSION } from "@kgos/sdk";
 
 import { localAuthenticationError, localIOError, runtimeError, targetError } from "./errors.js";
 import { isInitializationComplete, resolveWorkspacePaths } from "./paths.js";
 
-const require = createRequire(import.meta.url);
 const START_TIMEOUT_MS = 10_000;
 const POLL_INTERVAL_MS = 40;
 
@@ -46,13 +45,7 @@ interface RuntimeManifest {
   version: string;
 }
 
-interface PackageMetadata {
-  name: string;
-  version: string;
-}
-
 export interface RuntimeTarget {
-  packageName: string;
   platform: "darwin" | "linux" | "win32";
   arch: "arm64" | "x64";
 }
@@ -73,11 +66,7 @@ export function currentRuntimeTarget(): RuntimeTarget {
   }
   const platform = process.platform;
   const arch = process.arch;
-  return {
-    packageName: "@kgos/runtime-" + platform + "-" + arch,
-    platform,
-    arch
-  };
+  return { platform, arch };
 }
 
 function isGlibc(): boolean {
@@ -94,21 +83,23 @@ function isGlibc(): boolean {
 
 export async function resolveNativeRuntime(): Promise<NativeRuntime> {
   const target = currentRuntimeTarget();
-  let packageJSON: string;
+  // This CLI is maintained only for in-repository development. Runtime files
+  // are staged by pnpm build, not resolved through retired npm platform packages.
+  const sourceRoot = fileURLToPath(new URL("../../../", import.meta.url));
+  const root = resolve(sourceRoot, "artifacts", "runtime", target.platform + "-" + target.arch);
+  let body: string;
   try {
-    packageJSON = require.resolve(target.packageName + "/package.json");
+    body = await readFile(join(root, "manifest.json"), "utf8");
   } catch {
-    throw localIOError("required KG OS native Runtime package is unavailable", {
-      package: target.packageName
+    throw localIOError("local KG OS Runtime is missing; build it with pnpm build", {
+      target: target.platform + "-" + target.arch
     });
   }
-  const root = dirname(packageJSON);
-  const metadata = decodePackageMetadata(await readFile(packageJSON, "utf8"), target.packageName);
-  const manifest = decodeManifest(await readFile(join(root, "manifest.json"), "utf8"));
-  validateRuntimeMetadata(target, metadata, manifest);
+  const manifest = decodeManifest(body);
+  validateRuntimeMetadata(target, manifest);
   await verifyRuntimeFiles(root, manifest);
   return {
-    name: target.packageName,
+    name: "kgos-local-runtime-" + target.platform + "-" + target.arch,
     root,
     daemon: join(root, process.platform === "win32" ? "kgosd.exe" : "kgosd"),
     version: manifest.version,
@@ -116,16 +107,6 @@ export async function resolveNativeRuntime(): Promise<NativeRuntime> {
       .filter((file) => file.file.startsWith("extensions/"))
       .map((file) => ({ file: file.file, sha256: file.sha256 }))
   };
-}
-
-function decodePackageMetadata(body: string, expectedName: string): PackageMetadata {
-  const value = parseRecordJSON(body, "native Runtime package.json");
-  const name = value["name"];
-  const version = value["version"];
-  if (name !== expectedName || typeof version !== "string" || version.length === 0) {
-    throw localIOError("native Runtime package metadata is invalid");
-  }
-  return { name, version };
 }
 
 function decodeManifest(body: string): RuntimeManifest {
@@ -163,20 +144,14 @@ function decodeManifestFile(value: unknown): RuntimeManifestFile {
   return { file, sha256 };
 }
 
-function validateRuntimeMetadata(
-  target: RuntimeTarget,
-  metadata: PackageMetadata,
-  manifest: RuntimeManifest
-): void {
+function validateRuntimeMetadata(target: RuntimeTarget, manifest: RuntimeManifest): void {
   if (
-    metadata.version !== KGOS_VERSION ||
     manifest.version !== KGOS_VERSION ||
     manifest.platform !== target.platform ||
     manifest.arch !== target.arch
   ) {
-    throw localIOError("native Runtime package is incompatible with this CLI", {
+    throw localIOError("local Runtime bundle is incompatible with this CLI", {
       cliVersion: KGOS_VERSION,
-      packageVersion: metadata.version,
       runtimeVersion: manifest.version
     });
   }

@@ -154,9 +154,9 @@ Web 登录使用单一根 Token，不引入账号或密码，也不把其凭证�
 └── manifest.json
 ```
 
-- 镜像从固定、经过 manifest/SHA-256 校验的历史 `@kgos/runtime-linux-x64@0.2.1` 原生文件取得三个扩展，**只用于构建**；当前 `kgosd` 由本次 Go 源码重新编译，并更新 manifest 内的 daemon SHA-256。镜像自身用 `v<version>` Tag 与精确源码 revision 标识；不能把旧扩展输入版本错误等同于当前镜像版本。
+- 镜像直接使用经过 SHA-256 校验的固定 Lithograph / Provider v0.3.3 Release，并从 `native/jieba` 锁定的 Rust 源码构建官方 Jieba；不再获取历史 `@kgos/runtime-linux-x64` npm 包。构建时按**实际** `kgosd`、三个扩展、Jieba Notice 与许可证生成七文件 SHA-256 manifest，版本来自当前 KG OS 源码，而不是任何旧 Runtime 包。镜像自身用 `v<version>` Tag 与精确源码 revision 标识。
 - `kgosd` 仍从可执行文件相邻的 manifest/extensions 找到 required official artifacts，启动时验证后固定到 `<workspace>/.kgos/extensions/<sha256>`，与原有 Instance 及 SQLite 连接的一致性规则相同。额外扩展继续由 `[[sqlite.extensions]]` 显式定义，不依赖 Node/npm 运行时。
-- **只支持 Linux amd64** 的正式运行镜像。已有六平台 npm Runtime 及本地 `packages/cli` 的启动机制属于历史/内部开发路径，不再是产品交付或远端 CI 兼容目标。分发与 Release 见 [Client](client.md#docker-only-交付)、[D99](decisions.md#d99-linux-amd64-docker-only-distribution)。
+- **只支持 Linux amd64** 的正式运行镜像。已发行六平台 npm Runtime 属于历史；本地开发把已验证的原生文件组装在 `artifacts/runtime/<platform>-<arch>/`，供 Web/E2E 和保留的内部 CLI 使用，不再依赖平台 npm manifest。它不是新的分发格式或跨平台发行承诺。分发与 Release 见 [Client](client.md#docker-only-交付)、[D99](decisions.md#d99-linux-amd64-docker-only-distribution)。
 
 <a id="instance-root"></a>
 
@@ -549,7 +549,7 @@ v1 Knowledge Base 的唯一 target 固定为 `<workspace-root>/.kgos/kgos.db`，
 
 `kgosd` 自身始终是 **foreground server**：它不 self-daemonize、不 fork 到后台。下面 CLI-managed daemon 规则是历史 npm/本机运行入口；当前正式发行仅为 Linux amd64 Docker 单进程，D105 让这一进程在**无配置时也能提供受限 Web**。不因此增加第二套监听服务或 daemon 自我守护机制。
 
-普通用户不直接管理 `kgosd`；daemon lifecycle不进入v1 public CLI namespace。成功完成首次 `init` 后，任何需要本地daemon的业务命令都先针对已解析 Workspace Root 执行 Runtime ensure：已有healthy compatible active daemon时复用，没有usable owner时从当前platform npm Runtime package后台spawn `kgosd --root <absolute-root>`并等待ready。这个自动spawn是CLI本地运行前置，不改变原始业务request的HTTP/Bearer边界。
+普通用户不直接管理 `kgosd`；daemon lifecycle不进入v1 public CLI namespace。成功完成首次 `init` 后，保留的**内部开发 CLI** 针对已解析 Workspace Root 执行 Runtime ensure：已有 healthy compatible active daemon 时复用，没有 usable owner 时从本仓库已组装的本地 Runtime bundle 后台 spawn `kgosd --root <absolute-root>` 并等待 ready。旧 npm 发行 CLI 的历史安装行为不因此追溯改变。这个自动 spawn 只为本地内部开发服务，不改变业务 HTTP/Bearer 边界。
 
 ### 启动
 

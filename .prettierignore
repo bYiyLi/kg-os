@@ -1,6 +1,7 @@
 node_modules
 **/dist
 **/dist-mcp
+distribution/site/.astro
 coverage
 playwright-report
 test-results

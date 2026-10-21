@@ -126,6 +126,38 @@ function SetupProgress({ step }: { step: number }) {
   );
 }
 
+function reviewCopy(state: SetupStatus["state"]) {
+  if (state === "initializing")
+    return {
+      title: "setup.review.runningTitle",
+      tagline: "setup.review.runningTagline",
+      description: "setup.review.runningDescription"
+    };
+  if (state === "error")
+    return {
+      title: "setup.review.failedTitle",
+      tagline: "setup.review.failedTagline",
+      description: "setup.review.failedDescription"
+    };
+  return {
+    title: "setup.review.title",
+    tagline: "setup.review.tagline",
+    description: "setup.review.description"
+  };
+}
+
+function SetupHeading({
+  stage,
+  state
+}: {
+  stage: (typeof stages)[number];
+  state: SetupStatus["state"];
+}) {
+  const { t } = useTranslation();
+  const title = stage === "initialize" ? reviewCopy(state).title : "setup.stages." + stage;
+  return <h1>{t(title)}</h1>;
+}
+
 function SetupStepDescription({
   flow,
   stage
@@ -158,6 +190,15 @@ function SetupStepDescription({
         <p className="setup-auth-tagline">{t("setup.authTagline")}</p>
         <p className="setup-auth-intro">{t("setup.description.auth")}</p>
         <p className="setup-auth-intro">{t("setup.authIntroductionSecond")}</p>
+      </>
+    );
+  }
+  if (flow.step === 4) {
+    const copy = reviewCopy(flow.status.state);
+    return (
+      <>
+        <p className="setup-vector-tagline">{t(copy.tagline)}</p>
+        <p className="setup-vector-intro">{t(copy.description)}</p>
       </>
     );
   }
@@ -215,7 +256,6 @@ function SetupFooter({
 }
 
 function SetupForm({ flow }: SetupFormProps) {
-  const { t } = useTranslation();
   const [showKey, setShowKey] = useState(false);
   const { step, draft, status, access, claimedToken, busy, error } = flow;
   const stage = stages[step] ?? stages[0];
@@ -237,10 +277,12 @@ function SetupForm({ flow }: SetupFormProps) {
           ) : (
             <div
               className={
-                step === 1 || step === 2 ? "setup-title setup-title-vector" : "setup-title"
+                step === 1 || step === 2 || step === 4
+                  ? "setup-title setup-title-vector"
+                  : "setup-title"
               }
             >
-              <h1>{t("setup.stages." + stage)}</h1>
+              <SetupHeading stage={stage} state={status.state} />
               <SetupStepDescription flow={flow} stage={stage} />
             </div>
           )}
@@ -274,7 +316,9 @@ function SetupForm({ flow }: SetupFormProps) {
               onLogin={flow.login}
             />
           )}
-          {step === 4 && <SetupInitializeFields status={status} draft={draft} />}
+          {step === 4 && (
+            <SetupInitializeFields status={status} draft={draft} verified={flow.verified} />
+          )}
           {step !== 2 && error !== "" && (
             <p role="alert" className="setup-error">
               {error}
@@ -301,15 +345,17 @@ function SetupUnavailable({ status }: { status: SetupStatus }) {
 export function SetupWizard({
   languageControl,
   initialStatus,
-  previewOnly = false
+  previewOnly = false,
+  previewStep
 }: {
   languageControl?: ReactNode;
   initialStatus: SetupStatus;
   previewOnly?: boolean;
+  previewStep?: number;
 }) {
   const { t } = useTranslation();
   const { theme, preference, selectTheme } = useThemePreference();
-  const flow = useSetupFlow(initialStatus, previewOnly);
+  const flow = useSetupFlow(initialStatus, previewOnly, previewStep);
   const unavailable = flow.status.state === "error" && !flow.status.credentialConfigured;
   return (
     <div className={"setup-page theme-" + theme} data-theme={theme}>

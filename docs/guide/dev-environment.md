@@ -6,7 +6,7 @@
 
 **当前交付边界（[D99](../design/decisions.md#d99-linux-amd64-docker-only-distribution)）**：此后 KG OS 仅正式发行 Linux amd64 Docker。Dev 仍使用本文件的 OpenClaw/Compose、备份和回退入口；普通 CI 改为 Ubuntu Validate + Linux amd64 Docker Smoke 两个 Job，旧六平台 npm/Native Runtime CI 与新版发布已停止。历史部署记录保持不变；本轮简化不意味着已经部署或发布新镜像。
 
-**环境职责（D94）**：Mac 只做源码与非 Docker 验证；OpenClaw Linux amd64 负责 Dev Docker，GitHub Actions PR/main CI 独立构建/测试同一单进程镜像。**2026-10-13 已将长期 Dev 切换到 `Dockerfile.unified` 与单个 Go `kgosd` 进程**，保留原 Workspace、凭证、端口和 `pnpm dev:mcp` 管理入口；旧 Node MCP 的镜像仅作为迁移回退候选。
+**环境职责（D94）**：Mac 只做源码与非 Docker 验证；OpenClaw Linux amd64 负责 Dev Docker，公开 `kg-releases` 的 CI 独立构建/测试同一单进程镜像。**2026-10-13 已将长期 Dev 切换到 `Dockerfile.unified` 与单个 Go `kgosd` 进程**，保留原 Workspace、凭证、端口和 `pnpm dev:mcp` 管理入口。2026-10-21 核对当前 `kgos-dev-mcp:local` 与 `kgos-dev-mcp:previous` 的 EntryPoint 均为 Go `/opt/kgos/kgosd`，旧 Node MCP 回退分支及专用验收脚本已从本地源码退役；Go 镜像回退、备份和现有数据仍保留。
 
 **2026-10-14 Phase 17 Dev 部署成功**：使用 Mac 当前 `dirty` 工作树通过正式 `Dockerfile.unified` 在 OpenClaw 构建并切换镜像；`kgos-dev-mcp-1` 已 `healthy`，`pnpm dev:mcp check` 通过统一 Instance Bearer、OAuth Discovery 与四个 Tool 的只读请求。镜像 ID 为 `sha256:81216e09a1f64ac8ed67db3b30ea4e31c400a209135eaf339eccf7018c2e8951`；部署前受保护的 SQLite 一致性快照位于 `/data/apps/KgosDev/data/backups/20261014T070920Z-qwRPyKkr`。公网 HTTPS 首页及 OAuth 资源/授权元数据已返回 200，无凭证 MCP/请求详情返回 401；用户已确认新版 ChatGPT 重新授权成功，GitHub CI / 完整新版隔离矩阵未验收。历史独立 MCP Token 文件保留用于旧镜像回退，不由新版认证使用。2026-10-14 主题适配后的最新 Dev 镜像为 `sha256:6c67e96e381f97fa1764fc5e994cd488498d018ae3b361d2d46da6f1e4c6f6c3`，正式 Docker 构建、健康检查、只读 MCP 自动验收及公网主题 CSS 验证通过；Phase 17 按用户批准的未完成 CI 例外标记 `done`。
 
@@ -32,7 +32,7 @@
 
 参照现有 Nexum Dev 的**源码、配置、数据分离 + 独立 Compose 项目**，但 KG OS 不依赖 Nexum 的 Server、数据库、身份服务、Registry 或部署脚本。Dev 直接从 Mac 未发布工作树同步源码到 Linux Docker 构建；**普通 CI 也构建及测试 Docker，但不推送 GHCR**；正式镜像与 GHCR 仅由获独立授权的 Release CI 交付。Dev 实测不等于最终 CI 通过、镜像发布或生产部署。责任规则见 [AGENTS](../../AGENTS.md#开发ci-与-release-分工)。
 
-Dev 多阶段构建生成 Web 静态资源、当前 Go `kgosd`（CGO + SQLite FTS5），并校验固定版本的 Linux amd64 Lithograph、Provider 和 Jieba 扩展。构建时 Go **1.27.3** 归档进行 SHA-256 校验，运行时不需要 Go/Node 编译工具；Runtime `manifest.json` 的 daemon 摘要同步为当前编译产物。**此 Dev 流程不会自动重新编译 `native/jieba` 或 Lithograph**；改变它们时需单独准备已验证 native artifact。
+Dev 多阶段构建生成 Web 静态资源和当前 Go `kgosd`（CGO + SQLite FTS5），从仓库锁定的 `native/jieba/Cargo.lock` 与 Rust 1.97.1 源码构建官方 Jieba，并校验固定版本 Linux amd64 Lithograph / Provider 的 Release SHA-256；不再从历史 npm Runtime 包取得原生文件。Go 构建基础镜像提供 C 编译器与系统头文件，不再在构建阶段临时 apt 安装；**实际 Go 1.27.3 工具链仍从 SHA-256 固定的官方归档覆盖安装**，不会因为复用旧镜像而降低编译版本。运行时不需要 Go/Node/Rust 编译工具；构建阶段按实际文件重新生成 Runtime `manifest.json`。OpenClaw 可用 `KGOS_DEV_RUST_IMAGE` 和 `KGOS_DEV_GO_BUILDER_IMAGE` 指向经过审核的缓存构建镜像；`KGOS_DEV_GO_ARCHIVE_URL` 仅允许切换归档下载位置，仍必须通过 Dockerfile 固定的 SHA-256 校验，默认来源保持 `go.dev`。Rust 编译器实际版本须为 1.97.1，Go 实际工具链须为验证后的 1.27.3。这不改变正式 Docker-only 交付平台。**Jieba 会在构建时编译，Lithograph / Provider 仍取自固定校验的 Release，而非在 Dev 临时重新编译。**
 
 | Linux 路径 | 所有权与用途 |
 | --- | --- |
@@ -69,7 +69,7 @@ Phase 19 已将 `kgosd` 的诊断日志统一为 JSON Lines，使用可选 `KGOS
 
 对当前已授权的 Instance，可通过 `POST /api/v1/system/diagnostics`（JSON 请求体 `{}`）取得进程内指标摘要；必须使用合法 Instance Bearer，或符合现有 Web Access Bearer + Boot Guard 的浏览器会话。不能用 MCP OAuth Token 调用普通 API。需要定位单次请求时，使用服务端返回的 `X-KGOS-Request-ID` 与只属于该 Instance 的安全日志关联；诊断 API 不提供原始日志下载。**Phase 19 能力已部署 Dev 并通过本地只读诊断验收；远端 CI 完成与否仍按 Phase 19 开发记录独立判断。**
 
-入口为 `scripts/mcp-dev.mjs`，远端单机生命周期归 `scripts/mcp-dev-remote.sh`，**Go 单进程只读验收由 OpenClaw 宿主执行 `scripts/mcp-dev-accept-unified.mjs`**，Compose 归仓库根 `compose.dev.yaml`。原 `scripts/mcp-dev-accept.mjs` 仅在旧镜像回退验证时使用。这些是可重复执行的 Dev 入口，不在持久 `data/` 中保存第二套部署脚本。
+入口为 `scripts/mcp-dev.mjs`，远端单机生命周期归 `scripts/mcp-dev-remote.sh`，**Go 单进程只读验收由 OpenClaw 宿主执行 `scripts/mcp-dev-accept-unified.mjs`**，Compose 归仓库根 `compose.dev.yaml`。回退仅允许入口为 Go `kgosd` 的已保留镜像；旧 Node MCP 专用验收脚本已经删除。这些是可重复执行的 Dev 入口，不在持久 `data/` 中保存第二套部署脚本。
 
 ### 首次初始化（仅新 Workspace）
 

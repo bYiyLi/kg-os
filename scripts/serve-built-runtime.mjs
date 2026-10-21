@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 
 import { waitForRuntimeEndpoint } from "./runtime-locator.mjs";
 import { prepareRuntimeProfile } from "./runtime-profile.mjs";
-import { currentRuntimeTarget } from "./runtime-package.mjs";
+import { currentRuntimeBundle } from "./runtime-bundle.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const portIndex = process.argv.indexOf("--port");
@@ -18,7 +18,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 const workspaceRoot = await mkdtemp(join(tmpdir(), "kgos-e2e-"));
 await prepareRuntimeProfile({ workspaceRoot });
 
-const runtimeRoot = resolve(root, "artifacts", "npm", "runtime-" + currentRuntimeTarget());
+const runtimeRoot = currentRuntimeBundle(root);
 const child = spawn(
   resolve(runtimeRoot, process.platform === "win32" ? "kgosd.exe" : "kgosd"),
   ["--root", workspaceRoot],

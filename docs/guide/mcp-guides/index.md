@@ -14,6 +14,8 @@
 
 `kgos_ontology_overview` 展示全部 Branch 的 pinned Ontology Markdown；`kgos_commit_ancestry` 分页展示 Commit DAG；`kgos_query` 允许所有只读 JavaScript SDK 方法（**不限于 Cypher**），`kgos_mutate` 执行获明确授权的读写 SDK 方法。两种 JavaScript Tool 没有 `docs.read` 全局对象。
 
+**脚本形式**：`kgos_query` / `kgos_mutate` 的 `code` 是 async JavaScript **函数体**，不是模块；直接使用 `ontology`、`object`、`graph`、`evolution` 四个无前缀 SDK 对象。无需安装客户端或导入包，不能访问 Node.js `process`、本地文件、任意网络或凭证。须显式 `return` JSON 可表示的结果；不要返回 `undefined`、`BigInt`、函数或循环引用。支持 `async/await`、`Promise.all` 和 `for await...of`；流式结果与失败恢复详见 `guides/errors.md`。
+
 **任何写入先选目标**：`evolution.overview()` 仅给出默认 Branch/State，不是“当前测试分支”。测试时先按 `guides/ontology.md` 创建独立 Branch，后续始终明确 `branch` 名称，并用 `evolution.get({state:"branch/"+branch}).state` 获取其真实 Head 作为 Patch `baseState`。不要从默认 Branch 借用 baseState，也不要在网络失败后重复创建 Branch。
 
 **接着读**：按上表选择文档，再按相应方法页链接读取确切请求/返回类型。所有相关读取复用一个 immutable State；多个 JavaScript SDK 调用不是原子事务，未知写入结果先核查再决定是否重试。

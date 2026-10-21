@@ -7,3 +7,8 @@ id_ed25519*
 
 # User-specific MCP app IDs must never be committed.
 /plugins/kgos/.app.json
+
+# The public website is built from source by GitHub Pages.
+/site/node_modules/
+/site/dist/
+/site/.astro/

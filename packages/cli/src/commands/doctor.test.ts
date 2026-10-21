@@ -31,7 +31,7 @@ const CONFIG: InstanceConfig = {
 
 beforeEach(() => {
   runtimeMocks.resolveNativeRuntime.mockResolvedValue({
-    name: "@kgos/runtime-darwin-arm64",
+    name: "kgos-local-runtime-darwin-arm64",
     root: "/runtime",
     daemon: "/runtime/kgosd",
     version: "0.2.1",
@@ -185,7 +185,7 @@ describe("kg doctor", () => {
     await writeFile(join(cacheRoot, "manifest.json"), JSON.stringify({ sha256, files: {} }) + "\n");
     await writeFile(join(cacheRoot, "artifact"), "corrupt");
     runtimeMocks.resolveNativeRuntime.mockResolvedValue({
-      name: "@kgos/runtime-darwin-arm64",
+      name: "kgos-local-runtime-darwin-arm64",
       root: "/runtime",
       daemon: "/runtime/kgosd",
       version: "0.2.1",

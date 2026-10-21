@@ -37,7 +37,7 @@ pnpm build
 pnpm test:e2e
 ```
 
-`build` 目前仍会为本机开发生成 `artifacts/npm/runtime-<target>` 内部目录，供 Web Playwright 的 `kgosd` 测试启动器使用；这个目录**不能视为将来发行的 npm package**，也不做 Registry Smoke。现存 CLI 源码可通过 `pnpm exec` / Node 本机执行，用于回归，但其 npm 分发不再是未来 CI 的验收要求。
+`build` 为本机开发生成 `artifacts/runtime/<platform>-<arch>` 原生文件和校验 manifest，供内部 CLI、Web 开发启动器及 Playwright E2E 使用；它**不是 npm package**，也不做 Registry Smoke。现存 CLI 源码可通过 `pnpm exec` / Node 本机执行，用于回归，但其 npm 分发不再是未来 CI 的验收要求。
 
 ### Web 通用组件维护
 

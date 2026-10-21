@@ -13,10 +13,10 @@ vi.mock("node:readline/promises", () => ({
 import { initWizardSuccessMessage, runInitWizard, type InitWizardOptions } from "./init-wizard.js";
 
 const RUNTIME = {
-  name: "@kgos/runtime-darwin-arm64",
+  name: "kgos-local-runtime-darwin-arm64",
   root: "/runtime",
   daemon: "/runtime/kgosd",
-  version: "0.2.1",
+  version: "0.3.0",
   extensions: []
 };
 

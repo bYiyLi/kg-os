@@ -49,7 +49,7 @@ const CONFIG: InstanceConfig = {
 
 beforeEach(() => {
   runtimeMocks.resolveNativeRuntime.mockResolvedValue({
-    name: "@kgos/runtime-darwin-arm64",
+    name: "kgos-local-runtime-darwin-arm64",
     root: "/runtime",
     daemon: "/runtime/kgosd",
     version: "0.2.1",

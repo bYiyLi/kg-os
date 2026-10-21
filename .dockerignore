@@ -1,7 +1,9 @@
 .git
 .kgos
 .kgos-*
-native
+native/*
+!native/jieba/
+native/jieba/target/
 .cache
 .DS_Store
 node_modules
@@ -15,3 +17,4 @@ test-results
 .env.*
 *.db
 *.lock
+!native/jieba/Cargo.lock
