@@ -1,5 +1,7 @@
 # Phase 30 — Private KG OS Source & Generated Public Releases
 
+<!-- cspell:words opencontainers -->
+
 ## Design inputs
 
 - [D108：私有 KG OS 真源与自动生成的公开 kg-releases](../../design/decisions.md#d108-private-source-public-releases)
@@ -8,7 +10,7 @@
 
 ## 当前状态
 
-`in_progress`。源→公开自动同步和公开 `Validate` + `Docker Linux amd64` 两项 CI 均已完成真实成功验收。两把 Deploy Key 可用；`kg-os` 的 Actions 只负责同步，所有产品质量门禁归公开仓库。**正式 v0.3.0 GHCR 镜像、Plugin 归档和 GitHub Release 仍未发布**：公共仓库没有 `KGOS_BINARY_DISTRIBUTION_APPROVED` 变量，法律分发授权及发布后的镜像可匿名拉取性尚未验证，因此阶段继续保持 `in_progress`。
+`done`（2026-10-22）。私有源码 → 自动生成的公开分发仓库 → 双 Job CI → 正式 Linux amd64 Docker/GHCR → Plugin ZIP/GitHub Release 的端到端分发链已通过实际验收。公开版本为 **v0.3.0**，固定私有源 SHA `cbae2b9db4022b96bc4847fcd352ac1e674e5be6`。官网由 Phase 31 独立验收，真实用户 Agent 的环境权限、登录和客户端连接仍须在各自安装环境进行检查，不视为本阶段自动化测试已覆盖。
 
 ## Scope
 
@@ -23,14 +25,14 @@
 - [x] 本地源代码生成器提供有界白名单、可信 ref/SHA 校验、确定性输出、危险目标目录与不受控文件拒绝；有独立测试。
 - [x] 同步 workflow 与公开 CI/Release workflow 均由私有 KG OS 仓库保存，公开目录由同一套模板生成，不再独立编辑。
 - [x] 私有安装文档唯一真源；根 `INSTALL.md` 自动生成，公开版不出现第二个安装指南；准确七个完整 Skill/Plugin Manifest/连接样例及许可证均通过导出测试，旧通用 Skill 与实际用户连接配置被排除。
-- [x] 正式 Release 工作流已定义同版本 Plugin ZIP 与 Docker 绑定、公开 CI 专门检查 Plugin 导出；真实 GHCR/Plugin Release 和客户端安装仍按下列未完成项验证。
+- [x] 正式 Release 工作流已定义同版本 Plugin ZIP 与 Docker 绑定、公开 CI 专门检查 Plugin 导出；真实 GHCR、Plugin Release 已按下列发布证据验收。用户实际客户端安装依赖其环境和授权，单独验证。
 - [x] 公开模板的 YAML/内嵌 Shell 完成基础语法检查，源仓库生成器与相关文档本地链接完成定向验证。
 - [x] GitHub 核实源仓库 Private、公开仓库存在且为 Public、均具管理员权限；源仓库当前 Fork count 为 0，仍承认历史公开副本和许可不能撤销。
 - [x] 两个独立 Deploy Key 实际配置并验证源→公开自动 Push、公开→源只读 Checkout。
 - [x] 对实际私有 `main` 提交验证公开 `Validate` 与 `Docker` 两 Job 均通过，且公开没有源码、敏感日志或构建 Artifact。
-- [ ] 合法分发许可与公开 GHCR 权限确认后，获独立授权的真实 Tag 端到端通过版本、同源 revision、镜像平台/digest/匿名拉取及公开 GitHub Release。
+- [x] 经仓库所有者明确确认二进制分发授权并设置门禁后，获授权的真实 Tag 端到端通过版本、同源 revision、镜像平台/digest/匿名拉取及公开 GitHub Release。
 - [x] 旧私有 `ci.yml`/`release.yml` 停用，私有 Sync 不执行生成器测试或任何源码/容器质量门禁。
-- [ ] 公开 CI 已完成成功验收；进一步验证正式 Release、合法发行授权和公开 GHCR 权限，闭合最终验收。
+- [x] 公开 CI、正式 Release、版本与来源校验、GHCR 公开匿名访问、Plugin ZIP 完整性均有实际验证记录；已检查执行后 Git 状态与范围。
 
 ## 首次远端验证记录（2026-10-21）
 
@@ -47,6 +49,15 @@
 - 对应公开 [CI Run 39632399914](https://github.com/bYiyLi/kg-releases/actions/runs/39632399914) 在绑定相同私有 SHA 的真实 GitHub Runner 上完成 `Validate private source=success` 和 `Docker Linux amd64 integration=success`；后者从该源码构建并隔离 Smoke，而不是仓库主机上运行的旧镜像。
 - 公开根目录经 GitHub API 回读，仅有受限安装/Plugin/Skill/站点/工作流/许可资源及 `source.json`；本次 CI `artifacts.total_count=0`，未公开私有完整源码、测试产物或构建日志。官网另由 Phase 31 独立验收，不能替代镜像发布。
 - `KGOS_BINARY_DISTRIBUTION_APPROVED` 当前不存在；未创建新 `v0.3.0` Tag、未触发正式 Release workflow、未推送 GHCR，也没有正式 Release。发布前必须取得版权/许可授权证明并由仓库所有者允许开启该门禁，再按原有 Tag 工作流完成 GHCR digest/platform/revision/匿名拉取及 Plugin ZIP 验证。
+
+## 2026-10-22 首个正式 Docker Release
+
+- **发行授权与版本**：仓库所有者在本次会话明确确认 KG OS v0.3.0 与打包依赖公开二进制分发授权，并要求发布首个可用 Docker 版本；据此设置公共仓库 Actions 变量 `KGOS_BINARY_DISTRIBUTION_APPROVED=true`，读回确认。此为所有者授权声明，不等于独立法律审计。私有代码仍保持 Private，不镜像到公开仓库。
+- **不可变来源**：私有 `v0.3.0` annotated Tag 已推送，解引用为 `cbae2b9db4022b96bc4847fcd352ac1e674e5be6`；私有同步自动创建公共 `v0.3.0` Tag，公共 `source.json` 的 `ref=refs/tags/v0.3.0` 和 `revision` 与私有 Tag 一致。私有 Git 无强推、未移动 Tag。
+- **正式 Run**：[Release #39636695605](https://github.com/bYiyLi/kg-releases/actions/runs/39636695605) 三个 Job 全部 **success**：`Full release validation / Validate private source`、`Full release validation / Docker Linux amd64 integration`、`Publish tested Linux amd64 image`。镜像发布前对将推送的同一镜像执行真实 Smoke；发布后工作流核对匿名拉取、平台、源码 revision 和 digest。
+- **镜像与 Registry 独立复验**：`ghcr.io/byiyli/kgos:v0.3.0`，不可变镜像引用 `ghcr.io/byiyli/kgos@sha256:f5a3a9c7a343bd073584f82cb4abac25aab916455509f8d9474c188f919e654b`。在 GitHub Actions 之外，通过**匿名 GHCR Bearer Token** 获取 Manifest 与 config，证明 Registry 可公开读取，镜像配置为 `linux/amd64`，标签 `org.opencontainers.image.version=v0.3.0`、`org.opencontainers.image.revision=cbae2b9db4022b96bc4847fcd352ac1e674e5be6`，返回 digest 与正式 Release 一致。
+- **公开发行物**：[GitHub Release v0.3.0](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.0) 已发布（非 draft/prerelease），资产 `kgos-plugin-v0.3.0.zip` 可公开下载。实际下载 ZIP 后**不解压执行**，检查根 `plugin.json`、唯一 `INSTALL.md`、精确七个官方 `skills/<name>/SKILL.md`，确认没有 `.app.json` 或额外嵌套 Plugin 根。Release 说明已根据首发情况完善为中英文，并保留完整镜像 digest、Tag 和私有来源 SHA。
+- **状态与边界**：首个正式 Docker + Plugin 分发已完成；没有同时部署生产 KG OS Instance，也没有修改 OpenClaw 长期 Dev 的数据。安装方应由有权限的外部 Agent 阅读公开 INSTALL，验证 Docker Linux amd64 环境、具体 MCP 连接及用户授予的权限；公开 CI/Smoke 不代表任何第三方主机已安装成功。
 
 ## Review / Constraints
 
