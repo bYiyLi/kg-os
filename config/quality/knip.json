@@ -1,6 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreDependencies": ["@secretlint/secretlint-rule-preset-recommend", "secretlint"],
+  "ignoreDependencies": [
+    "@secretlint/secretlint-rule-preset-recommend",
+    "secretlint",
+    "lefthook"
+  ],
   "workspaces": {
     ".": {
       "entry": [
@@ -9,17 +13,30 @@
         "scripts/mcp-dev-accept-unified.mjs",
         "scripts/mcp-dev-accept.mjs"
       ],
-      "project": ["config/test/*.ts", "scripts/*.mjs", "tests/**/*.ts"]
+      "project": [
+        "config/test/*.ts",
+        "scripts/*.mjs",
+        "tests/**/*.ts"
+      ]
     },
     "packages/sdk": {
-      "project": ["src/**/*.ts"]
+      "project": [
+        "src/**/*.ts"
+      ]
     },
     "packages/cli": {
-      "project": ["src/**/*.ts"]
+      "project": [
+        "src/**/*.ts"
+      ]
     },
     "packages/web": {
-      "entry": ["src/mcp-main.tsx", "src/app/styles/global.css"],
-      "project": ["src/**/*.{ts,tsx,css}"]
+      "entry": [
+        "src/mcp-main.tsx",
+        "src/app/styles/global.css"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx,css}"
+      ]
     }
   }
 }
