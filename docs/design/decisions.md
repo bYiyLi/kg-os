@@ -1059,6 +1059,50 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **依据与取舍**：上游 [v0.3.2 发布说明](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/releases/v0.3.2.md)修复 canonical 状态、插值/作用域与 Provider cache 首次并发初始化；[v0.3.3 发布说明](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/releases/v0.3.3.md)修复静态反引号名称、传播长表达式取消并提供显式预算。本次直接消费官方制品与已有兼容合同，不为可选底层能力扩展 KG OS 产品面；Procedure metadata 与 `SHOW INDEXES.createStatement` 完整性限制仍按同版 [Known Issues](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/reference/known-issues.md)处理。旧 v0.3.1 cache 串行预热规避不再作为当前版本前置要求。
 - **验证与交付**：现有 Go/SQLite/Lithograph、Ontology/Graph/Evolution/MCP、真实升级兼容、当前函数/Procedure 库存、取消/连接清理和 OpenClaw 隔离 Docker 均需重新验证。最终 SHA 的远程两 Job CI 是 Phase 关闭条件；本地通过不等于长期 Dev 已部署或当前 CI 已通过。实际状态与证据只由 [Phase 24](../development/phases/24-lithograph-v033-upgrade.md)维护；Commit、Push、Dev 部署、Tag/GHCR 与生产部署分别取得授权。
 
+<a id="d104-kgos-doctor-v1-and-vlog"></a>
+
+### D104 KG OS Doctor v1 使用环境诊断与系统级 VLog（2026-10-20）
+
+- **决定**：官方 `kgos-doctor` v1 是独立、只读、按需触发的**用户使用环境**诊断 Skill，不是传统主机健康检查或知识库自动修复。五项合同依次覆盖：当前会话中的官方特殊标签引导提示词、真实 MCP 发现/授权与一或多个有效 Knowledge Base、官方 Skill 安装/兼容/触发可见性、只读内容存在/后续独立规范符合性、持续自检整理任务与最近结果/VLog。基础使用不可用、体验不完整、规范未定义、外部状态不可见必须分别报告。
+- **可信边界**：只从当前 AI 会话可观察的可信指令、客户端元数据、已授权 MCP 只读结果及授权的外部调度信息判定；看不到隐藏配置或其它会话时记 `UNKNOWN`，不能凭用户引用的特殊标签判断已加载全局指令。MCP Tool 已注册不代表认证成功；一个 Instance 一个 Knowledge Base，多个 Instance 只能逐个验证当前可见连接，不能自行推断用户的全部库。Skill 缺失不否定 MCP 可用；没有独立知识质量规范时不编造质量标准。
+- **VLog 归属**：`branch/vlog` 是供官方 Skill/外部 AI 记录自检、整理、诊断、重要决策与维护结果的**系统级、高质量版本记录约定**，每个 Knowledge Base 可自行建立。记录提炼事实与可核实版本证据，不是通用工具日志或敏感内容归档。它仍遵守普通 Branch/State/Knowledge 规则，不由 KG OS Kernel 预留特殊资源、不自动合并到 `main`、不内置 Agent/调度；任务的启用和运行时间以外部调度平台为准，VLog 历史不能替代调度状态。
+- **取舍与延后**：不新增 Doctor 专用 MCP/API、后台 Scheduler、内置领域模型、自动提示词安装、修复/写入或跨库发现服务。官方引导提示词的准确标签/版本/正文、知识质量规范 Skill、VLog Model/运行记录识别规则与各宿主可见性验证后续再冻结；无可得证据的项目必须显式 `UNKNOWN`。仓库 `docs/vlog/` 仍只用于开发过程，与知识库 `branch/vlog` 不同。
+- **后续设计澄清（2026-10-21）**：此处“VLog Model 后续冻结”**不再表示需要一套 KG OS 官方强制本体**。调用方实际 Ontology 是记录结构真源；`kgos-vlog-standards` 只附一套可选单 `VLogEntry`（18 Property、3必填）参考，已有合适模型应直接复用。Doctor 不以固定Model/字段为前提，按目标 `branch/vlog` 的真实模型和可核实的任务/Run/时间/结果证据只读判断，不足即 `UNKNOWN`。最新合同由 [VLog 与 Doctor owner](mcp.md#kgos-doctor-v1) 和 [VLog Skill 参考](../../plugins/kgos/skills/kgos-vlog-standards/references/model-examples.md)维护。
+- **当前真源与计划**：[MCP Doctor v1 合同](mcp.md#kgos-doctor-v1)、[Evolution](evolution.md#branch-与-tag)、[Observability](observability.md)、[Phase 25](../development/phases/25-kgos-doctor.md)。本次只完成设计与计划，**尚未创作 Skill、实现检测、发布插件或执行运行验收**。
+
+<a id="d105-web-first-run-and-runtime-bootstrap"></a>
+
+### D105 Web-first 四步初始化与统一 Runtime 状态门禁（2026-10-20）
+
+- **问题**：当前 `kgosd` 在打开 Runtime 前强制加载完整 `config.toml`，缺失时 HTTP/Web 服务也无法启动；旧 CLI/Go `init` 的一次性 Bootstrap、Session 初始化与用户首次部署需要分离执行。此前的前端四步“向量/检索与存储/扩展/检查”仅是演示稿，不符合用户已确认的实际入门任务。
+- **决定**：正式单进程 `kgosd` 即使没有 config 也能提供受限 Web；Web 首次引导为 **欢迎 → 向量服务 → Instance 认证初始化 → 知识库 Bootstrap/readiness**。已有完整合法 config 的高级用户直接启动后由 daemon 自动完成缺失初始化，不经过 Web 问卷；二者与显式 Go/历史 CLI `init` 共用一套初始化/恢复机制与原 `initialized.json` 完成证明。无 config 不等于已有库为空；receipt 存在但关键文件不一致时必须 fail closed。
+- **路由与认证取舍**：**初始化状态判断先于普通业务认证**。未 ready 时浏览器页面导航到 `/setup`，已 ready 访问 `/setup` 跳首页；API/MCP/OAuth/Resource 未就绪返回机器可读 `503`，不把业务调用重定向成 HTML。仅 Setup Status、必要 Setup API 和已创建 Instance Token 后的原有 Web Session 是明列的未就绪例外；完成后关闭全部 Setup 写入，保留根 Token 和现有 Web/MCP 认证边界。首次认领**不增加部署凭证、管理员账号、密码或首次访问额外验证**；存在公网未初始化抢先认领风险，仍以可信部署网络/HTTPS、Origin 检查和用户及时初始化为基本操作前提，不假设此风险已消失。
+- **配置与凭证取舍**：`config.toml` 仍是完整显式配置真源，`initialized.json` 仅证明完整 authenticated readiness。Web 只展示主要 Embedding 参数，自动写出官方 Jieba、Provider cache 推荐值与空 custom extensions；手工配置继续允许完整合法值。管理员根 Token 留在 `auth.json`，Web 输入的 Embedding API Key 留在私有单实例文件，并显式映射到现有 `api_key_env` 的保留名称；不将 secret 写入 TOML、知识版本或日志，不引入通用 Secret Manager/新的 Provider 方言。手工模式继续使用调用方环境变量。
+- **恢复与兼容**：自动初始化不由任意普通业务请求触发；配置已存在时 Web 不覆盖，重复提交、并发启动、失败后重试都保持单 Instance/单 lock/单 listener，保留业务数据与原认证；无 receipt 时恢复，已有 receipt 的异常则只报错不“重新建库”。已 ready 的既有 Web、SDK、MCP、31 个方法、版本数据与原错误合同不变，唯一新增 Setup 状态/写入入口及未就绪错误。普通外部配置编辑在下一次启动生效，不增加热更新/文件监听。
+- **真源与实施**：[Runtime 初始化/状态/安全](runtime.md#web-first-run-bootstrap)、[Web 历史四步](web.md#web-first-run-setup)、[公共 Setup 错误](contracts.md#初始化门禁与-setup-错误)、[CLI Init](cli.md#init)、[Phase 26](../development/phases/26-web-first-run-bootstrap.md)。**本次是产品设计目标与开发计划；后端无配置启动、Web API 与真正初始化尚未实现。** D104 / Phase 25 的 Doctor/VLog 独立，不被本决定改写。
+- **后续确认的扩展（2026-10-21）**：初始四步改为欢迎 → 对外访问地址 → 向量服务 → 管理员 Token → 知识库初始化。新增的 `config.toml [server].public_origin` 为 Web/API/MCP/OAuth 唯一对外 Origin；原 `--mcp-oauth-issuer` 与 `KGOS_MCP_OAUTH_ISSUER` 明确废弃，不采用参数/文件优先级。新版 Web Setup 必填，旧配置缺字段仍可运行但不启用 OAuth，补字段重启后生效。此前四步及 CLI Issuer 入口描述属于历史基线，后续实际合同由 [Runtime](runtime.md#web-first-run-bootstrap)、[Web](web.md#web-first-run-setup) 和 [MCP](mcp.md) 分别拥有，Phase 26 记录验收状态。
+
+<a id="d106-six-kgos-standards-skills"></a>
+
+### D106 KG OS 六个独立知识管理规范 Skill 的职责划分（2026-10-20）
+
+- **决定**：不用单一大型 `kgos-standards`，首版规划六个平级规范 Skill：`kgos-knowledge-standards`（知识实例创建/更新与质量）、`kgos-ontology-standards`（本体结构/语义）、`kgos-retrieval-standards`（知识检索/使用可靠性）、`kgos-branch-standards`（分支/版本演进策略）、`kgos-vlog-standards`（系统级高价值记录）、`kgos-maintenance-standards`（持续检查/整理/质量维护）。每个 Skill 按任务独立提供规范指导，不拥有实际读写/调度结果；共享底层合同但不互相复制规范正文。
+- **选择与冲突边界**：模型定义归 Ontology，业务知识实例与事实证据归 Knowledge，知识检索/综合使用归 Retrieval，Branch/Commit/Diff/Merge 的操作习惯归 Branch，VLog 记录准入/质量归 VLog，周期维护任务的规划与质量检查归 Maintenance；交叉任务按需应用有关规范。不建立第七个总规范/Router，也不依赖客户端必定自动联动多个 Skill；AI 可以不安装 Skill 直接通过已授权 MCP 和 `kgos_docs` 工作。
+- **责任与可扩展性**：规范属于外部 AI 的可审查指导，不预置通用领域 Ontology 或强制字段、不改变 Kernel/Lithograph 的技术合同、不授予权限、不内置 Agent/Scheduler，也不把 `branch/vlog` 变成保留资源。Doctor v1 仍只读：只能依据**实际可用、版本明确**的规范与真实知识证据评价，缺失规范/证据时报告 `UNKNOWN`。
+- **理由与后续**：大型规范 Skill 在无关任务中增加加载和理解成本，领域职责混合也不利于独立审核迭代；过细拆分又增加选择成本。当前六个覆盖“定义、创作、使用、演进、维护、记录”的独立任务。**本次只冻结名称、目标、职责边界及协作规则**；详细质量规范、触发描述、示例、版本规则、资源布局、宿主测试与具体 Skill 实施后续逐个设计，未创作或安装任何新 Skill。
+- **真源与实施**：[官方规范 Skill 体系](mcp.md#kgos-standards-skill-suite)、[D104 Doctor/VLog](#d104-kgos-doctor-v1-and-vlog)、[Phase 27](../development/phases/27-knowledge-standards-skills.md)；Phase 25 的 Doctor 只按已存在规范检查，Phase 26 的 Web 初始化不受本决定影响。
+
+<a id="d107-final-seven-official-skills"></a>
+
+### D107 KG OS 官方 Skill 最终固定七个，通用 kgos 有条件退役（2026-10-20）
+
+- **最终清单**：官方 Plugin 的最终目标只有 **7 个 Skill**：`kgos-knowledge-standards`、`kgos-ontology-standards`、`kgos-retrieval-standards`、`kgos-branch-standards`、`kgos-vlog-standards`、`kgos-maintenance-standards` 和 `kgos-doctor`。前六个的职责沿用 [D106](#d106-six-kgos-standards-skills)，Doctor 的只读使用环境诊断沿用 [D104](#d104-kgos-doctor-v1-and-vlog)；无额外通用 Skill、执行 Skill、规范总入口或 Router。全局引导提示词和 MCP `kgos_docs` 不是 Skill。
+- **操作职责归属**：`kgos_docs` 是 MCP 工具能力/SDK 操作说明的唯一动态文档入口；六个规范负责内容与操作质量，Doctor 负责只读诊断，具体任务由外部 AI 按用户权限使用 MCP 执行。不得为了删掉通用 Skill 而把方法签名、SDK 用法或错误/版本合同复制成七个 Skill 的公共说明，也不得让 Skill 成为 MCP 访问前置。
+- **过渡现状**：当前仓库实际仅有通用 `plugins/kgos/skills/kgos/SKILL.md`，仍服务已有私人 Plugin；目标七个尚未创建。`kgos` 不纳入**最终交付清单**，但这不授权立即删改仓库现有文件、自动更新用户已安装私人 Plugin、破坏既有 MCP/Plugin 或把发布中的过渡版本声称为七个已交付。
+- **迁移与关闭门槛**：先核对原通用 Skill 对 `kgos_docs`/MCP/State/Branch/写入失败等操作知识的覆盖，再实际实现并验收 Phase 25 的 Doctor 和 Phase 27 的六个规范；最后验证不加载通用 `kgos` 的官方七 Skill 私人 Plugin、无 Skill 的 MCP-only 使用、正确选择与安全的读写/版本路径，更新官方模板/安装手册/引用后方可退役旧 Skill。任何缺口先在所属 MCP 手册或目标 Skill 中修复，并重新验证，不添加通用 Skill 的永久替代品。
+- **取舍**：减少操作手册重复、降低 AI 选择歧义，并确保每个 Skill 有独立职责；代价是过渡期间新旧版本可能并存，必须以**实际安装的 Plugin Release / 客户端能力**判断可用性。不得以本次文档记录代替迁移或客户端验收。
+- **真源与开发**：[MCP 最终七 Skill 与退役合同](mcp.md#kgos-seven-skills)、[Phase 25](../development/phases/25-kgos-doctor.md)、[Phase 27](../development/phases/27-knowledge-standards-skills.md)、[Phase 28](../development/phases/28-official-skill-roster.md)。本次仅确认产品目标与计划，未创作/删除 Skill、提交、推送或部署。
+
 <a id="d108-private-source-public-releases"></a>
 
 ### D108 私有 KG OS 真源与自动生成的公开 kg-releases（2026-10-21）

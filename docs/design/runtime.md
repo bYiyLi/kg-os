@@ -27,7 +27,7 @@ CLI-managed v1 Runtime 只使用 IPv4 loopback HTTP。每个 Instance daemon 启
 127.0.0.1:0
 ```
 
-端口 `0` 表示由 OS 为本次进程分配空闲端口。实际 endpoint 不是持久配置，而是在 daemon 完成 startup validation 与 bind 后写入当前 Workspace Root 的 `.kgos/kgosd.lock`。因此多个不同 Instance 可以同时运行，不需要用户手工分配端口，也不会因为固定 `4765` 冲突。
+端口 `0` 表示由 OS 为本次进程分配空闲端口。实际 endpoint 不是持久配置，而是在 daemon 完成 startup validation 与 bind 后写入当前 Workspace Root 的 `.kgos/kgosd.lock`。因此多个不同 Instance 可以同时运行，不需要用户手工分配端口，也不会因为固定 `4765` 冲突。**D105 的受限 Web 模式**可以先发布可连接的 listener/locator，但此时 locator 只证明端口可达；只有 [setup status](#web-first-run-bootstrap) 的 `ready` + 真实 runtime checks 才证明**业务可用**，CLI/SDK 不能再仅凭 locator 将未初始化实例当作业务 ready。
 
 CLI 不从 `config.toml` 推测 endpoint，只使用当前 Instance Directory 的 active lock locator。v1 的 CLI-managed Runtime 不提供 LAN / wildcard bind；如果未来需要远程或多机访问，必须单独设计 TLS、endpoint discovery 与 deployment/security contract，不能把本地 single-token loopback 模型直接外推到不可信网络。
 
@@ -67,7 +67,7 @@ Web 与 CLI / SDK 在逻辑上都是公共 API 的客户端。`kgosd` / Kernel �
 
 前后端代码分属 Go 与 TypeScript workspace，但这不产生第二个**产品部署服务**。Phase 00 开发环境可以使用 Vite dev server + proxy/HMR 作为开发工具，不要求把 Vite middleware嵌进 Go `net/http`；生产/本地正式运行的 Web构建产物仍由 `kgosd` 同端口直接提供，运行时不依赖 Vite。具体开发端口属于工程配置，不进入公开 endpoint contract。
 
-Phase 00 的页面 / HTTP 壳层验收只是工程验证，不修改正式 daemon 的数据库就绪条件，不新增跳过初始化或认证的公共运行模式。开发脚本不得把尚未接入 Knowledge Base 的壳层标成正式 `running`；完整启动仍须通过下文的能力检查与 bootstrap。
+Phase 00 的页面 / HTTP 壳层验收只是工程验证，不改变 Knowledge Base 的真实就绪条件。按 [D105](decisions.md#d105-web-first-run-and-runtime-bootstrap) 新目标，正式 daemon 可在**未初始化**时提供受限 setup HTTP/Web，但不得因此标记业务 `ready`；完整 API/MCP 仍须通过下文能力检查、Bootstrap 与 receipt，详情见 [无配置启动](#web-first-run-bootstrap)。当前代码仍需 Phase 26 才具备该受限模式。
 
 ## 统一 HTTP / MCP hosting（Phase 16 目标）
 
@@ -103,11 +103,11 @@ KG OS v1 以一个 `<workspace-root>/.kgos` Instance Token 作为唯一根凭证
 }
 ```
 
-初始化或后续直接 daemon startup 时，如果 `auth.json` 不存在，`kgosd` 使用 cryptographically secure random source 生成至少 256 bit entropy 的 opaque token，并原子创建该文件；后续 restart 继续读取并复用同一 token，**不会因为 restart 自动轮换 credential**。`auth.json` 已存在但无法读取、JSON/字段非法或 token 为空时启动 fail closed，不能静默覆盖为新 token。v1 不提供 token rotation API / CLI；operator 若要手工替换 credential，属于 daemon 停止后的本地 secret 管理，不是 Knowledge Base mutation。
+在原有完整 Runtime 初始化或直接 daemon startup 时，如果 `auth.json` 不存在，`kgosd` 使用 cryptographically secure random source 生成至少 256 bit entropy 的 opaque token，并原子创建该文件；后续 restart 继续读取并复用同一 token，**不会因为 restart 自动轮换 credential**。D105 允许无配置启动时**延迟到 Web 第四步**复用该原子生成机制；此前不开放业务认证和写入。`auth.json` 已存在但无法读取、JSON/字段非法或 token 为空时启动 fail closed，不能静默覆盖为新 token。v1 不提供 token rotation API / CLI；operator 若要手工替换 credential，属于 daemon 停止后的本地 secret 管理，不是 Knowledge Base mutation。
 
 `auth.json` 是 runtime secret，不属于 Knowledge Base State、Commit Data、配置 fingerprint 或 Evolution。POSIX 上新建文件权限必须为 `0600`；其它平台使用等价的当前用户私有访问控制。token 不得写入日志、error `message/details`、lock file、State、HTTP response body 或诊断 dump。
 
-所有 `kgosd` **API request** 都必须携带：
+所有已就绪 `kgosd` 的**普通业务 API request** 都必须携带（D105 的少量公开 Setup status、未认领 claim 和初始化期授权/Session 例外见 [受限启动](#web-first-run-bootstrap)，不能用来调用业务）：
 
 ```http
 Authorization: Bearer <token>
@@ -181,6 +181,7 @@ one Workspace Root
 └── .kgos/
     ├── config.toml
     ├── auth.json
+    ├── embedding-api-key  # 仅 Web 引导使用，初始化时按需创建；私有文件（D105 目标）
     ├── kgosd.lock
     ├── kgos.db
     ├── initialized.json
@@ -206,17 +207,72 @@ HTTP connection guard 已实现：daemon 每次创建正式 HTTP handler 时生�
 
 ### `initialized.json`
 
-`initialized.json` 是 CLI-owned、versioned 的本地 **first-run completion receipt**。它不是 startup configuration、Knowledge Base State、Commit metadata 或配置 fingerprint；当前格式只包含 `{"version":1}`。CLI 只有在当前 `config.toml` 已发布、daemon 完成 official/additional extension materialization、credential 与 `kgos.db` 建立、Lithograph / KG OS bootstrap 完成，并且使用同一 Instance token 做 authenticated readiness 成功后，才原子发布该 receipt。
+`initialized.json` 是原由 CLI 发布、按 [D105](decisions.md#d105-web-first-run-and-runtime-bootstrap) 扩展为 **CLI、Web 与 daemon 自动初始化共享**的 versioned first-run completion receipt。它不是 startup configuration、Knowledge Base State、Commit metadata 或配置 fingerprint；当前格式仍只有 `{"version":1}`。只有完整 `config.toml` 已发布、official/additional extensions 就绪、Instance credential 与 `kgos.db` 建立、Lithograph / KG OS bootstrap 完成，且同一 Instance token 的 authenticated readiness 成功后，才能原子发布该 receipt。三种入口不得分别定义成功标准。
 
-receipt 缺失表示首次 `init` 尚未完成，即使 `config.toml` 已存在；业务命令的 Runtime ensure 必须明确要求先执行 `kg init`，不能把正常业务调用变成隐式首次 bootstrap。再次 `init` 可以在合法 config 上恢复缺失步骤，并在最终 readiness 成功后补写 receipt。receipt 已存在但 `auth.json` / `kgos.db` 等完成态必要 artifact 缺失属于不一致状态，必须 fail closed，不自动重建成另一个 Instance。
+receipt 缺失表示首次初始化尚未完成，即使 `config.toml` 已存在；正常业务 API/CLI/MCP 仍不能在其缺失时执行隐式 Bootstrap。**仅 daemon 启动与显式 Web / CLI 初始化入口**可运行下文规定的共享初始化流程，并在成功后补写 receipt。receipt 已存在但 `auth.json` / `kgos.db` 等完成态必要 artifact 缺失属于不一致状态，必须 fail closed，不自动重建成另一个 Instance。
 
-`doctor` 可以用这个 receipt 区分 config-only recovery state 与“已初始化但 daemon 当前 stopped”的正常状态。删除 receipt 不删除 Knowledge Base，也不修改 config；它只会让下一次 `init` 重新证明当前 Instance 的完整 readiness。KG OS 不把 receipt 内容用于 Ontology / Object / Graph / Evolution 语义，也不因为它存在就绕过 daemon 自身的数据库/extension/bootstrap 校验。
+`doctor` 可以用这个 receipt 区分 config-only recovery state 与“已初始化但 daemon 当前 stopped”的正常状态。删除 receipt 不删除 Knowledge Base，也不修改 config；它只会让下一次合规的 daemon startup / 显式 init 重新证明当前 Instance 的完整 readiness。KG OS 不把 receipt 内容用于 Ontology / Object / Graph / Evolution 语义，也不因为它存在就绕过 daemon 自身的数据库/extension/bootstrap 校验。
+
+<a id="web-first-run-bootstrap"></a>
+
+### 无配置启动、共享初始化与先于鉴权的门禁（D105，目标设计）
+
+KG OS 正式 Docker 只运行**一个 `kgosd`、一个 HTTP listener、一个 Workspace / Instance lock**。未提供 `config.toml` 不再阻止启动**受限的 Web 初始化模式**，也不要求安装 Node/CLI 或另起初始化 Web Server。浏览器可以按五步流程完成配置；高级用户可以事先手工编写完整合法的 `config.toml` 后直接启动。启动及 HTTP dispatch **先确定初始化状态，再决定是否进入普通业务认证**；缺配置不能伪装成 Token 认证失败。
+
+| 持久状态与检查结果 | 运行状态及入口 | 必须遵守的边界 |
+| --- | --- | --- |
+| 无 config、无 receipt 且无必须保护的旧实例数据 | `setup_required`：提供基础 Web 初始化页面 | 不创建空 `kgos.db`，不启动业务 Kernel/MCP |
+| 完整合法 config，无有效 receipt | 启动时进入 `initializing`，自动使用共享初始化过程；Web 可查看进度 | 对既有合法数据只恢复缺失步骤，不删除/重建 |
+| Web 第五步提交完整配置，无 receipt | `initializing`：在当前 daemon 内触发同一初始化过程 | 原子发布配置，不另起占用锁/端口的 daemon |
+| receipt 有效，且当前启动的 config、Token、扩展、数据库/Kernel 全部验证成功 | `ready`：开放正常 Web / API / MCP | 保留原 Token、State、Branch、历史和认证会话 |
+| config 非法、旧布局/持久文件冲突，或已有 receipt 但必要文件损坏/丢失 | `error`：提供只读状态和恢复指引；仅“合法已有配置、无 receipt、可恢复执行失败”允许持有 Token 的显式 resume | fail closed；不得重置或覆盖原有知识库与管理员凭证 |
+
+**配置文件存在不等于 ready**：仍必须获得经过真实 authenticated readiness 才发布的 `initialized.json`；receipt 存在也不能跳过当前启动的 Runtime/DB 能力检查。无 receipt 时再次启动或显式重试可沿用原有合法 config、Token、扩展和 DB 恢复；初始化步骤的部分持久结果不得在失败后冒充完成。运行期间手工补齐/编辑 `config.toml` 不会触发监听或热重载，**下次启动**才进入自动初始化。Web 的“重新开始”只重置未提交的表单草稿，不等于删除已持久化文件或知识。
+
+**内部 readiness 与对外门禁不能互相阻塞**：共享初始化器在本进程中打开并验证真实 Runtime、Kernel/Lithograph 和已持有的 Instance Token，调用**同一正式业务 Handler 的进程内 authenticated readiness**（不经过外部初始化门禁、不产生可从网络调用的例外路由，不新建监听/进程）。现有 `cmd/kgosd/init.go` 的 authenticated overview 验收语义保持不变。readiness 未通过时，对外普通业务 API 仍始终返回 503；成功后先原子发布 receipt、再使当前 listener 的业务门禁转为 `ready`。在进程内做受控 readiness 并不是向匿名 HTTP 请求开放业务路由；对外没有“临时允许访问”的窗口。底层 Handler/Session 实例在就绪切换期间要保持当前 boot/session 一致性，或用原有会话 Cookie 安全恢复新的临时 Web Bearer，**不能要求第四步已登录用户重新输入管理员 Token**。
+
+#### HTTP 路由优先级与受限服务
+
+1. `GET /api/v1/setup/status` 在所有运行状态可**无 Bearer**读取，仅返回 `state=setup_required|initializing|ready|error`、必要的安全状态说明，错误时不泄漏本机路径、Token、API Key、扩展内部报错；固定 `Cache-Control: no-store`。页面跳转与前端显示必须以当前 daemon 的这一结果为准，不能用浏览器缓存中的“已初始化”猜测。
+2. **浏览器 HTML 页面**：未 ready 时 `GET /` 和其他可导航的 Web 页面统一重定向到 `/setup`，该页面不弹正常业务登录；已 ready 时 `GET /setup` 重定向至 `/` 并恢复正常 Session/Token 鉴权。初始化页面的 JS/CSS/favicon 等静态资源始终可访问，不误重定向。
+3. **业务协议**：未 ready 的普通 `/api/v1/*`、`/mcp`、OAuth / discovery 和 MCP Apps Resource，在业务鉴权前返回 `503 INSTANCE_NOT_INITIALIZED`（JSON 或对应 MCP 协议错误），**绝不返回 HTML / 302**，也不得创建/访问业务 Kernel；拥有已完成 receipt 但运行时损坏的错误状态使用 `503 INSTANCE_UNAVAILABLE`，不假装是一个可以重新创建的空库。新 code/HTTP 映射由 [公共错误合同](contracts.md#初始化门禁与-setup-错误) 统一管理。
+4. 仅 `setup/status`、setup 写入接口以及第四步所需的现有 `web/auth/login|session|logout` 是未 ready 时的**显式例外**。达到 ready 后，普通业务调用仍按原有 Instance Bearer / Web Session / Boot Guard / MCP OAuth 认证；全部 setup 写入接口立即关闭，返回 `409 SETUP_CONFLICT`。Status 依旧可只读，页面 `/setup` 不再可进入。
+
+首次使用遵循 [Web 五步界面](web.md#web-first-run-setup)；最小后端目标 API 为：
+
+认领管理员 Token 不等于完成初始化。用户从第四步返回第三步，只要实例仍为 `setup_required` 且磁盘没有 `config.toml`，就可重新验证当前向量参数，不因 `auth.json` 已存在而阻断。配置发布、开始初始化、完成及异常状态仍保持禁止验证，不允许借此接口覆盖已保存配置；未认证请求继续受同源、目标地址、超时、并发和响应大小限制。初始化入口不应暴露给不可信网络。
+
+| 接口 | 调用边界 | 实际作用 |
+| --- | --- | --- |
+| `GET /api/v1/setup/status` | 所有状态，无 Bearer | 安全状态与初始化进度；前端据此导航/轮询 |
+| `POST /api/v1/setup/validate-embedding` | 仅 `setup_required`、磁盘无 `config.toml` 且浏览器同源；管理员 Token 已认领仍可重新验证 | 对未保存的 URL/模型/密钥执行一次真实 Embeddings 请求并检查向量维度，不创建配置或完成状态 |
+| `POST /api/v1/setup/claim` | `setup_required` 且无 `auth.json`；符合既有同源请求校验，**不新增一次性部署证明** | 原子创建 256-bit Instance Token；**仅成功首次创建时返回根 Token 一次**，供用户保存并调用现有 Web login；自动初始化执行中不得插入匿名认领 |
+| `POST /api/v1/setup/rotate-token` | 仅 `setup_required`、`auth.json` 已有合法管理员令牌、尚未发布 `config.toml` 且浏览器同源；无须提供旧 Token 或 Web Session | 原子替换 `auth.json` 中的管理员 Token，新 Token 仅在本次成功响应展示；旧 Token、Cookie Session 和 Web Access Bearer 同时失效，浏览器用新 Token 自动登录 |
+| `POST /api/v1/web/auth/login`、`POST /api/v1/web/auth/session`、`POST /api/v1/web/auth/logout` | 根 Token 已存在时可在未 ready 期间复用现有 Session 合同 | 第四步建立/恢复 Web 登录状态，不授予业务 API 绕过初始化门禁的能力 |
+| `POST /api/v1/setup/initialize` | 未 ready、已持有有效 Instance Bearer 或 Web Access Bearer | 第五步首次提交完整配置及可选 Web API Key，或对**已有合法 config 且无 receipt** 发起仅恢复初始化、不更新配置的显式请求；客户端按 status 轮询真实结果 |
+
+**第三步真实验证（D105 优化）**：`POST setup/validate-embedding` 接受 `{"base_url":"...","model":"...","dimensions":4096,"similarity":"cosine","apiKey":null}`；留空密钥由浏览器显式传 `null`，不再有“无密钥”开关。服务端只在 `setup_required` 且同源请求下调用 `{base_url}/embeddings`，发送短测试文本及 OpenAI-compatible 的 `model/input/encoding_format:"float"`，**不发送 `dimensions`**；仅真实 HTTP 200、合法向量响应且返回维度与配置完全相符时确认成功。结果只报告成功维度或有界、不会回显密钥的稳定失败原因，不作为本地数据库 Bootstrap 的额外硬前置。验证出口允许公网及普通私网 Embedding 服务（包含 `10/8`、`172.16/12`、`192.168/16` 及 IPv6 ULA），避免 DNS 解析到私网地址时误报服务不可用；保留本机回环、链路本地、元数据及其它特殊保留地址拒绝规则。未认证出口仍禁用环境代理与重定向，并限制超时、请求/响应体和并发数量；使用方应避免将未初始化服务暴露在不可信网络中。测试不写入 Key、Config、Session 或 Knowledge。Web 仅在当前草稿对应的验证成功后显示“下一步”，任何参数修改均使旧验证结果失效。
+
+最小 wire shape 固定为：`GET setup/status` 返回例如 `{"state":"setup_required","credentialConfigured":false}`；`credentialConfigured` 只报告是否已有合法的 `auth.json`，不返回其内容；`initializing` 可以附 `phase=configuration|extensions|authentication|database|readiness` 的阶段标识，`error` 只附无 secret 的公开错误摘要。`POST setup/claim` 首次创建返回 `201 {"token":"<new-instance-token>"}` 和 `Cache-Control: no-store`；已有凭证返回 `409 SETUP_CONFLICT` 而不是泄漏旧 Token。`POST setup/initialize` **首次新配置**接收严格 JSON `{"config":{"embedding":{"base_url":"...","model":"...","dimensions":1536,"similarity":"cosine"},"cache":{"path":"cache/openai-compatible.db","max_size_mb":4096},"fulltext":{"analyzer":"jieba"},"sqlite":{"extensions":[]}},"apiKey":"<user-supplied-secret>"}`；`apiKey` 只能是非空字符串或显式 `null`（无需认证），不得包含内联到 `config.toml` 的 `api_key` / 任意 `api_key_env`。**合法 config 已发布、但 receipt 尚不存在**时，同一端点可接收空对象 `{}` 作为仅重新执行未完成初始化的请求，严禁附带新配置或密钥；config 非法或已完成实例不能通过此形式恢复。成功受理返回 `202 {"state":"initializing"}`，不包含提交密钥，最终结果必须通过 status 查询；已存在任何 config 时，绝不接受带新 config 的 Web payload 静默覆盖。Setup 状态、认领、初始化和 Session 写入响应一律 `Cache-Control: no-store`，不允许跨域 CORS。
+
+Web 第二步与第三步只在浏览器本次向导内保存未提交草稿，**点击“下一步”不创建半成品 `config.toml`**。第五步请求提交经过严格类型/范围/未知字段校验的完整 `[server]` 与 Cache、SQLite、Full-text、Embedding 配置：Web 默认提供 `cache.path=cache/openai-compatible.db`、`cache.max_size_mb=4096`、`fulltext.analyzer=jieba`、额外 `sqlite.extensions=[]`；Embedding 要求完整 URL、模型、维度、`cosine|euclidean` 及凭证模式。它们是 Web UI 显式生成的值，不改变手工 `config.toml` 必须完整的合同，也不允许用缺字段表示关闭 Embedding、Full-text 或 Cache。
+
+**凭证分工**：第四步生成/复用的管理员 Token 只归 `auth.json`；第三步填写的 Embedding API Key 不得进入 `config.toml`、IndexDefinition、版本历史、响应日志或诊断。手工配置继续使用当前 `embedding.api_key_env` + 宿主环境变量，不要求 Web secret 文件。Web setup 则把 Key 原子写入 `<workspace>/.kgos/embedding-api-key`（文件权限 0600、目录私有），生成的 `embedding.api_key_env` 固定使用专用名字 `KGOS_WEB_EMBEDDING_API_KEY`；仅当 config 显式指向此专用名字时，Runtime 才在 Provider 初始化之前安全读取私有文件并注入该**单个 daemon 进程**的对应环境变量，之后仍由既有 Provider operation-time 解析，不增加通用密钥注册中心或内联 `api_key`。该保留环境变量若同时由宿主设置，应报明确配置冲突而非悄悄选一边。Web API Key 留空即为无需认证的 endpoint（`api_key_env=""`，不创建 Key 文件）。若私有 Key 文件缺失/权限错误，保留已有配置，报告错误，不假装服务已就绪；Web 不提供已初始化后的任意密钥改写接口。**首次保存先原子发布并校验私有 Key 文件，再原子发布完整 config**；中断后的孤立私有文件不构成初始化完成，config 已发布但 Key 不可读取时 fail closed，不删除配置/已有数据，也不因重试暴露旧 Key。
+
+当前 `auth.json` 原子生成 / root Token 只持一份，不新增账号、密码、角色或一套安装 Token。首次匿名 `claim` 仍只可成功一次；已有 Token 且**尚未提交初始化配置**时，可通过同源 `rotate-token` 无须旧凭证直接重新生成。服务端串行检查 `setup_required`、尚无 `config.toml`、磁盘旧凭证与当前内存凭证一致，再通过私有临时文件原子替换为新随机 Token；旧 Token 与旧 Web Session 失效，只有新 Token 能重新登录。配置已发布、初始化中、ready 或凭证/文件异常时不得轮换。每次新 Token 只在成功创建响应中显示一次，普通状态和登录接口不会回显旧明文。**未初始化前匿名轮换属于明确的安全取舍**：任何能通过同源限制访问该接口的人，都可能使已认领的管理员 Token 失效并获得新的管理员凭证；因此初始化入口必须仅对可信环境开放。保留现有 Origin / Sec-Fetch-Site 检查、文件权限及部署边界，不为此增加额外认证。
+
+初始化与重试必须序列化：同时打开两个浏览器、重复点击或 daemon 检测到手工 config 新出现时，只允许一个写入/Bootstrap，其他请求返回当前 status 或 `409 SETUP_CONFLICT`，不可覆盖外部写入，也不可运行第二个需重新持锁/监听的 daemon。响应丢失不能假定操作没有生效；浏览器从 status 恢复。合法配置的失败恢复只调用已认证的 `{}` resume，不删除/覆盖配置；无法安全恢复的损坏/非法配置只能要求用户修复文件并重启。达到真实 ready 后复用当前 HTTP listener/Session/Token，先通过进程内 authenticated readiness，**随后发布 receipt 并开放外部业务门禁**；失败保留可安全重试的状态和诊断。实现与隔离验收归 [Phase 26](../development/phases/26-web-first-run-bootstrap.md)，**本地未提交工作树已实现上述受限启动，仍须 Phase 26 最终质量与 CI 验收后才算正式交付**。
 
 ### `config.toml`
+
+`[server].public_origin` 是新版本首次初始化必填的实例对外访问根地址，统一提供 Web/API/MCP/OAuth Origin。浏览器默认从 `location.origin` 预填，允许用户修改；它与本机监听 Host/Port 是两种配置，不能由请求 Header、监听地址或环境变量偷偷覆盖。必须为 HTTPS origin，只有本机 loopback 开发可使用 HTTP；不能包含 path、query、fragment 或账号。OAuth Issuer 从本字段加载，MCP 连接地址在其后拼接现有 `--mcp-path`（默认 `/mcp`）。已存在且不含此字段的旧版 `config.toml` 仍然可加载，但不启用 OAuth；升级前需手工增加此字段后重启。新 Web 初始化始终明确写入，管理员以后可修改并通过重启生效，不支持热更新。已废弃的 `--mcp-oauth-issuer` / `KGOS_MCP_OAUTH_ISSUER` 启动入口明确拒绝；迁移时先把现有值写入 `[server].public_origin` 再删除旧入口。填写地址不会自动创建公网接入或 TLS 证书。
 
 `config.toml` 是 Instance Directory 中持久的 **Instance startup configuration**。v1 使用 Embedding cache policy、caller additional SQLite Extension、Full-text 与 Embedding 四组配置。最终文件始终写出完整显式配置；`init` 可以按 [CLI Init](cli.md#init) 为 KG OS-owned 字段解析产品默认值，手工配置仍必须满足同一完整性校验。official Lithograph / Provider / Jieba由native Runtime package拥有，不写入config：
 
 ```toml
+[server]
+public_origin = "https://kgos.example.com"
+
 [cache]
 path = "cache/openai-compatible.db"
 max_size_mb = 4096
@@ -438,7 +494,7 @@ Relationship 使用同形的 `createRelationshipIndex`。startup config 的 `emb
 
 #### 凭证不落库
 
-KG OS 只保留 `api_key_env` 这一认证输入，不增加内联密钥的转接层。配置值非空时，索引只保存环境变量**名称**；`init`、普通 CLI Runtime ensure 与 `kgosd` startup 都不预先解析这个变量。Provider 只在实际 Semantic operation 需要形成 effective request identity 时读取 kgosd 环境中的实际值；这一步可能发生在 Provider cache lookup 之前，因此即使最终不发 HTTP，也属于该次 Semantic operation 的按需解析；缺失/空值使该次 Semantic operation 按 Lithograph 当前 Provider mapping 以 `INVALID_ARGUMENT` 失败，但不影响 daemon startup、Ontology/Object/Evolution 或不需要 Semantic Provider 的 Graph operation。KG OS 不把解析后的 secret 写回 `providerConfig`、State、日志或错误。配置值为空时表示 no-auth endpoint，索引不保存 `api_key_env`。
+KG OS 在 Provider/IndexDefinition 层仍只保留 `api_key_env` 这一认证输入，不增加内联密钥的转接层。配置值非空时，索引只保存环境变量**名称**；`init`、普通 CLI Runtime ensure 与 `kgosd` startup 都不预先解析这个变量。Provider 只在实际 Semantic operation 需要形成 effective request identity 时读取 kgosd 环境中的实际值；这一步可能发生在 Provider cache lookup 之前，因此即使最终不发 HTTP，也属于该次 Semantic operation 的按需解析；缺失/空值使该次 Semantic operation 按 Lithograph 当前 Provider mapping 以 `INVALID_ARGUMENT` 失败，但不影响 daemon startup、Ontology/Object/Evolution 或不需要 Semantic Provider 的 Graph operation。KG OS 不把解析后的 secret 写回 `providerConfig`、State、日志或错误。配置值为空时表示 no-auth endpoint，索引不保存 `api_key_env`。D105 新增的**首次 Web 表单 API Key**只经 [受限启动设计](#web-first-run-bootstrap) 指定的私有文件注入专用环境变量，并非 Provider 新字段或启动时的在线认证检查；原有人工提供环境变量的模式仍然成立。
 
 环境变量名称随索引定义保存；历史索引仍引用原名称，修改当前默认名称不改写它们。普通 credential rotation 可保持同名变量并重启进程；若新 credential 会把相同 endpoint/model 路由到不同 embedding space，则必须按新的索引配置处理，不能把它当作只有认证值变化的轮换。KG OS 不增加 secret registry 或隐藏环境变量约定。Lithograph 本身仍支持直接配置 `api_key`，但该低层能力不进入 KG OS 的公共配置 profile。
 
@@ -446,12 +502,12 @@ KG OS 只保留 `api_key_env` 这一认证输入，不增加内联密钥的转�
 
 ### 配置生效时机
 
-`kgosd` **只在进程启动时读取配置**。运行期间修改 `config.toml`：
+已进入完整运行态的 `kgosd` **只在启动/打开 Runtime 时读取配置**；D105 无配置启动属于特殊的受限阶段，Web 第五步写入的配置由本次首次 Runtime Open 读取，**不是对已经打开的 Runtime 做热更新**。完整运行态修改 `config.toml`：
 
 - 不触发 file watch / hot reload；
 - 不改变当前进程的 effective config；
 - 不触发当前进程自动退出；
-- `cache`、caller `sqlite.extensions`、`fulltext` 与 `embedding` 的当前文件值只在下一次 `kgosd` 启动时被读取。
+- `cache`、caller `sqlite.extensions`、`fulltext` 与 `embedding` 的新文件值只在下一次 `kgosd` 启动时被读取。
 
 KG OS 不检测运行中的 `config.toml` 是否被修改，也不因为文件变化自行 hot-reload / restart daemon。下一次进程启动读取当前文件；其中 `[fulltext]` / `[embedding]` 虽然属于“初始化后禁止修改”的 Instance 初始化合同，Runtime 仍不保存旧值进行比较。
 
@@ -461,7 +517,7 @@ KG OS 不检测运行中的 `config.toml` 是否被修改，也不因为文件�
 
 ### `kgosd.lock`
 
-`kgosd.lock` 是 **single-instance lock + active runtime locator**，不是配置文件、credential store 或 runtime state database。每个 Instance Directory 同一时间最多一个 active `kgosd`。
+`kgosd.lock` 是 **single-instance lock + active runtime locator**，不是配置文件、credential store 或 runtime state database。每个 Instance Directory 同一时间最多一个 active `kgosd`。D105 受限 listener 可先发布 locator，但其业务就绪必须继续依据 receipt 和真实状态检查，不改变单实例独占规则。
 
 `kgosd` 启动时 open/create 此文件并尝试获取 OS-level exclusive file lock；整个进程生命周期持续持有该 lock。另一个 `kgosd` 无法取得 lock 时必须停止启动，不能通过不同端口绕过 single-instance 约束。
 
@@ -491,13 +547,13 @@ v1 Knowledge Base 的唯一 target 固定为 `<workspace-root>/.kgos/kgos.db`，
 
 ## Daemon lifecycle
 
-`kgosd` 自身始终是 **foreground server**：它不 self-daemonize、不 fork 到后台。正式用户 lifecycle 由 `@kgos/cli` 管理；直接执行 resolved Runtime package 中的 `kgosd --root ...` 只保留给开发、测试和诊断，不建立第二套用户安装/服务管理产品面。
+`kgosd` 自身始终是 **foreground server**：它不 self-daemonize、不 fork 到后台。下面 CLI-managed daemon 规则是历史 npm/本机运行入口；当前正式发行仅为 Linux amd64 Docker 单进程，D105 让这一进程在**无配置时也能提供受限 Web**。不因此增加第二套监听服务或 daemon 自我守护机制。
 
 普通用户不直接管理 `kgosd`；daemon lifecycle不进入v1 public CLI namespace。成功完成首次 `init` 后，任何需要本地daemon的业务命令都先针对已解析 Workspace Root 执行 Runtime ensure：已有healthy compatible active daemon时复用，没有usable owner时从当前platform npm Runtime package后台spawn `kgosd --root <absolute-root>`并等待ready。这个自动spawn是CLI本地运行前置，不改变原始业务request的HTTP/Bearer边界。
 
 ### 启动
 
-CLI Runtime ensure 与开发/测试直接执行的 `kgosd --root ...` 最终进入同一个 startup path：
+以下是**当前已实现的完整 Runtime 启动链路**；D105 的目标是在持有同一锁且提供受限 HTTP listener 后，按 [初始化状态](#web-first-run-bootstrap) 选择只读 Web Setup、自动 Bootstrap 或正常完整 Runtime。图中的“未加载 config 则失败”“endpoint 发布才等于业务 ready”仅是现有实现基线，不能被当作新目标：
 
 ```text
 require and resolve --root <absolute-workspace-root>
@@ -528,7 +584,7 @@ require and resolve --root <absolute-workspace-root>
 → serve Web shell + authenticated API
 ```
 
-任一步失败都必须结束该次启动并释放OS lock；不能留下一个“看起来active”的逻辑实例。首次 `init` 在配置发布后把 `kgosd` 作为detached/background child启动并等待它达到 `running`，再做 authenticated readiness 检查；成功后 daemon 保持运行。后续业务 Runtime ensure 使用同一 spawn/startup path 恢复已完成初始化但当前 stopped 的 Instance。daemon 自身仍保持 foreground process 语义。对于原本没有active daemon的root，父CLI等待winner完成config/auth/database validation和HTTP bind后发布endpoint，或观察child提前退出 / startup timeout。endpoint publication就是本地ready signal，不新增credential-free或authenticated health route；ready后 CLI 读取同一 Workspace 的 `.kgos/auth.json`，直接用该 token 发送原始业务 request。
+在以上**旧完整 Runtime 路径**中，任一步失败都必须结束该次启动并释放 OS lock，不能留下一个“看起来 active”的逻辑实例。旧本机 `init` 在配置发布后把 `kgosd` 作为 detached/background child 启动并等待 `running`，再做 authenticated readiness 检查；成功后 daemon 保持运行。D105 的新受限 HTTP 模式即使 Kernel 尚未 ready 也可以发布 active endpoint；**新 `GET /api/v1/setup/status` 与已有 receipt/readiness** 必须进一步区分“HTTP 服务活着”和“业务可用”。完整初始化出错而仍安全保留的受限 listener 只能服务状态/恢复引导，不能假称业务启动成功；普通 CLI/SDK/MCP 不得把它当作就绪 Kernel。
 
 自动start必须幂等且并发安全：已有healthy compatible `running` daemon时不再启动第二个进程；多个caller并发触发ensure时最终只有一个 `kgosd` 获得exclusive lock，其它caller等待winner发布endpoint后复用。active locator报告不同/不兼容Runtime version时CLI fail closed，不静默kill或替换正在运行的daemon。
 
@@ -587,7 +643,7 @@ v1 不定义 launchd/systemd registration、开机启动、service installation�
 - CLI-managed Runtime固定使用loopback动态端口，不从Instance config选择端口；
 - v1 不提供第二种 IPC transport；
 - Workspace Root 只由 CLI 的 `--root` / `KGOS_ROOT` 明确解析；daemon 接收显式 `--root`，不存在 `KG_HOME`、默认 profile、cwd/parent discovery 或 hidden current base，一个 Workspace 只承载 `<root>/.kgos/kgos.db`；
-- `auth.json` 是该 Instance Directory 的持久 server credential；所有 daemon API request 使用 Bearer token，本机 CLI 只读取同一 Workspace 的 `.kgos/auth.json`，不存在 `KG_TOKEN` override；
+- `auth.json` 是该 Instance Directory 的持久 server credential；ready 后的业务 API 仍使用 Bearer token，D105 仅公开少量初始化 status/首认领/预初始化 Web Session 入口，本机 CLI 只读取同一 Workspace 的 `.kgos/auth.json`，不存在 `KG_TOKEN` override；
 - v1只有单token全权限认证，不提供user / role / scope / OAuth / TLS；CLI-managed daemon只监听loopback；
 - `kgosd` / Kernel / Database Host使用Go；`@kgos/sdk` / `@kgos/cli` / Web使用TypeScript；内置Web随daemon native package交付，与API共用进程、endpoint和lifecycle；
 - `config.toml` 不 hot reload，也不做修改检测；当前文件只在下一次 daemon startup 读取；

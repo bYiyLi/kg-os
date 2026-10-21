@@ -1,3 +1,5 @@
+import { UiProvider } from "../shared/ui/ui-provider.js";
+import { Button } from "../shared/ui/button.js";
 import { App as McpApp } from "@modelcontextprotocol/ext-apps";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
@@ -7,9 +9,9 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 import { readMcpResult } from "../core/client/mcp-read.js";
 import { createMcpVersionReader } from "../features/version/mcp-version-reader.js";
 import type { VersionReader } from "../features/version/version-data.js";
-import { detectLocale, i18n } from "./i18n/index.js";
+import { i18n, synchronizeHostLocale } from "./i18n/index.js";
 import { WorkspaceShell } from "./layout/workspace-shell.js";
-import type { Theme } from "./layout/version-sidebar.js";
+import type { Theme } from "../shared/lib/use-theme-preference.js";
 
 const overviewCode = "return await evolution.overview()";
 
@@ -43,19 +45,17 @@ export function readOverview(result: unknown): Overview {
 export function EmbeddedApp() {
   return (
     <I18nextProvider i18n={i18n}>
-      <EmbeddedWorkspace />
+      <UiProvider>
+        <EmbeddedWorkspace />
+      </UiProvider>
     </I18nextProvider>
   );
 }
 
-function applyHostPreferences(app: McpApp, setTheme: (theme: Theme) => void) {
+function applyHostPreferences(app: McpApp, setTheme: (theme: Theme | undefined) => void) {
   const context = app.getHostContext();
-  if (context?.theme === "light" || context?.theme === "dark") {
-    setTheme(context.theme);
-  }
-  if (typeof context?.locale === "string") {
-    void i18n.changeLanguage(detectLocale(null, [context.locale]));
-  }
+  setTheme(context?.theme === "light" || context?.theme === "dark" ? context.theme : undefined);
+  synchronizeHostLocale(typeof context?.locale === "string" ? context.locale : undefined);
 }
 
 function EmbeddedWorkspace() {
@@ -126,6 +126,7 @@ function EmbeddedWorkspace() {
       generation.current++;
       appRef.current = null;
       readerRef.current = null;
+      synchronizeHostLocale(undefined);
       void app.close().catch(() => {
         // Host disconnect is best-effort during teardown.
       });
@@ -163,9 +164,9 @@ function ConnectionPanel({
     <section className="embedded-connection" aria-label={t("embedded.title")}>
       <header className="embedded-connection-header">
         <h2>{t("embedded.title")}</h2>
-        <button type="button" onClick={onRefresh} disabled={disabled}>
+        <Button variant="ghost" type="button" onClick={onRefresh} disabled={disabled}>
           {t("embedded.refresh")}
-        </button>
+        </Button>
       </header>
       {connection.status === "loading" && <p role="status">{t("embedded.loading")}</p>}
       {connection.status === "error" && <p role="alert">{t("embedded.unavailable")}</p>}

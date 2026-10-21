@@ -34,6 +34,11 @@ type ListenOptions struct {
 }
 
 func ServeWithOptions(ctx context.Context, runtime *runtimehost.Runtime, handler http.Handler, output io.Writer, options ListenOptions) error {
+	return ServeWithPublisher(ctx, runtime.PublishEndpoint, handler, output, options)
+}
+
+// ServeWithPublisher permits setup HTTP to start before the Kernel is opened.
+func ServeWithPublisher(ctx context.Context, publish func(string) error, handler http.Handler, output io.Writer, options ListenOptions) error {
 	if options.Host == "" {
 		options.Host = "127.0.0.1"
 	}
@@ -81,11 +86,11 @@ func ServeWithOptions(ctx context.Context, runtime *runtimehost.Runtime, handler
 	if !ok {
 		return fmt.Errorf("unexpected listener address %T", listener.Addr())
 	}
-	endpoint := runtime.LocalEndpoint(tcpAddress.Port)
+	endpoint := "http://127.0.0.1:" + strconv.Itoa(tcpAddress.Port)
 	if secure {
 		endpoint = "https://127.0.0.1:" + strconv.Itoa(tcpAddress.Port)
 	}
-	if err := runtime.PublishEndpoint(endpoint); err != nil {
+	if err := publish(endpoint); err != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		_ = server.Shutdown(shutdownCtx)
 		cancel()

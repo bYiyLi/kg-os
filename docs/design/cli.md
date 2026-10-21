@@ -253,6 +253,8 @@ kg init
 
 `init` 是完整 Instance Setup，而不是单纯的 `config.toml` 生成器。成功返回表示当前 Workspace 的 `.kgos` 已经形成可用 Instance：配置已发布、Runtime package 已验证、official/additional extensions 已解析并固定、credential 与 Knowledge Base 已建立、Lithograph 与 KG OS bootstrap 已完成、compatible daemon 已达到 ready 并继续运行。任何这些步骤未完成都不能返回“initialized”成功。
 
+**D105 新启动合同（本地开发中，尚未正式交付）**：拥有完整有效 `.kgos/config.toml` 的用户不必先运行交互式 CLI `init`，可直接启动正式 Docker / `kgosd --root`，daemon 在尚无完成 receipt 时自动复用同一 Bootstrap + authenticated readiness + receipt 发布流程；没有配置时 daemon 仅启动受限 Web 初始化页面，由人走四步引导。原有 `kg init` 与 Go `kgosd init --root` 保留为**显式、幂等的初始化/恢复入口**，不再是手动 TOML 用户首次启动的强制前置；不得让普通 Ontology / Graph / MCP 请求自发执行 Bootstrap。完整配置仍是强约束，手动配置不因 Web 提供推荐值就默默容忍缺失字段；启动时非法或旧库损坏必须 fail closed。自动启动和浏览器流程、一次性管理员 Token、Web API Key 文件及错误门禁见 [Runtime](runtime.md#web-first-run-bootstrap) 和 [Phase 26](../development/phases/26-web-first-run-bootstrap.md)，CLI 的历史命令参数与可交互 prompt 原语义保持不变。
+
 交互路径按职责分阶段，而不是把所有字段平铺成问卷：
 
 ```text

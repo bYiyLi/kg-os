@@ -160,11 +160,12 @@ test("an expired request can be dismissed without issuing any grant", async ({ p
 });
 
 test("authorization surfaces and actions inherit both Web theme token sets", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
   await mockWebConnection(page, true);
   const inspect = () =>
     page.evaluate(() => {
       const shell = document.querySelector<HTMLElement>(".app-shell");
-      const dialog = document.querySelector<HTMLDialogElement>(".mcp-authorization-dialog");
+      const dialog = document.querySelector<HTMLElement>(".mcp-authorization-dialog");
       const permissions = document.querySelector<HTMLElement>(".mcp-authorization-permissions");
       const notice = document.querySelector<HTMLElement>(".mcp-authorization-notice");
       const approve = document.querySelector<HTMLButtonElement>(".mcp-authorization-approve");
@@ -208,17 +209,22 @@ test("authorization surfaces and actions inherit both Web theme token sets", asy
   expect(dark.scheme).toBe("dark");
 
   // OAuth enters via navigation; replacing the URL and collapsing the sidebar
-  // does not update the parent app's requestId. With the native dialog open,
+  // does not update the parent app's requestId. With the Base UI dialog open,
   // the controls behind it are inert. Exercise the theme's CSS contract here;
   // interactive theme switching is covered by the Web shell tests.
   await page.evaluate(() => {
     const shell = document.querySelector<HTMLElement>(".app-shell");
     if (shell === null) throw new Error("Missing Web shell");
+    document.documentElement.classList.replace("theme-dark", "theme-light");
     shell.classList.replace("theme-dark", "theme-light");
     shell.dataset["theme"] = "light";
   });
   await expect(page.getByRole("dialog", { name: "Authorize Connection" })).toBeVisible();
   await expect(page.getByText("Modify knowledge")).toBeVisible();
+  await expect(page.locator(".mcp-authorization-approve")).toHaveCSS(
+    "background-color",
+    "rgb(90, 69, 199)"
+  );
   const light = await inspect();
   expect(light.theme).toBe("light");
   expect(light.scheme).toBe("light");

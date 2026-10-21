@@ -91,7 +91,7 @@ it("toggles normally and only resizes an expanded handle by supported keys", () 
   expect(button.querySelector(".sidebar-handle-surface")).not.toBeNull();
   expect(button.querySelector(".sidebar-handle-edge")).not.toBeNull();
   expect(button.querySelector(".sidebar-handle-contour")?.getAttribute("aria-hidden")).toBe("true");
-  expect(button.querySelector(".icon path")?.getAttribute("d")).toBe("m15 5-7 7 7 7");
+  expect(button.querySelector(".icon.lucide-chevron-left")).not.toBeNull();
   key(button, "ArrowRight");
   key(button, "ArrowLeft");
   key(button, "Space");
@@ -102,7 +102,7 @@ it("toggles normally and only resizes an expanded handle by supported keys", () 
   expect(onToggle).toHaveBeenCalledOnce();
 
   const collapsed = renderHandle(true);
-  expect(collapsed.querySelector(".icon path")?.getAttribute("d")).toBe("m9 5 7 7-7 7");
+  expect(collapsed.querySelector(".icon.lucide-chevron-right")).not.toBeNull();
   key(collapsed, "ArrowLeft");
   pointer(collapsed, "pointerdown", [1, 100]);
   expect(onResize).toHaveBeenCalledTimes(2);

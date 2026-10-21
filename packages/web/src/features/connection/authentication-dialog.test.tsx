@@ -36,12 +36,6 @@ function mockResponses(...responses: Response[]) {
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  HTMLDialogElement.prototype.showModal = function () {
-    this.open = true;
-  };
-  HTMLDialogElement.prototype.close = function () {
-    this.open = false;
-  };
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -68,7 +62,7 @@ function renderDialog(onAuthenticated: (connection: Connection) => void = vi.fn(
 }
 
 function tokenInput(): HTMLInputElement {
-  const input = host.querySelector<HTMLInputElement>("#kgos-access-token");
+  const input = document.body.querySelector<HTMLInputElement>("#kgos-access-token");
   if (input === null) {
     throw new Error("Missing token input");
   }
@@ -88,7 +82,7 @@ function setToken(value: string) {
 }
 
 function findButton(label: string): HTMLButtonElement {
-  const button = Array.from(host.querySelectorAll<HTMLButtonElement>("button")).find(
+  const button = Array.from(document.body.querySelectorAll<HTMLButtonElement>("button")).find(
     (element) =>
       element.getAttribute("aria-label") === label || element.textContent.trim() === label
   );
@@ -105,22 +99,23 @@ async function submit() {
   });
 }
 
-it("opens a mandatory native dialog with masked token, visibility toggle, and help", () => {
+it("opens a mandatory Base UI dialog with masked token, visibility toggle, and help", () => {
   renderDialog();
-  const dialog = host.querySelector<HTMLDialogElement>(".authentication-dialog");
-  expect(dialog?.open).toBe(true);
-  expect(host.textContent).toContain("Authentication Required");
+  const dialog = document.body.querySelector<HTMLElement>(".authentication-dialog");
+  expect(dialog?.hasAttribute("data-open")).toBe(true);
+  expect(document.body.textContent).toContain("Authentication Required");
   expect(tokenInput().type).toBe("password");
   expect(findButton("Connect").disabled).toBe(true);
-  expect(host.textContent).toContain("<workspace>/.kgos/auth.json");
-  expect(host.querySelector(".authentication-dialog button[aria-label='Close']")).toBeNull();
+  expect(document.body.textContent).toContain("<workspace>/.kgos/auth.json");
+  expect(
+    document.body.querySelector(".authentication-dialog button[aria-label='Close']")
+  ).toBeNull();
 
-  const cancel = new Event("cancel", { bubbles: true, cancelable: true });
+  const cancel = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
   act(() => {
     dialog?.dispatchEvent(cancel);
   });
-  expect(cancel.defaultPrevented).toBe(true);
-  expect(dialog?.open).toBe(true);
+  expect(dialog?.hasAttribute("data-open")).toBe(true);
   act(() => {
     findButton("Show access token").click();
   });
@@ -181,10 +176,10 @@ it("stays locked on a wrong token, clears it, and permits a valid retry", async 
   await submit();
   expect(authenticated).not.toHaveBeenCalled();
   expect(tokenInput().value).toBe("");
-  expect(host.querySelector(ERROR_MESSAGE)?.textContent).toContain("Invalid access token");
+  expect(document.body.querySelector(ERROR_MESSAGE)?.textContent).toContain("Invalid access token");
   expect(findButton("Connect").disabled).toBe(true);
   setToken("good-token");
-  expect(host.querySelector(ERROR_MESSAGE)).toBeNull();
+  expect(document.body.querySelector(ERROR_MESSAGE)).toBeNull();
   await submit();
   expect(authenticated).toHaveBeenCalledOnce();
 });
@@ -196,7 +191,7 @@ it("reports transport errors without discarding the user's input", async () => {
   setToken("user-token");
   await submit();
   expect(authenticated).not.toHaveBeenCalled();
-  expect(host.querySelector(ERROR_MESSAGE)?.textContent).toContain("Cannot reach");
+  expect(document.body.querySelector(ERROR_MESSAGE)?.textContent).toContain("Cannot reach");
   expect(tokenInput().value).toBe("user-token");
   expect(findButton("Connect").disabled).toBe(false);
 });
@@ -208,7 +203,7 @@ it("rejects invalid successful responses instead of unlocking the workspace", as
   setToken("user-token");
   await submit();
   expect(authenticated).not.toHaveBeenCalled();
-  expect(host.querySelector(ERROR_MESSAGE)?.textContent).toContain("Unable to connect");
+  expect(document.body.querySelector(ERROR_MESSAGE)?.textContent).toContain("Unable to connect");
   expect(tokenInput().value).toBe("user-token");
 });
 
@@ -227,7 +222,7 @@ it("cancels an in-flight request and cannot unlock after the dialog is unmounted
     await Promise.resolve();
   });
   expect(fetcher).toHaveBeenCalledOnce();
-  expect(host.textContent).toContain("Connecting...");
+  expect(document.body.textContent).toContain("Connecting...");
   expect(findButton("Connecting...").disabled).toBe(true);
   act(() => {
     root?.unmount();
@@ -239,13 +234,15 @@ it("cancels an in-flight request and cannot unlock after the dialog is unmounted
 
 it("rejects an empty programmatic submit even though its button is disabled", async () => {
   renderDialog();
-  const form = host.querySelector(".authentication-form");
+  const form = document.body.querySelector(".authentication-form");
   expect(form).not.toBeNull();
   await act(async () => {
     form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await Promise.resolve();
   });
-  expect(host.querySelector(ERROR_MESSAGE)?.textContent).toContain("Enter your access token");
+  expect(document.body.querySelector(ERROR_MESSAGE)?.textContent).toContain(
+    "Enter your access token"
+  );
 });
 
 it("ignores concurrent submits and never resumes a cancelled login attempt", async () => {
@@ -260,7 +257,7 @@ it("ignores concurrent submits and never resumes a cancelled login attempt", asy
   const authenticated = vi.fn<(connection: Connection) => void>();
   renderDialog(authenticated);
   setToken("pending-token");
-  const form = host.querySelector(".authentication-form");
+  const form = document.body.querySelector(".authentication-form");
   await act(async () => {
     findButton("Connect").click();
     form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));

@@ -74,6 +74,24 @@ Ontology read / batch edit 与 aggregate Patch 使用相同错误 envelope。Ont
 
 不支持的旧 Object kind/Ref、Ontology search 参数和无目标 Overview --edit 返回 `INVALID_ARGUMENT`。共享索引的相同显式目标合并不算冲突；不同目标、delete/update 竞争或依赖未解决返回 `OBJECT_CONFLICT`。底层 immediate constraint failure 仍返回对应数据库公开分类，整个 Patch rollback。
 
+<a id="初始化门禁与-setup-错误"></a>
+
+## 初始化门禁与 Setup 错误（D105，目标设计）
+
+新状态门禁与 Setup API 仍采用上文稳定的 JSON error envelope（必含 `code`、`message`，`details` 可选），且发生在普通业务鉴权之前；其状态来源、例外路由和恢复准则只由 [Runtime](runtime.md#web-first-run-bootstrap) 拥有，不增加第二套 Kernel/Data 错误分类。
+
+| 边界 | HTTP / code | 调用方行为 |
+| --- | --- | --- |
+| 未完成初始化时访问普通 `/api/v1/*`、MCP/OAuth/Resource 业务入口 | `503 INSTANCE_NOT_INITIALIZED`；对应协议使用同类机器可读错误 | 不要求先交 Bearer 才能知道实例未初始化；不能返回 HTML/302 或误导为 `AUTHENTICATION_FAILED` |
+| 有效 receipt 但当前 Runtime/DB 关键文件不一致、无法安全开放业务 | `503 INSTANCE_UNAVAILABLE` | 保留现存数据，提示运维修复，不重走“创建新库” |
+| Setup 已结束、已有 Token 企图再次被匿名认领、与本地现存 config/并发初始化发生冲突 | `409 SETUP_CONFLICT` | 用户重新取 `setup/status`，不得覆盖文件或 Token |
+| Setup 提交缺字段、未知字段、URL/维度/相似度等不合法 | `400 INVALID_ARGUMENT`；若由专属 Full-text/Embedding 配置校验得到已有稳定配置 code，沿用原映射 | 表单原位提示，不发布不完整配置、不启动 Bootstrap |
+| Setup 已持有 Token 但未带有效 Bearer/Session 发起最后初始化 | `401 AUTHENTICATION_FAILED` | 仍必须认证；“初始化状态先于业务鉴权”不代表已认领后仍可匿名写入 |
+| 未认领阶段发起 Embedding 验证 | `200 {"ok":true,"dimensions":N}` 或 `400/422 {"ok":false,"reason":"...","httpStatus"?:N,"dimensions"?:N}` | 原因固定为参数、出口限制、超时、连接失败、远端状态、响应形状、实际向量维度等安全类别；不回显远端错误正文、API Key 或内部地址 |
+| 验证出口仍在进行、管理员 Token 已认领、磁盘已有 `auth.json`/`config.toml`，或 Instance 状态已变化 | `429 {"ok":false,"reason":"busy"}` 或 `409 SETUP_CONFLICT` | 一次仅允许一个外部请求；第三步认领后及配置文件出现后即禁止新的未认证测试，即使进程仍暂报 `setup_required` |
+
+`GET /api/v1/setup/status` 的成功响应为无认证、`Cache-Control: no-store` 的少量安全状态（`setup_required|initializing|ready|error`）；不回显根 Token、API Key、内部文件路径、原始异常堆栈或用户配置。提交初始化收到接受响应不等于已 ready，必须轮询至经过认证的完整 readiness 成功及 receipt 发布。后端业务认证后状态中的 Web Access Bearer / Boot Guard 规则保持原有合同；未初始化页面导航的重定向是 HTML Web 路由，不改变业务 API 的机器错误语义。
+
 ## Web 持久数据错误方案
 
 以下是 [Web 工作区数据](web.md#web-工作区数据)的工程映射：`WEB_CONNECTION_CHANGED` / 409 与 `web.data.info` 已实现，记录、缓存等其它 code / route 尚未实现。它们使用相同 `code/message/details` envelope，不更改现有 Knowledge API 分类。

@@ -58,6 +58,8 @@ Tag
 → 只有显式 move 才改变目标
 ```
 
+Branch 的完整 Snapshot 可以承载长期独立的领域知识世界，不以最终合并或删除为前提；实验/协作路径是另一种合法用途。这些是[Branch 规范的使用决策](mcp.md#branch-standards-authoring)，不是新的 Branch 类型、父子容器或权限边界，不改变本文件的 State/ref/Merge 合同。
+
 KG OS 不把 Lithograph connection-local `checkout` 提升为公共 Evolution 能力。AI / SDK 读取必须显式传递 State / Branch / Tag reference，写入必须显式指定目标 Branch，避免依赖隐藏的 connection state。底层实现可以按 Lithograph 合同管理 connection，但该状态不能成为 KG OS 公共请求语义的一部分。
 
 ### State reference

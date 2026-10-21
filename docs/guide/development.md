@@ -39,6 +39,14 @@ pnpm test:e2e
 
 `build` 目前仍会为本机开发生成 `artifacts/npm/runtime-<target>` 内部目录，供 Web Playwright 的 `kgosd` 测试启动器使用；这个目录**不能视为将来发行的 npm package**，也不做 Registry Smoke。现存 CLI 源码可通过 `pnpm exec` / Node 本机执行，用于回归，但其 npm 分发不再是未来 CI 的验收要求。
 
+### Web 通用组件维护
+
+在 `packages/web/components.json` 检查组件目录和导入别名；实际组件源码位于 `src/shared/ui/`，官方来源许可保存在同目录。添加或更新组件前核对 [Web UI 设计](../design/web.md#通用-ui-组件体系)，只选当前使用的 Base UI 实现，不覆盖已有主题或业务 CSS。组件的通用 class 合并函数位于 `src/shared/lib/utils.ts`。
+
+先执行 `pnpm --filter @kgos/web check`，再执行 `pnpm test:e2e`，后者会重建包含 Web 的真实 daemon。验证 Browser 与内嵌入口时均检查 body Portal 中的深浅色、语言、键盘和焦点；仅在 Vite 开发页看到正常不足以证明生产 CSS 正常。MCP 自包含资源的协议 Host 测试位于 `tests/e2e/ui-migration.spec.ts`，不等同真实 ChatGPT 客户端验收。
+
+`pnpm build` 会清理和重建本机 `artifacts/`；不要与依赖这些原生制品的 Go race/coverage 并行运行。完整门禁优先使用 `pnpm validate` 的串行顺序，避免测试过程中真实扩展文件被构建清理。
+
 ## 代码质量与正确性
 
 | 命令 | 验证内容 |

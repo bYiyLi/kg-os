@@ -35,22 +35,12 @@ function trustedRedirect(value: unknown): value is string {
 }
 
 export function useConnectionAuthorization(connection: Connection, requestId: string | null) {
-  const ref = useRef<HTMLDialogElement>(null);
   const [details, setDetails] = useState<AuthorizationDetails | null>(null);
   const [error, setError] = useState<"unavailable" | "failed" | null>(null);
   const [loading, setLoading] = useState(false);
   const [deciding, setDeciding] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const decisionPending = useRef(false);
-
-  useEffect(() => {
-    if (requestId === null) return;
-    const dialog = ref.current;
-    if (dialog !== null && !dialog.open) dialog.showModal();
-    return () => {
-      if (dialog?.open === true) dialog.close();
-    };
-  }, [requestId]);
 
   useEffect(() => {
     if (requestId === null) return;
@@ -123,9 +113,8 @@ export function useConnectionAuthorization(connection: Connection, requestId: st
     const url = new URL(window.location.href);
     url.searchParams.delete("mcp_authorization");
     window.history.replaceState(window.history.state, "", url);
-    ref.current?.close();
     setDismissed(true);
   }
 
-  return { ref, details, error, loading, deciding, dismissed, decide, cancel };
+  return { details, error, loading, deciding, dismissed, decide, cancel };
 }

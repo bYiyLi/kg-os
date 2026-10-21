@@ -2,6 +2,7 @@ package command
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -22,7 +23,6 @@ func TestDaemonOptionDefaultsAndCompleteOverride(t *testing.T) {
 	}
 	env := map[string]string{
 		"KGOSD_HOST": "127.0.0.2", "KGOSD_PORT": "4488",
-		"KGOS_MCP_OAUTH_ISSUER":     "https://example.com",
 		"KGOS_MCP_SCRIPT_MAX_CALLS": "503",
 	}
 	settings, _, err = parseDaemonSettings([]string{
@@ -40,7 +40,7 @@ func TestDaemonOptionDefaultsAndCompleteOverride(t *testing.T) {
 	}
 	m := settings.MCP
 	if settings.Host != "0.0.0.0" || settings.Port != 4777 ||
-		m.Path != "/kgos-mcp" || m.OAuthIssuer != "https://example.com" ||
+		m.Path != "/kgos-mcp" ||
 		m.RequestTimeoutMS != 4300 || m.MaxConcurrency != 8 || m.MaxRequestBytes != 65536 ||
 		m.ScriptTimeoutMS != 2000 || m.ScriptMemoryMB != 96 || m.ScriptMaxCodeBytes != 8192 ||
 		m.ScriptMaxCalls != 17 || m.ScriptMaxStreams != 9 || m.ScriptMaxOutputBytes != 8192 ||
@@ -117,7 +117,10 @@ func TestDaemonOptionRejectsMalformedAndConflictingInput(t *testing.T) {
 			t.Errorf("legacy MCP credential setting %s was not rejected", key)
 		}
 	}
-	if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(map[string]string{"KGOS_MCP_OAUTH_ISSUER": "https://example.com"})); err != nil {
-		t.Fatalf("OAuth issuer unnecessarily requires second token: %v", err)
+	if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(map[string]string{"KGOS_MCP_OAUTH_ISSUER": "https://example.com"})); err == nil {
+		t.Fatal("legacy OAuth issuer environment variable was not rejected")
+	}
+	if _, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot, "--mcp-oauth-issuer", "https://example.com"}, optionLookup(nil)); err == nil || !strings.Contains(err.Error(), "config.toml") {
+		t.Fatalf("legacy OAuth flag must explain migration to Instance config: %v", err)
 	}
 }

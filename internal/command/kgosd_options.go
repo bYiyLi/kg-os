@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/url"
 	"strconv"
 	"strings"
 )
@@ -18,7 +17,6 @@ type DaemonSettings struct {
 }
 type DaemonMCPSettings struct {
 	Path                 string
-	OAuthIssuer          string
 	RequestTimeoutMS     int
 	MaxConcurrency       int
 	MaxRequestBytes      int
@@ -44,7 +42,6 @@ var daemonFields = map[string]daemonField{
 	"tls-cert":                    {env: "KGOSD_TLS_CERT"},
 	"tls-key":                     {env: "KGOSD_TLS_KEY"},
 	"mcp-path":                    {env: "KGOS_MCP_PATH", def: "/mcp"},
-	"mcp-oauth-issuer":            {env: "KGOS_MCP_OAUTH_ISSUER"},
 	"mcp-request-timeout-ms":      {env: "KGOS_MCP_REQUEST_TIMEOUT_MS", def: "30000", min: 100, max: 120000},
 	"mcp-max-concurrency":         {env: "KGOS_MCP_MAX_CONCURRENCY", def: "16", min: 1, max: 1024},
 	"mcp-max-request-bytes":       {env: "KGOS_MCP_MAX_REQUEST_BYTES", def: "1048576", min: 1024, max: 16777216},
@@ -60,6 +57,9 @@ var daemonFields = map[string]daemonField{
 }
 
 func parseDaemonSettings(args []string, lookup func(string) (string, bool)) (DaemonSettings, string, error) {
+	if _, present := lookup("KGOS_MCP_OAUTH_ISSUER"); present {
+		return DaemonSettings{}, "", errors.New("obsolete KGOS_MCP_OAUTH_ISSUER: move the value to config.toml [server].public_origin")
+	}
 	for _, key := range []string{"KGOS_MCP_TOKEN", "KGOS_MCP_TOKEN_ENV", "KGOS_MCP_TOKEN_FILE"} {
 		if _, present := lookup(key); present {
 			return DaemonSettings{}, "", fmt.Errorf("obsolete MCP credential setting %s: use the Instance credential", key)
@@ -72,6 +72,9 @@ func parseDaemonSettings(args []string, lookup func(string) (string, bool)) (Dae
 			return DaemonSettings{}, "", fmt.Errorf("unexpected argument %q", name)
 		}
 		key := strings.TrimPrefix(name, "--")
+		if key == "mcp-oauth-issuer" {
+			return DaemonSettings{}, "", errors.New("obsolete --mcp-oauth-issuer: move the value to config.toml [server].public_origin")
+		}
 		if _, ok := daemonFields[key]; !ok {
 			return DaemonSettings{}, "", fmt.Errorf("unknown option %q", name)
 		}
@@ -151,9 +154,6 @@ func parseDaemonSettings(args []string, lookup func(string) (string, bool)) (Dae
 	if !strings.HasPrefix(m.Path, "/") || m.Path == "/" || strings.ContainsAny(m.Path, "?#{}\\\r\n") || m.Path == "/api" || strings.HasPrefix(m.Path, "/api/") || m.Path == "/oauth" || strings.HasPrefix(m.Path, "/oauth/") || m.Path == "/.well-known" || strings.HasPrefix(m.Path, "/.well-known/") {
 		return DaemonSettings{}, "", errors.New("invalid MCP path")
 	}
-	if m.OAuthIssuer, err = optional("mcp-oauth-issuer"); err != nil {
-		return DaemonSettings{}, "", err
-	}
 	if m.RequestTimeoutMS, err = num("mcp-request-timeout-ms"); err != nil {
 		return DaemonSettings{}, "", err
 	}
@@ -191,23 +191,5 @@ func parseDaemonSettings(args []string, lookup func(string) (string, bool)) (Dae
 		return DaemonSettings{}, "", err
 	}
 
-	if m.OAuthIssuer != "" {
-		if err := validOAuthIssuerOrigin(m.OAuthIssuer); err != nil {
-			return DaemonSettings{}, "", err
-		}
-	}
 	return settings, root, nil
-}
-func validOAuthIssuerOrigin(raw string) error {
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" || !(u.Scheme == "https" || u.Scheme == "http") {
-		return errors.New("invalid MCP OAuth issuer origin")
-	}
-	if u.Scheme == "http" {
-		host := u.Hostname()
-		if host != "localhost" && host != "127.0.0.1" && host != "::1" {
-			return errors.New("MCP OAuth issuer requires HTTPS")
-		}
-	}
-	return nil
 }

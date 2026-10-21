@@ -1,3 +1,51 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.theme-dark, .theme-dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-md: var(--radius-small);
+  --radius-lg: var(--radius-small);
+  --radius-xl: var(--radius-panel);
+  --text-sm: 0.8125rem;
+}
+
+/* Keep the existing page reset; normalize only library controls, not business art. */
+@layer base {
+  [data-slot] {
+    border-style: solid;
+    border-width: 0;
+    border-color: var(--border);
+  }
+  [data-slot="button"],
+  [data-slot="select-trigger"],
+  [data-slot="checkbox"] {
+    font-family: inherit;
+  }
+  [data-slot="input"] {
+    font-family: inherit;
+    color: inherit;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -29,7 +77,8 @@ p {
   margin: 0;
 }
 
-:focus-visible {
+/* Input Group delegates the input focus ring to its outer shadcn control. */
+:focus-visible:not([data-slot="input-group-control"]) {
   outline: 2px solid var(--color-focus);
   outline-offset: 3px;
 }

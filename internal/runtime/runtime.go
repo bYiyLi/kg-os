@@ -47,6 +47,25 @@ func OpenWithOfficialExtensions(
 	official []runtimeprofile.ExtensionConfig,
 	client *http.Client,
 ) (_ *Runtime, returnErr error) {
+	return openWithExtensions(ctx, root, official, client, nil)
+}
+
+// OpenWithHeldLock opens the Kernel under the listener's already-owned lock.
+func OpenWithHeldLock(ctx context.Context, root string, held *runtimeprofile.InstanceLock, client *http.Client) (*Runtime, error) {
+	if held == nil {
+		return nil, fmt.Errorf("instance lock is required")
+	}
+	pkg, err := runtimeprofile.DiscoverRuntimePackage()
+	if err != nil {
+		return nil, err
+	}
+	if pkg.Version != buildinfo.Version {
+		return nil, fmt.Errorf("runtime package version %q does not match kgosd version %q", pkg.Version, buildinfo.Version)
+	}
+	return openWithExtensions(ctx, root, pkg.OfficialExtensions(), client, held)
+}
+
+func openWithExtensions(ctx context.Context, root string, official []runtimeprofile.ExtensionConfig, client *http.Client, held *runtimeprofile.InstanceLock) (_ *Runtime, returnErr error) {
 	if len(official) != 3 ||
 		official[0].Entrypoint != runtimeprofile.LithographEntrypoint ||
 		official[1].Entrypoint != runtimeprofile.ProviderEntrypoint ||
@@ -60,23 +79,29 @@ func OpenWithOfficialExtensions(
 	if err := os.MkdirAll(paths.Root, 0o700); err != nil {
 		return nil, fmt.Errorf("create instance root: %w", err)
 	}
-	lock, err := runtimeprofile.AcquireLock(paths.Lock)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if returnErr != nil {
-			_ = lock.Close()
+	lock := held
+	if held == nil {
+		lock, err = runtimeprofile.AcquireLock(paths.Lock)
+		if err != nil {
+			return nil, err
 		}
-	}()
-	if err := lock.PublishStarting(os.Getpid(), buildinfo.Version); err != nil {
-		return nil, fmt.Errorf("publish daemon starting locator: %w", err)
+		defer func() {
+			if returnErr != nil {
+				_ = lock.Close()
+			}
+		}()
+		if err := lock.PublishStarting(os.Getpid(), buildinfo.Version); err != nil {
+			return nil, fmt.Errorf("publish daemon starting locator: %w", err)
+		}
 	}
 	if err := runtimeprofile.EnsureDirectories(paths); err != nil {
 		return nil, err
 	}
 	config, err := runtimeprofile.LoadConfig(paths)
 	if err != nil {
+		return nil, err
+	}
+	if err := runtimeprofile.ResolveWebEmbeddingKey(paths, config); err != nil {
 		return nil, err
 	}
 	credential, err := runtimeprofile.LoadOrCreateCredential(paths)
@@ -121,7 +146,10 @@ func OpenWithOfficialExtensions(
 		Extensions: extensions,
 		Database:   database,
 		Kernel:     kernelService,
-		lock:       lock,
+		lock:       nil,
+	}
+	if held == nil {
+		runtime.lock = lock
 	}
 	return runtime, nil
 }
@@ -149,6 +177,7 @@ func (runtime *Runtime) Close() error {
 		return nil
 	}
 	runtime.closed = true
+	runtimeprofile.ReleaseWebEmbeddingKey(runtime.Paths)
 	var failures []string
 	if runtime.Database != nil {
 		if err := runtime.Database.Close(); err != nil {

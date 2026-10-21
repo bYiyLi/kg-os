@@ -20,7 +20,18 @@ func TestPhase16UnifiedKGOSDHTTPAuthAndOAuthRoutes(t *testing.T) {
 	prepareKGOSDTestRuntimePackage(t)
 	root := t.TempDir()
 	writeKGOSDIntegrationConfig(t, root)
-	t.Setenv("KGOS_MCP_OAUTH_ISSUER", "https://kgos-dev.y2l.top")
+	// OAuth derives its public Origin from the Instance's config.toml.
+	paths, pathsErr := runtimeprofile.ResolvePaths(root)
+	if pathsErr != nil {
+		t.Fatal(pathsErr)
+	}
+	configBody, readErr := os.ReadFile(paths.Config)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if err := os.WriteFile(paths.Config, append([]byte("[server]\npublic_origin = \"https://kgos-dev.y2l.top\"\n\n"), configBody...), 0600); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	client := &http.Client{Timeout: 6 * time.Second}
 	done := make(chan int, 1)
@@ -52,6 +63,33 @@ func TestPhase16UnifiedKGOSDHTTPAuthAndOAuthRoutes(t *testing.T) {
 	}
 	if err := json.Unmarshal(locatorBody, &locator); err != nil || locator.Endpoint == "" {
 		t.Fatal("missing daemon endpoint")
+	}
+	// The D105 listener is now published before the Kernel is ready. Unlike
+	// the earlier startup, a live endpoint alone is not business readiness.
+	readyDeadline := time.Now().Add(30 * time.Second)
+	ready := false
+	for time.Now().Before(readyDeadline) {
+		result, requestErr := client.Get(locator.Endpoint + "/api/v1/setup/status")
+		if requestErr == nil {
+			var state struct {
+				State string `json:"state"`
+			}
+			if result.StatusCode == http.StatusOK {
+				_ = json.NewDecoder(result.Body).Decode(&state)
+			}
+			result.Body.Close()
+			if state.State == "ready" {
+				ready = true
+				break
+			}
+			if state.State == "error" {
+				t.Fatal("startup reported a failed initialization")
+			}
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	if !ready {
+		t.Fatal("KG OS never completed startup initialization")
 	}
 	request := func(method, path, token string) *http.Response {
 		t.Helper()

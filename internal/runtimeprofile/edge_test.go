@@ -560,7 +560,7 @@ func TestCredentialAndLockFailurePaths(t *testing.T) {
 		t.Fatalf("write existing auth: %v", err)
 	}
 	if _, err := createCredential(existing, strings.NewReader(strings.Repeat("x", credentialEntropyBytes))); err == nil ||
-		!strings.Contains(err.Error(), "appeared") {
+		!errors.Is(err, ErrCredentialAlreadyExists) {
 		t.Fatalf("credential existing-target error = %v", err)
 	}
 	if err := syncDirectory(filepath.Join(parent, "missing")); err == nil ||

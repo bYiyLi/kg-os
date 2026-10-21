@@ -1,4 +1,9 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useState } from "react";
+import { Checkbox } from "../../shared/ui/checkbox.js";
+import { Popover, PopoverTrigger, PopoverContent } from "../../shared/ui/popover.js";
+import { Tooltip, TooltipTrigger, TooltipContent } from "../../shared/ui/tooltip.js";
+import { Button } from "../../shared/ui/button.js";
+import { Input } from "../../shared/ui/input.js";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "../../shared/ui/icon.js";
@@ -8,15 +13,13 @@ import type { VersionHistory } from "./use-version-history.js";
 function BranchOption({ branch, history }: { branch: VersionBranch; history: VersionHistory }) {
   return (
     <label className="version-branch-option">
-      <input
-        type="checkbox"
+      <Checkbox
+        aria-label={branch.name}
         checked={history.selectedBranches.has(branch.name)}
-        onChange={(event) => {
+        onCheckedChange={(checked) => {
           const names = [...history.selectedBranches];
           history.setBranches(
-            event.currentTarget.checked
-              ? [...names, branch.name]
-              : names.filter((name) => name !== branch.name)
+            checked ? [...names, branch.name] : names.filter((name) => name !== branch.name)
           );
         }}
       />
@@ -26,89 +29,58 @@ function BranchOption({ branch, history }: { branch: VersionBranch; history: Ver
   );
 }
 
-function BranchMenu({ id, history }: { id: string; history: VersionHistory }) {
+function BranchMenu({ history }: { history: VersionHistory }) {
   const { t } = useTranslation();
   const allSelected =
     history.branches.length > 0 && history.selectedBranches.size === history.branches.length;
   return (
-    <div
-      id={id}
+    <PopoverContent
+      align="start"
       className="version-branch-menu"
       role="group"
       aria-label={t("versions.filterBranches")}
     >
       <div className="version-branch-menu-heading">
         <span>{t("versions.branches")}</span>
-        <button
+        <Button
+          variant="ghost"
           type="button"
           onClick={() => {
             history.setBranches(allSelected ? [] : history.branches.map((branch) => branch.name));
           }}
         >
           {allSelected ? t("versions.clearAll") : t("versions.selectAll")}
-        </button>
+        </Button>
       </div>
       {history.branches.map((branch) => (
         <BranchOption key={branch.name} branch={branch} history={history} />
       ))}
-    </div>
+    </PopoverContent>
   );
 }
 
 function BranchPicker({ history }: { history: VersionHistory }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    const onOutsideClick = (event: PointerEvent) => {
-      if (event.target instanceof Node && containerRef.current?.contains(event.target) !== true) {
-        setOpen(false);
-      }
-    };
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", onOutsideClick);
-    document.addEventListener("keydown", onEscape);
-    return () => {
-      document.removeEventListener("pointerdown", onOutsideClick);
-      document.removeEventListener("keydown", onEscape);
-    };
-  }, [open]);
-
   return (
-    <div className="version-branch-picker" ref={containerRef}>
-      <button
-        ref={buttonRef}
-        className="version-branch-trigger"
-        type="button"
-        aria-expanded={open}
-        aria-controls={menuId}
-        aria-label={t("versions.filterBranches")}
-        onClick={() => {
-          setOpen((wasOpen) => !wasOpen);
-        }}
-      >
-        <Icon name="branch" />
-        <span className="version-branch-trigger-label">
-          {history.selectedBranches.size === history.branches.length
-            ? t("versions.allBranches")
-            : t("versions.selectedBranches")}
-        </span>
-        <span className="version-branch-count">
-          {history.selectedBranches.size}/{history.branches.length}
-        </span>
-        <Icon name="chevronDown" />
-      </button>
-      {open && <BranchMenu id={menuId} history={history} />}
+    <div className="version-branch-picker">
+      <Popover>
+        <PopoverTrigger
+          render={<Button variant="ghost" className="version-branch-trigger" />}
+          aria-label={t("versions.filterBranches")}
+        >
+          <Icon name="branch" />
+          <span className="version-branch-trigger-label">
+            {history.selectedBranches.size === history.branches.length
+              ? t("versions.allBranches")
+              : t("versions.selectedBranches")}
+          </span>
+          <span className="version-branch-count">
+            {history.selectedBranches.size}/{history.branches.length}
+          </span>
+          <Icon name="chevronDown" />
+        </PopoverTrigger>
+        <BranchMenu history={history} />
+      </Popover>
     </div>
   );
 }
@@ -146,7 +118,8 @@ function CommitRow({
   const selected = history.selectedCommit === commit.state;
   return (
     <li className="commit-item">
-      <button
+      <Button
+        variant="ghost"
         className="commit-row"
         type="button"
         aria-pressed={selected}
@@ -182,7 +155,7 @@ function CommitRow({
             {t("versions.reachableFrom", { names: commit.reachableFrom.join(", ") })}
           </span>
         </span>
-      </button>
+      </Button>
     </li>
   );
 }
@@ -232,20 +205,28 @@ export function VersionTree({ history }: { history: VersionHistory }) {
     <div className="version-tree" aria-label={t("versions.tree")}>
       <div className="version-browser-controls">
         <BranchPicker history={history} />
-        <button
-          className="version-refresh-button"
-          type="button"
-          title={t("versions.refresh")}
-          aria-label={t("versions.refresh")}
-          onClick={history.refresh}
-          disabled={!history.available || history.loading || history.loadingMore}
-        >
-          <Icon name="refresh" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                disabled={!history.available || history.loading || history.loadingMore}
+              />
+            }
+            className="version-refresh-button"
+            type="button"
+            aria-label={t("versions.refresh")}
+            onClick={history.refresh}
+            disabled={!history.available || history.loading || history.loadingMore}
+          >
+            <Icon name="refresh" />
+          </TooltipTrigger>
+          <TooltipContent>{t("versions.refresh")}</TooltipContent>
+        </Tooltip>
       </div>
       <label className="version-commit-search">
         <Icon name="search" />
-        <input
+        <Input
           type="search"
           aria-label={t("versions.searchCommits")}
           placeholder={t("versions.searchCommits")}
@@ -277,14 +258,15 @@ export function VersionTree({ history }: { history: VersionHistory }) {
         </p>
       )}
       {history.canLoadMore && (
-        <button
+        <Button
+          variant="ghost"
           type="button"
           className="version-load-more"
           disabled={history.loadingMore || history.loading}
           onClick={history.loadMore}
         >
           {history.loadingMore ? t("versions.loading") : t("versions.loadMore")}
-        </button>
+        </Button>
       )}
       {history.available && history.branches.length > 0 && (
         <span className="version-loaded-note">{t("versions.loadedOnly")}</span>

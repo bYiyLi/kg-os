@@ -9,6 +9,7 @@ import { INIT_FIELD_SPECS, type InitField, type InitFieldSpec } from "./init-sch
 import { resolveWorkspacePaths } from "./paths.js";
 
 export interface InstanceConfig {
+  server?: { public_origin: string };
   cache: { path: string; max_size_mb: number };
   sqlite?: { extensions?: ExtensionConfig[] };
   fulltext: { analyzer: string };
@@ -52,7 +53,7 @@ export function parseConfig(root: string, body: string): InstanceConfig {
   if (!isRecord(raw)) {
     throw usageError("config.toml must contain a TOML table");
   }
-  assertOnlyKeys(raw, ["cache", "sqlite", "fulltext", "embedding"], "config.toml");
+  assertOnlyKeys(raw, ["server", "cache", "sqlite", "fulltext", "embedding"], "config.toml");
   const cache = requireRecord(raw["cache"], "cache");
   const fulltext = requireRecord(raw["fulltext"], "fulltext");
   const embedding = requireRecord(raw["embedding"], "embedding");
@@ -86,11 +87,40 @@ export function parseConfig(root: string, body: string): InstanceConfig {
       api_key_env: scalarString(values, "--embedding-api-key-env")
     }
   };
+  if (raw["server"] !== undefined) {
+    const server = requireRecord(raw["server"], "server");
+    assertOnlyKeys(server, ["public_origin"], "server");
+    config.server = { public_origin: normalizePublicOrigin(server["public_origin"]) };
+  }
   const sqlite = parseSQLite(raw["sqlite"]);
   if (sqlite !== undefined) {
     config.sqlite = sqlite;
   }
   return config;
+}
+
+function normalizePublicOrigin(value: unknown): string {
+  if (typeof value !== "string" || value.includes("?") || value.includes("#")) {
+    throw usageError("server.public_origin must be an HTTPS origin without a path or query");
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw usageError("server.public_origin must be an HTTPS origin without a path or query");
+  }
+  if (
+    (url.protocol !== "https:" && url.protocol !== "http:") ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.pathname !== "/"
+  ) {
+    throw usageError("server.public_origin must be an HTTPS origin without a path or query");
+  }
+  if (url.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
+    throw usageError("server.public_origin requires HTTPS except for local loopback");
+  }
+  return url.origin;
 }
 
 export function buildConfigFromInitValues(

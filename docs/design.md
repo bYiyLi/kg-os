@@ -17,14 +17,14 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [object.md](design/object.md) | 公共 aggregate/Knowledge Ref、共享 YAML/JSON、batch read 与统一 Patch |
 | [graph.md](design/graph.md) | Knowledge 数据模型、Graph query / execute、Cypher 与搜索边界 |
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
-| [mcp.md](design/mcp.md) | `kgosd` 原生 Go MCP、Go/WASM JavaScript Sandbox、D102 独立批量 `kgos_docs` 与五个 AI-facing Tool 目标合同、KG OS 自有 MCP Cypher 手册、私人 Plugin / Skill、ChatGPT UI Tool/Resource、外部认证与 Markdown 视图（Phase 22 `docs.read` 为当前实现基线） |
-| [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同，以及 Web 持久数据错误方案 |
+| [mcp.md](design/mcp.md) | `kgosd` Go 原生 MCP、五个 AI-facing Tool / `kgos_docs`、Cypher 手册、Plugin/Skill、认证与 ChatGPT UI、[最终七个官方 Skill](design/mcp.md#kgos-seven-skills)（六规范 + Doctor）与过渡通用 Skill 退役目标，以及 VLog 合同；Phase 22 `docs.read` 为历史接口 |
+| [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同、D105 首次初始化错误，以及 Web 持久数据错误方案 |
 | [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、当前 Docker-only 交付、[D108 私有源码与公开 kg-releases 生成/CI](design/decisions.md#d108-private-source-public-releases)、TypeScript SDK、内部 CLI 与历史 npm 分发边界 |
 | [cli.md](design/cli.md) | AI-first CLI command tree、`--root` / `KGOS_ROOT`、分层 help、`doctor/init` setup、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
-| [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听目标、dynamic loopback endpoint、`auth.json` / `kgosd.lock`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
+| [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听与 [D105 Web-first 初始化门禁](design/runtime.md#web-first-run-bootstrap)、`auth.json` / `initialized.json`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
 | [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |
-| [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
-| [decisions.md](design/decisions.md) | D1–D103 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、[D105 五步首次初始化页面](design/web.md#web-first-run-setup)、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
+| [decisions.md](design/decisions.md) | D1–D107 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 ## 从配置到调用
@@ -34,10 +34,15 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 当前 Docker 怎么发布和运行 | [Client Docker-only](design/client.md#docker-only-交付)、[MCP 部署](design/mcp.md#docker-only-交付)、[D99](design/decisions.md#d99-linux-amd64-docker-only-distribution) |
 | 旧 v0.2.1 npm 如何定位 | [历史 npm 分发](design/client.md#npm-package-topology)、[历史 CLI](design/cli.md) |
 | 第一次怎么定位并初始化 KG OS Instance | [CLI Global root](design/cli.md#global-root)、[Doctor](design/cli.md#doctor)、[Init](design/cli.md#init)、[Workspace Root / Instance](design/runtime.md#instance-root) |
+| 未配置也启动 Web / 手工 TOML 自动初始化 / Setup API 如何先于鉴权 | [D105](design/decisions.md#d105-web-first-run-and-runtime-bootstrap)、[Runtime 状态/路由](design/runtime.md#web-first-run-bootstrap)、[Web 五步](design/web.md#web-first-run-setup)、[Setup 错误](design/contracts.md#初始化门禁与-setup-错误)、[Phase 26](development/phases/26-web-first-run-bootstrap.md)（尚未实现） |
 | kgosd 怎么配置扩展、模型和凭证 | [Runtime config](design/runtime.md#configtoml)、[Embedding 配置映射](design/runtime.md#embedding-配置与索引映射) |
 | 使用方怎么定义模型和索引 | [Ontology 公共格式](design/ontology.md#公共可编辑格式)、[完整编辑示例](design/ontology.md#编辑示例) |
 | 调用方怎么保存正文和查询 | [Graph 合同](design/graph.md#graph-公共调用合同)、[CLI query](design/cli.md#query)、[CLI execute](design/cli.md#execute) |
 | AI 如何通过 MCP / 私人 Plugin 预览知识库及执行受控 SDK | [MCP / Plugin 设计](design/mcp.md) |
+| AI 默认知识发现使用哪份全局指令 | [Global AI Guidance v1 唯一正文](../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance-v1.md)，读取对照不等于宿主已加载 |
+| AI 如何诊断 KG OS 引导提示词、MCP/知识库、Skill、知识内容及持续维护 | [Doctor v1 设计](design/mcp.md#kgos-doctor-v1)、[D104](design/decisions.md#d104-kgos-doctor-v1-and-vlog)、[Phase 25](development/phases/25-kgos-doctor.md) |
+| AI 应依循哪些独立知识创建、建模、检索、版本、维护及 VLog 规范 | [六个官方规范 Skill 职责](design/mcp.md#kgos-standards-skill-suite)、[D106](design/decisions.md#d106-six-kgos-standards-skills)、[Phase 27](development/phases/27-knowledge-standards-skills.md)；已创作 [Ontology](../plugins/kgos/skills/kgos-ontology-standards/SKILL.md)、[Knowledge](../plugins/kgos/skills/kgos-knowledge-standards/SKILL.md)、[Retrieval](../plugins/kgos/skills/kgos-retrieval-standards/SKILL.md)、[Branch](../plugins/kgos/skills/kgos-branch-standards/SKILL.md)、[VLog](../plugins/kgos/skills/kgos-vlog-standards/SKILL.md) 和 [Maintenance](../plugins/kgos/skills/kgos-maintenance-standards/SKILL.md)，实际安装与整包验收仍见阶段证据 |
+| 官方最终保留哪七个 Skill、如何安全移除现有通用 `kgos` | [七 Skill 最终清单](design/mcp.md#kgos-seven-skills)、[D107](design/decisions.md#d107-final-seven-official-skills)、[Phase 28](development/phases/28-official-skill-roster.md)（目标方案，通用 Skill 仍在） |
 | MCP 内的 AI 怎样获取 SDK 入参、出参、Cypher 25 语法及使用示例 | [MCP Tool / 批量文档目标](design/mcp.md#mcp-tool-help)、[D102](design/decisions.md#d102-mcp-tool-taxonomy-and-batch-docs)、[Phase 23](development/phases/23-mcp-tool-taxonomy-and-docs.md)；已实现的 `docs.read` 历史基线见 [D100](design/decisions.md#d100-mcp-self-describing-docs) / [Phase 22](development/phases/22-mcp-self-describing-docs.md)，更早 Help 见 [Phase 20](development/phases/20-mcp-tool-help.md) |
 | KG OS 当前锁定哪个 Lithograph 版本，以及如何同步 MCP 手册 | [D103 v0.3.3 依赖升级](design/decisions.md#d103-lithograph-v033-upgrade)、[Graph](design/graph.md#graph)、[Phase 24](development/phases/24-lithograph-v033-upgrade.md)；v0.3.1 历史见 [D101](design/decisions.md#d101-lithograph-v031-upgrade) / [Phase 22](development/phases/22-mcp-self-describing-docs.md) |
 | 人怎样浏览图谱、查询、编辑和管理版本 | [Web 设计](design/web.md)、[功能画板与覆盖](design/web-materials.md)、[一致评审样例](design/web-examples.md)；内置同源交付见 [Runtime](design/runtime.md#web-hosting) |

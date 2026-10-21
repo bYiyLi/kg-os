@@ -79,6 +79,25 @@ test("persists an explicit language choice without saving the token", async ({ p
 test.describe("Chinese browser preference", () => {
   test.use({ locale: "zh-CN" });
 
+  test("restores automatic Chinese language after clearing an English override", async ({
+    page
+  }) => {
+    await page.goto("/");
+    const controls = page
+      .getByRole("dialog", { name: "需要身份认证" })
+      .getByRole("group", { name: "界面语言" });
+    await controls.getByRole("button", { name: "English" }).click();
+    expect(await page.evaluate(() => localStorage.getItem("kgos.web.locale"))).toBe("en");
+    await page
+      .getByRole("dialog", { name: "Authentication Required" })
+      .getByRole("button", { name: "Follow system language" })
+      .click();
+    await expect(page.getByRole("dialog", { name: "需要身份认证" })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("kgos.web.locale"))).toBeNull();
+    await page.reload();
+    await expect(page.getByRole("dialog", { name: "需要身份认证" })).toBeVisible();
+  });
+
   test("selects Chinese on the first visit, but permits an English override", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("dialog", { name: "需要身份认证" })).toBeVisible();

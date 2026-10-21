@@ -122,7 +122,7 @@ async function render(reader: VersionReader | null) {
 }
 
 function click(text: string) {
-  const button = Array.from(host.querySelectorAll("button")).find(
+  const button = Array.from(document.body.querySelectorAll("button")).find(
     (element) => element.getAttribute("aria-label") === text || element.textContent.trim() === text
   );
   if (button === undefined) throw new Error("Missing button " + text);
@@ -133,15 +133,15 @@ function click(text: string) {
 }
 
 function checkbox(name: string) {
-  const input = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
-    (item) => item.parentElement?.textContent.trim() === name
+  const input = [...document.body.querySelectorAll<HTMLElement>('[role="checkbox"]')].find(
+    (item) => item.getAttribute("aria-label") === name
   );
   if (input === undefined) throw new Error("Missing checkbox: " + name);
   return input;
 }
 
 function rows() {
-  return [...host.querySelectorAll<HTMLButtonElement>(".commit-row")];
+  return [...document.body.querySelectorAll<HTMLButtonElement>(".commit-row")];
 }
 
 function resolved(state: string): EvolutionGetResult {
@@ -166,7 +166,7 @@ it("shows real branch heads and deduplicates shared commits", async () => {
   await render(api);
   expect(rows()).toHaveLength(6);
   expect(rows().filter((r) => r.textContent.includes(SHARED_MESSAGE))).toHaveLength(1);
-  expect(host.querySelector(".version-branch-count")?.textContent).toBe("4/4");
+  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("4/4");
   expect(
     rows()
       .find((r) => r.textContent.includes("Merge experiment"))
@@ -199,7 +199,7 @@ it("filters branches and searches only the loaded union", async () => {
   click("Select all");
   expect(rows()).toHaveLength(6);
   click(BRANCH_FILTER_LABEL);
-  const input = host.querySelector<HTMLInputElement>('input[type="search"]');
+  const input = document.body.querySelector<HTMLInputElement>('input[type="search"]');
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
   if (input === null || descriptor?.set === undefined) throw new Error("Missing search input");
   act(() => {
@@ -239,7 +239,9 @@ it("does not fake history when disconnected and keeps an accessible refresh acti
   await render(null);
   expect(rows()).toHaveLength(0);
   expect(host.textContent).toContain("Connect to view version history.");
-  expect(host.querySelector<HTMLButtonElement>(".version-refresh-button")?.disabled).toBe(true);
+  expect(document.body.querySelector<HTMLButtonElement>(".version-refresh-button")?.disabled).toBe(
+    true
+  );
 });
 
 it("distinguishes an empty repository from a disconnected session", async () => {
@@ -248,7 +250,7 @@ it("distinguishes an empty repository from a disconnected session", async () => 
   await render(api);
   expect(host.textContent).toContain("No branches are available.");
   expect(rows()).toHaveLength(0);
-  expect(host.querySelector(".version-branch-count")?.textContent).toBe("0/0");
+  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("0/0");
   expect(api.ancestry).not.toHaveBeenCalled();
 });
 
@@ -357,7 +359,9 @@ it("closes branch picker on outside interaction and Escape without clearing filt
   });
   expect(trigger.getAttribute("aria-expanded")).toBe("true");
   act(() => {
-    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    document.body.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    document.body.click();
   });
   expect(trigger.getAttribute("aria-expanded")).toBe("false");
   click(BRANCH_FILTER_LABEL);
@@ -365,8 +369,11 @@ it("closes branch picker on outside interaction and Escape without clearing filt
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
   expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
   expect(document.activeElement).toBe(trigger);
-  expect(host.querySelector(".version-branch-count")?.textContent).toBe("3/4");
+  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("3/4");
   click(BRANCH_FILTER_LABEL);
   click("Select all");
   click("Clear all");
@@ -398,5 +405,5 @@ it("does not replace a new connection with a late old connection response", asyn
     await Promise.resolve();
   });
   expect(rows()).toHaveLength(6);
-  expect(host.querySelector(".version-branch-count")?.textContent).toBe("4/4");
+  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("4/4");
 });

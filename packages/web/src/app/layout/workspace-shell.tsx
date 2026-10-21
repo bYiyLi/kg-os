@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useThemePreference } from "../../shared/lib/use-theme-preference.js";
+import type { Theme } from "../../shared/lib/use-theme-preference.js";
+import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { useVersionHistory } from "../../features/version/use-version-history.js";
@@ -6,7 +8,6 @@ import type { VersionReader } from "../../features/version/version-data.js";
 import { SidebarHandle } from "./sidebar-handle.js";
 import { VersionDrawer } from "./version-drawer.js";
 import { VersionSidebar } from "./version-sidebar.js";
-import type { Theme } from "./version-sidebar.js";
 import { Workspace } from "./workspace.js";
 
 export function WorkspaceShell({
@@ -26,21 +27,12 @@ export function WorkspaceShell({
   versionReader?: VersionReader | null;
   initialVersionState?: string | null;
 }) {
-  const [theme, setTheme] = useState<Theme>(hostTheme ?? "dark");
+  const { theme, preference, selectTheme } = useThemePreference(hostTheme);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [resizing, setResizing] = useState(false);
-  const versionDialogRef = useRef<HTMLDialogElement>(null);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const history = useVersionHistory(versionReader, initialVersionState);
-
-  useEffect(() => {
-    if (hostTheme !== undefined) setTheme(hostTheme);
-  }, [hostTheme]);
-
-  function openVersions() {
-    const dialog = versionDialogRef.current;
-    if (dialog !== null && !dialog.open) dialog.showModal();
-  }
 
   return (
     <div
@@ -56,14 +48,18 @@ export function WorkspaceShell({
     >
       <VersionSidebar
         collapsed={sidebarCollapsed}
-        theme={theme}
+        preference={preference}
         history={history}
         onDisconnect={onDisconnect}
-        onToggleTheme={() => {
-          setTheme((value) => (value === "dark" ? "light" : "dark"));
-        }}
+        onSelectTheme={selectTheme}
       />
-      <Workspace onOpenVersions={openVersions}>{canvasChildren}</Workspace>
+      <Workspace
+        onOpenVersions={() => {
+          setVersionsOpen(true);
+        }}
+      >
+        {canvasChildren}
+      </Workspace>
       <SidebarHandle
         collapsed={sidebarCollapsed}
         width={sidebarWidth}
@@ -74,13 +70,12 @@ export function WorkspaceShell({
         onDraggingChange={setResizing}
       />
       <VersionDrawer
-        dialogRef={versionDialogRef}
-        theme={theme}
+        open={versionsOpen && !authenticationRequired}
+        onOpenChange={setVersionsOpen}
+        preference={preference}
         history={history}
         onDisconnect={onDisconnect}
-        onToggleTheme={() => {
-          setTheme((value) => (value === "dark" ? "light" : "dark"));
-        }}
+        onSelectTheme={selectTheme}
       />
       {children}
     </div>

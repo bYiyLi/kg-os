@@ -1,32 +1,43 @@
+import { Button } from "../../shared/ui/button.js";
+import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
-import { selectLocale } from "../i18n/index.js";
-import type { Locale } from "../i18n/index.js";
+import { getLocalePreference, selectLocale, subscribeLocalePreference } from "../i18n/index.js";
+import type { LocalePreference } from "../i18n/index.js";
 
-const options: readonly { locale: Locale; key: "english" | "chinese"; label: string }[] = [
-  { locale: "en", key: "english", label: "EN" },
-  { locale: "zh-CN", key: "chinese", label: "中文" }
-];
+const options: readonly { preference: LocalePreference; key: "system" | "english" | "chinese" }[] =
+  [
+    { preference: "system", key: "system" },
+    { preference: "en", key: "english" },
+    { preference: "zh-CN", key: "chinese" }
+  ];
 
 export function LanguageSwitcher() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const preference = useSyncExternalStore(subscribeLocalePreference, getLocalePreference);
+  const labels: Record<LocalePreference, string> = {
+    system: t("language.auto"),
+    en: "EN",
+    "zh-CN": "中文"
+  };
 
   return (
     <div className="language-switcher" role="group" aria-label={t("language.label")}>
-      {options.map(({ locale, key, label }) => (
-        <button
-          key={locale}
+      {options.map(({ preference: option, key }) => (
+        <Button
+          variant="ghost"
+          key={option}
           type="button"
           className="language-option"
-          lang={locale}
+          lang={option === "system" ? undefined : option}
           aria-label={t(`language.${key}`)}
-          aria-pressed={i18n.resolvedLanguage === locale}
+          aria-pressed={preference === option}
           onClick={() => {
-            if (i18n.resolvedLanguage !== locale) void selectLocale(locale);
+            if (preference !== option) void selectLocale(option);
           }}
         >
-          {label}
-        </button>
+          {labels[option]}
+        </Button>
       ))}
     </div>
   );

@@ -1,3 +1,12 @@
+import { DialogTitle, DialogDescription } from "../../shared/ui/dialog.js";
+import { Button } from "../../shared/ui/button.js";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput
+} from "../../shared/ui/input-group.js";
+import { Eye, EyeOff, KeyRound } from "lucide-react";
 import type { ReactNode, SyntheticEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -30,12 +39,12 @@ export function AuthenticationIntroduction({
         <span className="authentication-lock" aria-hidden="true">
           <Icon name="lock" />
         </span>
-        <h2 id="authentication-title">{t("auth.title")}</h2>
-        <p id="authentication-description">
+        <DialogTitle id="authentication-title">{t("auth.title")}</DialogTitle>
+        <DialogDescription id="authentication-description">
           {t("auth.descriptionFirst")}
           <br />
           {t("auth.descriptionSecond")}
-        </p>
+        </DialogDescription>
         {reason !== undefined && reason !== null && (
           <p className="authentication-reason" role="status">
             {t(`auth.loss.${reason}`)}
@@ -69,9 +78,8 @@ export function AuthenticationForm({
       <label htmlFor="kgos-access-token" className="authentication-label">
         {t("auth.accessToken")} <Icon name="help" />
       </label>
-      <div className="authentication-token-field">
-        <Icon name="key" />
-        <input
+      <InputGroup>
+        <InputGroupInput
           id="kgos-access-token"
           type={showToken ? "text" : "password"}
           autoComplete="off"
@@ -87,16 +95,20 @@ export function AuthenticationForm({
             onTokenChange(event.target.value);
           }}
         />
-        <button
-          type="button"
-          className="authentication-reveal"
-          aria-label={t(showToken ? "auth.hideToken" : "auth.showToken")}
-          aria-pressed={showToken}
-          onClick={onToggleVisibility}
-        >
-          <Icon name={showToken ? "eyeOff" : "eye"} />
-        </button>
-      </div>
+        <InputGroupAddon align="inline-start">
+          <KeyRound aria-hidden="true" />
+        </InputGroupAddon>
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-xs"
+            aria-label={t(showToken ? "auth.hideToken" : "auth.showToken")}
+            aria-pressed={showToken}
+            onClick={onToggleVisibility}
+          >
+            {showToken ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
       <p id="authentication-token-note" className="authentication-token-note">
         {t("auth.tokenNote")}
       </p>
@@ -105,14 +117,15 @@ export function AuthenticationForm({
           {t(`auth.error.${error}`)}
         </p>
       )}
-      <button
+      <Button
+        variant="ghost"
         type="submit"
         className="authentication-connect"
         disabled={connecting || token.trim().length === 0}
       >
         {t(connecting ? "auth.connecting" : "auth.connect")}
         {!connecting && <Icon name="arrowRight" />}
-      </button>
+      </Button>
     </form>
   );
 }

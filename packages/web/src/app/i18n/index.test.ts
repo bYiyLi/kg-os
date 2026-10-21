@@ -3,7 +3,15 @@
 import { afterEach, expect, it } from "vitest";
 
 import { en } from "./en.js";
-import { browserLanguages, detectLocale, i18n, LOCALE_STORAGE_KEY, selectLocale } from "./index.js";
+import {
+  browserLanguages,
+  detectLocale,
+  getLocalePreference,
+  i18n,
+  LOCALE_STORAGE_KEY,
+  selectLocale,
+  synchronizeHostLocale
+} from "./index.js";
 import { zhCN } from "./zh-CN.js";
 
 function messages(resource: object, prefix = ""): Map<string, string> {
@@ -29,6 +37,8 @@ function placeholders(message: string): string[] {
 }
 
 afterEach(async () => {
+  synchronizeHostLocale(undefined);
+  await selectLocale("system");
   await i18n.changeLanguage("en");
   localStorage.clear();
 });
@@ -44,6 +54,28 @@ it("keeps all translation keys and interpolation parameters in sync", () => {
     expect(i18n.exists(key, { lng: "en" })).toBe(true);
     expect(i18n.exists(key, { lng: "zh-CN" })).toBe(true);
   }
+});
+
+it("explains administrator Token use, recovery and regeneration in both languages", () => {
+  const english = [
+    en.setup.description.auth,
+    en.setup.authIntroductionSecond,
+    en.setup.authGenerateDescription
+  ].join(" ");
+  const chinese = [
+    zhCN.setup.description.auth,
+    zhCN.setup.authIntroductionSecond,
+    zhCN.setup.authGenerateDescription
+  ].join(" ");
+  expect(en.setup.authTagline).toContain("secure administrator access");
+  expect(english).toContain("administrator credential");
+  expect(english).toContain(".kgos/auth.json");
+  expect(english).toContain("without entering the old one");
+  expect(zhCN.setup.authTagline).toBe("为知识库建立安全的管理员访问入口");
+  expect(chinese).toContain("主钥匙");
+  expect(chinese).toContain(".kgos/auth.json");
+  expect(chinese).toContain("登录会话失效");
+  expect(chinese).toContain("无需输入旧令牌");
 });
 
 it("honors an explicit supported preference before the browser languages", () => {
@@ -109,5 +141,42 @@ it("still switches the interface when browser storage is blocked", async () => {
     expect(i18n.resolvedLanguage).toBe("zh-CN");
   } finally {
     if (descriptor !== undefined) Object.defineProperty(window, "localStorage", descriptor);
+  }
+});
+
+it("restores automatic language and gives manual selection precedence over host changes", async () => {
+  await selectLocale("system");
+  expect(getLocalePreference()).toBe("system");
+  synchronizeHostLocale("zh-CN");
+  expect(i18n.resolvedLanguage).toBe("zh-CN");
+  expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBeNull();
+
+  await selectLocale("en");
+  expect(i18n.resolvedLanguage).toBe("en");
+  expect(getLocalePreference()).toBe("en");
+  synchronizeHostLocale("zh-CN");
+  expect(i18n.resolvedLanguage).toBe("en");
+
+  await selectLocale("system");
+  expect(getLocalePreference()).toBe("system");
+  expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBeNull();
+  expect(i18n.resolvedLanguage).toBe("zh-CN");
+  synchronizeHostLocale(undefined);
+});
+
+it("responds to browser language changes only while following the system", async () => {
+  const browser = navigator;
+  const previous = Object.getOwnPropertyDescriptor(browser, "languages");
+  Object.defineProperty(browser, "languages", { configurable: true, value: ["zh-CN"] });
+  try {
+    await selectLocale("system");
+    window.dispatchEvent(new Event("languagechange"));
+    expect(i18n.resolvedLanguage).toBe("zh-CN");
+    await selectLocale("en");
+    window.dispatchEvent(new Event("languagechange"));
+    expect(i18n.resolvedLanguage).toBe("en");
+  } finally {
+    if (previous === undefined) Reflect.deleteProperty(browser, "languages");
+    else Object.defineProperty(browser, "languages", previous);
   }
 });

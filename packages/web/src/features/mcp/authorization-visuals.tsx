@@ -1,3 +1,4 @@
+import { DialogTitle, DialogDescription } from "../../shared/ui/dialog.js";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "../../shared/ui/icon.js";
@@ -62,8 +63,10 @@ export function AuthorizationVisuals({
   return (
     <>
       <div className="mcp-authorization-heading">
-        <h2 id="mcp-authorization-title">{t("mcp.title")}</h2>
-        <p id="mcp-authorization-description">{t("mcp.description")}</p>
+        <DialogTitle id="mcp-authorization-title">{t("mcp.title")}</DialogTitle>
+        <DialogDescription id="mcp-authorization-description">
+          {t("mcp.description")}
+        </DialogDescription>
       </div>
       <div className="mcp-authorization-parties">
         <div>

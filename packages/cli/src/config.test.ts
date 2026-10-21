@@ -29,6 +29,32 @@ const BASE: InstanceConfig = {
 };
 
 describe("Instance config", () => {
+  it("accepts new public origins while keeping legacy Instance configs valid", async () => {
+    const root = await mkdtemp(join(tmpdir(), "kgos-public-origin-config-"));
+    expect(parseConfig(root, encodeConfig(BASE)).server).toBeUndefined();
+    const configured: InstanceConfig = {
+      ...BASE,
+      server: { public_origin: "https://kgos.example.com" }
+    };
+    const body = encodeConfig(configured);
+    expect(body).toContain('public_origin = "https://kgos.example.com"');
+    expect(parseConfig(root, body).server?.public_origin).toBe("https://kgos.example.com");
+    expect(
+      parseConfig(
+        root,
+        encodeConfig({ ...BASE, server: { public_origin: "http://localhost:5184/" } })
+      ).server?.public_origin
+    ).toBe("http://localhost:5184");
+    for (const public_origin of ["http://remote.example", "https://kgos.example.com/mcp", "bad"]) {
+      expect(() => parseConfig(root, encodeConfig({ ...BASE, server: { public_origin } }))).toThrow(
+        CLIError
+      );
+    }
+    expect(() => parseConfig(root, encodeConfig({ ...BASE, server: {} } as never))).toThrow(
+      CLIError
+    );
+  });
+
   it("round-trips and normalizes the complete explicit config", async () => {
     const root = await mkdtemp(join(tmpdir(), "kgos-config-"));
     const parsed = parseConfig(root, encodeConfig(BASE));

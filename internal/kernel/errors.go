@@ -12,32 +12,35 @@ import (
 type ErrorCode string
 
 const (
-	CodeObjectNotFound       ErrorCode = "OBJECT_NOT_FOUND"
-	CodeObjectConflict       ErrorCode = "OBJECT_CONFLICT"
-	CodePatchBaseMismatch    ErrorCode = "PATCH_BASE_MISMATCH"
-	CodeStaleBaseState       ErrorCode = "STALE_BASE_STATE"
-	CodeConsistency          ErrorCode = "CONSISTENCY_ERROR"
-	CodeUnsupportedOperation ErrorCode = "UNSUPPORTED_OPERATION"
-	CodeStateNotFound        ErrorCode = "STATE_NOT_FOUND"
-	CodeReservedIdentifier   ErrorCode = "RESERVED_IDENTIFIER"
-	CodeAuthenticationFailed ErrorCode = "AUTHENTICATION_FAILED"
-	CodeWebConnectionChanged ErrorCode = "WEB_CONNECTION_CHANGED"
-	CodeInvalidArgument      ErrorCode = "INVALID_ARGUMENT"
-	CodeParse                ErrorCode = "PARSE_ERROR"
-	CodeSemantic             ErrorCode = "SEMANTIC_ERROR"
-	CodeType                 ErrorCode = "TYPE_ERROR"
-	CodeSchema               ErrorCode = "SCHEMA_ERROR"
-	CodeConstraint           ErrorCode = "CONSTRAINT_ERROR"
-	CodeBranchNotFound       ErrorCode = "BRANCH_NOT_FOUND"
-	CodeTagNotFound          ErrorCode = "TAG_NOT_FOUND"
-	CodeBranchHeadMoved      ErrorCode = "BRANCH_HEAD_MOVED"
-	CodeMergeConflict        ErrorCode = "MERGE_CONFLICT"
-	CodeMergeSessionNotFound ErrorCode = "MERGE_SESSION_NOT_FOUND"
-	CodeMergeSessionChanged  ErrorCode = "MERGE_SESSION_CHANGED"
-	CodeReadOnlySnapshot     ErrorCode = "READ_ONLY_SNAPSHOT"
-	CodeResource             ErrorCode = "RESOURCE_ERROR"
-	CodeIO                   ErrorCode = "IO_ERROR"
-	CodeInternal             ErrorCode = "INTERNAL_ERROR"
+	CodeObjectNotFound         ErrorCode = "OBJECT_NOT_FOUND"
+	CodeObjectConflict         ErrorCode = "OBJECT_CONFLICT"
+	CodePatchBaseMismatch      ErrorCode = "PATCH_BASE_MISMATCH"
+	CodeStaleBaseState         ErrorCode = "STALE_BASE_STATE"
+	CodeConsistency            ErrorCode = "CONSISTENCY_ERROR"
+	CodeUnsupportedOperation   ErrorCode = "UNSUPPORTED_OPERATION"
+	CodeStateNotFound          ErrorCode = "STATE_NOT_FOUND"
+	CodeReservedIdentifier     ErrorCode = "RESERVED_IDENTIFIER"
+	CodeAuthenticationFailed   ErrorCode = "AUTHENTICATION_FAILED"
+	CodeInstanceNotInitialized ErrorCode = "INSTANCE_NOT_INITIALIZED"
+	CodeInstanceUnavailable    ErrorCode = "INSTANCE_UNAVAILABLE"
+	CodeSetupConflict          ErrorCode = "SETUP_CONFLICT"
+	CodeWebConnectionChanged   ErrorCode = "WEB_CONNECTION_CHANGED"
+	CodeInvalidArgument        ErrorCode = "INVALID_ARGUMENT"
+	CodeParse                  ErrorCode = "PARSE_ERROR"
+	CodeSemantic               ErrorCode = "SEMANTIC_ERROR"
+	CodeType                   ErrorCode = "TYPE_ERROR"
+	CodeSchema                 ErrorCode = "SCHEMA_ERROR"
+	CodeConstraint             ErrorCode = "CONSTRAINT_ERROR"
+	CodeBranchNotFound         ErrorCode = "BRANCH_NOT_FOUND"
+	CodeTagNotFound            ErrorCode = "TAG_NOT_FOUND"
+	CodeBranchHeadMoved        ErrorCode = "BRANCH_HEAD_MOVED"
+	CodeMergeConflict          ErrorCode = "MERGE_CONFLICT"
+	CodeMergeSessionNotFound   ErrorCode = "MERGE_SESSION_NOT_FOUND"
+	CodeMergeSessionChanged    ErrorCode = "MERGE_SESSION_CHANGED"
+	CodeReadOnlySnapshot       ErrorCode = "READ_ONLY_SNAPSHOT"
+	CodeResource               ErrorCode = "RESOURCE_ERROR"
+	CodeIO                     ErrorCode = "IO_ERROR"
+	CodeInternal               ErrorCode = "INTERNAL_ERROR"
 )
 
 var errInternalKnowledgeObject = errors.New("internal KG OS Knowledge object")
@@ -138,6 +141,10 @@ func HTTPStatus(err error) int {
 	switch public.Code {
 	case CodeAuthenticationFailed:
 		return http.StatusUnauthorized
+	case CodeInstanceNotInitialized, CodeInstanceUnavailable:
+		return http.StatusServiceUnavailable
+	case CodeSetupConflict:
+		return http.StatusConflict
 	case CodeObjectNotFound, CodeStateNotFound, CodeBranchNotFound, CodeTagNotFound,
 		CodeMergeSessionNotFound:
 		return http.StatusNotFound

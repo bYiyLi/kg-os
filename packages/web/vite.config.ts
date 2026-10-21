@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -14,9 +15,10 @@ export default defineConfig(({ mode }) => ({
       ? { rollupOptions: { input: fileURLToPath(new URL("./mcp.html", import.meta.url)) } }
       : {})
   },
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
       "@kgos/sdk": fileURLToPath(new URL("../sdk/src/index.ts", import.meta.url))
     }
   },

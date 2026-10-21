@@ -1,0 +1,189 @@
+import { readFile } from "node:fs/promises";
+
+import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+const activeToast = '[data-slot="toast"]:not([data-ending-style])';
+
+async function vectorStep(page: Page) {
+  await page.route("**/api/v1/setup/status", (route) =>
+    route.fulfill({ json: { state: "setup_required", credentialConfigured: false } })
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get started" }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.locator("#setup-url")).toBeVisible();
+  await page.locator("#setup-url").fill("https://embedding.example.test/v1");
+  await page.locator("#setup-model").fill("text-embedding-3-small");
+  await page.locator("#setup-dimensions").fill("1536");
+}
+
+test("Toast retains live language/theme, dismisses success, and never shifts the footer", async ({
+  page
+}) => {
+  await vectorStep(page);
+  let finish: (() => void) | undefined;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  let probes = 0;
+  await page.route("**/api/v1/setup/validate-embedding", async (route) => {
+    probes += 1;
+    await pending;
+    await route.fulfill({ json: { ok: true, dimensions: 1536 } });
+  });
+  const footer = await page.locator(".setup-footer").boundingBox();
+  await page.getByRole("button", { name: "Test connection", exact: true }).click();
+  const toast = page.locator(activeToast);
+  await expect(toast).toHaveAttribute("data-type", "loading");
+  await expect(toast.getByRole("button")).toHaveCount(0);
+  await page.getByRole("button", { name: "简体中文" }).click();
+  await expect(toast).toContainText("正在");
+  await page.getByRole("button", { name: "English" }).click();
+  await page.getByRole("button", { name: "Light theme" }).click();
+  expect(await toast.evaluate((element) => getComputedStyle(element).colorScheme)).toBe("light");
+  finish?.();
+  await expect(toast).toHaveAttribute("data-type", "success");
+  await expect(toast).toContainText("1536");
+  expect(await page.locator(".setup-footer").boundingBox()).toEqual(footer);
+  await expect(toast).toHaveCount(0, { timeout: 6000 });
+  expect(probes).toBe(1);
+  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+});
+
+test("error Toast closes manually and stale verification disappears after edits", async ({
+  page
+}) => {
+  await vectorStep(page);
+  await page.route("**/api/v1/setup/validate-embedding", (route) =>
+    route.fulfill({ json: { ok: false, reason: "authentication_failed" } })
+  );
+  await page.getByRole("button", { name: "Test connection", exact: true }).click();
+  const toast = page.locator(activeToast);
+  await expect(toast).toHaveAttribute("data-type", "error");
+  await expect(page.getByRole("button", { name: "Next", exact: true })).toHaveCount(0);
+  await page.keyboard.press("F6");
+  await expect(toast).not.toHaveAttribute("aria-hidden", "true");
+  await toast.getByRole("button", { name: "Close notification" }).click();
+  await expect(toast).toHaveCount(0);
+  await page.getByRole("button", { name: "Test connection", exact: true }).click();
+  await expect(toast).toHaveAttribute("data-type", "error");
+  await page.locator("#setup-model").fill("another-model");
+  await expect(toast).toHaveCount(0);
+});
+
+test("Base UI Select supports keyboard selection, Escape and portal theme at 320px", async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await vectorStep(page);
+  const trigger = page.getByRole("combobox", { name: "Similarity" });
+  await expect(trigger).toHaveCSS("display", "flex");
+  await trigger.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await expect(page.getByRole("option", { name: "Cosine similarity" })).toHaveAttribute(
+    "data-highlighted",
+    ""
+  );
+  await expect(page.getByRole("option", { name: "Cosine similarity" })).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(page.getByRole("option", { name: "Euclidean distance" })).toHaveAttribute(
+    "data-highlighted",
+    ""
+  );
+  await page.keyboard.press("Enter");
+  await expect(trigger).toContainText("Euclidean");
+  await expect(trigger).toBeFocused();
+  await page.getByRole("button", { name: "Light theme" }).click();
+  await trigger.click();
+  const popup = page.getByRole("listbox");
+  expect(await popup.evaluate((element) => getComputedStyle(element).colorScheme)).toBe("light");
+  await page.keyboard.press("Escape");
+  await expect(popup).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+for (const width of [375, 1100]) {
+  test(`self-contained MCP resource supports portal controls and host theme at ${String(width)}px`, async ({
+    page
+  }) => {
+    const html = await readFile("packages/web/dist/mcp-app.html", "utf8");
+    expect(html).not.toMatch(/<script[^>]+src=|<link[^>]+rel=["']stylesheet/);
+    const requests: string[] = [];
+    page.on("request", (request) => requests.push(request.url()));
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("about:blank");
+    await page.evaluate(
+      ({ content, frameWidth }) => {
+        const frame = document.createElement("iframe");
+        frame.title = "KG OS MCP fixture";
+        frame.style.cssText = `width:${String(frameWidth)}px;height:760px;border:0`;
+        document.body.style.margin = "0";
+        const state = "commit/" + "a".repeat(64);
+        window.addEventListener("message", (event: MessageEvent) => {
+          if (event.source !== frame.contentWindow) return;
+          const message = event.data as {
+            id?: number;
+            method?: string;
+            params?: { arguments?: { code?: string } };
+          };
+          if (message.id === undefined) return;
+          let result: unknown = {};
+          if (message.method === "ui/initialize") {
+            result = {
+              protocolVersion: "2026-01-26",
+              hostInfo: { name: "Migration test host", version: "1" },
+              hostCapabilities: { serverTools: {} },
+              hostContext: { theme: "light", locale: "en", displayMode: "inline" }
+            };
+          } else if (message.method === "tools/call") {
+            const code = message.params?.arguments?.code ?? "";
+            let value: unknown = { defaultBranch: "main", state };
+            if (code.includes("branch.list")) value = { items: [{ name: "main", state }] };
+            else if (code.includes("tag.list")) value = { items: [] };
+            else if (code.includes("ancestry"))
+              value = {
+                root: state,
+                items: [{ state, parents: [], message: "MCP migration fixture", committedAt: 1 }]
+              };
+            result = { content: [{ type: "text", text: JSON.stringify({ result: value }) }] };
+          }
+          frame.contentWindow?.postMessage({ jsonrpc: "2.0", id: message.id, result }, "*");
+        });
+        frame.srcdoc = content;
+        document.body.append(frame);
+      },
+      { content: html, frameWidth: width }
+    );
+    const app = page.frameLocator("iframe");
+    await expect(app.locator(".app-shell")).toHaveAttribute("data-theme", "light");
+    await expect(app.locator(".authentication-dialog")).toHaveCount(0);
+    if (width < 900)
+      await app.getByRole("button", { name: "Version navigation", exact: true }).click();
+    const trigger = app.getByRole("button", { name: "Filter branches" });
+    await trigger.click();
+    const choices = app.getByRole("group", { name: "Filter branches" });
+    await expect(choices.getByRole("checkbox", { name: "main" })).toBeChecked();
+    expect(await choices.evaluate((element) => getComputedStyle(element).colorScheme)).toBe(
+      "light"
+    );
+    await page.evaluate(() => {
+      document.querySelector("iframe")?.contentWindow?.postMessage(
+        {
+          jsonrpc: "2.0",
+          method: "ui/notifications/host-context-changed",
+          params: { theme: "dark", locale: "en" }
+        },
+        "*"
+      );
+    });
+    await expect(app.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
+    expect(await choices.evaluate((element) => getComputedStyle(element).colorScheme)).toBe("dark");
+    await page.keyboard.press("Escape");
+    await expect(choices).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    expect(requests).toEqual([]);
+  });
+}

@@ -24,10 +24,15 @@ const (
 )
 
 type Config struct {
+	Server    *ServerConfig   `toml:"server,omitempty"`
 	Cache     CacheConfig     `toml:"cache"`
 	SQLite    SQLiteConfig    `toml:"sqlite"`
 	FullText  FullTextConfig  `toml:"fulltext"`
 	Embedding EmbeddingConfig `toml:"embedding"`
+}
+
+type ServerConfig struct {
+	PublicOrigin string `toml:"public_origin" json:"public_origin"`
 }
 
 type CacheConfig struct {
@@ -106,6 +111,9 @@ func ParseConfig(paths Paths, body []byte) (Config, error) {
 			return Config{}, fmt.Errorf("config.toml missing required field %s", strings.Join(key, "."))
 		}
 	}
+	if metadata.IsDefined("server") && !metadata.IsDefined("server", "public_origin") {
+		return Config{}, fmt.Errorf("config.toml missing required field server.public_origin")
+	}
 	if err := config.normalizeAndValidate(paths); err != nil {
 		return Config{}, err
 	}
@@ -113,6 +121,13 @@ func ParseConfig(paths Paths, body []byte) (Config, error) {
 }
 
 func (config *Config) normalizeAndValidate(paths Paths) error {
+	if config.Server != nil {
+		origin, err := NormalizePublicOrigin(config.Server.PublicOrigin)
+		if err != nil {
+			return err
+		}
+		config.Server.PublicOrigin = origin
+	}
 	if strings.TrimSpace(config.Cache.Path) == "" || strings.ContainsRune(config.Cache.Path, 0) {
 		return fmt.Errorf("cache.path must be non-empty and contain no NUL")
 	}
@@ -155,6 +170,25 @@ func (config *Config) normalizeAndValidate(paths Paths) error {
 		return err
 	}
 	return nil
+}
+
+// NormalizePublicOrigin accepts an external HTTPS origin. HTTP is only
+// allowed for local loopback development, not ChatGPT Cloud access.
+func NormalizePublicOrigin(raw string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil || strings.ContainsAny(raw, "?#") || u.Host == "" || u.User != nil || u.Opaque != "" ||
+		(u.Path != "" && u.Path != "/") || u.RawPath != "" ||
+		u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.RawFragment != "" ||
+		(u.Scheme != "http" && u.Scheme != "https") {
+		return "", fmt.Errorf("server.public_origin must be an HTTPS origin without a path or query")
+	}
+	if u.Scheme == "http" {
+		host := u.Hostname()
+		if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+			return "", fmt.Errorf("server.public_origin requires HTTPS except for local loopback")
+		}
+	}
+	return u.Scheme + "://" + u.Host, nil
 }
 
 func normalizeEmbedding(config *EmbeddingConfig) error {

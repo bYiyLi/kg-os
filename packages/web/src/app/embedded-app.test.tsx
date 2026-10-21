@@ -8,7 +8,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 // cspell:words hostcontextchanged toolresult
 
 import { EmbeddedApp, readOverview } from "./embedded-app.js";
-import { i18n } from "./i18n/index.js";
+import { i18n, selectLocale } from "./i18n/index.js";
 
 const commitOne = vi.hoisted(() => "commit/" + "a".repeat(64));
 const commitTwo = vi.hoisted(() => "commit/" + "d".repeat(64));
@@ -98,6 +98,9 @@ let root: Root;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  await selectLocale("system");
+  localStorage.clear();
+  bridge.getHostContext.mockReturnValue({ theme: "light", locale: "en" });
   bridge.getHostCapabilities.mockReturnValue({ serverTools: true });
   bridge.callServerTool.mockImplementation((request) =>
     Promise.resolve(versionReply(request.arguments.code))
@@ -125,7 +128,7 @@ async function renderEmbedded() {
 }
 
 function button(name: string) {
-  const element = Array.from(host.querySelectorAll("button")).find(
+  const element = Array.from(document.body.querySelectorAll("button")).find(
     (item) => item.textContent === name || item.getAttribute("aria-label") === name
   );
   if (element === undefined) throw new Error("Missing button: " + name);
@@ -140,20 +143,20 @@ function overviewCalls() {
 
 it("loads the existing read-only tool through the bridge with no Web login", async () => {
   await renderEmbedded();
-  expect(host.textContent).toContain(commitOne);
-  expect(host.textContent).toContain("main");
-  expect(host.querySelector('[data-theme="light"]')).not.toBeNull();
-  expect(host.querySelector(".authentication-dialog")).toBeNull();
-  expect(host.querySelector('input[type="password"]')).toBeNull();
+  expect(document.body.textContent).toContain(commitOne);
+  expect(document.body.textContent).toContain("main");
+  expect(document.body.querySelector('[data-theme="light"]')).not.toBeNull();
+  expect(document.body.querySelector(".authentication-dialog")).toBeNull();
+  expect(document.body.querySelector('input[type="password"]')).toBeNull();
   expect(bridge.connect).toHaveBeenCalledTimes(1);
   expect(bridge.callServerTool).toHaveBeenCalledWith({
     name: "kgos_query",
     arguments: { code: "return await evolution.overview()" }
   });
   expect(overviewCalls()).toBe(1);
-  expect(host.querySelector(".version-branch-count")?.textContent).toBe("2/2");
-  expect(host.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
-  expect(host.textContent).toContain("Shared history");
+  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("2/2");
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
+  expect(document.body.textContent).toContain("Shared history");
   expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_query")).toBe(
     true
   );
@@ -166,18 +169,18 @@ it("filters embedded Branch history and reads the selected Commit through MCP", 
     button("Filter branches").click();
   });
   const main = Array.from(
-    host.querySelectorAll<HTMLInputElement>('.version-branch-option input[type="checkbox"]')
-  ).find((input) => input.parentElement?.textContent.trim() === "main");
+    document.body.querySelectorAll<HTMLElement>('.version-branch-option [role="checkbox"]')
+  ).find((input) => input.getAttribute("aria-label") === "main");
   if (main === undefined) throw new Error("Missing main branch");
   await act(async () => {
     main.click();
     await Promise.resolve();
   });
-  expect(host.querySelector(".version-branch-count")?.textContent).toBe("1/2");
-  expect(host.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
-  const row = Array.from(host.querySelectorAll<HTMLButtonElement>(sidebarCommitSelector)).find(
-    (candidate) => candidate.textContent.includes("Experiment update")
-  );
+  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("1/2");
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
+  const row = Array.from(
+    document.body.querySelectorAll<HTMLButtonElement>(sidebarCommitSelector)
+  ).find((candidate) => candidate.textContent.includes("Experiment update"));
   if (row === undefined) throw new Error("Missing experiment Commit");
   await act(async () => {
     row.click();
@@ -204,9 +207,9 @@ it("keeps MCP tool errors local to the version list without losing overview", as
     button("Refresh versions").click();
     await Promise.resolve();
   });
-  expect(host.textContent).toContain(commitOne);
-  expect(host.textContent).toContain("Could not load version history.");
-  expect(host.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
+  expect(document.body.textContent).toContain(commitOne);
+  expect(document.body.textContent).toContain("Could not load version history.");
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
 });
 
 it("clears stale embedded versions when MCP reports authentication failure", async () => {
@@ -219,22 +222,22 @@ it("clears stale embedded versions when MCP reports authentication failure", asy
     button("Refresh versions").click();
     await Promise.resolve();
   });
-  expect(host.querySelector(".embedded-connection [role='alert']")).not.toBeNull();
-  expect(host.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
+  expect(document.body.querySelector(".embedded-connection [role='alert']")).not.toBeNull();
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
 });
 
 it("invalidates the embedded connection and stale commits if the host revokes MCP access", async () => {
   await renderEmbedded();
-  expect(host.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
   bridge.callServerTool.mockRejectedValueOnce(new Error("OAuth authorization revoked"));
   await act(async () => {
     button("Refresh versions").click();
     await Promise.resolve();
   });
-  expect(host.querySelector(".embedded-connection [role='alert']")).not.toBeNull();
-  expect(host.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
-  expect(host.textContent).not.toContain("Shared history");
-  expect(host.querySelector(".authentication-dialog")).toBeNull();
+  expect(document.body.querySelector(".embedded-connection [role='alert']")).not.toBeNull();
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
+  expect(document.body.textContent).not.toContain("Shared history");
+  expect(document.body.querySelector(".authentication-dialog")).toBeNull();
 });
 
 it("changes language without a new tool call, but refreshes only on explicit action", async () => {
@@ -244,7 +247,7 @@ it("changes language without a new tool call, but refreshes only on explicit act
     button("简体中文").click();
     await Promise.resolve();
   });
-  expect(host.textContent).toContain("当前知识版本");
+  expect(document.body.textContent).toContain("当前知识版本");
   expect(bridge.callServerTool).toHaveBeenCalledTimes(before);
   bridge.callServerTool.mockImplementation((request) =>
     Promise.resolve(
@@ -257,8 +260,8 @@ it("changes language without a new tool call, but refreshes only on explicit act
     button("刷新").click();
     await Promise.resolve();
   });
-  expect(host.textContent).toContain(commitTwo);
-  expect(host.textContent).not.toContain(commitOne);
+  expect(document.body.textContent).toContain(commitTwo);
+  expect(document.body.textContent).not.toContain(commitOne);
   expect(overviewCalls()).toBe(2);
 });
 
@@ -271,14 +274,14 @@ it("reports failure without retaining stale branch data", async () => {
     button("Refresh").click();
     await Promise.resolve();
   });
-  expect(host.querySelector(alertSelector)?.textContent).toContain("unavailable");
-  expect(host.textContent).not.toContain(commitOne);
+  expect(document.body.querySelector(alertSelector)?.textContent).toContain("unavailable");
+  expect(document.body.textContent).not.toContain(commitOne);
 });
 
 it("requires host support for MCP server tool calls", async () => {
   bridge.getHostCapabilities.mockReturnValue({ serverTools: false });
   await renderEmbedded();
-  expect(host.querySelector(alertSelector)).not.toBeNull();
+  expect(document.body.querySelector(alertSelector)).not.toBeNull();
   expect(bridge.callServerTool).not.toHaveBeenCalled();
 });
 
@@ -287,14 +290,14 @@ it("fails safely when MCP overview returns a malformed resolved State", async ()
     reply({ defaultBranch: "main", state: "commit-one" })
   );
   await renderEmbedded();
-  expect(host.querySelector(alertSelector)).not.toBeNull();
-  expect(host.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
+  expect(document.body.querySelector(alertSelector)).not.toBeNull();
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
 });
 
 it("handles rejected host connections without querying", async () => {
   bridge.connect.mockRejectedValueOnce(new Error("Host denied initialization"));
   await renderEmbedded();
-  expect(host.querySelector(alertSelector)).not.toBeNull();
+  expect(document.body.querySelector(alertSelector)).not.toBeNull();
   expect(bridge.callServerTool).not.toHaveBeenCalled();
 });
 
@@ -305,8 +308,8 @@ it("handles transport failure after a successful read", async () => {
     button("Refresh").click();
     await Promise.resolve();
   });
-  expect(host.querySelector(alertSelector)).not.toBeNull();
-  expect(host.textContent).not.toContain(commitOne);
+  expect(document.body.querySelector(alertSelector)).not.toBeNull();
+  expect(document.body.textContent).not.toContain(commitOne);
 });
 
 it("invalidates the read when the host reports a tool error", async () => {
@@ -316,15 +319,15 @@ it("invalidates the read when the host reports a tool error", async () => {
   )?.[1] as ((result: { isError?: boolean }) => void) | undefined;
   expect(handler).toBeDefined();
   act(() => handler?.({ isError: true }));
-  expect(host.querySelector(alertSelector)).not.toBeNull();
-  expect(host.textContent).not.toContain(commitOne);
+  expect(document.body.querySelector(alertSelector)).not.toBeNull();
+  expect(document.body.textContent).not.toContain(commitOne);
 });
 
 it("accepts missing host preferences without requiring Web credentials", async () => {
   bridge.getHostContext.mockReturnValue(undefined);
   await renderEmbedded();
-  expect(host.querySelector('[data-theme="dark"]')).not.toBeNull();
-  expect(host.textContent).toContain(commitOne);
+  expect(document.body.querySelector('[data-theme="dark"]')).not.toBeNull();
+  expect(document.body.textContent).toContain(commitOne);
 });
 
 it("updates host theme and language independently of MCP data", async () => {
@@ -338,8 +341,8 @@ it("updates host theme and language independently of MCP data", async () => {
     handler?.();
     await Promise.resolve();
   });
-  expect(host.querySelector('[data-theme="dark"]')).not.toBeNull();
-  expect(host.textContent).toContain("当前知识版本");
+  expect(document.body.querySelector('[data-theme="dark"]')).not.toBeNull();
+  expect(document.body.textContent).toContain("当前知识版本");
   expect(overviewCalls()).toBe(1);
 });
 

@@ -1,6 +1,7 @@
+import { Dialog, DialogContent } from "../../shared/ui/dialog.js";
 import { KGOSDaemonError, KGOSTransportError } from "@kgos/sdk";
-import { useLayoutEffect, useRef, useState } from "react";
-import type { ReactNode, RefObject, SyntheticEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode, SyntheticEvent } from "react";
 
 import { connectToCurrentInstance } from "../../core/client/connect.js";
 import type { Connection } from "../../core/client/connect.js";
@@ -22,23 +23,6 @@ function errorMessage(error: unknown): AuthenticationError {
   return "unknown";
 }
 
-function useMandatoryDialog(
-  dialogRef: RefObject<HTMLDialogElement | null>,
-  requestRef: RefObject<AbortController | null>
-) {
-  useLayoutEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog !== null && !dialog.open) {
-      dialog.showModal();
-      dialog.querySelector("input")?.focus();
-    }
-    return () => {
-      requestRef.current?.abort();
-      if (dialog?.open === true) dialog.close();
-    };
-  }, [dialogRef, requestRef]);
-}
-
 export function AuthenticationDialog({
   onAuthenticated,
   onConnectionLost,
@@ -50,14 +34,13 @@ export function AuthenticationDialog({
   reason?: ConnectionLossReason | null;
   languageControl?: ReactNode;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const requestRef = useRef<AbortController | null>(null);
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<AuthenticationError | null>(null);
 
-  useMandatoryDialog(dialogRef, requestRef);
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,33 +80,39 @@ export function AuthenticationDialog({
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="authentication-dialog"
-      aria-labelledby="authentication-title"
-      aria-describedby="authentication-description"
-      onCancel={(event) => {
-        event.preventDefault();
+    <Dialog
+      open
+      disablePointerDismissal
+      onOpenChange={(_, details) => {
+        details.cancel();
       }}
     >
-      <AuthenticationIntroduction reason={reason} languageControl={languageControl} />
-      <AuthenticationForm
-        token={token}
-        showToken={showToken}
-        connecting={connecting}
-        error={error}
-        onSubmit={(event) => {
-          void submit(event);
-        }}
-        onTokenChange={(value) => {
-          setToken(value);
-          setError(null);
-        }}
-        onToggleVisibility={() => {
-          setShowToken((shown) => !shown);
-        }}
-      />
-      <AuthenticationHelp />
-    </dialog>
+      <DialogContent
+        overlayClassName="authentication-backdrop"
+        initialFocus={() => document.getElementById("kgos-access-token")}
+        className="authentication-dialog"
+        aria-labelledby="authentication-title"
+        aria-describedby="authentication-description"
+      >
+        <AuthenticationIntroduction reason={reason} languageControl={languageControl} />
+        <AuthenticationForm
+          token={token}
+          showToken={showToken}
+          connecting={connecting}
+          error={error}
+          onSubmit={(event) => {
+            void submit(event);
+          }}
+          onTokenChange={(value) => {
+            setToken(value);
+            setError(null);
+          }}
+          onToggleVisibility={() => {
+            setShowToken((shown) => !shown);
+          }}
+        />
+        <AuthenticationHelp />
+      </DialogContent>
+    </Dialog>
   );
 }

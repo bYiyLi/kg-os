@@ -1,3 +1,4 @@
+import { Button } from "../../shared/ui/button.js";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -23,7 +24,8 @@ export function Workspace({
   return (
     <main className="workspace-main" aria-label={t("workspace.label")}>
       <section className="canvas-stage" aria-label={t("workspace.canvas")}>
-        <button
+        <Button
+          variant="ghost"
           className="mobile-versions-button"
           type="button"
           aria-label={t("versions.navigation")}
@@ -31,10 +33,11 @@ export function Workspace({
           onClick={onOpenVersions}
         >
           <Icon name="menu" />
-        </button>
+        </Button>
         <div className="canvas-toolbar" aria-label={t("workspace.pendingTools")}>
           {pendingTools.map((tool) => (
-            <button
+            <Button
+              variant="ghost"
               className="canvas-tool"
               key={tool.name}
               type="button"
@@ -43,9 +46,10 @@ export function Workspace({
               title={t("workspace.pendingAction", { name: t(`workspace.${tool.label}`) })}
             >
               <Icon name={tool.name} />
-            </button>
+            </Button>
           ))}
-          <button
+          <Button
+            variant="ghost"
             className="canvas-zoom"
             type="button"
             disabled
@@ -53,7 +57,7 @@ export function Workspace({
             title={t("workspace.zoom")}
           >
             100% <Icon name="chevronDown" />
-          </button>
+          </Button>
         </div>
         <span className="sr-only">{t("workspace.pendingCanvas")}</span>
         {children}

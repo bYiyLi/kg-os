@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -35,6 +36,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			_, _ = fmt.Fprintln(stderr, "kgosd: invalid log directory")
 			return 1
 		}
+		// Setup may start before Runtime creates the Instance directories.
+		_ = os.MkdirAll(paths.LogsDir, 0o700)
 		file, openErr := observability.NewRotatingWriter(paths.LogsDir, observability.DefaultLogBytes, observability.DefaultLogFiles)
 		if openErr != nil {
 			_, _ = fmt.Fprintln(stderr, "kgosd: cannot open private diagnostic log")
@@ -53,6 +56,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	ctx = observability.WithObserver(ctx, observer)
 	observer.Log(ctx, slog.LevelInfo, "runtime", "runtime.starting")
+	if evaluation.Mode != command.DaemonModeInit {
+		if err := serveFirstRun(ctx, evaluation, stdout, observer); err != nil {
+			observer.Log(ctx, slog.LevelError, "runtime", "runtime.serve.failed")
+			return 1
+		}
+		observer.Log(ctx, slog.LevelInfo, "runtime", "runtime.stopped")
+		return 0
+	}
 	runtime, err := runtimehost.Open(ctx, evaluation.Root, nil)
 	if err != nil {
 		observer.Log(ctx, slog.LevelError, "runtime", "runtime.open.failed", slog.String("stage", "runtime_open"))
@@ -72,15 +83,23 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		observer.Log(ctx, slog.LevelInfo, "runtime", "runtime.initialized")
 		return 0
 	}
+	return 0
+}
+
+// readyHandler is shared by the normal listener and the process-local
+// authenticated readiness probe. It has no separate listener or Instance lock.
+func readyHandler(runtime *runtimehost.Runtime, mcpSettings command.DaemonMCPSettings) (http.Handler, error) {
+	issuer := ""
+	if runtime.Config.Server != nil {
+		issuer = runtime.Config.Server.PublicOrigin
+	}
 	handler, err := webui.EmbeddedHandler()
 	if err != nil {
-		observer.Log(ctx, slog.LevelError, "runtime", "runtime.web_assets.failed")
-		return 1
+		return nil, err
 	}
 	var extra []daemon.ExtraRoute
-	mcpSettings := evaluation.Settings.MCP
 	mcpService, err := mcpserver.New(runtime.Kernel, mcpserver.Options{
-		Token: runtime.Credential.Token, Path: mcpSettings.Path, OAuthIssuer: mcpSettings.OAuthIssuer,
+		Token: runtime.Credential.Token, Path: mcpSettings.Path, OAuthIssuer: issuer,
 		MaxConcurrency:  mcpSettings.MaxConcurrency,
 		RequestTimeout:  time.Duration(mcpSettings.RequestTimeoutMS) * time.Millisecond,
 		MaxRequestBytes: int64(mcpSettings.MaxRequestBytes),
@@ -97,22 +116,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		PreviewCacheTTL:     time.Duration(mcpSettings.PreviewCacheTTLMS) * time.Millisecond,
 	})
 	if err != nil {
-		observer.Log(ctx, slog.LevelError, "runtime", "runtime.mcp_configuration.failed")
-		return 1
+		return nil, err
 	}
 	extra = append(extra, daemon.ExtraRoute{Path: mcpSettings.Path, Handler: mcpService.Handler()})
 	for path, route := range mcpService.OAuthRoutes() {
 		extra = append(extra, daemon.ExtraRoute{Path: path, Handler: route})
 	}
-	if err := daemon.ServeWithOptions(ctx, runtime, observability.HTTPMiddleware(observer, daemon.NewHandler(runtime, handler, extra...), mcpSettings.Path), stdout, daemon.ListenOptions{
-		Host: evaluation.Settings.Host, Port: evaluation.Settings.Port,
-		TLSCert: evaluation.Settings.TLSCert, TLSKey: evaluation.Settings.TLSKey,
-	}); err != nil {
-		observer.Log(ctx, slog.LevelError, "runtime", "runtime.serve.failed")
-		return 1
-	}
-	observer.Log(ctx, slog.LevelInfo, "runtime", "runtime.stopped")
-	return 0
+	return daemon.NewHandler(runtime, handler, extra...), nil
 }
 
 func main() {

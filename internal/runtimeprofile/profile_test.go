@@ -318,6 +318,34 @@ func TestLoadOrCreateCredentialCreatesAndReusesToken(t *testing.T) {
 	}
 }
 
+func TestRotateCredentialReplacesOnlyExpectedToken(t *testing.T) {
+	paths := testProfilePaths(t)
+	original, err := ClaimCredential(paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RotateCredential(paths, "wrong-token"); !errors.Is(err, ErrCredentialChanged) {
+		t.Fatalf("unexpected stale-credential result: %v", err)
+	}
+	rotated, err := RotateCredential(paths, original.Token)
+	if err != nil {
+		t.Fatalf("rotate credential: %v", err)
+	}
+	if rotated.Token == original.Token || len(rotated.Token) != 43 {
+		t.Fatal("new administrator credential is not fresh")
+	}
+	if onDisk, err := LoadCredential(paths); err != nil || onDisk.Token != rotated.Token {
+		t.Fatal("rotated credential not saved")
+	}
+	if _, err := RotateCredential(paths, original.Token); !errors.Is(err, ErrCredentialChanged) {
+		t.Fatal("stale token unexpectedly replaced the new credential")
+	}
+	info, err := os.Stat(paths.Auth)
+	if err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatalf("rotated credential permissions invalid: %v", err)
+	}
+}
+
 func TestLoadOrCreateCredentialFailsClosed(t *testing.T) {
 	paths := testProfilePaths(t)
 	tests := []struct {

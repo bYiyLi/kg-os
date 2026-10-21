@@ -1,10 +1,12 @@
 # Web 设计
 
-<!-- cspell:ignore libfile WCAG -->
+<!-- cspell:ignore libfile WCAG languagechange -->
 
 本文拥有 KG OS **面向人的 Web 信息架构、图形阅读、查询结果帧、版本导航、前端编辑、国际化与连接交互**。产品定义见 [README](../../README.md)，职责索引见 [设计入口](../design.md)。数据与写入规则继续由 [Ontology](ontology.md)、[Object](object.md)、[Graph](graph.md)、[Evolution](evolution.md) 拥有；交付与认证边界由 [Runtime](runtime.md#web-hosting) 拥有。
 
 ## 依据与状态
+
+2026-10-21 **Web 显示偏好更新**：语言与主题均以“跟随系统”为默认模式；有效的用户手动选择优先并持久化。主题选项由原先的“浅色 / 深色”调整为“跟随系统 / 浅色 / 深色”；下文 2026-10-14 所述“默认深色、双选项”只保留为当时的视觉基线，不再定义当前默认行为。既有深浅色 Token、布局和视觉风格不变。具体解析、切换及内嵌宿主边界以 [显示偏好合同](#显示偏好与主题)为准。
 
 2026-10-15 **当前实现边界**：左侧版本示例已由真实 Evolution SDK/ChatGPT MCP 只读数据替换，支持多 Branch 筛选、已加载 Commit 搜索、分页和选中验证；下面 2026-10-14 的“静态版本示例”仅记录当时的视觉基线，不再描述当前左侧栏行为。右侧查询、图谱、编辑、草稿仍未接入，完整版本 DAG 与 Phase 14 验收尚未完成。
 
@@ -30,6 +32,28 @@
 | 已实现的 Web 国际化基础 | `app/i18n/` 内置 English / 简体中文、浏览器语言解析与语言偏好；当前 Shell、强制认证与 MCP 授权弹窗均可切换，错误与相对时间随语言更新，定向浏览器/单测已通过；正式打包和阶段门禁仍按 [Phase 14 P14-00](../development/phases/14-web.md#a14-00-国际化基础与双语界面) 核对 |
 | 本次工程方案，尚未实现 | 查询帧状态、图投影、查询 / 详情分页接入、表单到 Patch、完整业务上下文与持久草稿恢复、业务键盘与窄屏规则；`.kgos/web/ui.db`、可丢弃结果缓存、`info` 以外的 Web 数据 API 与按记录并发校验 |
 | 本轮决定更新 | 用户接受前两项默认，并追加“数据可以放到 kgos 下面，Web 临时数据也放里面”；按现有 Workspace→`.kgos` 合同理解，草稿不再默认随刷新丢失。随后明确“再简化点，不要过度设计”：首版只呈现常用工作流，保存 / 恢复在原编辑位置，缓存自动管理，普通错误就地短提示，真实冲突才打开比较。内部安全与持久化合同保留，均不代表已经实现 |
+
+<a id="web-first-run-setup"></a>
+
+### 五步首次初始化引导与路由（D105，扩展对外 Origin 配置）
+
+**这是部署后的独立全屏引导，不是正常工作区的欢迎页、可关闭弹窗或新的账号系统。** `kgosd` 未初始化也能提供 Web 静态资源，页面在恢复已有 Web Session 或显示常规登录弹窗**之前**先读取同源 `GET /api/v1/setup/status`：`setup_required/initializing` 导航到 `/setup`，`ready` 导航到首页（包括用户手动输入 `/setup` 时），`error` 展示有界错误及恢复说明，不把配置损坏或已有数据丢失误当作新空库。状态失败不能乐观跳进工作区；服务器也执行相同的页面导航门禁，避免仅依赖前端。普通 API/MCP 错误走 Runtime/Contracts，不在前端把 JSON 503 当作页面 302。
+
+| 阶段 | 页面核心内容 | 动作与状态 |
+| --- | --- | --- |
+| **1 · 欢迎使用 KG OS** | 简短介绍系统与后续四步配置目标，不要求填写目录、部署端口、Token 等技术项 | “开始设置”进入第二步；没有关闭/取消或提前进入工作区 |
+| **2 · 配置对外访问地址** | 必填 `server.public_origin`，由浏览器 `location.origin` 自动预填、可编辑。只允许 HTTPS Origin 或本机 loopback HTTP，拒绝用户名、路径、query 和 fragment；展示真实 MCP Path 派生地址 | 标题层级、卡片边框、底色与第三步向量配置保持一致；明确说明统一入口、预填、可达性与本机限制。只校验格式而不声称自动建立公网链路；地址随最终配置一次提交并由 MCP OAuth 使用，修改后通过重启生效 |
+| **3 · 配置向量服务** | `API URL`、可留空的 `API Key`、`Embedding 模型 ID`、`向量维度 1..4096`、`cosine / euclidean`；模型 ID 可自由填写 | 去掉无密钥切换开关：留空表示 no-auth。点击“验证配置”通过新的受限 Setup API 对用户所填 Embedding URL、模型、密钥执行真实测试，验证成功后才展示“下一步”；任何向量参数修改立即使旧验证失效，不把格式合格视为远端验证成功；已认领管理员 Token 但尚未提交配置时，返回本步骤仍可重新验证 |
+| **4 · 保护您的 KG OS 实例** | 标题、副标题、两段介绍及安全提示始终一致，说明管理员权限与用途、安全保管、仅创建时回显、从本地 `.kgos/auth.json` 找回及轮换后旧会话失效。首次按钮为「生成访问令牌」，已有 Token 时直接显示「重新生成访问令牌」，不提供输入已有令牌的路径；新令牌仅在本次创建响应中展示，可显隐、复制及保存 | 在尚未提交配置的 `setup_required` 状态直接生成或重新生成，无须输入旧 Token、登录或进行人工认证；服务端依然限制同源，配置提交后不允许重新生成。新令牌生成后浏览器自动建立 Web Session，成功后才允许进入第五步；失败时可直接再次重新生成或使用本次已展示的新令牌重试连接 |
+| **5 · 初始化知识库** | 先确认关键配置与密钥已提供/无认证状态，再展示 `配置 → Extensions → Instance Auth → Knowledge Base Bootstrap → Ready` 的实际执行进度、错误与重试入口 | 获认证后首次提交完整配置；若配置已合法发布而执行中断，重试仅按原 Session 调用不携带新配置的 `{}` resume；只有 daemon authenticated readiness 成功才显示完成并进入首页；失败不显示伪成功、不重建旧数据 |
+
+第三步的 **Web 向导预填值**为 `base_url=https://newapi.y2l.top/v1`、`model=qwen/qwen3-embedding-8b`、`dimensions=4096`、`similarity=cosine`；它们都可在提交初始化前修改，不代表 Runtime/手工 TOML 新增隐式默认或某个远端服务已验证可用。文案密度与欢迎页相近：先用简短的定位与两段介绍说明语义检索价值，再按“服务连接 / 模型配置”两栏分别解释服务和模型的作用，不给每个输入框重复附加技术帮助文本；底部仅保留真实验证过程的说明，不显示“初始化完成后不可修改”的提示。验证中、成功、失败及错误原因使用 shadcn/ui 基于 Base UI 的 Toast，不把结果插入正文，不移动固定 Footer；消息支持深浅主题和中英文，改变任一配置即取消过期结果。验证流程不写配置、不保存 API Key、不自动认领管理员 Token；密钥留空时验证与第五步提交均按显式 no-auth 处理。仅在相同向量参数通过真实测试后允许进入第四步，修改任一参数（包括密钥、维度或算法）均需要重新验证。受限出口与错误详情由 [Runtime](runtime.md#web-first-run-bootstrap) 统一拥有，不增加假 Provider Registry 或模型列表。
+
+Web 表单将对外地址和向量配置分为第二、第三步，不重新增加“检索/存储”“自定义扩展”两个独立步骤。`fulltext.analyzer=jieba`、`cache.path=cache/openai-compatible.db`、`cache.max_size_mb=4096` 与无额外扩展作为**完整显式值**写入配置；自定义 FTS5 tokenizer / SQLite extension、缓存路径等高级首次配置由直接编辑 `config.toml` 的用户管理，不在首版 Web 向导平铺。向量服务与全文分词仍遵守初始化后禁止修改的配置合同，但不在第三步页面重复展示限制文案；配置一旦写入后的操作不承诺动态修改或索引迁移。Web API Key 的私有文件保存、`api_key_env` 映射与无认证 endpoint 的执行语义只由 [Runtime](runtime.md#web-first-run-bootstrap) 定义，前端不直接处理文件或暴露秘密。
+
+初次浏览器状态检查、第四步已建立的 Web Session 与第五步初始化状态都属于**同一个 Instance / HTTP listener**。重复刷新或跳转不会重新认领已有 Token；Web Step 3 的未提交输入属于本次内存草稿，返回上一步可修改，页面刷新不声称已经持久化。已存在合法配置且在启动时自动初始化的手工文件用户**跳过 Web 问卷**：进行中显示进度，成功进入常规认证/首页；失败时显示可恢复诊断，不要求用户重新填一遍现有文件。已有完整实例直接访问 `/setup` 只能被导航回首页，不可激活第五步写入接口。现有 `?preview=setup` 前端开关只是未接后端的设计预览；正式接入时应移除该生产绕行或限定为开发态静态展示，不能成为已初始化实例的真实 setup 入口。
+
+布局沿用当前已确认的深/浅主题 Token、13px 基础字号、**窄左侧垂直编号导航 + 右侧内容垂直居中 + 底部左侧状态/右侧按钮**；手机按宽度重新排列，不允许步骤变更让步骤条、按钮或状态栏乱跳，长表单仅内容区滚动。欢迎、认证、初始化执行与错误态也必须遵守同一套布局和 English/简体中文 i18n。**本节是 Phase 26 正在实现的正式初始化合同**：当前未提交工作树已经将 `packages/web/src/features/setup/` 接入真实状态、Session 与五步 Setup API，并在正常工作区恢复 Session 之前检查初始化状态；但最终 CI、部署和生产验收仍未完成，不能把本地实现冒称已正式发布。服务端状态/安全约束参见 [Runtime](runtime.md#web-first-run-bootstrap)，实现任务见 [Phase 26](../development/phases/26-web-first-run-bootstrap.md)。
 
 ### 前端代码架构
 
@@ -76,10 +100,24 @@ src/
 │   ├── app.tsx
 │   ├── layout/        # Header / VersionSidebar / SidebarHandle / Workspace / VersionDrawer
 │   └── styles/        # tokens.css / global.css / layout.css
-└── shared/ui/icon.tsx # 无领域语义的 SVG 图标
+└── shared/
+    ├── ui/           # 按需 shadcn Base UI 控件、Lucide Icon 与 UI Provider
+    └── lib/          # class 合并与 document 主题同步
 ```
 
-设计变量集中于 `tokens.css`，`global.css` 只负责页面基础规则，`layout.css` 拥有顶层容器、间距、响应式及窄屏版本抽屉样式。新外壳无独立顶栏；浏览器在 100% 缩放下使用紧凑布局；桌面侧栏默认 240px，可在 240–420px 间拖动调整或通过方向键按 16px 微调，收起时宽度为 0；右侧独立点阵画布保留细边框与圆角，收起后画布四边距均为 12px。画布左边框中置的连续轮廓由 `SidebarHandle` 绘制，展开时向左凸出、收起时向右凹入，并局部覆盖原直线边框；不是分离按钮，且不被画布裁剪。桌面明暗主题位于侧栏底部，窄屏主题位于版本抽屉底部；窄屏画布内保留版本入口及原生 Dialog 的 Esc、关闭按钮和遮罩退出。左侧真实版本导航已先行接入；查询、图谱、本体、编辑等其余业务 Feature 仍按 Phase 14 实现，不用静态预览或局部完成替代业务验收。
+设计变量集中于 `tokens.css`，`global.css` 负责 Tailwind 样式入口、语义映射与页面基础规则，`layout.css` 拥有顶层容器、间距、响应式及窄屏版本抽屉样式。新外壳无独立顶栏；浏览器在 100% 缩放下使用紧凑布局；桌面侧栏默认 240px，可在 240–420px 间拖动调整或通过方向键按 16px 微调，收起时宽度为 0；右侧独立点阵画布保留细边框与圆角，收起后画布四边距均为 12px。画布左边框中置的连续轮廓由 `SidebarHandle` 绘制，展开时向左凸出、收起时向右凹入，并局部覆盖原直线边框；不是分离按钮，且不被画布裁剪。桌面明暗主题位于侧栏底部，窄屏主题位于版本抽屉底部；窄屏画布内保留版本入口及 Base UI Dialog 的 Esc、关闭按钮和遮罩退出。左侧真实版本导航已先行接入；查询、图谱、本体、编辑等其余业务 Feature 仍按 Phase 14 实现，不用静态预览或局部完成替代业务验收。
+
+### 通用 UI 组件体系
+
+Web 通用控件统一采用 **shadcn/ui 的 Base UI 实现 + Tailwind CSS v4 + Lucide**。保留 React / TypeScript / Vite 和 i18next，不重新创建应用，不引入第二套通用 UI 框架。以 [shadcn/ui Base UI 组件](https://ui.shadcn.com/docs/components/base/button)、[Toast](https://ui.shadcn.com/docs/components/base/toast) 和 [Vite 集成](https://ui.shadcn.com/docs/installation/vite) 为上游依据；不使用依赖 Sonner 或 Radix 的替代实现。
+
+组件源码按需放在现有 `shared/ui/`，`components.json` 指向该目录，通用 class 合并函数位于 `shared/lib/`。保留上游许可和来源；允许为本项目紧凑尺寸、主题、国际化和实际使用范围调整源码，不另建 package、组件注册系统或重复包装层。新增通用控件先检查已安装组件与 shadcn/ui；没有实际调用方的组件不安装。`SidebarHandle` 的拖拽/连续轮廓、Canvas、版本导航和 Setup Wizard 仍是业务组件，不用组件库模板重写。
+
+`tokens.css` 是唯一颜色、密度和圆角真源；shadcn 语义变量只映射这些 Token，不复制默认黑白配色。Tailwind v4 通过 Vite 插件编译；保留既有页面 reset，不叠加改变原有标题/表单默认值的全局 Preflight。组件必要的基础规则限于组件作用域。Browser 和 MCP Apps 使用同一个样式入口与 Provider；主题同步到各自 document 根，使挂载到 body 的 Dialog、Select、Popover、Tooltip、Toast 继承正确颜色，内嵌文档不修改宿主主题。
+
+Dialog 的焦点圈定、焦点恢复、Escape、遮罩和键盘行为由 Base UI 负责。认证弹窗不可通过 Escape 或遮罩绕过；MCP 授权的退出继续走现有 deny/cancel 合同，提交决定时不得关闭；移动端版本抽屉保留正常关闭与焦点恢复。分支筛选使用 Popover + Checkbox，算法选择使用 Select；现有模型输入仍允许自由文本，不变成固定 Provider 或模型枚举。
+
+通知只使用官方 shadcn/ui Base UI Toast 及其 Manager。每个应用根拥有独立 Provider，不自行实现事件总线、队列或计时器。向量验证在顶部显示同一条通知：Loading 不自动消失；Success 约 3.5 秒后消失；Error 保留至手动关闭、重新验证、修改配置或离开该步骤。更改配置或卸载必须取消请求并使旧结果失效；关闭消息不改变验证结果。消息文案在渲染时按当前语言解析，语言/主题切换不重发验证请求。所有图标按钮、弹层和关闭控件均有本地化可访问名称。
 
 ### ChatGPT 内嵌 Web（MCP Apps）
 
@@ -103,9 +141,19 @@ packages/web
 
 **布局、状态与降级**：复用响应式 Shell，遵守宿主实际视口，主题、English/简体中文均可用，但不假定 iframe 存储与独立站点共享；支持时读取宿主提供的 theme/locale，缺失时沿用 Web 已有选择与回退规则。`global` 与每个 `thread` 有各自的选择、暂存输入和当前页面状态，**不保证实时同步**；同一 Instance 的实际知识由服务端共享。外部 AI 修改 Branch 时不自动切换 pinned State，用户明确刷新再读取。宿主没有入口或不支持 MCP Apps 时，仍保留目标版本的五个 AI-facing MCP Tool（Phase 22 旧版为四个）与独立 Web；不退回直接嵌套整站 iframe 或跨站 Cookie。官方规范对 classic ChatGPT 网页端和 Work/桌面端支持范围有区别，真实验收见 [Phase 18](../development/phases/18-chatgpt-embedded-web.md)。
 
+### 显示偏好与主题
+
+浏览器 Web、首次初始化向导、认证弹窗和主工作区共享同一套主题选择规则，MCP Apps 在其独立文档中沿用同一规则。主题偏好有 `system`（默认）、`light`、`dark` 三种模式；本地存储键为 `localStorage["kgos.web.theme"]`，只持久化有效的显式 `light` / `dark`。无记录、损坏记录或明确选择 `system` 时均跟随系统，选择系统模式时移除旧记录，不把系统当前解析出的颜色永久保存为手动选择。手动选择立即生效并保留到刷新后；存储不可用时仍允许本次会话切换，刷新后重新检测。
+
+跟随系统模式用浏览器 `prefers-color-scheme` 检测并响应其变化；缺失浏览器能力时安全回退至深色。ChatGPT MCP Apps 内嵌宿主提供有效 `theme` 时，它是**自动模式的**优先来源；宿主缺失时回退系统颜色，手动选择始终优先于宿主。Host 状态变化不触发 MCP 数据请求。初始化页和工作区共用主题实现，Portal 跟随当前文档根的深浅色 Class；在首屏脚本执行时优先应用已保存或系统主题，避免初次 React 渲染前出现错误颜色；不修改 ChatGPT 宿主自身的主题。
+
+主题切换入口保持侧栏底部及窄屏抽屉，首次初始化页在现有页头使用同一三选项控件；语言与主题均不要求首次安装时填写，不增加后端设置 API、额外全屏设置页或持久化数据库。
+
 ### 国际化与语言偏好
 
-Web 作为浏览器中的人类界面，首版统一支持 **English (`en`)** 与**简体中文 (`zh-CN`)**；未指定时默认 English，与 [CLI 国际化](cli.md#国际化)的语言范围及英文回退方向一致，但 Web **不读取 CLI 的 `LC_*` / `LANG`**，也不共享 CLI 的文案或 locale 解析实现。当前已将原先中英文混用的 Shell、认证及 MCP 授权组件接入统一资源，`index.html` 默认 `lang="en"`，启动后按实际语言更新；后续业务 Feature 仍须遵守本节国际化合同。
+2026-10-21 **语言偏好模式更新**：默认 `system` 根据浏览器有序语言列表解析；用户显式选择 `en` 或 `zh-CN` 后，按原 `kgos.web.locale` 键持久化并优先于系统与内嵌宿主语言。语言控件提供“自动 / EN / 中文”三个模式，选择自动时移除手动偏好并即时重新检测，跟随模式响应浏览器 `languagechange`；内嵌宿主提供有效 `locale` 时只作为跟随模式优先来源，未支持的语言按浏览器列表回退，最终回退 English。初始化、授权与工作区沿用同一 i18n Context，不修改任何业务数据、认证或 OAuth 状态。
+
+Web 作为浏览器中的人类界面，首版统一支持 **English (`en`)** 与**简体中文 (`zh-CN`)**；默认跟随浏览器语言，无法匹配时才回退 English，与 [CLI 国际化](cli.md#国际化)的语言范围及英文回退方向一致，但 Web **不读取 CLI 的 `LC_*` / `LANG`**，也不共享 CLI 的文案或 locale 解析实现。当前已将原先中英文混用的 Shell、认证及 MCP 授权组件接入统一资源，`index.html` 默认 `lang="en"`，启动后按实际语言更新；后续业务 Feature 仍须遵守本节国际化合同。
 
 **语言确定与存储**：
 
@@ -464,6 +512,8 @@ resolve / finalize / abort 都携带最后观察到的 `expectedRevision`。reso
 未解决冲突阻止完成；完成动作调用 `finalize`，由后端对精确 revision candidate 做一致性检查。按实际 status 显示 `up_to_date / fast_forward / merged`，只有 merged 创建两 parent State。关闭面板保留可恢复 Session，list / get 可重开；显式“放弃合并”才 abort，不把关闭当 abort。状态失败 / 结果未知不自动重复 finalize。
 
 ## 连接、认证与恢复
+
+**D105 新入口顺序（目标，尚未实现）**：本节以下内容继续是已初始化业务工作区的现有 Session/Bearer/Boot Guard 合同；但首次页面加载必须先执行 [Web-first Setup 状态检查](#web-first-run-setup)，只有 `ready` 才继续本节的 Session 恢复和普通认证弹窗。未 ready 时只显示初始化/进度/不可用指引，其中第四步生成 Token 并建立 Web Session；不能因为旧 Session 不可恢复就抢先弹业务认证框，更不能从 `/setup` 绕过已初始化实例的登录流程。
 
 沿用 [Runtime 单 Token 实例认证](runtime.md#单-token-实例认证)与 [SDK 显式 token](client.md#kgossdk)。正式 Web 与 API 使用当前 daemon 的同源动态 loopback endpoint；浏览器没有读取 `.kgos/kgosd.lock / auth.json` 的特权，不默认扫描端口、自动启动 daemon 或重新定位另一个 workspace。
 

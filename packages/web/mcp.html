@@ -5,6 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="KG OS knowledge graph workspace" />
     <title>KG OS</title>
+    <script>
+      // Apply the saved or system appearance before the first paint.
+      const savedTheme = (() => {
+        try {
+          return localStorage.getItem("kgos.web.theme");
+        } catch {
+          return null;
+        }
+      })();
+      let theme = savedTheme === "light" || savedTheme === "dark" ? savedTheme : null;
+      if (theme === null) {
+        try {
+          theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        } catch {
+          theme = "dark";
+        }
+      }
+      document.documentElement.classList.add("theme-" + theme);
+    </script>
   </head>
   <body>
     <div id="app"></div>

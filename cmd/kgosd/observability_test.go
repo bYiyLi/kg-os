@@ -8,27 +8,30 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRunOwnsPrivateRotatingLogsForDetachedCLI(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("KGOS_INTERNAL_LOG_TO_FILE", "1")
 	t.Setenv("KGOS_LOG_LEVEL", "DEBUG")
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
 	var stdout, stderr bytes.Buffer
-	if code := run(context.Background(), []string{"--root", root}, &stdout, &stderr); code != 1 {
-		t.Fatalf("uninitialized runtime should fail: %d", code)
+	if code := run(ctx, []string{"--root", root}, &stdout, &stderr); code != 0 {
+		t.Fatalf("restricted setup should be available: %d", code)
 	}
 	file := filepath.Join(root, ".kgos", "logs", "kgosd.log")
 	data, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), `"event":"runtime.open.failed"`) ||
+	if !strings.Contains(string(data), `"event":"runtime.starting"`) ||
 		strings.Contains(string(data), root) {
 		t.Fatalf("missing safe startup log: %s", data)
 	}
-	if stdout.Len() != 0 || stderr.Len() != 0 {
-		t.Fatalf("detached stdout/stderr contaminated: %q / %q", stdout.String(), stderr.String())
+	if !strings.Contains(stdout.String(), "KG OS daemon: ") || stderr.Len() != 0 {
+		t.Fatalf("restricted startup stdout/stderr unexpected: %q / %q", stdout.String(), stderr.String())
 	}
 	if info, err := os.Stat(file); err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) {
 		t.Fatalf("log permission incorrect: %v %v", info, err)

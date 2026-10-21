@@ -148,7 +148,7 @@ Extension source、下载缓存与 native library 都属于 daemon runtime，不
 
 ## Knowledge Base
 
-一个 KG OS Knowledge Base 对应一个由 Lithograph 承载的知识世界。这里必须区分**公共能力面**与**State Snapshot 中的数据语义**：
+一个 KG OS Knowledge Base 对应一个由 Lithograph 承载的版本化图及其 State 空间。其中不同 Branch 可以承载长期独立演进的领域知识世界，也可以承载同一世界的实验版本；这是[知识世界组织约定](mcp.md#branch-standards-authoring)，不新增物理数据库、认证隔离或内核 Branch 类型。这里必须区分**公共能力面**与**State Snapshot 中的数据语义**：
 
 ```text
 Public Capability

@@ -1,109 +1,8 @@
 import { expect, test } from "@playwright/test";
-import type { Page, Route } from "@playwright/test";
 
-import { mockVersionRoutes, states } from "./version-fixture.js";
+import { authenticate, mockInstance, secondBootID } from "./web-shell-fixture.js";
 
-const testBootID = "e48245ac-51a4-4b6b-93ba-07bb4d0626a6";
-const secondBootID = "b6f0ba69-d40a-4819-9ed0-f09759c17292";
-const webAccess = "kgws_" + "A".repeat(43);
-
-async function mockInstance(page: Page) {
-  const state = {
-    bootID: testBootID,
-    online: true,
-    token: "valid-token",
-    rootAtLogin: "valid-token",
-    sessionValid: false
-  };
-  async function respond(route: Route, kind: "info" | "overview") {
-    const headers = route.request().headers();
-    if (!state.online) {
-      await route.abort("failed");
-    } else if (
-      headers["authorization"] !== "Bearer " + webAccess ||
-      state.rootAtLogin !== state.token
-    ) {
-      await route.fulfill({
-        status: 401,
-        contentType: "application/json",
-        body: JSON.stringify({ code: "AUTHENTICATION_FAILED", message: "authentication failed" })
-      });
-    } else if (
-      headers["x-kgos-expected-daemon-boot"] !== undefined &&
-      headers["x-kgos-expected-daemon-boot"] !== state.bootID
-    ) {
-      await route.fulfill({
-        status: 409,
-        contentType: "application/json",
-        body: JSON.stringify({ code: "WEB_CONNECTION_CHANGED", message: "web connection changed" })
-      });
-    } else {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(
-          kind === "info"
-            ? { daemonBootId: state.bootID, storageStatus: "unsupported" }
-            : { defaultBranch: "main", state: states.main }
-        )
-      });
-    }
-  }
-  await page.route("**/api/v1/web/auth/*", async (route) => {
-    const name = new URL(route.request().url()).pathname.split("/").at(-1);
-    const headers = route.request().headers();
-    if (name === "login" && headers["authorization"] === "Bearer " + state.token) {
-      state.sessionValid = true;
-      state.rootAtLogin = state.token;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        headers: {
-          "Set-Cookie":
-            "kgos_ws_fixture=" +
-            "B".repeat(43) +
-            "; Path=/api/v1/web/auth; HttpOnly; SameSite=Strict; Max-Age=2592000"
-        },
-        body: JSON.stringify({ accessToken: webAccess, daemonBootId: state.bootID })
-      });
-    } else if (
-      name === "session" &&
-      state.sessionValid &&
-      state.rootAtLogin === state.token &&
-      headers["cookie"]?.includes("kgos_ws_fixture=") === true
-    ) {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ accessToken: webAccess, daemonBootId: state.bootID })
-      });
-    } else if (name === "logout") {
-      state.sessionValid = false;
-      await route.fulfill({
-        status: 204,
-        headers: { "Set-Cookie": "kgos_ws_fixture=; Path=/api/v1/web/auth; Max-Age=0" }
-      });
-    } else {
-      await route.fulfill({
-        status: 401,
-        contentType: "application/json",
-        body: JSON.stringify({ code: "AUTHENTICATION_FAILED", message: "authentication failed" })
-      });
-    }
-  });
-  await page.route("**/api/v1/web/data/info", async (route) => respond(route, "info"));
-  await page.route("**/api/v1/evolution/overview", async (route) => respond(route, "overview"));
-  await mockVersionRoutes(page);
-  return state;
-}
-
-async function authenticate(page: Page) {
-  await mockInstance(page);
-  await page.goto("/");
-  await page.getByLabel("Access Token", { exact: true }).fill("valid-token");
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Authentication Required" })).toHaveCount(0);
-}
+test.use({ colorScheme: "dark" });
 
 test("renders API-backed versions with a blank graph canvas", async ({ page }) => {
   await authenticate(page);
@@ -167,7 +66,7 @@ test("filters real Evolution-shaped commits across branches without changing the
 
   await expect(history).toHaveCount(8);
   await branchFilter.click();
-  const choices = sidebar.getByRole("group", { name: "Filter branches" });
+  const choices = page.getByRole("group", { name: "Filter branches" });
   await expect(choices.getByRole("checkbox")).toHaveCount(4);
   await expect(choices.getByRole("checkbox", { name: "main" })).toBeChecked();
 
@@ -200,6 +99,28 @@ test("filters real Evolution-shaped commits across branches without changing the
   );
   await expect(page.getByRole("region", { name: "Graph canvas" })).toBeVisible();
   await expect(page.locator(".canvas-stage .commit-item")).toHaveCount(0);
+});
+
+test("follows system appearance until a persistent user override is chosen", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await authenticate(page);
+  const shell = page.locator(".app-shell");
+  const toggle = page.locator(".version-sidebar").getByRole("group", { name: "Appearance theme" });
+  await expect(shell).toHaveAttribute("data-theme", "light");
+  await expect(toggle.getByRole("button", { name: "Follow system theme" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(shell).toHaveAttribute("data-theme", "dark");
+  await toggle.getByRole("button", { name: "Light theme" }).click();
+  await expect(shell).toHaveAttribute("data-theme", "light");
+  expect(await page.evaluate(() => localStorage.getItem("kgos.web.theme"))).toBe("light");
+  await page.reload();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "light");
+  await toggle.getByRole("button", { name: "Follow system theme" }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
+  expect(await page.evaluate(() => localStorage.getItem("kgos.web.theme"))).toBeNull();
 });
 
 test("switches themes and hides the entire sidebar from the canvas border", async ({ page }) => {
@@ -290,7 +211,7 @@ test("switches themes and hides the entire sidebar from the canvas border", asyn
   });
   expect(collapsedAppearance.transform).toBe("matrix(-1, 0, 0, 1, 0, 0)");
   expect(collapsedAppearance.fill).toBe(collapsedAppearance.pageBackground);
-  await expect(expandHandle.locator(".icon path")).toHaveAttribute("d", "m9 5 7 7-7 7");
+  await expect(expandHandle.locator(".icon.lucide-chevron-right")).toBeVisible();
   expect((await canvas.boundingBox())?.width).toBeGreaterThan(before?.width ?? 0);
   await expandHandle.click();
   await expect(sidebar).toBeVisible();
@@ -343,6 +264,9 @@ test("keeps version navigation available at 320 CSS px without horizontal overfl
   await navigation.click();
   await expect(page.getByRole("dialog", { name: "Mobile version navigation" })).toBeVisible();
   await expect(page.locator(".version-drawer .commit-item")).toHaveCount(8);
+  const drawerBounds = await page.locator(".version-drawer").boundingBox();
+  expect(drawerBounds?.x).toBe(0);
+  expect(drawerBounds?.y).toBe(0);
   await page
     .getByRole("dialog", { name: "Mobile version navigation" })
     .getByRole("button", { name: "Light theme" })
@@ -394,13 +318,35 @@ test("requires authentication and cannot dismiss or interact with the background
 
   const token = page.getByLabel("Access Token", { exact: true });
   await expect(token).toHaveAttribute("type", "password");
+  await expect(token).toHaveAttribute("data-slot", "input-group-control");
+  const inputGroup = dialog.locator('[data-slot="input-group"]');
+  await expect(inputGroup).toBeVisible();
   await token.fill("wrong");
+  expect(await token.evaluate((input) => getComputedStyle(input).outlineStyle)).toBe("none");
+  expect(await token.evaluate((input) => getComputedStyle(input).boxShadow)).not.toMatch(
+    /\b[1-9]\d*px\b/
+  );
+  await expect(inputGroup).toHaveCSS("background-image", "none");
+  const focusAppearance = await inputGroup.evaluate((field) => {
+    const style = getComputedStyle(field);
+    return {
+      borderColor: style.borderColor,
+      borderStyle: style.borderStyle,
+      shadow: style.boxShadow
+    };
+  });
+  expect(focusAppearance.borderStyle).toBe("solid");
+  expect(focusAppearance.borderColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(focusAppearance.shadow).toBe("none");
+  await inputGroup.locator('[data-align="inline-start"]').click();
+  await expect(token).toBeFocused();
   await page.getByRole("button", { name: "Show access token" }).click();
   await expect(token).toHaveAttribute("type", "text");
   await page.getByRole("button", { name: "Hide access token" }).click();
   await expect(token).toHaveAttribute("type", "password");
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("Invalid access token");
+  expect(await inputGroup.evaluate((field) => getComputedStyle(field).boxShadow)).toBe("none");
   await expect(token).toHaveValue("");
   await expect(dialog).toBeVisible();
 });

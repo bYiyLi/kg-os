@@ -47,7 +47,7 @@ docker run --rm --platform linux/amd64 \
 
 ## 2. 启动、配置与认证
 
-Phase 17 目标使用现有 `.kgos/auth.json` Instance Token，不再要求独立的 MCP 管理员凭证。需要 ChatGPT 时，可在受保护的宿主环境文件（例如 `/secure/path/kgos.env`，权限 `0600`）配置 `KGOS_MCP_OAUTH_ISSUER=https://your-actual-domain.example`。不要把任何凭证写入聊天、URL 或公开配置。
+Phase 17 使用现有 `.kgos/auth.json` Instance Token，不再要求独立的 MCP 管理员凭证。需要 ChatGPT 时，请在首次 Web 初始化填写对外 HTTPS 根地址，或在已有实例的 `.kgos/config.toml` 中添加 `[server]` 分组并填写 `public_origin = "https://your-actual-domain.example"`，随后重启 `kgosd`。该地址是 Web/API/MCP/OAuth 的唯一对外地址来源。旧 `KGOS_MCP_OAUTH_ISSUER` / `--mcp-oauth-issuer` 已停止接受，升级时应先迁移配置、再移除旧值。不要把凭证写入聊天、URL 或公开配置。
 
 ```sh
 docker run -d --name kgos-unified --platform linux/amd64 \
@@ -64,7 +64,7 @@ docker run -d --name kgos-unified --platform linux/amd64 \
 | 统一监听 | `--host`, `--port` | `KGOSD_HOST`, `KGOSD_PORT` |
 | TLS | `--tls-cert`, `--tls-key`（须成对） | `KGOSD_TLS_CERT`, `KGOSD_TLS_KEY` |
 | MCP 路径 | `--mcp-path` | `KGOS_MCP_PATH` |
-| OAuth | `--mcp-oauth-issuer` | `KGOS_MCP_OAUTH_ISSUER` |
+| OAuth 对外地址 | 无单独参数 | `.kgos/config.toml` 的 `[server].public_origin` |
 
 请求超时、并发、大小、Sandbox 时间/内存/调用量/流数量及 Preview 缓存预算的完整参数见 [MCP 运行配置](../design/mcp.md#部署交付与运行合同)。有效 Instance 会开放认证保护下的 MCP 工具；独立 MCP Token 的旧参数/环境变量不再接受，路径冲突和无效 OAuth 配置必须拒绝。服务本身不创建公网 URL、Tunnel、用户账户或外部身份系统。
 
@@ -133,7 +133,7 @@ Ontology 预览的 `viewRevision` 属于进程内有界缓存；过期后返回 
 
 ## 4. ChatGPT OAuth 与私人 Plugin
 
-用户自行准备可从 ChatGPT 访问的 HTTPS 入口，例如 `https://kgos.example.com/mcp`，将 `KGOS_MCP_OAUTH_ISSUER` 设置为确切的 `https://kgos.example.com`，而**不是**完整的 `/mcp` URL。代理必须同时公开同源 Web `/` 与静态资源、Web 登录 API、`/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/request`、`/oauth/decision`、`/oauth/token`。
+用户自行准备可从 ChatGPT 访问的 HTTPS 入口，例如 `https://kgos.example.com/mcp`，在 `.kgos/config.toml` 中配置 `[server].public_origin = "https://kgos.example.com"`，随后重启 KG OS，而**不是**完整的 `/mcp` URL。代理必须同时公开同源 Web `/` 与静态资源、Web 登录 API、`/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/request`、`/oauth/decision`、`/oauth/token`。
 
 ChatGPT 连接使用受限 CIMD 客户端与 OAuth Authorization Code + PKCE S256。Go 校验后将浏览器跳转到**现有 KG OS Web**；已登录直接显示连接授权弹窗，未登录先执行 Web 原有登录，随后明确允许或拒绝。OAuth Code/Access/Refresh 由 Go 管理，对用户透明。当前 Web 的跨页面登录状态尚由另一开发任务负责，不能借此声称无重复登录已验收。请求 5 分钟有效，重启后 OAuth 凭证失效；不能绕过认证。
 

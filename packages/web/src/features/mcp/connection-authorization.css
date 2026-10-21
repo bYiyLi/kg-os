@@ -17,17 +17,13 @@
   scrollbar-color: var(--color-track) transparent;
 }
 
-.mcp-authorization-dialog:not([open]) {
-  display: none;
-}
-
-.mcp-authorization-dialog::backdrop {
+.mcp-authorization-backdrop {
   background: rgb(15 25 48 / 63%);
   backdrop-filter: blur(7px) saturate(0.76);
   -webkit-backdrop-filter: blur(7px) saturate(0.76);
 }
 
-.theme-dark .mcp-authorization-dialog::backdrop {
+.theme-dark .mcp-authorization-backdrop {
   background: rgb(3 7 22 / 73%);
 }
 

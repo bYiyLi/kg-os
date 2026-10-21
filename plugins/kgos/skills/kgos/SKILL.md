@@ -9,10 +9,10 @@ KG OS 是确定性的知识图基础设施，不是 Agent。你负责理解任�
 
 ## 阅读上下文
 
-1. 新会话先调用独立 MCP Tool `kgos_docs({})` 获取任务目录，再用 `paths: ["guides/ontology.md","guides/objects.md"]` 批量阅读文档。文档 Tool 不能在 JavaScript 中调用。不清楚当前模型时调用 `kgos_ontology_overview`。预览包括全部 Branch 的 Head Commit、Message 与各 State 的完整 Ontology。默认返回首 300 行。
+1. 首次处理任务或不确定 SDK 用法时，调用独立 MCP Tool `kgos_docs({})` 获取任务目录，按任务推荐的 `paths` 批量读取**相关** Guide、方法与类型；不要每次固定加载全部指南。文档 Tool 不能在 JavaScript 中调用。不清楚当前模型时调用 `kgos_ontology_overview`。预览包括全部 Branch 的 Head Commit、Message 与各 State 的完整 Ontology。默认返回首 300 行。
 2. 返回的 `viewRevision` 用于继续读取同一不可变视图；使用 `offset`、`limit` 读取缺失片段。目录中的 `Offset` / `Lines` 是**完整视图的绝对零基行号**，不是当前页的相对行号。不要只看首页就断言模型不含某个 Definition。过期后重新取新视图。
 3. 如果关心过去的修改，调用 `kgos_commit_ancestry`，指定 Branch/Commit Ref，按 `cursor` 继续。Commit DAG 是局部页；不把未展开的父 Commit 当作不存在。Message 在代码围栏中保留原文，而不是结构化摘要。
-4. 复杂读取使用 `kgos_query`：在 JavaScript 中先读 `evolution.overview()`，再将同一个 `state` 作为各读取的 `at`，避免移动 Branch 的多次读取混成一个快照。
+4. 复杂读取使用 `kgos_query`：默认 Branch 可从 `evolution.overview()` 获得固定 `state`；指定 Branch 必须以 `evolution.get({ state: "branch/" + branch })` 解析该 Branch 的真实 Head。相关读取都复用同一不可变 State，不把不同 Branch 或不同时间的结果混成一个快照。
 
 ## 可编程操作
 
@@ -51,7 +51,7 @@ return { state, selected };
 
 ## 修改、失败与版本
 
-- 对 Ontology/Object 修改，先读取准确 State 和 canonical YAML，再构造局部 Git Extended Diff。一次 Patch 可原子修改多个 Object；不要假定多个独立 SDK mutation 会组成跨方法事务。
+- 修改前确认用户授权的**目标 Branch 和操作**，不得将 `evolution.overview()` 的默认 Branch 误用为测试 Branch；先通过 `evolution.get({ state: "branch/" + branch })` 解析目标 Head，读取准确 State 和 canonical YAML，再构造局部 Git Extended Diff。一次 Patch 可原子修改多个 Object；不要假定多个独立 SDK mutation 会组成跨方法事务。安装验证默认只读，不对真实数据执行写入探针。
 - Graph Cypher 原样传给现有 KG OS/Lithograph；不要替用户发明 Cypher 扩展或假装预先校验过查询。
 - Commit `message` 建议使用 Markdown：`## 简介` 写摘要，`## 改动` 写准确差异，必要时后接上下文段落。它是建议，不是强制校验；不拆成多个 Message 字段。
 - `kgos_mutate` 脚本执行多次写入时，先前成功的操作可能已经持久化。后续脚本报错、调用中断、超时、Stream 部分消费或回执丢失时，不得自动重试 mutation；先用 `evolution`/目标 Branch/Tag/Merge 查询真实状态，必要时人工确认。

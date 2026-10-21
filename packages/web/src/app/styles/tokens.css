@@ -17,8 +17,11 @@
   --motion-fast: 160ms;
 }
 
+:root,
 .theme-dark {
   color-scheme: dark;
+  --color-error: #f1a1ac;
+  --color-success: #6ed5b0;
   --color-page: #080d22;
   --color-sidebar: #111831;
   --color-canvas: #0c1530;
@@ -46,6 +49,8 @@
 
 .theme-light {
   color-scheme: light;
+  --color-error: #b4233b;
+  --color-success: #147d5b;
   --color-page: #f6f8fc;
   --color-sidebar: #ffffff;
   --color-canvas: #f8fbff;
@@ -69,4 +74,27 @@
   --color-commit-blue: #2687e4;
   --color-commit-green: #14a87a;
   --color-commit-orange: #e58b3e;
+}
+
+/* shadcn/ui semantics map to the existing KG OS palette, never a second theme. */
+:root,
+.theme-dark,
+.theme-light {
+  --background: var(--color-page);
+  --foreground: var(--color-text);
+  --popover: var(--color-sidebar);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-selected-text);
+  --secondary: var(--color-control);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-control-hover);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-primary-soft);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--color-error);
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-focus);
+  --radius: var(--radius-small);
 }

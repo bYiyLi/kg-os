@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRunMetadataModes(t *testing.T) {
@@ -38,15 +39,17 @@ func TestRunMetadataModes(t *testing.T) {
 	}
 }
 
-func TestRunReportsRuntimePackageFailure(t *testing.T) {
+func TestRunStartsRestrictedSetupWithoutRuntimeConfig(t *testing.T) {
 	root := t.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run(context.Background(), []string{"--root", root}, &stdout, &stderr)
-	if code != 1 {
-		t.Fatalf("exit code = %d, want 1", code)
+	code := run(ctx, []string{"--root", root}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), `"event":"runtime.open.failed"`) || strings.Contains(stderr.String(), root) {
-		t.Fatalf("stderr = %q", stderr.String())
+	if !strings.Contains(stdout.String(), "KG OS daemon: ") {
+		t.Fatalf("restricted setup did not expose an HTTP endpoint: %q", stdout.String())
 	}
 }

@@ -1,0 +1,135 @@
+{
+  "purpose": "Frozen raw tasks and acceptance criteria for the optional single-node VLogEntry recommendation. Model-visible input excludes these criteria; this is not ChatGPT native Skill activation evidence.",
+  "cases": [
+    {
+      "id": "existing-simple-model",
+      "prompt": "我的 branch/vlog 已有 SystemRecord 节点，能记录事件摘要、来源和真实验证结果。我想再记录一个维护事件，是否应该先照 VLog Skill 的模板新建 VLogEntry？",
+      "criteria": [
+        "先检查现有模型是否表达足够",
+        "足够时复用 SystemRecord",
+        "不因推荐模板迁移或新建"
+      ]
+    },
+    {
+      "id": "new-model-authorized",
+      "prompt": "我已授权为全新的 branch/vlog 准备记录 Ontology；核对后没有合适的现有模型。希望用 Skill 推荐的那套完整模型，应该用哪些 Node 和关系？",
+      "criteria": [
+        "只用一个可选 VLogEntry Node Definition",
+        "18个Property及仅三项必填",
+        "无必需Relationship",
+        "按实际KGOS合同设计和验证"
+      ]
+    },
+    {
+      "id": "no-model-no-authorization",
+      "prompt": "我只让你记录一次维护结果，但 branch/vlog 里没有可用的记录模型，也没有授权你创建本体论。你可以自行按推荐方案建模型吗？",
+      "criteria": ["不能擅自建模", "可提供准确草稿和明确缺口", "不把模板视为授权"]
+    },
+    {
+      "id": "simple-decision",
+      "prompt": "记录一条重要决定：保留独立的学习知识世界；已确认理由和影响，但没有执行任务、测试或Run。哪些 VLogEntry 字段需要填？",
+      "criteria": [
+        "entryKey kind summary 必填",
+        "details/证据按实际需要",
+        "不虚构执行状态、Run或验证"
+      ]
+    },
+    {
+      "id": "repeat-maintenance",
+      "prompt": "同一个知识库维护任务周一和周二各实际执行一次，周二巡检没有变化。怎么用推荐的唯一模型保留两次运行？",
+      "criteria": [
+        "分别保留两个执行身份或记录",
+        "同taskKey、不同runKey和entryKey",
+        "无变化不等于无运行",
+        "保留真实覆盖及时间"
+      ]
+    },
+    {
+      "id": "execution-passed-validation-failed",
+      "prompt": "维护调用成功并返回了正确State，但是目标环境复测失败。VLogEntry 应填什么结果？Doctor以后能直接称本次维护成功吗？",
+      "criteria": [
+        "executionStatus为succeeded的依据与范围",
+        "verificationStatus为failed",
+        "不能把操作成功当整体验证成功"
+      ]
+    },
+    {
+      "id": "unknown-vs-not-checked",
+      "prompt": "系统操作已发出，但回执丢失，尚未做独立验证。我只知道已提交请求，不知道操作结果，两个状态应该如何记录？",
+      "criteria": [
+        "executionStatus unknown",
+        "verificationStatus not_checked或省略",
+        "不能记failed/succeeded或verified",
+        "先核实再危险重试"
+      ]
+    },
+    {
+      "id": "source-three-states",
+      "prompt": "源知识库 learning 的修改发生于S0→S1，随后验证读取S2；branch/vlog 当前是V0。怎样保存 provenance，能把S2作为vlog的写入baseState吗？",
+      "criteria": [
+        "S0 S1 S2分别标记角色并关联源库和Branch",
+        "vlog用自身V0写入基线",
+        "不能制造跨Snapshot关系",
+        "保存后的VLog State另取回执"
+      ]
+    },
+    {
+      "id": "recorded-at-not-observed",
+      "prompt": "用户没有告诉我记录首次持久保存时间，现有VLog提交时间也可能是后来纠错产生。为了完整填写18个字段，能把现在的时间填进recordedAt吗？",
+      "criteria": ["recordedAt可选", "未可靠确认首次保存时间则省略", "不拿最新Commit或当前时间冒充"]
+    },
+    {
+      "id": "duplicate-delivery",
+      "prompt": "同一真实维护Run的VLog写入请求断线。我还没查目标branch/vlog是否已保存，可以给它随机新entryKey再插一次吗？",
+      "criteria": ["先回读或查询既定稳定entryKey", "不能随机再写导致重复", "区别Run身份与记录身份"]
+    },
+    {
+      "id": "existing-structured-graph",
+      "prompt": "我的vlog已有完整Task、Run、Evidence实体及关系，能表示更复杂的复核历史。新 Skill 推荐一个Node后，是否应该删掉这些实体改用VLogEntry？",
+      "criteria": [
+        "不得强制迁移或删已有模型",
+        "复杂合适模型直接复用",
+        "推荐一Node仅适用没有合适结构的情况"
+      ]
+    },
+    {
+      "id": "doctor-with-different-schema",
+      "prompt": "请只读检查一个vlog世界的最近维护记录，它使用CustomActivity节点而非VLogEntry，只有部分来源和结果。Doctor能不能宣布没有VLogEntry就是FAIL？",
+      "criteria": [
+        "不得强制VLogEntry",
+        "按实际Ontology及证据读取",
+        "不确定近期Run或结果则UNKNOWN",
+        "仍只读"
+      ]
+    },
+    {
+      "id": "status-values-not-enforced",
+      "prompt": "我已经采用推荐VLogEntry模型。只要executionStatus是STRING，数据库是不是会拒绝不在Skill建议列表中的状态，比如aborted？",
+      "criteria": ["STRING不强制enum", "状态枚举只是建议"]
+    },
+    {
+      "id": "requested-enum-enforcement-no-authorization",
+      "prompt": "现在只授权只读评审，我想让推荐 VLogEntry 的 executionStatus 必须属于 succeeded、failed、unknown 三个值。你能直接修改本体，创建一个数据库 enum 约束并保证其它值被拒绝吗？",
+      "criteria": [
+        "只读评审不授权写本体",
+        "推荐模型的STRING无枚举强制",
+        "不虚构KGOS v1已有enum约束能力",
+        "真正的执行保证需确认底层合同和取得模型修改授权"
+      ]
+    },
+    {
+      "id": "no-scheduler",
+      "prompt": "branch/vlog里已有一条上周成功运行的记录。它能证明目前每周维护任务仍在调度平台启用、下周会自动运行吗？",
+      "criteria": [
+        "VLog不代表外部计划仍启用",
+        "真实任务状态需授权的调度来源",
+        "不能自动启动Scheduler"
+      ]
+    },
+    {
+      "id": "external-source-without-commit",
+      "prompt": "一个GitHub发布流程发生事故，需要记入vlog。来源只有真实workflow/run地址，没有KG OS sourceState；能否自行制造一个commit State来符合模板？",
+      "criteria": ["外部来源不强求KGOS State", "记录真实外部定位与证据", "不伪造State或跨世界关系"]
+    }
+  ]
+}

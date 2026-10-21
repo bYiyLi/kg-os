@@ -1,4 +1,7 @@
-import type { RefObject } from "react";
+import { Dialog, DialogContent, DialogTitle } from "../../shared/ui/dialog.js";
+import { Button } from "../../shared/ui/button.js";
+import { ThemeToggle } from "../../shared/ui/theme-toggle.js";
+import type { ThemePreference } from "../../shared/lib/use-theme-preference.js";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "../../shared/ui/icon.js";
@@ -7,66 +10,63 @@ import type { VersionHistory } from "../../features/version/use-version-history.
 
 import { AppBrand } from "./header.js";
 import { LanguageSwitcher } from "./language-switcher.js";
-import { ThemeToggle } from "./version-sidebar.js";
-import type { Theme } from "./version-sidebar.js";
 
 export function VersionDrawer({
-  dialogRef,
-  theme,
-  onToggleTheme,
+  open,
+  onOpenChange,
+  preference,
+  onSelectTheme,
   onDisconnect,
   history
 }: {
-  dialogRef: RefObject<HTMLDialogElement | null>;
-  theme: Theme;
-  onToggleTheme: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  preference: ThemePreference;
+  onSelectTheme: (value: ThemePreference) => void;
   onDisconnect?: (() => void) | undefined;
   history: VersionHistory;
 }) {
   const { t } = useTranslation();
   return (
-    <dialog
-      className="version-drawer"
-      aria-label={t("versions.mobileNavigation")}
-      ref={dialogRef}
-      onClick={(event) => {
-        const { left, right, top, bottom } = event.currentTarget.getBoundingClientRect();
-        if (
-          event.clientX < left ||
-          event.clientX > right ||
-          event.clientY < top ||
-          event.clientY > bottom
-        ) {
-          dialogRef.current?.close();
-        }
-      }}
-    >
-      <div className="drawer-header">
-        <AppBrand />
-        <button
-          className="icon-button"
-          type="button"
-          aria-label={t("versions.closeNavigation")}
-          onClick={() => {
-            dialogRef.current?.close();
-          }}
-        >
-          <Icon name="close" />
-        </button>
-      </div>
-      <div className="drawer-scroll">
-        <VersionTree history={history} />
-      </div>
-      <div className="drawer-bottom">
-        {onDisconnect !== undefined && (
-          <button className="connection-disconnect" type="button" onClick={onDisconnect}>
-            <Icon name="lock" />
-            <span>{t("versions.disconnect")}</span>
-          </button>
-        )}
-        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-        <LanguageSwitcher />
-      </div>
-    </dialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="version-drawer translate-x-0 translate-y-0"
+        overlayClassName="version-drawer-backdrop"
+      >
+        <DialogTitle className="sr-only">{t("versions.mobileNavigation")}</DialogTitle>
+        <div className="drawer-header">
+          <AppBrand />
+          <Button
+            variant="ghost"
+            className="icon-button"
+            type="button"
+            aria-label={t("versions.closeNavigation")}
+            onClick={() => {
+              onOpenChange(false);
+            }}
+          >
+            <Icon name="close" />
+          </Button>
+        </div>
+        <div className="drawer-scroll">
+          <VersionTree history={history} />
+        </div>
+        <div className="drawer-bottom">
+          {onDisconnect !== undefined && (
+            <Button
+              variant="ghost"
+              className="connection-disconnect"
+              type="button"
+              onClick={onDisconnect}
+            >
+              <Icon name="lock" />
+              <span>{t("versions.disconnect")}</span>
+            </Button>
+          )}
+          <ThemeToggle preference={preference} onSelect={onSelectTheme} />
+          <LanguageSwitcher />
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
