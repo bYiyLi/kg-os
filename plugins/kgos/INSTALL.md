@@ -40,25 +40,27 @@
 
    在 Docker 主机本地浏览器访问 `http://127.0.0.1:3777/setup`；若浏览器不在该主机，先使用经授权的 SSH 本地端口转发。先核实实际镜像版本是否支持 Web-first Setup；支持时通过 Web 引导完成向量服务参数设置/验证、管理员 Token 首次认领与保存，以及配置初始化。Token 只会展示一次，用户在受信任的位置保存，不发送给 AI。通过 `GET /api/v1/setup/status` 实际确认 `state=ready` 才允许对外开放 MCP；仅 `setup_required`、`initializing` 或错误都不是业务可用。当前源码的 Web Setup 未必存在于已发布的旧镜像，不能据此断定旧服务损坏。
 
-3. 为 **ChatGPT 远程 OAuth** 配置用户真实可达的 HTTPS origin。以 MCP URL `https://kgos.example.com/mcp` 为例，OAuth issuer 是 `https://kgos.example.com`（**不是**带 `/mcp` 的地址）。在可信宿主创建权限受限的环境文件，例如 `/secure/path/kgos.env`：
+3. 为 **ChatGPT 远程 OAuth** 在持久 `.kgos/config.toml` 中设置用户真实可达的 HTTPS Origin。例如 MCP URL 为 `https://kgos.example.com/mcp` 时，配置为：
 
-   ```dotenv
-   KGOS_MCP_OAUTH_ISSUER=https://kgos.example.com
+   ```toml
+   [server]
+   public_origin = "https://kgos.example.com"
    ```
 
-   环境文件不能公开提交；`example.com` 仅是示意，必须替换为用户实际 HTTPS origin。若第 2 步启动的是**刚创建且已确认归属的** `kgos-unified` 容器，配置 OAuth 后经用户授权按下列命令重建（**保留原 Volume**）；已有其它服务/容器不能直接套用，须先核对当前挂载与维护影响：
+   此配置不是完整的 `config.toml`：保留既有完整 Cache、SQLite、Full-text 和 Embedding 字段，不要只用此片段覆盖原配置。使用 Web-first Setup 的**全新实例**，在其引导中设置公开 Origin 并完成初始化；已有手工配置的实例，先核对目标 Volume/备份、配置文件的归属及实际修改授权，再向原配置添加或更新 `[server].public_origin`，重启后生效。它必须是 HTTPS 根 Origin（仅 loopback 开发可使用 HTTP），不能附带 `/mcp`、路径或查询参数。旧 `KGOS_MCP_OAUTH_ISSUER` 环境变量和 `--mcp-oauth-issuer` 命令参数在新版中**明确拒绝**，不得继续使用。配置 Origin 本身不会自动创建公网 HTTPS、证书或代理。
+
+   如果 Embedding Provider 需要通过 `embedding.api_key_env` 读取独立凭证，应按实际 Provider 配置在受保护的宿主环境文件中提供，不把凭证写入公开 `config.toml` 或聊天。若是第 2 步**由本安装新建且已确认归属的** `kgos-unified` 容器，配置完成后经授权用同一镜像、同一持久 Volume 重建（不删除 Volume）：
 
    ```sh
    docker stop kgos-unified
    docker rm kgos-unified
    docker run -d --name kgos-unified --platform linux/amd64 \
-     --env-file /secure/path/kgos.env \
      -v kgos-workspace:/workspace \
      -p 127.0.0.1:3777:3777 \
      "$KGOS_IMAGE"
    ```
 
-   不运行 `docker volume rm` 或其他清理命令；重建后确认 Setup Status 仍为 `ready`。未确认容器配置或现有业务维护窗口时，不擅自停止或覆盖。
+   若确实依赖手工配置的 Embedding 环境变量，需要在新 `docker run` 命令额外传入已保护的 `--env-file /secure/path/kgos.env`；**该环境文件不得设置废弃 OAuth Issuer**。已有其它容器/服务、不能确认挂载或维护窗口时，不能直接停止或覆盖。重建后核对 Setup Status 仍为 `ready`，再从真实 HTTPS 入口检查 OAuth discovery。
 
 4. 用户所选 HTTPS 代理必须转发同源 Web `/`、静态资源、登录路由、`/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/request`、`/oauth/decision`、`/oauth/token`，并保留请求方法、Host、Authorization 头与 TLS 信任链。KG OS 负责 OAuth Authorization Code + PKCE S256 + CIMD/Web 确认；**配置 issuer 不会自动创建公网 HTTPS、代理或 Tunnel**。Secure MCP Tunnel 只有在目标客户端和当前服务器认证流程都实际兼容时才使用，不能假定它自动解决 OAuth。
 

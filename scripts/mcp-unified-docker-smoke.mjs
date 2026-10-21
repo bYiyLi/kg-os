@@ -28,6 +28,9 @@ let token;
 const oauthIssuer = "https://kgos-smoke.example.invalid";
 
 const config = [
+  "[server]",
+  'public_origin = "' + oauthIssuer + '"',
+  "",
   "[cache]",
   'path = "cache/openai-compatible.db"',
   "max_size_mb = 16",
@@ -138,8 +141,6 @@ async function start() {
     "127.0.0.1::3777",
     "-v",
     volume + ":/workspace",
-    "-e",
-    "KGOS_MCP_OAUTH_ISSUER=" + oauthIssuer,
     image
   );
   const binding = await docker("port", container, "3777/tcp");
