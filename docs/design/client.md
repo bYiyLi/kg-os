@@ -95,3 +95,13 @@ Linux amd64 Docker / OCI (one official runtime artifact)
 - [D103](decisions.md#d103-lithograph-v033-upgrade) 规定 Docker 构建中的 Lithograph 主扩展及 Provider 使用经过 SHA-256 校验的 **v0.3.3** Release 制品；历史 `@kgos/runtime-linux-x64@0.2.1` 仅保留 Jieba/许可等 build-only 输入，所含旧 Lithograph/Provider 必须被替换且 Runtime manifest 摘要重算。构建阶段重新编译 `kgosd`；历史 npm 版本独立于 KG OS 镜像 Tag，不构成 npm 发行承诺。完整原生扩展安装、Instance/materialization、网络和安全规则仍由 [Runtime](runtime.md#native-runtime-package)、[MCP Docker](mcp.md#docker-only-交付) 拥有；正式镜像升级状态由实际 Docker 测试证明。
 - 验证只对单一交付目标做 Ubuntu/Linux amd64 源码质量门禁与 Linux amd64 Docker 隔离 Smoke。镜像中的原生扩展及 Go/JS/WASM 实际行为必须测试；旧 npm packaging/六平台 runner 不是这条链上的门禁。
 - Tag、镜像 digest、GHCR 发布、Dev 部署/生产部署互相独立；未执行的动作不得写成已成功。详见 [D99](decisions.md#d99-linux-amd64-docker-only-distribution) 和 [Phase 21](../development/phases/21-docker-only-delivery.md)。
+
+### 私有源码与公开分发仓库
+
+按 [D108](decisions.md#d108-private-source-public-releases)，`bYiyLi/kg-os` 是唯一私有开发真源，`bYiyLi/kg-releases` 只提供由该真源生成的公开 README、安装说明、CI/CD 和 Release，不复制源码或 Git 历史。源码修改、公开工作流修改和发布文案修改均在 KG OS 完成：
+
+1. `kg-os/main` Push 由 `.github/workflows/sync-kg-releases.yml` 检查确切来源 revision，调用 `scripts/render-kg-releases.mjs` 输出 `distribution/` 中的白名单内容和 `source.json`，使用仅授权公开仓库的可写 Deploy Key 推送 `kg-releases/main`；公开 CI 自动对 `source.json` 固定的私有 revision 执行 Validate 与 Linux amd64 Docker 隔离 Smoke。
+2. 经授权创建并 Push 的私有 `v<version>` Tag 生成匹配的公开 Tag；公开 Release 先通过完整 CI，再针对该 Tag 的确切私有 SHA 构建、隔离 Smoke、核对 GHCR 平台/revision/digest/匿名拉取并创建公开 GitHub Release。一般 `main` Push 不发布镜像。
+3. 公开 runner 只能通过单独的私有源码**只读** Deploy Key 读取，不能把源码、完整历史、测试报告或缓存发布到公开仓库；Public PR 不触发含该密钥的工作流。镜像正式公开前仍须满足源代码许可义务或具备合法替代授权；公开仓库设置 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 才允许二进制发布。
+
+该架构正在 [Phase 30](../development/phases/30-private-source-public-releases.md) 迁移；旧私有仓库 CI/Release 只有在新公开流水线真实运行通过后才可停用。生成器、工作流及一次性仓库/密钥配置的唯一维护说明见 [`distribution/MAINTAINING.md`](../../distribution/MAINTAINING.md)。

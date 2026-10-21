@@ -50,8 +50,8 @@
 
 - **Mac 工作树是源码真源，不是 Docker 测试机**：日常编码、Go/TypeScript/native 定向测试、`pnpm validate` 与 Review 在 Mac 进行；**不在 Mac 运行 Docker、Compose 或 Buildx**，也不要求 Mac 配置 Docker Engine/Context。Mac 缺少 Docker 不是开发阻塞项。
 - **OpenClaw 负责开发阶段 Docker 实测**：通过 `ssh openclaw` 访问现有 Linux amd64 主机，在 `/data/apps/KgosDev` 用现有受控入口执行镜像构建、隔离容器/临时 Volume 的完整 MCP/SDK/重启测试。长期 Dev Instance 不接受破坏性写入。Mac 可以远程触发 OpenClaw 的测试，但 Docker 命令实际在 OpenClaw 执行。
-- **GitHub Actions PR/main CI 只保留两个 Linux amd64 Job**：Ubuntu `pnpm validate` 验证仍实际运行的 Go/TypeScript/Kernel/Web、安全、竞态与覆盖率合同；Docker Job 在该源码 revision 上构建单进程镜像，在独立临时 Volume 中验证首次初始化、Web/API/MCP 四 Tool、31/31 SDK、认证/读写隔离、重启持久化、非 root 等。**取消六平台 native/npm package matrix，不把 Docker 产物检查误删**。Mac 本地 `pnpm validate` 不包含 Docker；普通 CI 只测试镜像，不推送 GHCR。
-- **Release CI 从正式 Tag 只交付 Linux amd64 Docker**：获独立授权的 `v*` Release CI 对确切待发布镜像执行 Smoke，通过后推送 GHCR、核对平台/revision/digest 并完成 GitHub Release；不再运行 npm/Native Runtime 发布流程。发布成功不是生产部署。
+- **公开仓库拥有完整 CI**：按照 [D108](docs/design/decisions.md#d108-private-source-public-releases)，当前 `kg-os` 是唯一私有源码与 `distribution/` 公开发布模板真源；推送 `main` 后，私有 `.github/workflows/sync-kg-releases.yml` 只生成并同步到 `kg-releases`，后者依据绑定的私有 SHA 运行两个 Linux amd64 Job：Ubuntu `pnpm validate` 验证 Go/TypeScript/Kernel/Web、安全、竞态及覆盖率；Docker Job 对同一 revision 构建并隔离验证初始化、Web/API/MCP、31/31 SDK、认证、持久化及非 root。取消六平台 native/npm matrix。**公开仓库没有独立编辑真源，任何公开工作流修改都必须在私有 `distribution/` 完成。**
+- **正式 Release**：获独立授权的私有 `v*` Tag 自动同步成公开 Tag，公开 Release 先完整 CI、再构建与 Smoke 精确镜像、验证 GHCR 平台/revision/digest 和匿名拉取并创建 GitHub Release；普通 `main` CI 不推送 GHCR。发布前须解决 AGPL/商业双授权的二进制源码许可问题，通过公开仓库变量 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 明确解锁。旧私有 CI/Release 只在新公开流水线真实验证后停用；不能把模板存在视为迁移完成。
 - **状态与权限分离**：OpenClaw Dev 部署、Git Commit、Push、Tag、GHCR 发布和生产部署是不同动作，各需相应授权；Phase 按自身要求的本地质量、OpenClaw Dev、**远程 Docker CI**、真实 ChatGPT 和 Review 判断，不能以在 Mac 上没有 Docker 为由跳过 Docker CI，也不能把旧 Phase 15 镜像证据充当 Phase 16。见 [D94](docs/design/decisions.md#d94-openclaw-docker-development-and-ci)、[Dev Runbook](docs/guide/dev-environment.md)。
 
 ## 写入与验证

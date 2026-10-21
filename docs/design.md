@@ -19,7 +19,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
 | [mcp.md](design/mcp.md) | `kgosd` 原生 Go MCP、Go/WASM JavaScript Sandbox、D102 独立批量 `kgos_docs` 与五个 AI-facing Tool 目标合同、KG OS 自有 MCP Cypher 手册、私人 Plugin / Skill、ChatGPT UI Tool/Resource、外部认证与 Markdown 视图（Phase 22 `docs.read` 为当前实现基线） |
 | [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同，以及 Web 持久数据错误方案 |
-| [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、当前 Docker-only 交付、TypeScript SDK、内部 CLI 与历史 npm 分发边界 |
+| [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、当前 Docker-only 交付、[D108 私有源码与公开 kg-releases 生成/CI](design/decisions.md#d108-private-source-public-releases)、TypeScript SDK、内部 CLI 与历史 npm 分发边界 |
 | [cli.md](design/cli.md) | AI-first CLI command tree、`--root` / `KGOS_ROOT`、分层 help、`doctor/init` setup、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听目标、dynamic loopback endpoint、`auth.json` / `kgosd.lock`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
 | [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |

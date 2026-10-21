@@ -188,6 +188,9 @@ Go Engineering Foundation
        Phase 24: Lithograph v0.3.3 Upgrade [done; D103]
          (same-version artifacts/manual → compatibility + cancellation →
           Mac quality + OpenClaw isolated Docker → final SHA CI)
+       Phase 30: Private Source & Generated Public kg-releases [in_progress; D108]
+         (private source → allowlisted public generation/sync → source-pinned public CI →
+          public Docker Release → remote verification → retire legacy private CI)
 ```
 
 Phase 02–13 均已完成，当前公开版本为 **v0.2.1**。Phase 13 实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 的本地/fresh-source/packed/中英文 PTY 与 CI Run `36505717058` 均已通过；后续独立发布 revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，`v0.2.1` tag 指向同一 revision。首次 Release Run `36510797281` 因 registry propagation timeout 在六个 Runtime 已发布后停止；Recovery Run `36514243605` 复用 verified `release-set`，最终完成八包 exact-version/`latest=0.2.1`、六平台 public-registry smoke 与 GitHub Release。Phase 12 的 `v0.2.0`、Phase 09 的 `v0.1.0`、Phase 11 的 `v0.1.1` 继续保留为历史发布基线。[Phase 14 Web](phases/14-web.md) 保持 `deferred`；[Phase 15 MCP](phases/15-mcp.md) 以 `ea37ddf` / CI 7/7 成功关闭为 `done`；[Phase 16 Go 原生 MCP](phases/16-kgosd-unified-mcp.md) 为 `done`，真实 ChatGPT OAuth/隔离写入及 Codex Skill 验收完成，最终实现提交 `813bff4` 的 [GitHub CI 8/8](https://github.com/bYiyLi/kg-os/actions/runs/38353358947) 全部成功；[Phase 17 MCP 统一认证](phases/17-mcp-web-authorization.md) 按用户批准例外关闭为 `done`，2026-10-14 的真实 ChatGPT 重新授权来自用户验收，不以 Phase 16 替代；本阶段未执行 GitHub CI / 全新版隔离矩阵，不得声称已通过。Docker 正式 Release/部署另行授权。
@@ -233,5 +236,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 22：MCP 自描述文档与 Lithograph v0.3.1 对齐](phases/22-mcp-self-describing-docs.md)
 - [Phase 23：MCP Tool 命名统一与批量文档入口](phases/23-mcp-tool-taxonomy-and-docs.md)
 - [Phase 24：Lithograph v0.3.3 依赖升级](phases/24-lithograph-v033-upgrade.md)
+- [Phase 30：私有代码真源与自动生成的公开 kg-releases](phases/30-private-source-public-releases.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

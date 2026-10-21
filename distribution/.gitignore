@@ -1,0 +1,6 @@
+.DS_Store
+/config.toml
+/kgos.env
+*.pem
+*.key
+id_ed25519*

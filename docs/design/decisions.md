@@ -1058,3 +1058,13 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **能力边界**：上游新增 `readAccess` / `writeAccess` 与 `memoryLimitBytes` 是 SQL execution options；现有 KG OS Graph 请求不暴露这些字段，本次升级不增加公共字段、不自动启用内存配额、不改变 Graph 的只读/读写及外部 I/O 合同。省略新选项继续使用现有执行行为；内存预算即使由宿主另行显式启用，也不是进程 RSS 硬上限。
 - **依据与取舍**：上游 [v0.3.2 发布说明](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/releases/v0.3.2.md)修复 canonical 状态、插值/作用域与 Provider cache 首次并发初始化；[v0.3.3 发布说明](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/releases/v0.3.3.md)修复静态反引号名称、传播长表达式取消并提供显式预算。本次直接消费官方制品与已有兼容合同，不为可选底层能力扩展 KG OS 产品面；Procedure metadata 与 `SHOW INDEXES.createStatement` 完整性限制仍按同版 [Known Issues](https://github.com/bYiyLi/Lithograph/blob/v0.3.3/docs/reference/known-issues.md)处理。旧 v0.3.1 cache 串行预热规避不再作为当前版本前置要求。
 - **验证与交付**：现有 Go/SQLite/Lithograph、Ontology/Graph/Evolution/MCP、真实升级兼容、当前函数/Procedure 库存、取消/连接清理和 OpenClaw 隔离 Docker 均需重新验证。最终 SHA 的远程两 Job CI 是 Phase 关闭条件；本地通过不等于长期 Dev 已部署或当前 CI 已通过。实际状态与证据只由 [Phase 24](../development/phases/24-lithograph-v033-upgrade.md)维护；Commit、Push、Dev 部署、Tag/GHCR 与生产部署分别取得授权。
+
+<a id="d108-private-source-public-releases"></a>
+
+### D108 私有 KG OS 真源与自动生成的公开 kg-releases（2026-10-21）
+
+- **仓库职责**：现有 `bYiyLi/kg-os` 作为唯一 **Private** 开发真源，保留源码、测试、设计、开发规范及 `distribution/` 公开内容模板；新 `bYiyLi/kg-releases` 为 **Public** 分发仓库，其 README、安装说明、工作流、来源 Manifest 等内容只能由私有仓库自动生成和同步。公开仓库不接收完整源码、历史和手动维护的分发实现，不反向修改 KG OS。Lithograph 的独立仓库与交付不受本决定影响。
+- **自动化**：私有 `main` Push 只执行有限的同步工作流，生成公开文件和绑定确切私有 SHA 的 `source.json`，使用专用、仅授权访问公开仓库的可写 Deploy Key 推送 `kg-releases/main`；该 Push 自动触发公开 **Validate + Linux amd64 Docker 隔离 Smoke**。获得独立发布授权的私有 `v*` Tag 推送生成同名公开 Tag，公开 Release 先复用完整 CI，再构建、Smoke、验证并发布精确镜像与 GitHub Release。普通 `main` Push 不推送 GHCR。公开 CI 使用另一把只读私有 Deploy Key，检验 Commit 在私有 `main` 祖先中；不复制源码到公开 Git、不上传源码、测试报告或公开缓存，不向外部 PR 提供密钥。
+- **单一开发真源**：公开工作流、文案和同步白名单都在 `kg-os/distribution/` 与 `scripts/render-kg-releases.mjs` 维护；更改后只提交私有仓库。保留旧私有 CI/Release 到公开流水线真正验证通过，再停用，避免迁移期间丢失工程门禁；既有 CI/Release GitHub 历史不能伪称在新仓库已验收。
+- **许可证与发布门禁**：原仓库 AGPL-3.0-only 与双授权文本、历史公开发布及已授予许可不因变为私有而自动撤销。公开二进制交付须先明确遵守对应源码提供要求或具有有效的重新授权依据；公开 Release 的镜像推送由仓库变量 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 显式解锁，默认关闭。GHCR 公开可拉取、镜像平台/revision/digest 和 GitHub Release 是实际发布验收的一部分，非私有 Git Tag Push 的自动推定结果。
+- **取舍与验收**：用两个独立、定向的 Deploy Key 换取统一开发体验和公开 CI/CD 可见性；公开 GitHub Actions 的执行日志本身仍可见，须抑制源码相关命令输出并禁止外部工作流执行。仓库管理、权限、CI、Tag、镜像与用户安装要分别实际验证，未部署或未完成的动作不标记为完成。实施见 [Client Docker 交付](client.md#docker-only-交付)、[Phase 30](../development/phases/30-private-source-public-releases.md) 和 [公开模板维护说明](../../distribution/MAINTAINING.md)。

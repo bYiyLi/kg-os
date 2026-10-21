@@ -1,0 +1,196 @@
+name: CI
+
+# Only generated pushes and trusted release workflow reuse can read private source.
+on:
+  push:
+    branches:
+      - main
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-ci-${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate private source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out generated public metadata
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate public source manifest
+        id: manifest
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const data = JSON.parse(fs.readFileSync('source.json', 'utf8'));
+          if (data.schema !== 1 || data.repository !== 'bYiyLi/kg-os' ||
+              !/^[0-9a-f]{40}$/.test(data.revision) ||
+              (data.ref !== 'refs/heads/main' && !/^refs\/tags\/v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(data.ref))) {
+            throw Error('Invalid generated source manifest');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `revision=${data.revision}\nref=${data.ref}\n`);
+          NODE
+
+      - name: Check out private source
+        uses: actions/checkout@v7
+        with:
+          repository: bYiyLi/kg-os
+          ref: ${{ steps.manifest.outputs.revision }}
+          ssh-key: ${{ secrets.KGOS_SOURCE_DEPLOY_KEY }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: source
+
+      - name: Verify commit is on source main
+        working-directory: source
+        env:
+          SOURCE_SHA: ${{ steps.manifest.outputs.revision }}
+          SOURCE_REF: ${{ steps.manifest.outputs.ref }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          if [[ "$SOURCE_REF" == refs/tags/* ]]; then
+            test "$(git rev-parse "$SOURCE_REF^{commit}")" = "$SOURCE_SHA"
+          fi
+          echo "Accepted source SHA: $SOURCE_SHA"
+
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.34.5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: source/.node-version
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.27.2
+          cache: false
+
+      - name: Install Rust and CGO dependencies
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup default 1.97.1
+          test "$(rustc --version | cut -d' ' -f2)" = "1.97.1"
+          sudo apt-get update
+          sudo apt-get install -y gcc
+          test "$(go env GOVERSION)" = "go1.27.2"
+
+      - name: Install dependencies and Chromium
+        working-directory: source
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps --only-shell chromium
+
+      - name: Validate without publishing source-derived logs
+        working-directory: source
+        run: |
+          set -euo pipefail
+          if pnpm validate > "$RUNNER_TEMP/kgos-validate.log" 2>&1; then
+            echo "Source validation passed"
+          else
+            echo "::error::Validation failed; details are suppressed on public runners"
+            exit 1
+          fi
+
+  docker-unified:
+    name: Docker Linux amd64 integration
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out generated public metadata
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate public source manifest
+        id: manifest
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const data = JSON.parse(fs.readFileSync('source.json', 'utf8'));
+          if (data.schema !== 1 || data.repository !== 'bYiyLi/kg-os' ||
+              !/^[0-9a-f]{40}$/.test(data.revision) ||
+              (data.ref !== 'refs/heads/main' && !/^refs\/tags\/v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(data.ref))) {
+            throw Error('Invalid generated source manifest');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `revision=${data.revision}\nref=${data.ref}\n`);
+          NODE
+
+      - name: Check out private source
+        uses: actions/checkout@v7
+        with:
+          repository: bYiyLi/kg-os
+          ref: ${{ steps.manifest.outputs.revision }}
+          ssh-key: ${{ secrets.KGOS_SOURCE_DEPLOY_KEY }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: source
+
+      - name: Verify commit is on source main
+        working-directory: source
+        env:
+          SOURCE_SHA: ${{ steps.manifest.outputs.revision }}
+          SOURCE_REF: ${{ steps.manifest.outputs.ref }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          if [[ "$SOURCE_REF" == refs/tags/* ]]; then
+            test "$(git rev-parse "$SOURCE_REF^{commit}")" = "$SOURCE_SHA"
+          fi
+          echo "Accepted source SHA: $SOURCE_SHA"
+
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.34.5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: source/.node-version
+
+      - name: Install test-client dependencies
+        working-directory: source
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build exact image without public output
+        working-directory: source
+        env:
+          IMAGE: kgos-unified-ci:${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if docker build --platform linux/amd64 -f Dockerfile.unified -t "$IMAGE" . > "$RUNNER_TEMP/kgos-build.log" 2>&1; then
+            echo "Linux amd64 image built"
+          else
+            echo "::error::Docker build failed; details are suppressed on public runners"
+            exit 1
+          fi
+
+      - name: Isolated integration smoke without public output
+        working-directory: source
+        env:
+          KGOS_UNIFIED_DOCKER_SMOKE_IMAGE: kgos-unified-ci:${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if node scripts/mcp-unified-docker-smoke.mjs > "$RUNNER_TEMP/kgos-smoke.log" 2>&1; then
+            echo "Unified Docker smoke passed"
+          else
+            echo "::error::Docker smoke failed; details are suppressed on public runners"
+            exit 1
+          fi

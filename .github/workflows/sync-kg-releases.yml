@@ -1,0 +1,119 @@
+name: Sync kg-releases
+
+# KG OS is the only authoring repository. This workflow exports an allowlisted
+# public release repository and never copies private source or Git history.
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-kg-releases
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Generate public release repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out private source revision
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          path: source
+
+      - name: Validate private main or release tag
+        id: source
+        working-directory: source
+        env:
+          SOURCE_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          SOURCE_SHA=$(git rev-parse HEAD)
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          case "$SOURCE_REF" in
+            refs/heads/main)
+              test "$SOURCE_SHA" = "$GITHUB_SHA"
+              if [[ "$(git rev-parse refs/remotes/origin/main)" != "$SOURCE_SHA" ]]; then
+                echo "This source push was superseded by a newer main commit"
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+            refs/tags/v*)
+              TAG=${SOURCE_REF#refs/tags/}
+              VERSION=$(node -p 'require("./package.json").version')
+              test "$TAG" = "v$VERSION"
+              test "$(git rev-parse "$SOURCE_REF^{commit}")" = "$SOURCE_SHA"
+              ;;
+            *)
+              echo "::error::Unexpected source ref"
+              exit 1
+              ;;
+          esac
+          printf 'revision=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Install source Node.js toolchain
+        if: steps.source.outputs.skip != 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: source/.node-version
+
+      - name: Test the release generator
+        if: steps.source.outputs.skip != 'true'
+        working-directory: source
+        run: node --test tests/render-kg-releases.test.mjs
+
+      - name: Check out public distribution repository with repo-scoped write key
+        if: steps.source.outputs.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: bYiyLi/kg-releases
+          ref: main
+          ssh-key: ${{ secrets.KG_RELEASES_WRITE_KEY }}
+          fetch-depth: 0
+          persist-credentials: true
+          path: releases
+
+      - name: Sync generated files and publish release tag
+        if: steps.source.outputs.skip != 'true'
+        env:
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_SHA: ${{ steps.source.outputs.revision }}
+        run: |
+          set -euo pipefail
+          cd releases
+          if [[ "$SOURCE_REF" == refs/tags/* ]]; then
+            TAG=${SOURCE_REF#refs/tags/}
+            if git show-ref --verify --quiet "refs/tags/$TAG"; then
+              EXISTING_SHA=$(git show "$TAG:source.json" | node -e 'let s="";process.stdin.on("data",x=>s+=x).on("end",()=>{const m=JSON.parse(s);console.log(m.revision+" "+m.ref)})')
+              test "$EXISTING_SHA" = "$SOURCE_SHA $SOURCE_REF" || {
+                echo "::error::Public release tag is immutable and does not match the source"
+                exit 1
+              }
+              echo "Public release tag already matches; no changes required"
+              exit 0
+            fi
+          fi
+          cd ..
+          node source/scripts/render-kg-releases.mjs \
+            --output releases --revision "$SOURCE_SHA" --ref "$SOURCE_REF"
+          cd releases
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "build: sync kg-os ${SOURCE_SHA:0:12}"
+            git push origin HEAD:main
+          fi
+          if [[ "$SOURCE_REF" == refs/tags/* ]]; then
+            TAG=${SOURCE_REF#refs/tags/}
+            git tag "$TAG"
+            git push origin "refs/tags/$TAG"
+          fi

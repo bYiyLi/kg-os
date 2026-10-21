@@ -1,0 +1,193 @@
+name: Release
+
+# The private source tag is mirrored as a generated public distribution tag.
+# Its exact source commit must pass public CI before any image is published.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kgos-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Full release validation
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  docker:
+    name: Publish tested Linux amd64 image
+    needs: ci
+    if: vars.KGOS_BINARY_DISTRIBUTION_APPROVED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out generated public source manifest
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify source manifest matches the public tag
+        id: manifest
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const data = JSON.parse(fs.readFileSync('source.json', 'utf8'));
+          const tag = process.env.GITHUB_REF_NAME;
+          if (data.schema !== 1 || data.repository !== 'bYiyLi/kg-os' ||
+              !/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(tag) ||
+              data.ref !== `refs/tags/${tag}` || !/^[0-9a-f]{40}$/.test(data.revision)) {
+            throw Error('Public tag does not match a trusted private source tag');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `revision=${data.revision}\n`);
+          NODE
+
+      - name: Check out exact private source tag
+        uses: actions/checkout@v7
+        with:
+          repository: bYiyLi/kg-os
+          ref: ${{ steps.manifest.outputs.revision }}
+          ssh-key: ${{ secrets.KGOS_SOURCE_DEPLOY_KEY }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: source
+
+      - name: Verify tag, package version, and private main ancestry
+        id: source
+        working-directory: source
+        env:
+          TAG: ${{ github.ref_name }}
+          EXPECTED_SOURCE_SHA: ${{ steps.manifest.outputs.revision }}
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')
+          test "$TAG" = "v$VERSION"
+          git show-ref --verify --quiet "refs/tags/$TAG"
+          REVISION=$(git rev-parse HEAD)
+          test "$REVISION" = "$EXPECTED_SOURCE_SHA"
+          test "$REVISION" = "$(git rev-parse "refs/tags/$TAG^{commit}")"
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+          printf 'revision=%s\n' "$REVISION" >> "$GITHUB_OUTPUT"
+          printf 'image=ghcr.io/byiyli/kgos:%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.34.5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: source/.node-version
+
+      - name: Install test-client dependencies
+        working-directory: source
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build exact source image
+        working-directory: source
+        env:
+          IMAGE: ${{ steps.source.outputs.image }}
+          REVISION: ${{ steps.source.outputs.revision }}
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if docker build --platform linux/amd64 -f Dockerfile.unified \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$REVISION" \
+            --label "org.opencontainers.image.version=$TAG" \
+            -t "$IMAGE" . > "$RUNNER_TEMP/kgos-release-build.log" 2>&1; then
+            echo "Linux amd64 release image built"
+          else
+            echo "::error::Release build failed; details are suppressed on public runners"
+            exit 1
+          fi
+
+      - name: Smoke-test the exact image before publishing
+        working-directory: source
+        env:
+          KGOS_UNIFIED_DOCKER_SMOKE_IMAGE: ${{ steps.source.outputs.image }}
+        run: |
+          set -euo pipefail
+          if node scripts/mcp-unified-docker-smoke.mjs > "$RUNNER_TEMP/kgos-release-smoke.log" 2>&1; then
+            echo "Release smoke passed"
+          else
+            echo "::error::Release smoke failed; details are suppressed on public runners"
+            exit 1
+          fi
+
+      - name: Authenticate to GHCR
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Push tested image
+        env:
+          IMAGE: ${{ steps.source.outputs.image }}
+        run: |
+          set -euo pipefail
+          if docker push "$IMAGE" > "$RUNNER_TEMP/kgos-release-push.log" 2>&1; then
+            echo "GHCR push completed"
+          else
+            echo "::error::GHCR push failed; confirm package access for the distribution repository"
+            exit 1
+          fi
+
+      - name: Verify anonymous pull, platform, revision, and digest
+        id: verify
+        env:
+          IMAGE: ${{ steps.source.outputs.image }}
+          REVISION: ${{ steps.source.outputs.revision }}
+        run: |
+          set -euo pipefail
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          docker image rm "$IMAGE" >/dev/null 2>&1 || true
+          if ! docker pull "$IMAGE" > "$RUNNER_TEMP/kgos-anonymous-pull.log" 2>&1; then
+            echo "::error::Image is not anonymously accessible; make the GHCR package Public and retry"
+            exit 1
+          fi
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$IMAGE")" = "linux/amd64"
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE")" = "$REVISION"
+          DIGEST_REF=$(docker image inspect --format '{{ index .RepoDigests 0 }}' "$IMAGE")
+          case "$DIGEST_REF" in
+            ghcr.io/*@sha256:*) ;;
+            *) echo "::error::Missing GHCR digest"; exit 1 ;;
+          esac
+          printf 'digest_ref=%s\n' "$DIGEST_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Publish public GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.source.outputs.tag }}
+          REVISION: ${{ steps.source.outputs.revision }}
+          IMAGE: ${{ steps.source.outputs.image }}
+          DIGEST_REF: ${{ steps.verify.outputs.digest_ref }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            BODY=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body')
+            if [[ "$BODY" != *"$REVISION"* || "$BODY" != *"$DIGEST_REF"* ]]; then
+              echo "::error::Existing release differs from the verified source or digest"
+              exit 1
+            fi
+            echo "Matching public GitHub Release already exists"
+          else
+            {
+              printf 'Linux amd64 Docker image: \`%s\`\n\n' "$IMAGE"
+              printf 'Verified image digest: \`%s\`\n\n' "$DIGEST_REF"
+              printf 'Private source commit SHA: \`%s\`\n\n' "$REVISION"
+              echo "The public release tag belongs to this distribution repository, not the private source."
+            } > "$RUNNER_TEMP/kgos-release-notes.md"
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "KG OS $TAG" \
+              --notes-file "$RUNNER_TEMP/kgos-release-notes.md"
+          fi
