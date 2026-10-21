@@ -8,7 +8,7 @@ const root = resolve(import.meta.dirname, "..");
 const env = {
   ...process.env,
   CGO_ENABLED: "1",
-  GOTOOLCHAIN: "go1.27.2"
+  GOTOOLCHAIN: "go1.27.3"
 };
 const allowed = new Map([
   [

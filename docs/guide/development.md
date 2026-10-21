@@ -10,7 +10,7 @@
 | --- | --- |
 | Node.js | 24.15.0，TypeScript/Web 构建与测试工具，不包含在运行镜像 |
 | pnpm | 10.34.5，源码依赖与质量命令 |
-| Go | 1.27.2，`kgosd` / Kernel / MCP / SQLite driver |
+| Go | 1.27.3，`kgosd` / Kernel / MCP / SQLite driver |
 | Rust | 1.97.1，本机 official Jieba 原生扩展测试 |
 | CGO / C compiler | 本机 `kgosd` 和 SQLite 扩展编译 |
 

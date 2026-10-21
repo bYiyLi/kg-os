@@ -75,7 +75,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: 1.27.2
+          go-version: 1.27.3
           cache: false
 
       - name: Install Rust and CGO dependencies
@@ -86,7 +86,7 @@ jobs:
           test "$(rustc --version | cut -d' ' -f2)" = "1.97.1"
           sudo apt-get update
           sudo apt-get install -y gcc
-          test "$(go env GOVERSION)" = "go1.27.2"
+          test "$(go env GOVERSION)" = "go1.27.3"
 
       - name: Install dependencies and Chromium
         working-directory: source

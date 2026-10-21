@@ -32,7 +32,7 @@
 
 参照现有 Nexum Dev 的**源码、配置、数据分离 + 独立 Compose 项目**，但 KG OS 不依赖 Nexum 的 Server、数据库、身份服务、Registry 或部署脚本。Dev 直接从 Mac 未发布工作树同步源码到 Linux Docker 构建；**普通 CI 也构建及测试 Docker，但不推送 GHCR**；正式镜像与 GHCR 仅由获独立授权的 Release CI 交付。Dev 实测不等于最终 CI 通过、镜像发布或生产部署。责任规则见 [AGENTS](../../AGENTS.md#开发ci-与-release-分工)。
 
-Dev 多阶段构建生成 Web 静态资源、当前 Go `kgosd`（CGO + SQLite FTS5），并校验固定版本的 Linux amd64 Lithograph、Provider 和 Jieba 扩展。构建时 Go **1.27.2** 归档进行 SHA-256 校验，运行时不需要 Go/Node 编译工具；Runtime `manifest.json` 的 daemon 摘要同步为当前编译产物。**此 Dev 流程不会自动重新编译 `native/jieba` 或 Lithograph**；改变它们时需单独准备已验证 native artifact。
+Dev 多阶段构建生成 Web 静态资源、当前 Go `kgosd`（CGO + SQLite FTS5），并校验固定版本的 Linux amd64 Lithograph、Provider 和 Jieba 扩展。构建时 Go **1.27.3** 归档进行 SHA-256 校验，运行时不需要 Go/Node 编译工具；Runtime `manifest.json` 的 daemon 摘要同步为当前编译产物。**此 Dev 流程不会自动重新编译 `native/jieba` 或 Lithograph**；改变它们时需单独准备已验证 native artifact。
 
 | Linux 路径 | 所有权与用途 |
 | --- | --- |
