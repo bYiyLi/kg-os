@@ -104,4 +104,4 @@ Linux amd64 Docker / OCI (one official runtime artifact)
 2. 经授权创建并 Push 的私有 `v<version>` Tag 生成匹配的公开 Tag；公开 Release 先通过完整 CI，再针对该 Tag 的确切私有 SHA 构建、隔离 Smoke、核对 GHCR 平台/revision/digest/匿名拉取并创建公开 GitHub Release。一般 `main` Push 不发布镜像。
 3. 公开 runner 只能通过单独的私有源码**只读** Deploy Key 读取，不能把源码、完整历史、测试报告或缓存发布到公开仓库；Public PR 不触发含该密钥的工作流。镜像正式公开前仍须满足源代码许可义务或具备合法替代授权；公开仓库设置 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 才允许二进制发布。
 
-该架构正在 [Phase 30](../development/phases/30-private-source-public-releases.md) 迁移；旧私有仓库 CI/Release 只有在新公开流水线真实运行通过后才可停用。生成器、工作流及一次性仓库/密钥配置的唯一维护说明见 [`distribution/MAINTAINING.md`](../../distribution/MAINTAINING.md)。
+该架构正在 [Phase 30](../development/phases/30-private-source-public-releases.md) 验收。私有仓库只保留有限的自动同步工作流，不再运行源码 Validate、Docker 或 Release；全部远端质量门禁归 `kg-releases`，公开 CI 是否通过必须以其真实 Run 为准。生成器、工作流及一次性仓库/密钥配置的唯一维护说明见 [`distribution/MAINTAINING.md`](../../distribution/MAINTAINING.md)。

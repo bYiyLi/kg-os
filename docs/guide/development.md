@@ -67,10 +67,10 @@ pnpm dev:mcp check   # 只读核对长期 Dev
 
 Dev 部署必须获得单独授权；已授权后使用 `pnpm dev:mcp deploy`，它会在 OpenClaw 自动备份、构建、切换并验证，不能对长期用户 Instance 做写入 Smoke。
 
-需要测试一次真正的 Docker 镜像时，在 OpenClaw 的**独立临时源码目录**用当前 `Dockerfile.unified` 构建 Linux amd64 镜像，然后以环境变量 `KGOS_UNIFIED_DOCKER_SMOKE_IMAGE` 指向**该新镜像**执行 `pnpm test:docker:unified`。它创建、清理独立 Volume，验收单 `kgosd`、非 root/无 Node、Web/API/MCP、五个 AI-facing Tool 与 app-only UI、OAuth/认证、31/31 SDK、读写权限、重启持久化。普通 GitHub PR/main CI 只包含 Ubuntu Validate 和 Linux amd64 Docker 两个 Job；源码本地通过不能替代实际 Docker CI。
+需要测试一次真正的 Docker 镜像时，在 OpenClaw 的**独立临时源码目录**用当前 `Dockerfile.unified` 构建 Linux amd64 镜像，然后以环境变量 `KGOS_UNIFIED_DOCKER_SMOKE_IMAGE` 指向**该新镜像**执行 `pnpm test:docker:unified`。它创建、清理独立 Volume，验收单 `kgosd`、非 root/无 Node、Web/API/MCP、五个 AI-facing Tool 与 app-only UI、OAuth/认证、31/31 SDK、读写权限、重启持久化。GitHub 的完整 Validate 和 Linux amd64 Docker 两项 CI **只在公开 `kg-releases` 执行**；私有 `kg-os` 的 GitHub Actions 仅负责自动同步公开内容。源码本地通过不能替代实际 Docker CI。
 
 ## 正式 Release 边界
 
-唯一官方新发行物是 `ghcr.io/<owner 小写>/kgos:v<version>` 的 **Linux amd64 Docker**；镜像内容及首次初始化操作见 [MCP 运行指南](mcp.md)。只有明确授权创建或使用已存在的 `v<version>` Git Tag 后，`.github/workflows/release.yml` 才会按该 exact revision 构建、隔离 Smoke、推送并验证 GHCR 镜像与 digest，最后创建/确认 GitHub Release。它不再执行 npm Trusted Publishing、六平台 candidate/registry smoke。
+唯一官方新发行物是 `ghcr.io/<owner 小写>/kgos:v<version>` 的 **Linux amd64 Docker**；镜像内容及首次初始化操作见 [MCP 运行指南](mcp.md)。只有明确授权创建并推送私有源码仓库的 `v<version>` Git Tag 后，私有 Sync 才将其同步成公开 Tag，交由 `kg-releases` 中的 `distribution/.github/workflows/release.yml` 模板所生成的工作流执行完整 CI、精确镜像构建与 Smoke；只有分发许可门禁解除，才推送并验证 GHCR 镜像与 digest、创建/确认公开 GitHub Release。不再执行 npm Trusted Publishing、六平台 candidate/registry smoke。
 
 本地检查、Git Commit/Push、OpenClaw Dev、CI、GHCR Release、生产部署是独立动作；只有实际完成的动作才能报告成功。历史 v0.1.x–v0.2.1 npm 发布证据仍在各自 Phase 08–13 文档中。

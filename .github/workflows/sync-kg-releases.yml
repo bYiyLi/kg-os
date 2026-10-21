@@ -65,11 +65,6 @@ jobs:
         with:
           node-version-file: source/.node-version
 
-      - name: Test the release generator
-        if: steps.source.outputs.skip != 'true'
-        working-directory: source
-        run: node --test tests/render-kg-releases.test.mjs
-
       - name: Check out public distribution repository with repo-scoped write key
         if: steps.source.outputs.skip != 'true'
         uses: actions/checkout@v7
