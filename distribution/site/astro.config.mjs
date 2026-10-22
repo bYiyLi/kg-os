@@ -1,8 +1,7 @@
 import { defineConfig } from "astro/config";
 
 export default defineConfig({
-  site: "https://www.y2l.top",
-  base: "/kg-releases",
+  site: "https://kghub.y2l.top",
   output: "static",
   trailingSlash: "ignore"
 });

@@ -116,6 +116,6 @@ KG OS 官网与产品工作区是**不同的界面**。官网负责说明产品�
 - **内容**：首版采用已确认的 V4 首页叙事「不止检索知识，更能操作知识」，依次展示示例知识图、为何需要结构化知识、定义→关联→操作→演化、四项基础能力、Agent/KG OS/Lithograph/SQLite 架构及 **AI Agent 安装入口**。图谱界面只使用明确标注的示例数据，不暗示它是真实运行截图或新增产品能力。
 - **唯一安装方式的展示**：官网不提供手动安装页面、手动/AI 切换标签或第二份安装步骤。中英文官网只展示一份可复制的 Agent 提示词，指向公开 `https://raw.githubusercontent.com/bYiyLi/kg-releases/main/INSTALL.md`；其职责只是要求 Agent 先获取完整安装真源、检查现有环境/权限/正式 Release、执行获授权的动作并按实际结果验收。网页本身不执行安装，不能保证任意 Agent 都能访问用户环境；需要用户处理的登录与授权由 Agent 逐步说明，不在聊天中索取密钥。按钮只负责复制文本，失败时可选择并自行复制，不虚报已复制。该网页提示词不重复定义镜像、Plugin、MCP 或 Skill 的具体安装流程。
 - **语言与主题**：静态生成 English `/en/` 与简体中文 `/zh/`，站点根入口依据浏览器语言跳转，其他语言回退英文；用户手动选语种后由当前 URL 保持。主题提供 `system`（默认）、`light`、`dark`，`system` 动态跟随 `prefers-color-scheme`；仅显式明暗偏好写入 `localStorage["kgos.site.theme"]`，选择系统时删除。站点与运行时 Web 位于不同 Origin，不共享 Web 的偏好存储。
-- **公开部署**：`kg-releases/.github/workflows/pages.yml` 只从公开 `site/` 构建并发布到 GitHub Pages；不读取私有源码、不注入 `KGOS_SOURCE_DEPLOY_KEY`，与公开 Validate/Docker/Release 完全独立。公开仓库 Settings → Pages 选择 GitHub Actions；当前账号已有 Pages 自定义域名，项目站点使用 `https://www.y2l.top/kg-releases/`，Astro `base=/kg-releases`，所有内部 URL 按此基准生成。普通同步不等于 Pages 已部署。
+- **公开部署**：`kg-releases/.github/workflows/pages.yml` 只从公开 `site/` 构建并发布到 GitHub Pages；不读取私有源码、不注入 `KGOS_SOURCE_DEPLOY_KEY`，与公开 Validate/Docker/Release 完全独立。公开仓库 Settings → Pages 选择 GitHub Actions，并为该项目配置独立自定义域名 `kghub.y2l.top`（DNS CNAME 指向 `byiyli.github.io`）；Astro 从站点根路径 `/` 构建，页面地址为 `https://kghub.y2l.top/en/` 与 `https://kghub.y2l.top/zh/`。普通同步不等于 Pages 已部署。
 
 实施与独立验收见 [Phase 31](../development/phases/31-public-product-website.md)。

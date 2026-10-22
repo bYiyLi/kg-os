@@ -6,7 +6,7 @@ English · [简体中文](README.zh-CN.md)
 
 KG OS is programmable knowledge graph infrastructure for AI. Define the information and relationships that matter to your work, connect your AI through MCP, and keep a history of how that knowledge changes. You choose where to run it and which models to use; KG OS works with your Agent rather than replacing it.
 
-[Product website](https://www.y2l.top/kg-releases/en/) · [Releases](https://github.com/bYiyLi/kg-releases/releases) · [Get help](https://github.com/bYiyLi/kg-releases/issues)
+[Product website](https://kghub.y2l.top/en/) · [Releases](https://github.com/bYiyLi/kg-releases/releases) · [Get help](https://github.com/bYiyLi/kg-releases/issues)
 
 ## What you can do
 

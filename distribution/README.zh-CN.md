@@ -6,7 +6,7 @@
 
 KG OS 是面向 AI 的可编程知识图基础设施。你可以按自己的工作定义信息与关系，通过 MCP 连接 AI，并保留知识变化的历史。部署在哪里、采用什么知识模型，由你决定；KG OS 与现有 Agent 协作，而不是替换它。
 
-[产品官网](https://www.y2l.top/kg-releases/zh/) · [发布版本](https://github.com/bYiyLi/kg-releases/releases) · [问题反馈](https://github.com/bYiyLi/kg-releases/issues)
+[产品官网](https://kghub.y2l.top/zh/) · [发布版本](https://github.com/bYiyLi/kg-releases/releases) · [问题反馈](https://github.com/bYiyLi/kg-releases/issues)
 
 ## 你可以用它做什么
 
