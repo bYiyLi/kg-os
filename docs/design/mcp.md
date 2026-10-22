@@ -647,12 +647,14 @@ flowchart TD
 
 **官方 Skill 源码已收敛为七个**：旧通用 `plugins/kgos/skills/kgos/SKILL.md` 已依用户明确清理要求从源码移除。它原先指导的 `kgos_docs`、`kgos_ontology_overview`、`kgos_commit_ancestry`、`kgos_query`、`kgos_mutate`、SDK 命名空间、State pin、Object Patch、Cypher、分页、Merge、Commit Message 与失败恢复，由 MCP 自描述 `kgos_docs` 和相应 Guide/SDK 合同承接。新任务按需读取文档与当前 State，不把完整 Ontology/Commit DAG 无界加载；没有 Skill 也能调用已授权 MCP。**仓库源码清理不证明私人 Plugin 已自动更新或七个 Skill 已通过目标客户端验收**，对应缺口仍归 Phase 25/27/28。
 
-**ChatGPT 协作安装规则（2026-10-22）**：初始“帮我安装”请求先进入有界只读调查。AI 核对真实发行物、相关已有资源、权限和目标 ChatGPT 能力，提出可执行方案及建议，由用户选择并明确授权后执行。方案须说明目标 Instance、版本、数据位置、公网接入、Embedding、账户/Workspace、安装范围、AI/用户分工和验收；AI 不替用户选择部署目标、收费服务或权限范围。一次确认可覆盖完整具体计划，已覆盖动作直接推进；目标、费用、数据处理、权限或范围实质变化时，仅重新确认受影响部分。具体步骤由唯一 [INSTALL.md](../../plugins/kgos/INSTALL.md) 维护。
+**ChatGPT 协作安装规则（2026-10-23）**：初始“帮我安装”请求先只读收集官方公开安装资料并核实实际可用版本，不检查用户设备、已有连接或账户。资料整理后按“欢迎问候 → 资料摘要 → 下一步说明 → 请求授权”的顺序回复，等待用户明确同意后才了解安装需求与可用资源；设备、连接或账户检查须先明确目标和范围并取得授权。随后基于获授权的调查结果提出可执行方案及建议，由用户选择并明确授权后执行安装。方案须说明目标 Instance、版本、数据位置、公网接入、Embedding、账户/Workspace、安装范围、AI/用户分工和验收；AI 不替用户选择部署目标、收费服务或权限范围。一次确认可覆盖完整具体计划，已覆盖动作直接推进；目标、费用、数据处理、权限或范围实质变化时，仅重新确认受影响部分。具体步骤由唯一 [INSTALL.md](../../plugins/kgos/INSTALL.md) 维护。
+
+**服务取得与初始化**：用户选择 AI 协助新部署、用户手动安装或复用已有 KG OS MCP 应用。两种新部署都须基于环境形成计划，由用户明确确认并授权后执行；需要用户操作时给出步骤并等待核实。取得服务入口后检查初始化状态，已完成则复用，未完成则在相应授权内协助初始化；必要验收通过后才继续。选择、检查授权、计划确认、用户操作和验收是明确的进展卡点，具体操作集中在安装指南。
 
 完整安装按以下依赖推进：
 
 1. 按用户选定方案复用或部署统一 `kgosd`，在受控入口完成初始化，再验收目标 Instance 就绪、持久化及公网 HTTPS；`[server].public_origin` 为安全根 Origin。已有可用实例不重跑初始化，不因发现新版本自动升级，也不强制取得与复用无关的宿主权限。
-2. 在目标 ChatGPT 账户/Workspace 注册或复用用户自己的 MCP Connection；用户在可信 KG OS Web 完成 OAuth 登录和同意，管理员 Token 不交给 ChatGPT。核实连接实际注册 ID，并在准备私人 Plugin 前验证工具真实只读调用与目标 State。
+2. 在目标 ChatGPT 账户/Workspace 注册或复用用户自己的 MCP Connection；已有有效授权直接复用，需要登录或 OAuth 时由用户在可信 KG OS Web 完成，管理员 Token 不交给 ChatGPT。核实连接实际注册 ID，并在准备私人 Plugin 前验证工具真实只读调用与目标 State。
 3. 依据同版真实发行物与用户诉求准备**用户私有** Plugin，用真实连接 ID 绑定，保留七个官方 Skill 及完整引用资源。Creator 或手工兼容包路径都以目标宿主实际支持和用户选定方案为前提；既有私人 Plugin 的更新与旧 Skill 移除需要相应授权，不推断已随源码同步。
 4. 协助安装到用户选定的 ChatGPT Web / Desktop 及 Chat / Work 范围，在新会话验证 MCP、Skill 安装/发现/加载及必要资源。各目标入口分别取证；发现名称、文件存在、正文加载与实际使用分别报告，不用安装测试写业务数据。
 5. 提供完整 Global AI Guidance v1 和实际客户端配置步骤，保留已有个人指令，由用户选择冲突处理方式并保存。新会话分别验证保存、可信加载、正文/版本完整性与已观察行为；隐藏或缺失证据记为未知，不以引用正文或 Doctor 探测冒充生效。
@@ -663,7 +665,7 @@ flowchart TD
 
 <a id="kgos-seven-skills"></a>
 
-**公开安装与分发职责（D109）**：Plugin/Skill 内容真源保留在私有 `plugins/kgos/`，`kg-releases` 只接受生成器公开的 `plugin.json`、`.app.json.example` 和七个目标 Skill 的完整 Markdown 资源；私有源码内旧通用 `kgos` 已清理，但不会自动从用户已安装的私人 Plugin 中删除。`plugins/kgos/INSTALL.md` 是**唯一安装指南真源**，发布为 `kg-releases/INSTALL.md`（公开仓库只有这一份），完整覆盖 Docker、MCP、Plugin、Skill 与全局引导词。正式发行时 Plugin 归档与 GHCR 镜像跟随同一个经授权的产品 Tag，`.app.json` 中的用户连接 ID 必须由用户私下配置；公开候选资料不等于 Phase 25/27/28 的完整客户端验收。详见 [D109](decisions.md#d109-single-public-distribution-and-installer) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。
+**公开安装与分发职责（D109）**：Plugin/Skill 内容真源保留在私有 `plugins/kgos/`，`kg-releases` 只接受生成器公开的 `plugin.json`、`.app.json.example` 和七个目标 Skill 的完整 Markdown 资源；私有源码内旧通用 `kgos` 已清理，但不会自动从用户已安装的私人 Plugin 中删除。`plugins/kgos/INSTALL.md` 是**唯一安装指南真源**，发布为 `kg-releases/INSTALL.md`（公开仓库只有这一份），目标覆盖 Docker、MCP、Plugin、Skill 与全局引导词。正式发行时 Plugin 归档与 GHCR 镜像跟随同一个经授权的产品 Tag，`.app.json` 中的用户连接 ID 必须由用户私下配置；公开候选资料不等于 Phase 25/27/28 的完整客户端验收。详见 [D109](decisions.md#d109-single-public-distribution-and-installer) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。
 
 ### 最终官方 Skill 清单与通用 Skill 退役（D107：目标方案）
 
