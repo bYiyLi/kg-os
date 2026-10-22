@@ -21,7 +21,7 @@ For example, a project knowledge graph can connect a technical decision to the c
 
 ## Install with your AI Agent
 
-Copy this prompt into an AI Agent that can access your chosen installation environment:
+Copy this prompt into ChatGPT to plan the installation and get help with each step:
 
 ```text
 Help me install KG OS using its official installation guide:
@@ -30,11 +30,11 @@ https://raw.githubusercontent.com/bYiyLi/kg-releases/main/INSTALL.md
 Read the guide first, check my existing setup and available published releases, then complete and verify the authorized installation steps. Reuse working connections and preserve existing data. Tell me which login or approval actions require my participation. Do not ask me to paste credentials into the conversation.
 ```
 
-The Agent uses [INSTALL.md](INSTALL.md) to set up the runtime when needed, connect your MCP client, and install the seven official Skills and knowledge-discovery guidance where your client supports them. An existing KG OS instance can be reused; an MCP-only connection is also supported. You do not need to follow a separate set of manual installation commands.
+Following [INSTALL.md](INSTALL.md), the Agent first checks existing resources and permissions without changing them, then explains feasible installation plans and who will perform each step. You choose a plan and explicitly authorize its actions before installation begins. The complete ChatGPT setup includes a ready KG OS service, an MCP connection, your private Plugin, seven official Skills, and the full Global AI Guidance v1. Working resources are reused; you can explicitly choose an MCP-only setup.
 
 ### Before you begin
 
-You need an existing KG OS instance or a **Linux amd64 host with Docker** for a new installation, plus an Agent with permission to operate that environment. The Agent will check persistent storage, the embedding service configuration, and a compatible MCP client. Remote connections also need a trusted HTTPS endpoint or a supported secure tunnel.
+You need an existing KG OS instance or a **Linux amd64 host with Docker** for a new installation. The Agent checks persistent storage, your chosen embedding service, a trusted public HTTPS endpoint, and the capabilities and permissions of your target ChatGPT account and workspace. If the Agent cannot operate the host, it can guide your manual steps where feasible. Missing ChatGPT features or account permissions must be resolved separately. Login and consent happen in the trusted interface indicated by the Agent.
 
 Use a version listed in **Releases** with an available runtime image and matching Plugin resources. Files on `main` may be ahead of a released version. If no suitable release is available, the Agent should explain what is missing rather than attempt an installation with a placeholder version.
 
@@ -42,7 +42,7 @@ Keep administrator tokens, API keys, and other credentials out of chat and publi
 
 ## After installation
 
-Ask your AI: “Read my KG OS knowledge model and version overview, then explain what is available. Do not change any data.” The Agent should verify the actual connection and report which parts of the installation are ready, unavailable, or still need your action.
+Ask your AI: “Read my KG OS knowledge model and version overview, then explain what is available. Do not change any data.” The Agent verifies the actual connection and reports each component with evidence. The agreed installation scope is complete only when all required checks pass; partial results, pending actions, and unknowns remain explicit, with a point from which to resume.
 
 Use the Web address of **your installed instance** for setup and connection authorization. The product website introduces KG OS; it is not your knowledge workspace. The [official Skills](plugins/kgos/skills/) help your AI work with your knowledge, and `kgos-doctor` provides on-demand, read-only checks when something is not working.
 

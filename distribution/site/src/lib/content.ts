@@ -135,9 +135,9 @@ export const copy = {
     },
     final: {
       label: "05 / INSTALL WITH AI",
-      heading: "把安装交给 AI Agent。",
+      heading: "你选方案，AI 协助安装。",
       description:
-        "复制下面的提示词，发送给能够访问你的安装环境的 AI Agent。它会先阅读官方安装手册，再检查环境、执行可用步骤并验证结果。",
+        "将下面的提示词发送给 ChatGPT。它会先阅读手册，只读检查环境并给出方案；由你选择和明确授权后，再按分工执行并逐项验证。",
       promptLabel: "给 AI Agent 的提示词",
       promptBeforeUrl: "请按照这份官方安装手册帮我安装 KG OS：",
       promptAfterUrl:
@@ -146,7 +146,7 @@ export const copy = {
       copied: "已复制",
       copySuccess: "已复制。将提示词粘贴到你的 AI Agent 对话中即可。",
       copyFailed: "复制未成功，请选中上方提示词并手动复制。",
-      note: "新部署需要 Linux amd64 Docker 环境；已有实例可直接连接。网页不会直接安装软件，Agent 会检查可用版本、环境和权限，并说明仍需你完成的操作。"
+      note: "新部署需要 Linux amd64 Docker 环境；有效实例与连接先验证后复用。AI 无法操作的步骤可由你按指引完成；缺少功能或权限时会说明阻塞，保留已完成结果。"
     },
     footer: "面向 AI 的可编程知识图基础设施"
   },
@@ -295,9 +295,9 @@ export const copy = {
     },
     final: {
       label: "05 / INSTALL WITH AI",
-      heading: "Let your AI Agent handle setup.",
+      heading: "You choose the plan. AI helps you install.",
       description:
-        "Copy the prompt below into an AI Agent with access to your installation environment. It will read the official guide, check your setup, perform permitted actions, and verify the result.",
+        "Send the prompt below to ChatGPT. It reads the guide, checks your setup without changing it, and proposes a plan. After you choose and explicitly authorize the plan, it helps carry out each step and verifies the results.",
       promptLabel: "Prompt for your AI Agent",
       promptBeforeUrl: "Help me install KG OS using its official installation guide:",
       promptAfterUrl:
@@ -306,7 +306,7 @@ export const copy = {
       copied: "Copied",
       copySuccess: "Copied. Paste the prompt into your AI Agent to begin.",
       copyFailed: "Automatic copy failed. Select the prompt above and copy it manually.",
-      note: "New deployments need Linux amd64 with Docker; existing instances can be connected directly. This page does not install software. Your Agent checks releases, environment access, and permissions, then explains any steps that need your action."
+      note: "New deployments need Linux amd64 with Docker. Working instances and connections are checked and reused. You can follow instructions for steps the AI cannot perform; missing features or permissions are reported while completed work is preserved."
     },
     footer: "Programmable knowledge graph infrastructure for AI"
   }

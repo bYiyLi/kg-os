@@ -647,12 +647,17 @@ flowchart TD
 
 **官方 Skill 源码已收敛为七个**：旧通用 `plugins/kgos/skills/kgos/SKILL.md` 已依用户明确清理要求从源码移除。它原先指导的 `kgos_docs`、`kgos_ontology_overview`、`kgos_commit_ancestry`、`kgos_query`、`kgos_mutate`、SDK 命名空间、State pin、Object Patch、Cypher、分页、Merge、Commit Message 与失败恢复，由 MCP 自描述 `kgos_docs` 和相应 Guide/SDK 合同承接。新任务按需读取文档与当前 State，不把完整 Ontology/Commit DAG 无界加载；没有 Skill 也能调用已授权 MCP。**仓库源码清理不证明私人 Plugin 已自动更新或七个 Skill 已通过目标客户端验收**，对应缺口仍归 Phase 25/27/28。
 
-私人安装流程目标：
+**ChatGPT 协作安装规则（2026-10-22）**：初始“帮我安装”请求先进入有界只读调查。AI 核对真实发行物、相关已有资源、权限和目标 ChatGPT 能力，提出可执行方案及建议，由用户选择并明确授权后执行。方案须说明目标 Instance、版本、数据位置、公网接入、Embedding、账户/Workspace、安装范围、AI/用户分工和验收；AI 不替用户选择部署目标、收费服务或权限范围。一次确认可覆盖完整具体计划，已覆盖动作直接推进；目标、费用、数据处理、权限或范围实质变化时，仅重新确认受影响部分。具体步骤由唯一 [INSTALL.md](../../plugins/kgos/INSTALL.md) 维护。
 
-1. 用户在自己的电脑或受控主机初始化 KG OS，运行统一 `kgosd`；目标方案中 MCP 由现有 Instance 凭证保护，用户自行配置受保护的 HTTPS MCP 入口与统一 `[server].public_origin`，无需独立 MCP Server 或管理员 Token。
-2. 用户在 ChatGPT 侧手工添加**自己的**自定义 MCP Connection，验证工具真实可调用并取得连接自身的注册 ID。
-3. 根据官方 `plugins/kgos/` 模板与 AI-facing `INSTALL.md`，由 ChatGPT / Plugin Creator 优先生成**用户私有** Plugin；模板中的连接映射引用该用户真实注册的 MCP App ID。当前源码与公开候选包只含下文七个官方 Skill；既有私人 Plugin 可能仍安装早期通用 Skill，须按实际客户端能力与授权另行更新，不得推断已同步。没有 Creator 时，可在符合当时客户端合同的前提下手工生成兼容包并私有安装。
-4. 在 ChatGPT Web / Desktop 分别验证 Plugin 的工具发现、**实际打包的** Skill 激活、受保护连接、只读/写入区分，以及真实 `kgos_docs`、`kgos_ontology_overview` 和 JS 组合操作；账户与 Workspace 功能可用性以实际连接测试为准。
+完整安装按以下依赖推进：
+
+1. 按用户选定方案复用或部署统一 `kgosd`，在受控入口完成初始化，再验收目标 Instance 就绪、持久化及公网 HTTPS；`[server].public_origin` 为安全根 Origin。已有可用实例不重跑初始化，不因发现新版本自动升级，也不强制取得与复用无关的宿主权限。
+2. 在目标 ChatGPT 账户/Workspace 注册或复用用户自己的 MCP Connection；用户在可信 KG OS Web 完成 OAuth 登录和同意，管理员 Token 不交给 ChatGPT。核实连接实际注册 ID，并在准备私人 Plugin 前验证工具真实只读调用与目标 State。
+3. 依据同版真实发行物与用户诉求准备**用户私有** Plugin，用真实连接 ID 绑定，保留七个官方 Skill 及完整引用资源。Creator 或手工兼容包路径都以目标宿主实际支持和用户选定方案为前提；既有私人 Plugin 的更新与旧 Skill 移除需要相应授权，不推断已随源码同步。
+4. 协助安装到用户选定的 ChatGPT Web / Desktop 及 Chat / Work 范围，在新会话验证 MCP、Skill 安装/发现/加载及必要资源。各目标入口分别取证；发现名称、文件存在、正文加载与实际使用分别报告，不用安装测试写业务数据。
+5. 提供完整 Global AI Guidance v1 和实际客户端配置步骤，保留已有个人指令，由用户选择冲突处理方式并保存。新会话分别验证保存、可信加载、正文/版本完整性与已观察行为；隐藏或缺失证据记为未知，不以引用正文或 Doctor 探测冒充生效。
+
+**范围与完成规则**：默认完整安装包含就绪服务、ChatGPT MCP、私人 Plugin、七个官方 Skill 与 Global AI Guidance v1；只有用户明确选择 MCP-only 才按该范围结束。每阶段通过对应验收后继续；已验证资源直接复用，缺少能力、权限或证据时保留局部结果并给出恢复位置。中断或结果未知先查实际状态，不盲目重放副作用；在原授权内恢复，实质改变方案则返回用户选择。完整安装的所有必要项目通过才报告整体完成；空知识库可以通过基础安装验收，业务模型、知识写入、D4/D5 与维护调度不属于必需安装内容。
 
 通用 Plugin 模板不是可直接指向所有用户同一 MCP 地址的公共插件；不把动态连接 ID、Bearer Token、OAuth secret 或本地根目录写死进公开包。优先按 OpenAI 当前支持的 **注册 MCP Connection → 私有 Plugin 的 `.app.json` 引用 + 官方 Skill** 路径生成；`mcp.json` 可在需要便携 MCP 配置时单独选用，不与用户已有连接配置重复。`plugin.json`、`.app.json` 与 Skill 等具体文件布局按安装时的插件规范验证，**不把一种开发样例格式误当成所有客户端永远不变的产品合同**。
 

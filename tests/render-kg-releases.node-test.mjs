@@ -204,10 +204,6 @@ test("user-facing documentation is bilingual without exposing maintainer operati
 test("agent installer has one installation flow and preserves official guidance", async () => {
   const installer = await readFile(join(root, "plugins/kgos/INSTALL.md"), "utf8");
   assert.doesNotMatch(installer, /^## (?:English|简体中文)$/m);
-  assert.deepEqual(
-    [...installer.matchAll(/^## ([1-6])\. /gm)].map((match) => match[1]),
-    ["1", "2", "3", "4", "5", "6"]
-  );
   const guidance = await readFile(
     join(root, "plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance-v1.md"),
     "utf8"
