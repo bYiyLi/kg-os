@@ -119,12 +119,21 @@ func TestFirstRunExistingConfigResumeAndRequestSafety(t *testing.T) {
 	if wrong := setupTestRequest(c, "POST", "/api/v1/setup/initialize", "wrong", "{}"); wrong.Code != 401 {
 		t.Fatalf("wrong credential accepted: %d", wrong.Code)
 	}
+	// Check the in-progress guard deterministically. A background bootstrap in
+	// this test has no native Runtime and can fail before the next HTTP request,
+	// legitimately allowing a fresh retry instead of returning 409.
+	c.mu.Lock()
+	c.status = "initializing"
+	c.mu.Unlock()
+	if repeat := setupTestRequest(c, "POST", "/api/v1/setup/initialize", root.Token, "{}"); repeat.Code != 409 {
+		t.Fatalf("in-progress initialization accepted another request: %d", repeat.Code)
+	}
+	c.mu.Lock()
+	c.status = "error"
+	c.mu.Unlock()
 	started := setupTestRequest(c, "POST", "/api/v1/setup/initialize", root.Token, "{}")
 	if started.Code != 202 {
 		t.Fatalf("resume rejected: %d %s", started.Code, started.Body.String())
-	}
-	if repeat := setupTestRequest(c, "POST", "/api/v1/setup/initialize", root.Token, "{}"); repeat.Code != 409 {
-		t.Fatalf("concurrent resume not rejected: %d", repeat.Code)
 	}
 	c.Close()
 	after, err := os.ReadFile(c.paths.Config)

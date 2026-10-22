@@ -1,3 +1,5 @@
+import { appendFile } from "node:fs/promises";
+
 import { run } from "./process.mjs";
 
 const task = process.argv[2];
@@ -46,7 +48,19 @@ if (!(task in taskCommands)) {
   throw new Error("Unknown task sequence: " + String(task));
 }
 
-for (const args of taskCommands[task]) {
+for (const [index, args] of taskCommands[task].entries()) {
   process.stdout.write("\n> pnpm " + args.join(" ") + "\n");
-  await run("pnpm", args);
+  try {
+    await run("pnpm", args);
+  } catch (error) {
+    // The public job masks private logs. A stage number in its job summary
+    // allows troubleshooting without exposing tests or source paths.
+    if (task === "validate" && process.env.GITHUB_STEP_SUMMARY) {
+      await appendFile(
+        process.env.GITHUB_STEP_SUMMARY,
+        `Validation failed at stage ${index + 1}/${taskCommands[task].length}; details are suppressed.\n`
+      ).catch(() => undefined);
+    }
+    throw error;
+  }
 }
