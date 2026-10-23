@@ -39,7 +39,7 @@ export function validateInstallationCatalog(catalog) {
   return catalog;
 }
 
-export async function readInstallationCatalog(sourceDirectory) {
+async function readInstallationCatalog(sourceDirectory) {
   return validateInstallationCatalog(
     JSON.parse(await readFile(join(sourceDirectory, "catalog.json"), "utf8"))
   );
@@ -139,7 +139,7 @@ function releaseFacts(tag, digestRef) {
   return { version: tag.slice(1), image: `${imageRepository}:${tag}@${digestRef.split("@")[1]}` };
 }
 
-export function installationTemplateVersion(content) {
+function installationTemplateVersion(content) {
   const frontmatter = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   const version = frontmatter?.[1].match(
     new RegExp(`^version: *["']?(${stableVersion})["']? *$`, "m")
@@ -223,13 +223,7 @@ export function renderInstaller(content, { tag, digestRef }) {
   );
 }
 
-export async function renderReleaseInstallation({
-  sourceDirectory,
-  installer,
-  output,
-  tag,
-  digestRef
-}) {
+async function renderReleaseInstallation({ sourceDirectory, installer, output, tag, digestRef }) {
   releaseFacts(tag, digestRef);
   await installationSnapshotFiles(sourceDirectory);
   const manuals = await Promise.all(
