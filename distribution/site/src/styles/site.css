@@ -1116,101 +1116,6 @@ button:focus-visible {
   font-size: 14px;
   line-height: 1.9;
 }
-.agent-install-panel {
-  margin: 40px auto 0;
-  padding: 36px 44px 27px;
-  background: var(--panel-raised);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  text-align: left;
-}
-.agent-prompt-card {
-  padding: 23px 25px;
-  background: var(--panel);
-  border: 1px solid var(--border-subtle);
-  border-radius: 13px;
-}
-.agent-prompt-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 15px;
-  margin-bottom: 14px;
-  color: var(--muted);
-}
-.agent-prompt-header label {
-  font-size: 12px;
-  font-weight: 690;
-}
-.agent-prompt-header span {
-  color: var(--faint);
-  font:
-    10px ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  white-space: nowrap;
-}
-.agent-prompt-card textarea {
-  display: block;
-  width: 100%;
-  min-height: 184px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  resize: vertical;
-  background: transparent;
-  color: var(--text);
-  font:
-    13px/1.8 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Consolas,
-    monospace;
-  overflow-wrap: anywhere;
-}
-.agent-prompt-card textarea:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 5px;
-  border-radius: 3px;
-}
-.agent-install-action {
-  margin-top: 25px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  text-align: center;
-}
-.agent-copy-button {
-  min-width: 195px;
-  border: 0;
-  cursor: pointer;
-  font-size: 13px;
-  padding: 14px 24px;
-}
-.agent-copy-button svg {
-  width: 18px;
-  height: 18px;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.agent-copy-feedback {
-  min-height: 18px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-.agent-install-note {
-  max-width: 680px;
-  margin: 17px auto 0;
-  text-align: center;
-  color: var(--faint);
-  font-size: 11px;
-  line-height: 1.8;
-}
 .site-footer {
   border-top: 1px solid var(--border-subtle);
   display: flex;
@@ -1436,24 +1341,8 @@ button:focus-visible {
   .agent-install-section {
     padding-block: 77px 84px;
   }
-  .agent-install-panel {
-    padding: 18px 15px 20px;
-    border-radius: 14px;
-    margin-top: 28px;
-  }
   .agent-install-intro {
     font-size: 12px;
-  }
-  .agent-prompt-card {
-    padding: 17px 15px;
-  }
-  .agent-prompt-header {
-    flex-direction: column;
-    gap: 4px;
-  }
-  .agent-prompt-card textarea {
-    font-size: 11px;
-    min-height: 210px;
   }
   .site-footer {
     padding-block: 21px 29px;
@@ -1488,3 +1377,32 @@ button:focus-visible {
     transition: none !important;
   }
 }
+
+.manual-install-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px 26px;
+  list-style: none;
+  padding: 0;
+  margin: 30px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.manual-install-steps li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.manual-install-steps li span {
+  color: var(--primary);
+  font-family: ui-monospace, monospace;
+}
+.manual-install-note {
+  max-width: 620px;
+  margin: 24px auto 0;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.9;
+}
+/* cspell:words eyeline */

@@ -1,0 +1,25 @@
+<script>
+  const themeKey = "kgos.site.theme";
+  const root = document.documentElement;
+  const options = document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]");
+  function updateTheme(value: string) {
+    const theme = value === "light" || value === "dark" ? value : "system";
+    root.dataset.theme = theme;
+    for (const option of options) {
+      option.setAttribute("aria-pressed", String(option.dataset.themeChoice === theme));
+    }
+  }
+  updateTheme(root.dataset.theme ?? "system");
+  for (const option of options) {
+    option.addEventListener("click", () => {
+      const theme = option.dataset.themeChoice ?? "system";
+      updateTheme(theme);
+      try {
+        if (theme === "system") localStorage.removeItem(themeKey);
+        else localStorage.setItem(themeKey, theme);
+      } catch {
+        // Keep the explicit selection in the current page.
+      }
+    });
+  }
+</script>

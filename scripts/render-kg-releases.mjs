@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs";
 import { lstat, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { installationSnapshotFiles } from "./render-release-installation.mjs";
 
 const sourceRoot = fileURLToPath(new URL("../", import.meta.url));
 const publicRepository = "bYiyLi/kg-releases";
@@ -17,6 +18,7 @@ const generatedFiles = [
   "INSTALL.md",
   "LICENSE",
   "COMMERCIAL-LICENSE.md",
+  "scripts/render-release-installation.mjs",
   "plugins/kgos/plugin.json",
   "plugins/kgos/.app.json.example"
 ];
@@ -37,17 +39,34 @@ const siteFiles = [
   "site/public/favicon.svg",
   "site/src/components/AiInstall.astro",
   "site/src/components/Homepage.astro",
+  "site/src/components/InstallationGuide.astro",
+  "site/src/components/SiteHeader.astro",
+  "site/src/components/ThemeControls.astro",
+  "site/src/components/ThemeInit.astro",
   "site/src/components/WorkspacePreview.astro",
+  "site/src/content/service-installation/catalog.json",
+  "site/src/content/service-installation/zh.md",
+  "site/src/content/service-installation/en.md",
   "site/src/lib/content.ts",
+  "site/src/lib/installations.ts",
+  "site/src/pages/[locale]/install/[version]/index.astro",
+  "site/src/pages/[locale]/install/[version].md.ts",
+  "site/src/pages/install/[version]/INSTALL.md.ts",
   "site/src/pages/en/index.astro",
+  "site/src/pages/en/install.astro",
+  "site/src/pages/en/install.md.ts",
   "site/src/pages/index.astro",
   "site/src/pages/zh/index.astro",
+  "site/src/pages/zh/install.astro",
+  "site/src/pages/zh/install.md.ts",
+  "site/src/styles/install.css",
   "site/src/styles/site.css",
   "site/tsconfig.json"
 ];
 const rootOwnedFiles = new Set([
   "LICENSE",
   "COMMERCIAL-LICENSE.md",
+  "scripts/render-release-installation.mjs",
   "plugins/kgos/plugin.json",
   "plugins/kgos/.app.json.example"
 ]);
@@ -131,18 +150,23 @@ async function publicFiles() {
   const actualSiteFiles = (await collectFiles(sourceRoot, "distribution/site")).map((file) =>
     file.slice("distribution/".length)
   );
-  const expectedSiteFiles = new Set(siteFiles);
+  const manualDirectory = "site/src/content/service-installation";
+  const versionedFiles = (
+    await installationSnapshotFiles(join(sourceRoot, "distribution", manualDirectory))
+  ).map((file) => `${manualDirectory}/${file}`);
+  const websiteFiles = [...siteFiles, ...versionedFiles];
+  const expectedSiteFiles = new Set(websiteFiles);
   for (const file of actualSiteFiles) {
     if (!expectedSiteFiles.has(file)) {
       throw new Error(`Unexpected public website source file: ${file}`);
     }
   }
-  for (const file of siteFiles) {
+  for (const file of websiteFiles) {
     if (!actualSiteFiles.includes(file)) {
       throw new Error(`Missing public website source file: ${file}`);
     }
   }
-  paths.push(...siteFiles);
+  paths.push(...websiteFiles);
   return paths;
 }
 

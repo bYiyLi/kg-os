@@ -1,0 +1,179 @@
+---
+// cspell:words eyeline frontmatter
+import SiteHeader from "./SiteHeader.astro";
+import ThemeInit from "./ThemeInit.astro";
+import ThemeControls from "./ThemeControls.astro";
+import { copy, installationCopy } from "../lib/content";
+import { installationVersions, latestInstallationVersion, type InstallationGuideDocument } from "../lib/installations";
+import "../styles/site.css";
+import "../styles/install.css";
+
+interface Props {
+  guide: InstallationGuideDocument;
+}
+
+const { guide } = Astro.props;
+const { locale, version, frontmatter: { title, description } } = guide;
+const shared = copy[locale];
+const t = installationCopy[locale];
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const pagePath = `${base}${locale}/install/${version}/`;
+const pageUrl = new URL(pagePath, Astro.site).href;
+const titleText = `${title} ${version} — KG OS`;
+const isLatest = version === latestInstallationVersion;
+const downloadPath = `${base}${locale}/install/${version}.md`;
+const instructionsPath = `${base}install/${version}/INSTALL.md`;
+const sections = guide.getHeadings().filter((heading) => heading.depth === 2);
+---
+
+<!doctype html>
+<html lang={shared.htmlLang} data-theme="system">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="description" content={description} />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content={titleText} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={pageUrl} />
+    <meta name="twitter:card" content="summary" />
+    <link rel="canonical" href={pageUrl} />
+    <link rel="alternate" hreflang="en" href={new URL(`${base}en/install/${version}/`, Astro.site).href} />
+    <link rel="alternate" hreflang="zh-CN" href={new URL(`${base}zh/install/${version}/`, Astro.site).href} />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <title>{titleText}</title>
+    <ThemeInit />
+  </head>
+  <body class="installation-page">
+    <a class="skip-link" href="#installation-content">{shared.skip}</a>
+    <SiteHeader locale={locale} installation installationVersion={version} />
+    <main class="wrapper installation-main">
+      <div class="installation-breadcrumb">
+        <a href={`${base}${locale}/`}>← {t.back}</a>
+        <details class="installation-version-switch">
+          <summary>{t.versions} <span>{version}</span><span aria-hidden="true">⌄</span></summary>
+          <nav aria-label={t.versions}>
+            {installationVersions.map((item) => (
+              <a href={`${base}${locale}/install/${item}/`} aria-current={item === version ? "page" : undefined}>
+                <span>{item}</span>{item === latestInstallationVersion && <span class="installation-latest-badge">{t.latest}</span>}
+              </a>
+            ))}
+          </nav>
+        </details>
+      </div>
+      <header class="installation-heading">
+        <p class="eyeline">{t.eyebrow}</p>
+        <h1>{title}</h1>
+        <p class="installation-description">{description}</p>
+        <p class="installation-version">
+          {t.appliesTo} KG OS {version}
+          {isLatest && <span class="installation-latest-badge">{t.latest}</span>}
+        </p>
+        {!isLatest && <p class="installation-history-note">{t.historical} <a href={`${base}${locale}/install/`}>{t.viewLatest} {latestInstallationVersion} →</a></p>}
+        <div class="installation-actions">
+          <a class="button-secondary" href={downloadPath} download={`kgos-install-${locale}-${version}.md`}>
+            {t.download}<span aria-hidden="true">↓</span>
+          </a>
+          <a class="installation-release" href={instructionsPath} download={`kgos-${version}-INSTALL.md`}>{t.aiGuide} ↓</a>
+          <a class="installation-release" href={`https://github.com/bYiyLi/kg-releases/releases/download/${version}/kgos-plugin-${version}.zip`}>{t.plugin} ↓</a>
+          <a class="installation-release" href="#upgrade">{t.upgrade} →</a>
+          <a class="installation-release" href={`https://github.com/bYiyLi/kg-releases/releases/tag/${version}`} target="_blank" rel="noopener noreferrer">{t.source} {version} ↗</a>
+        </div>
+      </header>
+      <div class="installation-recommendation">
+        <span class="signal" aria-hidden="true"></span>
+        <div><strong>{t.recommendation}</strong><p>{t.methods}</p></div>
+      </div>
+      <div class="installation-layout">
+        <aside class="installation-sidebar">
+          <nav aria-label={t.toc}>
+            <p class="installation-toc-label">{t.toc}</p>
+            <ol>
+              {sections.map((heading) => <li><a href={`#${heading.slug}`}>{heading.text}</a></li>)}
+            </ol>
+          </nav>
+        </aside>
+        <article
+          class="installation-prose"
+          id="installation-content"
+          data-code-copy={t.copy}
+          data-code-copied={t.copied}
+          data-code-copying={t.copying}
+          data-code-success={t.copySuccess}
+          data-code-failed={t.copyFailed}
+          data-code-label={t.code}
+        >
+          <slot />
+        </article>
+      </div>
+    </main>
+    <footer class="site-footer wrapper installation-footer">
+      <div><strong>KG OS</strong><span>{t.footer}</span></div>
+      <nav aria-label={locale === "zh" ? "页脚导航" : "Footer"}>
+        <a href={`${base}${locale}/`}>{t.back}</a>
+        <a href={downloadPath} download>{t.download}</a>
+        <a href="https://github.com/bYiyLi/kg-releases" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+      </nav>
+    </footer>
+    <ThemeControls />
+    <script>
+      const article = document.querySelector<HTMLElement>(".installation-prose");
+      if (article) {
+        for (const [index, pre] of article.querySelectorAll<HTMLPreElement>("pre").entries()) {
+          const code = pre.querySelector("code");
+          if (!code) continue;
+          const number = index + 1;
+          const wrapper = document.createElement("div");
+          wrapper.className = "installation-code";
+          pre.before(wrapper);
+          wrapper.append(pre);
+          pre.tabIndex = 0;
+          pre.setAttribute("aria-label", `${article.dataset.codeLabel} ${number}`);
+          const controls = document.createElement("div");
+          controls.className = "installation-code-controls";
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "installation-code-copy";
+          button.textContent = article.dataset.codeCopy ?? "";
+          button.setAttribute("aria-label", `${article.dataset.codeCopy} ${number}`);
+          const feedback = document.createElement("span");
+          feedback.className = "installation-copy-feedback";
+          feedback.id = `code-copy-feedback-${number}`;
+          feedback.setAttribute("role", "status");
+          feedback.setAttribute("aria-live", "polite");
+          button.setAttribute("aria-describedby", feedback.id);
+          controls.append(button, feedback);
+          wrapper.prepend(controls);
+          button.addEventListener("click", async () => {
+            button.disabled = true;
+            button.textContent = article.dataset.codeCopying ?? "";
+            feedback.textContent = "";
+            try {
+              await navigator.clipboard.writeText(code.textContent ?? "");
+              button.textContent = article.dataset.codeCopied ?? "";
+              feedback.textContent = article.dataset.codeSuccess ?? "";
+            } catch {
+              button.textContent = article.dataset.codeCopy ?? "";
+              const selection = window.getSelection();
+              const range = document.createRange();
+              range.selectNodeContents(code);
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+              feedback.textContent = article.dataset.codeFailed ?? "";
+            } finally {
+              button.disabled = false;
+            }
+          });
+        }
+        for (const table of article.querySelectorAll("table")) {
+          const wrapper = document.createElement("div");
+          wrapper.className = "installation-table-scroll";
+          wrapper.tabIndex = 0;
+          table.before(wrapper);
+          wrapper.append(table);
+        }
+      }
+    </script>
+  </body>
+</html>

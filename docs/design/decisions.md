@@ -1117,11 +1117,12 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 <a id="d109-single-public-distribution-and-installer"></a>
 
-### D109 kg-releases 是单一产品分发入口，安装指南只维护一份（2026-10-21）
+### D109 kg-releases 是单一产品分发入口，安装内容按职责维护唯一真源（2026-10-21）
 
 - **产品入口**：公开 `bYiyLi/kg-releases` 提供用户实际所需的 Docker/OCI 镜像与 GHCR 链接、GitHub Release、Plugin、七个官方目标 Skill、完整安装指引及公开 CI/CD；外部用户无需读取或克隆私有 `kg-os` 源码。继续保留 D108 的“只有私有仓库维护、公开仓库自动生成”边界，不复制 Kernel/Web/SDK 源码或完整 Git 历史。
-- **唯一安装真源**：私有 `plugins/kgos/INSTALL.md` 是唯一可编辑的安装说明，目标是完整解释公开镜像安装、MCP OAuth、用户私人 Plugin/七 Skill 和 Global AI Guidance v1。该文件同步生成到 `kg-releases/INSTALL.md`。删除 `distribution/INSTALL.md`，不在公开 Plugin 目录或两仓库分别维护第二套独立安装流程。Skill 的 `SKILL.md` 与参考资料属于可安装资源，不是另一份安装指南。
-- **安装流程补充（2026-10-23）**：面向 ChatGPT，先只读收集官方公开资料与实际可用版本，整理后欢迎用户、汇报结果并直接呈现安装方式供用户选择，不另问是否进入下一步。目标不明先询问，检查范围明确且获授权后才核查相应环境；找不到连接不授权扫描设备。基于核查结果提供具体方案，由用户选择和明确授权后执行及逐项验收，已授权步骤不重复确认。默认完整安装覆盖上述全部组成；用户明确选择 MCP-only 时按该范围报告，未知或部分完成不冒充整体成功。复用有效资源，实质改变目标、费用、数据处理、权限或范围时重新确认受影响部分。规则归 [MCP 私人安装](mcp.md#官方-skill-与私人-plugin)，操作与恢复步骤归唯一安装指南，不增加第二套流程。
+- **安装内容真源（2026-10-23 调整）**：官网对应语言 Markdown 唯一维护用户手动部署、初始化、HTTPS、ChatGPT 基础 MCP 应用接入与验收、升级恢复和开始使用；同一正文生成网页与下载。`plugins/kgos/INSTALL.md` 唯一维护 AI 私人 Plugin 制作安装、定制迁移、全局引导词与自检，导出为公开根 INSTALL；从已连接应用开始，不复制部署或接入操作正文，不保留 `distribution/INSTALL.md`。
+- **安装与升级流程（2026-10-23）**：推荐 Compose + Web，支持 Compose / Docker 与 Web / 配置文件四组合；用户选择主机、Embedding、模型、费用、账户和权限，手动部署与连接 ChatGPT，真实只读调用通过后交给 AI。AI 给出具体 Plugin 方案，经用户确认后每次新建带版本号的私人 Plugin，不原地更新；读取旧 Plugin 与旧版官方基线，迁移定制，冲突由用户决定。复用真实 app/connection ID，七个官方 Skill 与资源完整保留；新版本验收后才按用户选择移除旧 Plugin，保留共享连接。已授权步骤不重复确认，未知结果先查实际状态。
+- **版本与完成规则**：官网显示最新稳定版与适用版本，命令固定版本/digest；更新纳入正式发行收尾，不随开发版本提前变化。每个正式发布版本在 KGHub 保留完整双语手册与同版 INSTALL 快照，固定版本页面和下载绑定同版镜像/Plugin，网站提供历史版本与保留版本的语言切换；最新入口是明确发布目录指定版本的别名，未知版本不回退。候选技术修改仅进入可编辑双语模板与 canonical INSTALL，网站只读已归档快照；新版本不覆盖历史正文。本轮补齐 v0.3.0 网站文档但不改写既有 Tag/Release。此决定取代此前仅保留 Release 下载、不提供网站版本选择器的方案。服务升级先核对兼容说明，停止写入和服务、私有完整备份后按原挂载替换镜像并验收；镜像回退与数据恢复分别处理。完整安装逐项报告可观察的实际证据，不把隐藏指令来源或自动 Skill 轨迹作为不可完成的硬门槛，不把已确认缺失当作不可观测；Doctor 只覆盖安装相关 D1–D3，用户可明确选择 MCP-only。规则归 [MCP 私人安装](mcp.md#官方-skill-与私人-plugin)，官网呈现归 [Client 官网](client.md#公开产品官网astro--github-pages)。
 - **Plugin/Skill 同步**：只公开 `plugins/kgos/plugin.json`、不含用户凭证的 `.app.json.example` 和七个目标 Skill 的所有必要 Markdown 资源，同时公开适用许可文本。Plugin Manifest 版本须与 KG OS 产品包版本相同。历史过渡通用 `skills/kgos` 不进入公开候选包（后续已从私有源码删除）；旧私人 Plugin 不自动更新或移除，真实七 Skill/Doctor 客户端验收仍按 Phase 25/27/28 独立完成，不能以文件导出代替。
-- **发布**：普通 Private `main` Push 只同步公开候选内容，公开 CI 执行测试；获得独立授权的 Private `v*` Tag 对应公开同名版本，正式 Release 除 Docker 外必须提供包含一份 `INSTALL.md`、Plugin Manifest、无凭证配置样例、七个 Skill 与许可的归档。AGPL 与商业双授权的二进制发布合规前置和 `KGOS_BINARY_DISTRIBUTION_APPROVED` 门禁继续有效；不把尚未发行的 GHCR Tag 当作用户可安装镜像。
+- **发布**：普通 Private `main` Push 只同步公开候选内容，公开 CI 执行测试；获得独立授权的 Private `v*` Tag 对应公开同名版本，正式 Release 除 Docker 外必须提供包含一份 `INSTALL.md`、Plugin Manifest、无凭证配置样例、七个 Skill 与许可的归档；后续 Release 另附同版双语用户安装 Markdown。AGPL 与商业双授权的二进制发布合规前置和 `KGOS_BINARY_DISTRIBUTION_APPROVED` 门禁继续有效；不把尚未发行的 GHCR Tag 当作用户可安装镜像。
 - **验证归属**：渲染白名单、拒绝秘密/额外 Skill、单安装文档、产品版本一致性及归档完整性属于当前发布链可验证合同，维护于 [Client](client.md#私有源码与公开分发仓库)、[MCP Plugin](mcp.md#最终官方-skill-清单与通用-skill-退役d107目标方案) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。不为这些文件建立第二套技术或设计真源。

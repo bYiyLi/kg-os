@@ -1,0 +1,13 @@
+---
+import InstallationGuide from "../../../../components/InstallationGuide.astro";
+import { getInstallationPaths, type InstallationGuideDocument } from "../../../../lib/installations";
+
+export const getStaticPaths = getInstallationPaths;
+interface Props { guide: InstallationGuideDocument; }
+const { guide } = Astro.props;
+const { Content } = guide;
+---
+
+<InstallationGuide guide={guide}>
+  <Content />
+</InstallationGuide>

@@ -1,5 +1,7 @@
 name: Release
 
+# cspell:words pipefail opencontainers esac
+
 # The private source tag is mirrored as a generated public distribution tag.
 # Its exact source commit must pass public CI before any image is published.
 on:
@@ -79,6 +81,11 @@ jobs:
           printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
           printf 'revision=%s\n' "$REVISION" >> "$GITHUB_OUTPUT"
           printf 'image=ghcr.io/byiyli/kgos:%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo 'stable=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'stable=false' >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: pnpm/action-setup@v6
         with:
@@ -164,9 +171,22 @@ jobs:
           esac
           printf 'digest_ref=%s\n' "$DIGEST_REF" >> "$GITHUB_OUTPUT"
 
+      - name: Render versioned installation guides using the verified image digest
+        if: steps.source.outputs.stable == 'true'
+        env:
+          TAG: ${{ steps.source.outputs.tag }}
+          DIGEST_REF: ${{ steps.verify.outputs.digest_ref }}
+        run: |
+          set -euo pipefail
+          node scripts/render-release-installation.mjs \
+            --source-directory site/src/content/service-installation --installer INSTALL.md \
+            --output "$RUNNER_TEMP" --tag "$TAG" --digest-ref "$DIGEST_REF"
+          (cd "$RUNNER_TEMP" && sha256sum "kgos-install-zh-$TAG.md" "kgos-install-en-$TAG.md" "kgos-INSTALL-$TAG.md" > "kgos-install-$TAG.sha256")
+
       - name: Package complete official Plugin and Skills
         env:
           TAG: ${{ steps.source.outputs.tag }}
+          STABLE_RELEASE: ${{ steps.source.outputs.stable }}
         run: |
           set -euo pipefail
           PLUGIN_VERSION=$(python3 -c 'import json; print(json.load(open("plugins/kgos/plugin.json"))["version"])')
@@ -186,7 +206,12 @@ jobs:
           PACKAGE_DIR="$RUNNER_TEMP/kgos-plugin-content"
           mkdir -p "$PACKAGE_DIR"
           cp -R plugins/kgos/. "$PACKAGE_DIR/"
-          cp INSTALL.md LICENSE COMMERCIAL-LICENSE.md "$PACKAGE_DIR/"
+          cp LICENSE COMMERCIAL-LICENSE.md "$PACKAGE_DIR/"
+          if [ "$STABLE_RELEASE" = true ]; then
+            cp "$RUNNER_TEMP/kgos-INSTALL-$TAG.md" "$PACKAGE_DIR/INSTALL.md"
+          else
+            cp INSTALL.md "$PACKAGE_DIR/INSTALL.md"
+          fi
           ARCHIVE="$RUNNER_TEMP/kgos-plugin-$TAG.zip"
           (cd "$PACKAGE_DIR" && zip -q -r "$ARCHIVE" .)
           if unzip -Z -1 "$ARCHIVE" | grep -E '(^|/)\.app\.json$|(^|/)skills/kgos/|(^|/)plugins/kgos/'; then
@@ -203,12 +228,22 @@ jobs:
           REVISION: ${{ steps.source.outputs.revision }}
           IMAGE: ${{ steps.source.outputs.image }}
           DIGEST_REF: ${{ steps.verify.outputs.digest_ref }}
+          STABLE_RELEASE: ${{ steps.source.outputs.stable }}
         run: |
           set -euo pipefail
+          EXPECTED_PRERELEASE=true
+          if [ "$STABLE_RELEASE" = true ]; then
+            EXPECTED_PRERELEASE=false
+          fi
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             BODY=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body')
             if [[ "$BODY" != *"$REVISION"* || "$BODY" != *"$DIGEST_REF"* ]]; then
               echo "::error::Existing release differs from the verified source or digest"
+              exit 1
+            fi
+            IS_PRERELEASE=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')
+            if [ "$IS_PRERELEASE" != "$EXPECTED_PRERELEASE" ]; then
+              echo "::error::Existing release classification differs from the tag stability"
               exit 1
             fi
             echo "Matching public GitHub Release already exists"
@@ -218,11 +253,29 @@ jobs:
               printf 'Verified image digest: \`%s\`\n\n' "$DIGEST_REF"
               printf 'Private source commit SHA: \`%s\`\n\n' "$REVISION"
               echo "Plugin archive: kgos-plugin-$TAG.zip (includes the sole INSTALL.md and seven Skills)"
+              if [ "$STABLE_RELEASE" = true ]; then
+                printf '\nInstallation guides for `%s`: `kgos-install-zh-%s.md`, `kgos-install-en-%s.md`.\n' "$TAG" "$TAG" "$TAG"
+                printf 'AI Plugin guide: `kgos-INSTALL-%s.md` (also included as INSTALL.md in the Plugin archive).\n' "$TAG"
+                echo 'Generated from this tag with the verified image digest; all three guides belong to this release.'
+                printf '\nInstallation guide SHA256 checksums:\n\n```text\n'
+                cat "$RUNNER_TEMP/kgos-install-$TAG.sha256"
+                printf '\n```\n'
+              fi
               echo "The public release tag belongs to this distribution repository, not the private source."
             } > "$RUNNER_TEMP/kgos-release-notes.md"
+            RELEASE_FLAGS=()
+            if [ "$EXPECTED_PRERELEASE" = true ]; then
+              RELEASE_FLAGS=(--prerelease --latest=false)
+            fi
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" --title "KG OS $TAG" \
-              --notes-file "$RUNNER_TEMP/kgos-release-notes.md"
+              --notes-file "$RUNNER_TEMP/kgos-release-notes.md" "${RELEASE_FLAGS[@]}"
           fi
           gh release upload "$TAG" "$RUNNER_TEMP/kgos-plugin-$TAG.zip" \
             --repo "$GITHUB_REPOSITORY" --clobber
+          if [ "$STABLE_RELEASE" = true ]; then
+            gh release upload "$TAG" "$RUNNER_TEMP/kgos-install-zh-$TAG.md" \
+              "$RUNNER_TEMP/kgos-install-en-$TAG.md" "$RUNNER_TEMP/kgos-INSTALL-$TAG.md" \
+              "$RUNNER_TEMP/kgos-install-$TAG.sha256" \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          fi

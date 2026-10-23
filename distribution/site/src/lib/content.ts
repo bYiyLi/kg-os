@@ -8,7 +8,7 @@ export const copy = {
       description:
         "KG OS 是面向 AI 的可编程知识图基础设施。自定义模型，以图连接知识，通过 MCP 查询、修改并追踪知识演化。"
     },
-    nav: ["产品介绍", "工作方式", "核心能力", "架构", "AI 安装"],
+    nav: ["产品介绍", "工作方式", "核心能力", "架构", "安装 KG OS"],
     github: "GitHub",
     theme: {
       label: "外观主题",
@@ -24,7 +24,7 @@ export const copy = {
       title2: "更能操作知识。",
       description:
         "定义自己的知识模型，让图连接数据与关系。通过 KG OS，AI 可以查询、修改和追踪知识的变化，而不只是获得一段相关文本。",
-      primary: "通过 AI Agent 安装",
+      primary: "安装 KG OS",
       secondary: "了解它如何工作",
       properties: ["图结构", "自定义模型", "MCP + Skills", "版本历史"]
     },
@@ -134,19 +134,13 @@ export const copy = {
       note: "保留你熟悉的 Agent，由同一个 KG OS 实例提供 MCP 和 Web 入口，图数据库负责保存与查询知识。"
     },
     final: {
-      label: "05 / INSTALL WITH AI",
-      heading: "你选方案，AI 协助安装。",
+      label: "05 / INSTALL KG OS",
+      heading: "从你的第一套知识基础设施开始。",
       description:
-        "将下面的提示词发送给 ChatGPT。它会先阅读手册，只读检查环境并给出方案；由你选择和明确授权后，再按分工执行并逐项验证。",
-      promptLabel: "给 AI Agent 的提示词",
-      promptBeforeUrl: "请按照这份官方安装手册帮我安装 KG OS：",
-      promptAfterUrl:
-        "先阅读手册，检查已有环境和实际发布的可用版本，再完成获授权的安装与验证。复用有效连接，保留现有数据。需要我登录或授权时，告诉我具体操作；不要让我把凭证粘贴到对话中。",
-      copy: "复制安装提示词",
-      copied: "已复制",
-      copySuccess: "已复制。将提示词粘贴到你的 AI Agent 对话中即可。",
-      copyFailed: "复制未成功，请选中上方提示词并手动复制。",
-      note: "新部署需要 Linux amd64 Docker 环境；有效实例与连接先验证后复用。AI 无法操作的步骤可由你按指引完成；缺少功能或权限时会说明阻塞，保留已完成结果。"
+        "按照官方教程部署、初始化并连接 ChatGPT，再由 AI 为你制作私人 Plugin、配置使用规范并完成自检。",
+      action: "安装 KG OS",
+      steps: ["部署服务与配置 HTTPS", "连接 ChatGPT 并验证调用", "制作私人 Plugin，完成自检"],
+      note: "推荐 Docker Compose + Web 初始化，也支持 Docker 命令与配置文件。主机、模型与费用由你选择；已有服务和连接可复用。"
     },
     footer: "面向 AI 的可编程知识图基础设施"
   },
@@ -157,7 +151,7 @@ export const copy = {
       description:
         "Programmable knowledge graph infrastructure for AI. Define custom models, connect knowledge, and let agents query, update, and evolve it through MCP."
     },
-    nav: ["Overview", "How it works", "Capabilities", "Architecture", "Install with AI"],
+    nav: ["Overview", "How it works", "Capabilities", "Architecture", "Install KG OS"],
     github: "GitHub",
     theme: {
       label: "Appearance",
@@ -173,7 +167,7 @@ export const copy = {
       title2: "Make knowledge operable.",
       description:
         "Define your own knowledge models. Connect data through relationships. Give AI a structured system it can query, update, and evolve—not just retrieve relevant text from.",
-      primary: "Install with AI Agent",
+      primary: "Install KG OS",
       secondary: "See how it works",
       properties: ["Graph-first", "Custom Models", "MCP + Skills", "Versioned Knowledge"]
     },
@@ -294,22 +288,73 @@ export const copy = {
       note: "Keep the Agent you already use. One KG OS instance provides MCP and Web access, with a graph database to store and query knowledge."
     },
     final: {
-      label: "05 / INSTALL WITH AI",
-      heading: "You choose the plan. AI helps you install.",
+      label: "05 / INSTALL KG OS",
+      heading: "Start with your own knowledge infrastructure.",
       description:
-        "Send the prompt below to ChatGPT. It reads the guide, checks your setup without changing it, and proposes a plan. After you choose and explicitly authorize the plan, it helps carry out each step and verifies the results.",
-      promptLabel: "Prompt for your AI Agent",
-      promptBeforeUrl: "Help me install KG OS using its official installation guide:",
-      promptAfterUrl:
-        "Read the guide first, check my existing setup and available published releases, then complete and verify the authorized installation steps. Reuse working connections and preserve existing data. Tell me which login or approval actions require my participation. Do not ask me to paste credentials into the conversation.",
-      copy: "Copy installation prompt",
-      copied: "Copied",
-      copySuccess: "Copied. Paste the prompt into your AI Agent to begin.",
-      copyFailed: "Automatic copy failed. Select the prompt above and copy it manually.",
-      note: "New deployments need Linux amd64 with Docker. Working instances and connections are checked and reused. You can follow instructions for steps the AI cannot perform; missing features or permissions are reported while completed work is preserved."
+        "Deploy and initialize KG OS, connect ChatGPT, then let AI create your private Plugin, configure guidance, and run the installation checks.",
+      action: "Install KG OS",
+      steps: [
+        "Deploy the service and configure HTTPS",
+        "Connect ChatGPT and verify real calls",
+        "Create a private Plugin and run checks"
+      ],
+      note: "Docker Compose + Web initialization is recommended; Docker commands and configuration files are also supported. You choose the host, model, and costs. Reuse existing services and connections."
     },
     footer: "Programmable knowledge graph infrastructure for AI"
   }
 } as const;
 
 export type Locale = keyof typeof copy;
+
+export const installationCopy = {
+  zh: {
+    eyebrow: "安装与升级 / GET STARTED",
+    back: "产品首页",
+    latest: "最新稳定版",
+    versions: "版本与历史",
+    historical: "你正在阅读历史版本手册。",
+    viewLatest: "查看最新稳定版",
+    aiGuide: "AI 安装指南 INSTALL.md",
+    plugin: "同版官方 Plugin",
+    appliesTo: "适用版本：",
+    download: "下载 Markdown",
+    upgrade: "升级已有安装",
+    toc: "本页目录",
+    recommendation: "推荐：Docker Compose + Web 初始化",
+    methods: "也支持 Docker 命令与配置文件初始化。按所选方式操作，共同步骤只需完成一次。",
+    copy: "复制内容",
+    copied: "已复制",
+    copying: "正在复制…",
+    copySuccess: "内容已复制。使用前请填写自己的参数或需求。",
+    copyFailed: "复制未成功。请选中本段内容手动复制。",
+    code: "可复制内容",
+    footer: "部署服务 → 连接 ChatGPT → 安装私人 Plugin → 自检与开始使用。",
+    source: "官方发行版本"
+  },
+  en: {
+    eyebrow: "INSTALLATION & UPGRADES / GET STARTED",
+    back: "Product overview",
+    latest: "Latest stable",
+    versions: "Versions & history",
+    historical: "You are reading an archived version of the manual.",
+    viewLatest: "View the latest stable version",
+    aiGuide: "AI installation guide INSTALL.md",
+    plugin: "Matching official Plugin",
+    appliesTo: "Applies to:",
+    download: "Download Markdown",
+    upgrade: "Upgrade an existing installation",
+    toc: "On this page",
+    recommendation: "Recommended: Docker Compose + Web initialization",
+    methods:
+      "Docker commands and configuration-file initialization are also supported. Follow your chosen path and complete shared steps once.",
+    copy: "Copy content",
+    copied: "Copied",
+    copying: "Copying…",
+    copySuccess: "Content copied. Fill in your own parameters or requirements before using it.",
+    copyFailed: "Copy failed. Select this content and copy it manually.",
+    code: "Copyable content",
+    footer:
+      "Deploy the service → Connect ChatGPT → Install a private Plugin → Verify and start using KG OS.",
+    source: "Official release"
+  }
+} as const;

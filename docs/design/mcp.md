@@ -647,25 +647,27 @@ flowchart TD
 
 **官方 Skill 源码已收敛为七个**：旧通用 `plugins/kgos/skills/kgos/SKILL.md` 已依用户明确清理要求从源码移除。它原先指导的 `kgos_docs`、`kgos_ontology_overview`、`kgos_commit_ancestry`、`kgos_query`、`kgos_mutate`、SDK 命名空间、State pin、Object Patch、Cypher、分页、Merge、Commit Message 与失败恢复，由 MCP 自描述 `kgos_docs` 和相应 Guide/SDK 合同承接。新任务按需读取文档与当前 State，不把完整 Ontology/Commit DAG 无界加载；没有 Skill 也能调用已授权 MCP。**仓库源码清理不证明私人 Plugin 已自动更新或七个 Skill 已通过目标客户端验收**，对应缺口仍归 Phase 25/27/28。
 
-**ChatGPT 协作安装规则（2026-10-23）**：初始“帮我安装”请求先只读收集官方公开安装资料并核实实际可用版本，不检查用户设备、已有连接或账户。资料整理后按“欢迎问候 → 资料摘要 → 安装方式选择”的顺序回复，直接由用户选择起点，不另问是否进入下一步；已有明确选择直接沿用。目标不明先补问，设备、连接或账户检查须明确目标和范围并取得授权；连接不可见不授权转查宿主，工具可用或历史连接不构成本次检查授权。随后基于获授权的调查结果提出可执行方案及建议，由用户选择并明确授权后执行安装。方案须说明目标 Instance、版本、数据位置、公网接入、Embedding、账户/Workspace、安装范围、AI/用户分工和验收；AI 不替用户选择部署目标、收费服务或权限范围。一次确认可覆盖完整具体计划，已覆盖动作直接推进；目标、费用、数据处理、权限或范围实质变化时，仅重新确认受影响部分。具体步骤由唯一 [INSTALL.md](../../plugins/kgos/INSTALL.md) 维护。
+**安装职责（2026-10-23）**：官网双语教程负责用户手动部署、初始化、公网 HTTPS、连接并安装 ChatGPT 基础 MCP 应用，直到目标客户端的真实只读调用通过；`plugins/kgos/INSTALL.md` 从这个已连接应用开始，指导 AI 制作和安装版本化私人 Plugin、迁移定制、配置 Global AI Guidance v1 与自检。主机、Embedding、模型、费用、账户/Workspace、权限与变更方案由用户选择。官方推荐 Compose + Web 初始化，不据此自动选用用户设备或执行部署；AI 不扫描设备、不重置或自动升级实例。只补问具体缺项，已授权步骤不重复确认，实质变更只确认受影响部分。
 
-**服务取得与初始化**：安装入口按用户现状提供七种选择，区分已有 ChatGPT 连接、已有服务、AI 协助新部署、用户手动安装、尚无环境、继续安装及尚不确定；具体选项与分支只在安装指南维护。两种新部署都须基于环境形成计划，由用户明确确认并授权后执行；需要用户操作时给出步骤并等待核实。已有连接优先以获授权的实际调用核对就绪状态；证据不足再补问，不自行扫描设备。未完成初始化时在相应授权内协助完成，必要验收通过后才继续。选择、目标、检查授权、计划确认、用户操作和验收是明确的进展卡点。
+**用户教程与版本**：可编辑发布模板按语言唯一维护在 `distribution/site/src/content/service-installation/zh.md` 与 `en.md`；它们不直接作为最新版网页。正式发布后，已验证的完整正文与配套 INSTALL 保存为 `vX.Y.Z/` 快照，再由目录生成 `/zh/install/`、`/en/install/` 及同源 Markdown 下载。Compose / Docker 命令与 Web / 配置文件初始化四种组合共用持久化、非 root 身份、受控初始化与验收；初始化就绪后配置 Caddy HTTPS，已有代理可复用。官网按正式发布版本保存完整双语手册与对应 INSTALL 快照：`/zh/install/vX.Y.Z/`、`/en/install/vX.Y.Z/`、各语言对应 `.md` 下载及语言无关 `/install/vX.Y.Z/INSTALL.md`。`/zh/install/`、`/en/install/` 保留最新稳定版入口；版本切换和中英文切换保持选中版本。每版的正文、镜像 digest、AI 提示词、INSTALL 与 Plugin 发行资源绑定同版，历史页面不标为最新，也不跳到 main 或其它版本资源。最新版本由显式发布目录决定，不随开发包版本提前变化，不使用浮动 `:latest`。发布时保存完整配套资料，发布收尾将实际已发行版本注册到官网；下一版技术内容只编辑发布模板和 canonical INSTALL，不改已归档正文；新版本不覆盖旧版正文。本轮补齐 v0.3.0 官网配套资料，不改写其既有 Git Tag 或 Release。教程提供逐步操作、预期结果、异常恢复、服务升级与备份恢复，不展示内部评审措辞；真实 Docker/证书/客户端证据在开发记录中维护。
 
 完整安装按以下依赖推进：
 
-1. 按用户选定方案复用或部署统一 `kgosd`，在受控入口完成初始化，再验收目标 Instance 就绪、持久化及公网 HTTPS；`[server].public_origin` 为安全根 Origin。已有可用实例不重跑初始化，不因发现新版本自动升级，也不强制取得与复用无关的宿主权限。
-2. 在目标 ChatGPT 账户/Workspace 注册或复用用户自己的 MCP Connection；已有有效授权直接复用，需要登录或 OAuth 时由用户在可信 KG OS Web 完成，管理员 Token 不交给 ChatGPT。核实连接实际注册 ID，并在准备私人 Plugin 前验证工具真实只读调用与目标 State。
-3. 依据同版真实发行物与用户诉求准备**用户私有** Plugin，用真实连接 ID 绑定，保留七个官方 Skill 及完整引用资源。Creator 或手工兼容包路径都以目标宿主实际支持和用户选定方案为前提；既有私人 Plugin 的更新与旧 Skill 移除需要相应授权，不推断已随源码同步。
-4. 协助安装到用户选定的 ChatGPT Web / Desktop 及 Chat / Work 范围，在新会话验证 MCP、Skill 安装/发现/加载及必要资源。各目标入口分别取证；发现名称、文件存在、正文加载与实际使用分别报告，不用安装测试写业务数据。
-5. 提供完整 Global AI Guidance v1 和实际客户端配置步骤，保留已有个人指令，由用户选择冲突处理方式并保存。新会话分别验证保存、可信加载、正文/版本完整性与已观察行为；隐藏或缺失证据记为未知，不以引用正文或 Doctor 探测冒充生效。
+1. 用户手动部署或指定已有 `kgosd`，完成初始化、真实 Embedding、持久化、公网 HTTPS 与认证验收。`[server].public_origin` 为最终安全根 Origin；有效实例不重新初始化，不要求无关的宿主权限。
+2. 用户在指定 ChatGPT 账户/Workspace 添加或复用基础 MCP 应用，按实际界面完成 OAuth、安装、启用及新会话只读调用验收。管理员 Token 只输入自己的 KG OS Web；CIMD/PKCE 不要求把 Token 当 client secret。服务重启使进程内 OAuth 凭证失效时重新授权原连接，不默认删除重建。
+3. AI 确认已有应用与真实 app/connection ID、服务版本及对应官方资源；识别用户指定旧私人 Plugin 与旧版官方基线的差异，列出定制迁移、冲突、版本化名称及安装范围，用户确认方案后执行。目标 Plugin ID、app ID 与 OAuth client_id 不混同；未知旧内容不视为没有定制。
+4. 每次制作新的私人 Plugin，不原地更新旧 Plugin；展示名包含官方版本号，同版再次制作增加修订序号，实际对象保持独立。复用验证过的应用连接，保留七个官方 Skill 与完整引用资源，迁移用户定制；有冲突由用户选择，不以旧包整体覆盖新版。新版本失败保留旧版，创建结果未知先查状态，不盲目重复创建。
+5. 在新会话验证新 Plugin 的实际安装、MCP 调用、版本、Skill 与引用资源，提供完整 Global AI Guidance v1 和目标 ChatGPT 的配置步骤。保留现有个人指令，冲突由用户决定；配置保存与普通任务行为分别检查，不以 Doctor 探测冒充自动生效。新版本验收后，用户可选择卸载旧 Plugin；已有明确授权直接执行，保留共享 app/MCP 连接，不扩大共享或公开范围。
 
-**范围与完成规则**：默认完整安装包含就绪服务、ChatGPT MCP、私人 Plugin、七个官方 Skill 与 Global AI Guidance v1；只有用户明确选择 MCP-only 才按该范围结束。每阶段通过对应验收后继续；已验证资源直接复用，缺少能力、权限或证据时保留局部结果并给出恢复位置。中断或结果未知先查实际状态，不盲目重放副作用；在原授权内恢复，实质改变方案则返回用户选择。完整安装的所有必要项目通过才报告整体完成；空知识库可以通过基础安装验收，业务模型、知识写入、D4/D5 与维护调度不属于必需安装内容。
+**自检与完成规则**：默认完整安装包含就绪服务、ChatGPT 应用、版本化私人 Plugin、七个官方 Skill、引导词与定制迁移结果；用户明确选择 MCP-only 时可在官网的连接验收后结束。按组件区分已安装、已配置、实际调用通过、待操作、失败与不可观测。必要的可操作项必须通过，隐藏全局指令来源或自动 Skill 选择等不可观测项目分别报告，不伪造加载证据，也不把它们变成永远无法通过的硬门槛；已确认缺失/错误不能当作不可观测略过。Doctor 自检覆盖安装相关 D1–D3，空知识库可通过；D4 知识质量、D5 维护调度与业务写入不是安装条件。失败或中断先核实现状，原授权内安全恢复，缺输入仅暂停依赖部分。
+
+**服务升级**：先核对目标发行说明与适用升级路径，拉取固定镜像；暂停写入、停止服务后私有备份整个工作目录、启动配置和凭证，保留权限。Compose / Docker 分别按原参数与挂载替换镜像，不重新初始化、不修改代理或清理持久目录；升级后重验 State/数据/身份、HTTPS、OAuth 与 ChatGPT 调用。镜像回退不是数据恢复，未声明兼容时不承诺直接降级；恢复备份须由用户选择并说明会丢失备份后的写入。服务升级和私人 Plugin 升级独立。
 
 通用 Plugin 模板不是可直接指向所有用户同一 MCP 地址的公共插件；不把动态连接 ID、Bearer Token、OAuth secret 或本地根目录写死进公开包。优先按 OpenAI 当前支持的 **注册 MCP Connection → 私有 Plugin 的 `.app.json` 引用 + 官方 Skill** 路径生成；`mcp.json` 可在需要便携 MCP 配置时单独选用，不与用户已有连接配置重复。`plugin.json`、`.app.json` 与 Skill 等具体文件布局按安装时的插件规范验证，**不把一种开发样例格式误当成所有客户端永远不变的产品合同**。
 
 <a id="kgos-seven-skills"></a>
 
-**公开安装与分发职责（D109）**：Plugin/Skill 内容真源保留在私有 `plugins/kgos/`，`kg-releases` 只接受生成器公开的 `plugin.json`、`.app.json.example` 和七个目标 Skill 的完整 Markdown 资源；私有源码内旧通用 `kgos` 已清理，但不会自动从用户已安装的私人 Plugin 中删除。`plugins/kgos/INSTALL.md` 是**唯一安装指南真源**，发布为 `kg-releases/INSTALL.md`（公开仓库只有这一份），目标覆盖 Docker、MCP、Plugin、Skill 与全局引导词。正式发行时 Plugin 归档与 GHCR 镜像跟随同一个经授权的产品 Tag，`.app.json` 中的用户连接 ID 必须由用户私下配置；公开候选资料不等于 Phase 25/27/28 的完整客户端验收。详见 [D109](decisions.md#d109-single-public-distribution-and-installer) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。
+**公开安装与分发职责（D109）**：Plugin/Skill 内容真源保留在私有 `plugins/kgos/`，`kg-releases` 只接受生成器公开的 `plugin.json`、`.app.json.example` 和七个目标 Skill 的完整 Markdown 资源；私有源码内旧通用 `kgos` 已清理，但不会自动从用户已安装的私人 Plugin 中删除。`plugins/kgos/INSTALL.md` 是**唯一 AI 私人 Plugin 安装指南真源**，发布为 `kg-releases/INSTALL.md`；官网双语手动教程维护部署、ChatGPT 接入、升级与恢复；每版网页和 Markdown 下载共用该版本对应语言正文，INSTALL 为同版冻结快照，不作为第二份独立编辑真源。正式发行时 Plugin 归档与 GHCR 镜像跟随同一个经授权的产品 Tag，`.app.json` 中的用户连接 ID 必须由用户私下配置；公开候选资料不等于 Phase 25/27/28 的完整客户端验收。详见 [D109](decisions.md#d109-single-public-distribution-and-installer) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。
 
 ### 最终官方 Skill 清单与通用 Skill 退役（D107：目标方案）
 

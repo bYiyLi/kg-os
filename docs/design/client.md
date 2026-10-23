@@ -98,13 +98,13 @@ Linux amd64 Docker / OCI (one official runtime artifact)
 
 ### 私有源码与公开分发仓库
 
-按 [D108](decisions.md#d108-private-source-public-releases) 和 [D109](decisions.md#d109-single-public-distribution-and-installer)，`bYiyLi/kg-os` 是唯一私有开发真源，`bYiyLi/kg-releases` 统一提供自动生成的 Docker 镜像/Release 入口、Plugin、七个目标 Skill、唯一安装指南和公开 CI/CD，不复制私有程序源码或 Git 历史。所有内容均只在私有 KG OS 开发：
+按 [D108](decisions.md#d108-private-source-public-releases) 和 [D109](decisions.md#d109-single-public-distribution-and-installer)，`bYiyLi/kg-os` 是唯一私有开发真源，`bYiyLi/kg-releases` 统一提供自动生成的 Docker 镜像/Release 入口、Plugin、七个目标 Skill、AI 私人 Plugin 安装指南、用户安装教程和公开 CI/CD，不复制私有程序源码或 Git 历史。所有内容均只在私有 KG OS 开发：
 
 1. `kg-os/main` Push 由 `.github/workflows/sync-kg-releases.yml` 检查确切来源 revision，调用 `scripts/render-kg-releases.mjs` 输出 `distribution/` 中的白名单内容和 `source.json`，使用仅授权公开仓库的可写 Deploy Key 推送 `kg-releases/main`；公开 CI 自动对 `source.json` 固定的私有 revision 执行 Validate 与 Linux amd64 Docker 隔离 Smoke。
 2. 经授权创建并 Push 的私有 `v<version>` Tag 生成匹配的公开 Tag；公开 Release 先通过完整 CI，再针对该 Tag 的确切私有 SHA 构建、隔离 Smoke、核对 GHCR 平台/revision/digest/匿名拉取并创建公开 GitHub Release。一般 `main` Push 不发布镜像。
 3. 公开 runner 只能通过单独的私有源码**只读** Deploy Key 读取，不能把源码、完整历史、测试报告或缓存发布到公开仓库；Public PR 不触发含该密钥的工作流。镜像正式公开前仍须满足源代码许可义务或具备合法替代授权；公开仓库设置 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 才允许二进制发布。
-4. `plugins/kgos/INSTALL.md` 是**唯一可编辑的完整安装指南**，生成器将其发布为公开仓库根目录的唯一 `INSTALL.md`；不保留另一份 `distribution/INSTALL.md`，也不在 Plugin 目录重复一份。发布白名单包含 `plugins/kgos/plugin.json`、无凭证连接模板、准确七个目标 Skill 的 Markdown 资源、许可证，不包括已从源码退役的旧通用 `kgos` Skill、实际用户 `.app.json`、Token 或数据库。Plugin Manifest 的版本必须与产品包版本一致。
-5. 正式公开 `v*` Release 除经许可发布的 Linux amd64 Docker 镜像外，还在同一版本的 GitHub Release 附带带唯一 `INSTALL.md` 和七 Skill 的 Plugin 压缩包；普通 `main` 仅是自动更新的公开候选内容，不代表 Plugin 的真实宿主/客户端验收已完成。
+4. `plugins/kgos/INSTALL.md` 是**唯一 AI 私人 Plugin 安装指南**，导出为公开根目录唯一 `INSTALL.md`；官网对应语言 Markdown 唯一维护部署、初始化、HTTPS、ChatGPT 基础应用接入与验收、升级与恢复，由网页和同源下载共用。INSTALL 只接续已有应用，负责新建版本化私人 Plugin、迁移定制、安装、引导词与自检，不复制用户操作正文。不保留 `distribution/INSTALL.md` 或 Plugin 内第二份安装真源。公开白名单只包含 Manifest、无凭证模板、七个官方 Skill 的完整 Markdown、站点与许可，不包含真实 `.app.json`、Token 或数据库。
+5. 正式 Release 的镜像与官方 Plugin 归档对应同一产品 Tag；归档包含唯一 INSTALL、七个官方 Skill 和许可。后续 Release 同时保存双语安装 Markdown 供对应版本使用；现有 v0.3.0 Tag 不改写。官网适用版本独立于开发包版本，更新前核对真实最新稳定 Release、digest 与匹配 Plugin，不把候选版提前写成最新稳定版。官网每个正式版本保留双语完整手册与 INSTALL 快照，提供历史版本切换；不改写既有 Tag。
 
 该架构正在 [Phase 30](../development/phases/30-private-source-public-releases.md) 验收。私有仓库只保留有限的自动同步工作流，不再运行源码 Validate、Docker 或 Release；全部远端质量门禁归 `kg-releases`，公开 CI 是否通过必须以其真实 Run 为准。生成器、工作流及一次性仓库/密钥配置的唯一维护说明见 [`docs/guide/distribution-maintenance.md`](../guide/distribution-maintenance.md)。
 
@@ -113,8 +113,8 @@ Linux amd64 Docker / OCI (one official runtime artifact)
 KG OS 官网与产品工作区是**不同的界面**。官网负责说明产品定位、真实能力、使用方式、架构及安装入口，不提供账户、知识数据操作或新的后端 API；`packages/web` 继续独立承载 KG OS 管理工作区。两者共享 KG OS 品牌标识、深海军蓝/紫蓝/冷白视觉 Token 与交互原则，不复制 Web 的 React/shadcn/ui 组件或业务实现。
 
 - **单一真源**：`kg-os/distribution/site/` 保存 Astro + TypeScript + CSS 静态网站，独立的 pnpm lock/workspace 仅用于该网站构建；`scripts/render-kg-releases.mjs` 通过受控白名单导出到公开 `kg-releases/site/`。官方 Docker/Web/SDK/Kernel 源码、密钥及工作区数据不进入公开站点。
-- **内容**：首版采用已确认的 V4 首页叙事「不止检索知识，更能操作知识」，依次展示示例知识图、为何需要结构化知识、定义→关联→操作→演化、四项基础能力、Agent/KG OS/Lithograph/SQLite 架构及 **AI Agent 安装入口**。图谱界面只使用明确标注的示例数据，不暗示它是真实运行截图或新增产品能力。
-- **唯一安装方式的展示**：官网不提供手动安装页面、手动/AI 切换标签或第二份安装步骤。中英文官网只展示一份可复制的 Agent 提示词，指向公开 `https://raw.githubusercontent.com/bYiyLi/kg-releases/main/INSTALL.md`；其职责只是要求 Agent 先获取完整安装真源、检查现有环境/权限/正式 Release、执行获授权的动作并按实际结果验收。网页本身不执行安装，不能保证任意 Agent 都能访问用户环境；需要用户处理的登录与授权由 Agent 逐步说明，不在聊天中索取密钥。按钮只负责复制文本，失败时可选择并自行复制，不虚报已复制。该网页提示词不重复定义镜像、Plugin、MCP 或 Skill 的具体安装流程。
+- **内容**：首版采用已确认的 V4 首页叙事「不止检索知识，更能操作知识」，依次展示示例知识图、为何需要结构化知识、定义→关联→操作→演化、四项基础能力、Agent/KG OS/Lithograph/SQLite 架构及 **服务手动安装入口**。图谱界面只使用明确标注的示例数据，不暗示它是真实运行截图或新增产品能力。
+- **安装手册（2026-10-23 调整）**：首页、导航和安装区域进入 `/zh/install/` 或 `/en/install/`。用户按 Compose / Docker 与 Web / 配置文件四种组合安装服务（推荐 Compose + Web），在可信入口初始化、配置或复用 HTTPS，再按实际 ChatGPT 界面添加/复用基础 MCP 应用、完成 OAuth 与真实客户端验收；之后复制提示词，由 AI 按唯一 INSTALL 制作版本化私人 Plugin、迁移定制、安装引导词并自检。正文还提供服务升级、备份恢复与最小使用示例。可编辑发布模板为 `service-installation/{zh.md,en.md}`，与 canonical INSTALL 一起承载下次发布的技术修改，网站不直接渲染候选模板。每个正式版本保存 `service-installation/vX.Y.Z/{zh.md,en.md,INSTALL.md}`，发布目录 `catalog.json` 唯一记录已归档版本与最新稳定版；同版网页与下载共用这些内容。固定页面为 `/{locale}/install/vX.Y.Z/`，语言 Markdown 为 `/{locale}/install/vX.Y.Z.md`，AI 指南为 `/install/vX.Y.Z/INSTALL.md`，旧 `/{locale}/install/` 和 `.md` 是最新稳定版别名。版本菜单与语言切换保持版本；历史页显示适用版本并提供返回最新入口，不冒充最新。Plugin 与 Release 链接根据选中版本定位，不跳 main。目录只接收实际正式发布版本，未知版本不回退最新。页面沿用品牌、语言、主题、目录、锚点与代码/提示词复制反馈；显示真实最新稳定版和适用版本，命令 pin 版本与 digest。用户正文采用正式产品文案，测试与交付状态保留在开发记录，不声称未经执行的验证。无新后端或动态命令生成器。
 - **语言与主题**：静态生成 English `/en/` 与简体中文 `/zh/`，站点根入口依据浏览器语言跳转，其他语言回退英文；用户手动选语种后由当前 URL 保持。主题提供 `system`（默认）、`light`、`dark`，`system` 动态跟随 `prefers-color-scheme`；仅显式明暗偏好写入 `localStorage["kgos.site.theme"]`，选择系统时删除。站点与运行时 Web 位于不同 Origin，不共享 Web 的偏好存储。
 - **公开部署**：`kg-releases/.github/workflows/pages.yml` 只从公开 `site/` 构建并发布到 GitHub Pages；不读取私有源码、不注入 `KGOS_SOURCE_DEPLOY_KEY`，与公开 Validate/Docker/Release 完全独立。公开仓库 Settings → Pages 选择 GitHub Actions，并为该项目配置独立自定义域名 `kghub.y2l.top`（DNS CNAME 指向 `byiyli.github.io`）；Astro 从站点根路径 `/` 构建，页面地址为 `https://kghub.y2l.top/en/` 与 `https://kghub.y2l.top/zh/`。普通同步不等于 Pages 已部署。
 

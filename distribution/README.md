@@ -19,26 +19,25 @@ KG OS is programmable knowledge graph infrastructure for AI. Define the informat
 
 For example, a project knowledge graph can connect a technical decision to the components it affects and the evidence behind it. Ask your AI to inspect those relationships before proposing a change.
 
-## Install with your AI Agent
+## Install KG OS
 
-Copy this prompt into ChatGPT to plan the installation and get help with each step:
+Follow the [installation guide](https://kghub.y2l.top/en/install/) through **service deployment → initialization → public HTTPS → ChatGPT connection → private Plugin installation → verification and first use**. **Docker Compose + Web initialization** is recommended; Docker commands and configuration-file initialization are also supported. Reuse existing services and connections. The [Markdown download](https://kghub.y2l.top/en/install.md) and web page use the same source.
 
-```text
-Help me install KG OS using its official installation guide:
-https://raw.githubusercontent.com/bYiyLi/kg-releases/main/INSTALL.md
+The guide helps you create or reuse a basic MCP app in ChatGPT and verify real calls, then provides a prompt for the AI installation steps. Use the **INSTALL.md linked from your selected manual version** ([v0.3.0 AI guide](https://kghub.y2l.top/install/v0.3.0/INSTALL.md)). It guides AI to read the matching release, identify customizations in your old Plugin, and create a new versioned private Plugin after you confirm the plan. It covers the seven official Skills, Global AI Guidance v1, and installation checks. Once the new Plugin passes verification, you choose whether to uninstall the old version; shared apps and MCP connections remain available.
 
-Read the guide first, check my existing setup and available published releases, then complete and verify the authorized installation steps. Reuse working connections and preserve existing data. Tell me which login or approval actions require my participation. Do not ask me to paste credentials into the conversation.
-```
-
-Following [INSTALL.md](INSTALL.md), the Agent first checks existing resources and permissions without changing them, then explains feasible installation plans and who will perform each step. You choose a plan and explicitly authorize its actions before installation begins. The complete ChatGPT setup includes a ready KG OS service, an MCP connection, your private Plugin, seven official Skills, and the full Global AI Guidance v1. Working resources are reused; you can explicitly choose an MCP-only setup.
+The complete setup includes a ready service, a ChatGPT app, your private Plugin, seven official Skills, and global guidance. If you only need basic MCP, you can start using KG OS after the connection checks pass.
 
 ### Before you begin
 
-You need an existing KG OS instance or a **Linux amd64 host with Docker** for a new installation. The Agent checks persistent storage, your chosen embedding service, a trusted public HTTPS endpoint, and the capabilities and permissions of your target ChatGPT account and workspace. If the Agent cannot operate the host, it can guide your manual steps where feasible. Missing ChatGPT features or account permissions must be resolved separately. Login and consent happen in the trusted interface indicated by the Agent.
+Use an existing service, or choose a **Linux amd64 Docker host**, persistent storage, and a working embedding service and model. ChatGPT also needs trusted public HTTPS and the necessary account/workspace capabilities and permissions. You choose the host, model, costs, and permissions, and run the service installation steps manually.
 
-Use a version listed in **Releases** with an available runtime image and matching Plugin resources. Files on `main` may be ahead of a released version. If no suitable release is available, the Agent should explain what is missing rather than attempt an installation with a placeholder version.
+KGHub keeps a complete manual for each release. The [latest guide](https://kghub.y2l.top/en/install/) opens the stable version; use its version menu to read historical manuals, including [v0.3.0](https://kghub.y2l.top/en/install/v0.3.0/). Language switching keeps the selected version. Each manual links its matching INSTALL.md and [official Plugin archive](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.0); commands pin the applicable version and image digest. The v0.3.0 KGHub manual supplements that release while retaining the original Tag and ZIP. Release assets remain available in [Releases](https://github.com/bYiyLi/kg-releases/releases).
 
-Keep administrator tokens, API keys, and other credentials out of chat and public issues. Complete sensitive login or approval steps in the trusted interface indicated by the Agent.
+Use administrator tokens and API keys only in a trusted terminal or your instance interface. Keep credentials out of chat and public issues.
+
+### Upgrade an existing installation
+
+Follow the [upgrade and recovery steps](https://kghub.y2l.top/en/install/#upgrade): check compatibility, stop the service and make a complete backup, then replace the image using the original directories and configuration. Recheck the service and ChatGPT calls. Upgrade the service and private Plugin separately, without reinitializing data or automatically replacing the old Plugin. Rolling back an image does not restore data.
 
 ## After installation
 

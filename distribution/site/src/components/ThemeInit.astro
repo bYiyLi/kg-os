@@ -1,0 +1,11 @@
+<script is:inline>
+  // Apply a saved manual choice before painting. Missing/invalid means system.
+  try {
+    const value = localStorage.getItem("kgos.site.theme");
+    if (value === "light" || value === "dark") {
+      document.documentElement.dataset.theme = value;
+    }
+  } catch {
+    // Preferences remain usable for this page when storage is unavailable.
+  }
+</script>

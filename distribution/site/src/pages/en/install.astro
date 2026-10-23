@@ -1,0 +1,10 @@
+---
+import InstallationGuide from "../../components/InstallationGuide.astro";
+import { getInstallation, latestInstallationVersion } from "../../lib/installations";
+const guide = getInstallation("en", latestInstallationVersion);
+const { Content } = guide;
+---
+
+<InstallationGuide guide={guide}>
+  <Content />
+</InstallationGuide>

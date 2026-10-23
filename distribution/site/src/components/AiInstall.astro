@@ -1,13 +1,14 @@
 ---
+// cspell:words eyeline
 import { copy, type Locale } from "../lib/content";
 
 interface Props {
   locale: Locale;
 }
 
-const t = copy[Astro.props.locale].final;
-const guideUrl = "https://raw.githubusercontent.com/bYiyLi/kg-releases/main/INSTALL.md";
-const prompt = `${t.promptBeforeUrl}\n${guideUrl}\n\n${t.promptAfterUrl}`;
+const locale = Astro.props.locale;
+const t = copy[locale].final;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 ---
 
 <section class="agent-install-section" id="get-started" aria-labelledby="agent-install-heading">
@@ -15,59 +16,10 @@ const prompt = `${t.promptBeforeUrl}\n${guideUrl}\n\n${t.promptAfterUrl}`;
     <p class="eyeline">{t.label}</p>
     <h2 id="agent-install-heading">{t.heading}</h2>
     <p class="agent-install-intro">{t.description}</p>
-
-    <div class="agent-install-panel">
-      <div class="agent-prompt-card">
-        <div class="agent-prompt-header">
-          <label for="agent-install-prompt">{t.promptLabel}</label>
-          <span>INSTALL.md / OFFICIAL</span>
-        </div>
-        <textarea
-          id="agent-install-prompt"
-          readonly
-          spellcheck="false"
-          rows="7"
-          aria-label={t.promptLabel}
-        >{prompt}</textarea>
-      </div>
-
-      <div class="agent-install-action">
-        <button
-          class="button-primary agent-copy-button"
-          type="button"
-          data-copy-install
-          data-copied-label={t.copied}
-          data-copy-success={t.copySuccess}
-          data-copy-failed={t.copyFailed}
-        >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <rect x="8" y="8" width="12" height="13" rx="2" />
-            <path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h2" />
-          </svg>
-          <span data-copy-label>{t.copy}</span>
-        </button>
-        <p class="agent-copy-feedback" data-copy-feedback role="status" aria-live="polite"></p>
-      </div>
-      <p class="agent-install-note">{t.note}</p>
-    </div>
+    <ol class="manual-install-steps">
+      {t.steps.map((step, index) => <li><span>{String(index + 1).padStart(2, "0")}</span>{step}</li>)}
+    </ol>
+    <a class="button-primary" href={`${base}${locale}/install/`}>{t.action}<span aria-hidden="true">→</span></a>
+    <p class="manual-install-note">{t.note}</p>
   </div>
 </section>
-
-<script>
-  const button = document.querySelector<HTMLButtonElement>("[data-copy-install]");
-  const textarea = document.querySelector<HTMLTextAreaElement>("#agent-install-prompt");
-  const feedback = document.querySelector<HTMLElement>("[data-copy-feedback]");
-  const label = button?.querySelector<HTMLElement>("[data-copy-label]");
-  button?.addEventListener("click", async () => {
-    if (!textarea || !feedback || !label) return;
-    try {
-      await navigator.clipboard.writeText(textarea.value);
-      label.textContent = button.dataset.copiedLabel ?? label.textContent;
-      feedback.textContent = button.dataset.copySuccess ?? "";
-    } catch {
-      textarea.focus();
-      textarea.select();
-      feedback.textContent = button.dataset.copyFailed ?? "";
-    }
-  });
-</script>

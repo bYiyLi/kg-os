@@ -19,26 +19,25 @@ KG OS 是面向 AI 的可编程知识图基础设施。你可以按自己的工�
 
 例如，把项目中的一项技术决策，与它影响的模块、支持它的证据连接起来。提出修改前，让 AI 先检查这些关系。
 
-## 通过 AI Agent 安装
+## 安装 KG OS
 
-将下面的提示词复制给 ChatGPT，让它协助规划安装并逐步完成操作：
+按照[安装教程](https://kghub.y2l.top/zh/install/)完成：**部署服务 → 初始化 → 公网 HTTPS → 连接 ChatGPT → 安装私人 Plugin → 自检与开始使用**。推荐 **Docker Compose + Web 初始化**，也支持 Docker 命令与配置文件初始化。已有服务和连接可复用；[Markdown 原文](https://kghub.y2l.top/zh/install.md)与网页来自同一份内容。
 
-```text
-请按照这份官方安装手册帮我安装 KG OS：
-https://raw.githubusercontent.com/bYiyLi/kg-releases/main/INSTALL.md
+教程先引导你在 ChatGPT 创建或复用基础 MCP 应用，并验证真实调用，再提供可复制的 AI 安装提示词。使用**所选版本手册提供的 INSTALL.md**（[v0.3.0 AI 指南](https://kghub.y2l.top/install/v0.3.0/INSTALL.md)），引导 AI 读取对应发行资源、识别旧 Plugin 定制，并在你确认方案后新建带版本号的私人 Plugin，协助安装七个官方 Skill、配置 Global AI Guidance v1 并自检。新版验收通过后，由你选择是否卸载旧版；共享应用与 MCP 连接保留。
 
-先阅读手册，检查已有环境和实际发布的可用版本，再完成获授权的安装与验证。复用有效连接，保留现有数据。需要我登录或授权时，告诉我具体操作；不要让我把凭证粘贴到对话中。
-```
-
-Agent 按 [INSTALL.md](INSTALL.md) 先只读检查已有资源与权限，再说明可行安装方案和操作分工。由你选择方案并明确授权后，才开始执行安装。完整 ChatGPT 安装包含就绪的 KG OS 服务、MCP 连接、你的私人 Plugin、七个官方 Skill 和完整 Global AI Guidance v1；有效资源会复用，也可以由你明确选择仅连接 MCP。
+完整安装包含就绪服务、ChatGPT 应用、私人 Plugin、七个官方 Skill 和全局引导词；只需基础 MCP 的用户可在连接验收通过后开始使用。
 
 ### 开始前需要准备什么
 
-已有 KG OS 实例，或一台用于新部署的 **Linux amd64 Docker 主机**。Agent 会检查持久存储、你认可的向量服务、可信公网 HTTPS 地址，以及目标 ChatGPT 账户和 Workspace 的实际功能与权限。Agent 无法操作主机时，可在条件允许的情况下指导你手动完成；ChatGPT 功能或账户权限缺失则需另行补足。登录和授权在 Agent 指明的可信界面中完成。
+已有服务，或一台你选定的 **Linux amd64 Docker 主机**、持久存储、可用的 Embedding 服务及模型。连接 ChatGPT 还需要可信公网 HTTPS 和目标账户/Workspace 的实际功能与权限。主机、模型、费用及授权由你决定；服务安装步骤由你手动执行。
 
-使用**发布版本**中实际可用的运行时镜像及对应版本的 Plugin 资源。`main` 分支的文件可能先于正式版本更新。没有合适的可用版本时，Agent 应说明缺少什么，而不是拿占位版本尝试安装。
+KGHub 为每个发布版本保留完整手册。[最新入口](https://kghub.y2l.top/zh/install/)进入稳定版，可通过版本菜单阅读历史手册，包括 [v0.3.0](https://kghub.y2l.top/zh/install/v0.3.0/)；切换语言保留所选版本。各版手册链接同版 INSTALL.md 和[官方 Plugin 发行包](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.0)，命令固定适用版本与镜像 digest。v0.3.0 官网手册为该发行补齐，原有 Tag 和 ZIP 保持不变；发行资产仍可在[正式发行](https://github.com/bYiyLi/kg-releases/releases)下载。
 
-不要在聊天或公开 Issue 中发送管理员 Token、API Key 等凭证。需要登录或授权时，在 Agent 指明的可信界面中完成。
+管理员 Token、API Key 等凭证只在可信终端或实例界面使用，不发送到聊天或公开 Issue。
+
+### 升级已有安装
+
+按[升级与恢复步骤](https://kghub.y2l.top/zh/install/#upgrade)核对版本兼容性，停止服务并完整备份，再沿用原目录和配置替换镜像，重新验证服务及 ChatGPT 调用。服务升级与私人 Plugin 升级分别进行；不重新初始化，也不自动覆盖旧 Plugin。镜像回退不能代替数据恢复。
 
 ## 安装后如何开始
 
