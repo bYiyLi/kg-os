@@ -48,6 +48,10 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.ok(first.files.includes(".github/workflows/pages.yml"));
     assert.ok(first.files.includes("scripts/render-release-installation.mjs"));
     assert.ok(first.files.includes("site/astro.config.mjs"));
+    assert.match(
+      await readFile(join(directory, "site/astro.config.mjs"), "utf8"),
+      /site:\s*"https:\/\/kgos\.sites\.y2l\.top"/
+    );
     assert.ok(first.files.includes("site/pnpm-lock.yaml"));
     assert.ok(first.files.includes("site/src/pages/en/index.astro"));
     assert.ok(first.files.includes("site/src/pages/zh/index.astro"));
@@ -272,14 +276,14 @@ test("release guides render only verified KG OS facts from self-contained public
     "Latest stable release: KG OS v0.3.1.",
     "https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.1",
     "https://github.com/bYiyLi/kg-releases/releases/download/v0.3.1/kgos-plugin-v0.3.1.zip",
-    "https://kghub.y2l.top/install/v0.3.1/INSTALL.md",
+    "https://kgos.sites.y2l.top/install/v0.3.1/INSTALL.md",
     nextImage,
     "caddy:2.11.7-alpine / model:0.3.0 / historical v0.3.0 Tag",
     "ghcr.io/byiyli/kgos:v0.3.01 / KG OS v0.3.01 / https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.01"
   ].join("\n");
   assert.equal(renderInstallationGuide(body, options), expected);
   const installerTemplate =
-    "# KG OS v0.3.0 Plugin\nhttps://kghub.y2l.top/zh/install/v0.3.0/#connect-chatgpt\nhttps://kghub.y2l.top/en/install/\nhttps://kghub.y2l.top/zh/install/v0.3.0.md\nhttps://kghub.y2l.top/install/v0.3.0/INSTALL.md";
+    "# KG OS v0.3.0 Plugin\nhttps://kgos.sites.y2l.top/zh/install/v0.3.0/#connect-chatgpt\nhttps://kgos.sites.y2l.top/en/install/\nhttps://kgos.sites.y2l.top/zh/install/v0.3.0.md\nhttps://kgos.sites.y2l.top/install/v0.3.0/INSTALL.md";
   const updatedInstaller = renderInstaller(installerTemplate, options);
   assert.ok(updatedInstaller.includes("/zh/install/v0.3.1/#connect-chatgpt"));
   assert.ok(updatedInstaller.includes("/en/install/v0.3.1/"));
@@ -533,9 +537,9 @@ test("installation bundles reject mixed image digests and cross-version resource
     "https://github.com/bYiyLi/kg-releases/releases/download/v0.3.1/kgos-plugin-v0.3.1.zip",
     "https://github.com/bYiyLi/kg-releases/releases/download/v0.3.0/kgos-plugin-v0.3.1.zip",
     "https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.1",
-    "https://kghub.y2l.top/en/install/v0.3.1/",
-    "https://kghub.y2l.top/zh/install/v0.3.1.md",
-    "https://kghub.y2l.top/install/v0.3.1/INSTALL.md",
+    "https://kgos.sites.y2l.top/en/install/v0.3.1/",
+    "https://kgos.sites.y2l.top/zh/install/v0.3.1.md",
+    "https://kgos.sites.y2l.top/install/v0.3.1/INSTALL.md",
     "https://raw.githubusercontent.com/bYiyLi/kg-releases/main/INSTALL.md"
   ]) {
     for (const name of Object.keys(documents)) {
@@ -821,7 +825,7 @@ test("user-facing documentation is bilingual without exposing maintainer operati
     )
   );
   for (const document of [english, chinese]) {
-    assert.ok(document.includes(`https://kghub.y2l.top/install/${catalog.latest}/INSTALL.md`));
+    assert.ok(document.includes(`https://kgos.sites.y2l.top/install/${catalog.latest}/INSTALL.md`));
     assert.doesNotMatch(
       document,
       /raw\.githubusercontent\.com\/bYiyLi\/kg-releases\/main\/INSTALL\.md/

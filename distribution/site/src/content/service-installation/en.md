@@ -44,7 +44,7 @@ ghcr.io/byiyli/kgos:v0.3.0@sha256:f5a3a9c7a343bd073584f82cb4abac25aab916455509f8
 
 The image supports only `linux/amd64`, listens on port `3777` by default and runs as `10001:10001`. Container `/workspace` maps to your persistent directory; configuration and data live in its `.kgos` subdirectory. There is currently no official floating `:latest` tag. For an existing instance, check compatibility in the [upgrade procedure](#upgrade) instead of applying new-install commands.
 
-Use the version menu to read the complete manual for each formal release; switching languages preserves the selected version. This release’s Chinese/English guides, [AI installation guide](https://kghub.y2l.top/install/v0.3.0/INSTALL.md), and [official Plugin](https://github.com/bYiyLi/kg-releases/releases/download/v0.3.0/kgos-plugin-v0.3.0.zip) all apply to KG OS v0.3.0. Later releases do not overwrite this body. Read the target release instructions before upgrading. Use the official Plugin package for Skills and resources; follow this version’s companion AI guide for the installation workflow.
+Use the version menu to read the complete manual for each formal release; switching languages preserves the selected version. This release’s Chinese/English guides, [AI installation guide](https://kgos.sites.y2l.top/install/v0.3.0/INSTALL.md), and [official Plugin](https://github.com/bYiyLi/kg-releases/releases/download/v0.3.0/kgos-plugin-v0.3.0.zip) all apply to KG OS v0.3.0. Later releases do not overwrite this body. Read the target release instructions before upgrading. Use the official Plugin package for Skills and resources; follow this version’s companion AI guide for the installation workflow.
 
 ### Create a separate installation directory
 
@@ -500,7 +500,7 @@ Find and install **Plugin Creator** in [ChatGPT Plugins](https://chatgpt.com/plu
 
 ```markdown
 Please follow the official KG OS private Plugin installation guide:
-https://kghub.y2l.top/install/v0.3.0/INSTALL.md
+https://kgos.sites.y2l.top/install/v0.3.0/INSTALL.md
 
 My verified ChatGPT KG OS app: [app name]
 Public service: https://[my-domain]
@@ -513,7 +513,7 @@ Inspect the actual service, official release and any old Plugin/customizations. 
 Provide the complete official global guidance and ChatGPT settings steps, then run installation checks. Do not request credentials in chat or repeat confirmations for already authorized steps.
 ```
 
-AI then follows the single [INSTALL.md](https://kghub.y2l.top/install/v0.3.0/INSTALL.md) to help you:
+AI then follows the single [INSTALL.md](https://kgos.sites.y2l.top/install/v0.3.0/INSTALL.md) to help you:
 
 1. **Confirm a plan.** Check the service and matching official assets. For an old private Plugin, inspect its contents against the old official baseline and list customizations and conflicts. You choose the target, migration, permissions and installation scope, then confirm the specific plan. Already authorized steps need no repeated confirmation.
 2. **Create and install a new version.** Always create a new private Plugin named with the official version; add a revision number when recreating the same version. Reuse the basic app’s real connection and retain all seven official Skills and resources. Keep the old Plugin, and let you decide conflicts rather than overwriting it.

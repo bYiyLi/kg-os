@@ -62,9 +62,9 @@ function validateResourceLinks(raw: string, version: string) {
       /https:\/\/github\.com\/bYiyLi\/kg-releases\/releases\/tag\/(v[0-9]+\.[0-9]+\.[0-9]+)(?![\w.-])/g
     ),
     ...raw.matchAll(
-      /https:\/\/kghub\.y2l\.top\/(?:zh|en)\/install\/(v[0-9]+\.[0-9]+\.[0-9]+)(?=\/|\.md)/g
+      /https:\/\/kgos\.sites\.y2l\.top\/(?:zh|en)\/install\/(v[0-9]+\.[0-9]+\.[0-9]+)(?=\/|\.md)/g
     ),
-    ...raw.matchAll(/https:\/\/kghub\.y2l\.top\/install\/(v[^/\s]+)\/INSTALL\.md/g)
+    ...raw.matchAll(/https:\/\/kgos\.sites\.y2l\.top\/install\/(v[^/\s]+)\/INSTALL\.md/g)
   ];
   if (
     !raw.includes(
@@ -90,7 +90,7 @@ export function getInstallation(locale: Locale, version: string) {
   ].filter((image) => image[1] !== "vX.Y.Z");
   if (
     frontmatter.version !== version.slice(1) ||
-    !raw.includes(`https://kghub.y2l.top/install/${version}/INSTALL.md`) ||
+    !raw.includes(`https://kgos.sites.y2l.top/install/${version}/INSTALL.md`) ||
     new Set(images.map((image) => image[0])).size !== 1 ||
     images.some((image) => image[1] !== version || !/@sha256:[0-9a-f]{64}$/.test(image[0]))
   ) {
@@ -109,7 +109,9 @@ export function getInstallationInstructions(version: string) {
   validateResourceLinks(raw, version);
   if (
     raw.split("\n")[0].match(/^# KG OS (v[0-9]+\.[0-9]+\.[0-9]+)(?: |$)/)?.[1] !== version ||
-    !locales.every((locale) => raw.includes(`https://kghub.y2l.top/${locale}/install/${version}/`))
+    !locales.every((locale) =>
+      raw.includes(`https://kgos.sites.y2l.top/${locale}/install/${version}/`)
+    )
   ) {
     throw new Error(`Archived installer must bind its versioned guide and Plugin: ${version}`);
   }

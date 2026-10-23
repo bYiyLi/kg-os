@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const stableVersion = "(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)";
 const stableTag = new RegExp(`^v${stableVersion}$`);
 const imageRepository = "ghcr.io/byiyli/kgos";
-const website = "https://kghub.y2l.top";
+const website = "https://kgos.sites.y2l.top";
 const releases = "https://github.com/bYiyLi/kg-releases/releases";
 
 export function validateInstallationCatalog(catalog) {
@@ -62,9 +62,9 @@ export function validateInstallationBundle(documents, tag) {
         /https:\/\/github\.com\/bYiyLi\/kg-releases\/releases\/tag\/(v[0-9]+\.[0-9]+\.[0-9]+)(?![\w.-])/g
       ),
       ...content.matchAll(
-        /https:\/\/kghub\.y2l\.top\/(?:zh|en)\/install\/(v[0-9]+\.[0-9]+\.[0-9]+)(?=\/|\.md)/g
+        /https:\/\/kgos\.sites\.y2l\.top\/(?:zh|en)\/install\/(v[0-9]+\.[0-9]+\.[0-9]+)(?=\/|\.md)/g
       ),
-      ...content.matchAll(/https:\/\/kghub\.y2l\.top\/install\/(v[^/\s]+)\/INSTALL\.md/g)
+      ...content.matchAll(/https:\/\/kgos\.sites\.y2l\.top\/install\/(v[^/\s]+)\/INSTALL\.md/g)
     ];
     if (
       resources.some((match) => match[1] !== tag || (match[2] && match[2] !== tag)) ||
@@ -175,7 +175,7 @@ function versionedLinks(content, previous, tag) {
       `${website}/${locale}/install/${tag}.md`
     );
     rendered = rendered.replace(
-      new RegExp(`https://kghub\\.y2l\\.top/${locale}/install/(?!v[0-9])`, "g"),
+      new RegExp(`https://kgos\\.sites\\.y2l\\.top/${locale}/install/(?!v[0-9])`, "g"),
       `${website}/${locale}/install/${tag}/`
     );
   }
