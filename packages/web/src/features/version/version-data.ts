@@ -69,15 +69,14 @@ export function flattenCommits(
   selected: ReadonlySet<string>
 ): VersionCommit[] {
   const commits = new Map<string, VersionCommit>();
-  for (const branch of snapshot.branches) {
-    if (!selected.has(branch.name)) continue;
-    for (const item of snapshot.pages[branch.name]?.items ?? []) {
+  for (const name of selected) {
+    for (const item of snapshot.pages[name]?.items ?? []) {
       let commit = commits.get(item.state);
       if (commit === undefined) {
         commit = { ...item, reachableFrom: [], refs: [], merge: item.parents.length > 1 };
         commits.set(item.state, commit);
       }
-      commit.reachableFrom.push(branch.name);
+      commit.reachableFrom.push(name);
     }
   }
   for (const commit of commits.values()) {
@@ -178,10 +177,10 @@ async function page(
   };
 }
 
-export async function loadVersions(
+export async function readVersionRefs(
   reader: VersionReader,
   signal: AbortSignal
-): Promise<VersionSnapshot> {
+): Promise<Pick<VersionSnapshot, "branches" | "tags">> {
   const [branchResponse, tagResponse] = await Promise.all([
     reader.branch.list({ signal }),
     reader.tag.list({ signal })
@@ -191,6 +190,14 @@ export async function loadVersions(
     color: colors[index % colors.length] ?? "blue"
   }));
   const tags = assertRefs(tagResponse);
+  return { branches, tags };
+}
+
+export async function loadVersions(
+  reader: VersionReader,
+  signal: AbortSignal
+): Promise<VersionSnapshot> {
+  const { branches, tags } = await readVersionRefs(reader, signal);
   const pages = await batches(branches, signal, async (branch) =>
     page(reader, stateRef(branch.state), undefined, signal)
   );
@@ -205,9 +212,28 @@ export async function loadVersions(
 }
 
 export function hasMore(snapshot: VersionSnapshot, selected: ReadonlySet<string>): boolean {
-  return snapshot.branches.some(
-    (branch) => selected.has(branch.name) && snapshot.pages[branch.name]?.cursor !== undefined
-  );
+  return [...selected].some((name) => snapshot.pages[name]?.cursor !== undefined);
+}
+
+export function worldTopology(snapshot: VersionSnapshot, name: string): VersionCommit[] {
+  const selected = new Set([name]);
+  const commits = new Map(flattenCommits(snapshot, selected).map((item) => [item.state, item]));
+  return (snapshot.pages[name]?.items ?? []).flatMap((item) => {
+    const commit = commits.get(item.state);
+    return commit === undefined ? [] : [commit];
+  });
+}
+
+export async function loadWorldVersions(
+  reader: VersionReader,
+  name: string,
+  root: ResolvedState,
+  signal: AbortSignal
+): Promise<VersionSnapshot["pages"]> {
+  const result = await page(reader, root, undefined, signal);
+  const pages = Object.create(null) as VersionSnapshot["pages"];
+  pages[name] = result;
+  return pages;
 }
 
 export async function loadMoreVersions(
@@ -216,11 +242,9 @@ export async function loadMoreVersions(
   selected: ReadonlySet<string>,
   signal: AbortSignal
 ): Promise<VersionSnapshot> {
-  const pending = snapshot.branches.filter(
-    (branch) => selected.has(branch.name) && snapshot.pages[branch.name]?.cursor !== undefined
-  );
-  const next = await batches(pending, signal, async (branch) => {
-    const previous = snapshot.pages[branch.name];
+  const pending = [...selected].filter((name) => snapshot.pages[name]?.cursor !== undefined);
+  const next = await batches(pending, signal, async (name) => {
+    const previous = snapshot.pages[name];
     if (previous === undefined) throw new Error("Missing branch history");
     const update = await page(reader, previous.root, previous.cursor, signal);
     const items = new Map(previous.items.map((item) => [item.state, item]));
@@ -228,9 +252,9 @@ export async function loadMoreVersions(
     return { ...update, items: [...items.values()] };
   });
   const pages = Object.assign(Object.create(null) as Record<string, VersionPage>, snapshot.pages);
-  for (const [index, branch] of pending.entries()) {
+  for (const [index, name] of pending.entries()) {
     const result = next[index];
-    if (result !== undefined) pages[branch.name] = result;
+    if (result !== undefined) pages[name] = result;
   }
   return { ...snapshot, pages };
 }

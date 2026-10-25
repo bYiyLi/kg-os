@@ -122,6 +122,45 @@ for (const width of [375, 1100]) {
         frame.style.cssText = `width:${String(frameWidth)}px;height:760px;border:0`;
         document.body.style.margin = "0";
         const state = "commit/" + "a".repeat(64);
+        const previous = "commit/" + "0".repeat(64);
+        const learning = "commit/" + "b".repeat(64);
+        function readVersionTool(code: string): unknown {
+          if (code.includes("branch.list"))
+            return {
+              items: [
+                { name: "main", state },
+                { name: "novel", state },
+                { name: "learning", state: learning }
+              ]
+            };
+          if (code.includes("tag.list")) return { items: [] };
+          if (code.includes("ancestry")) {
+            const history = [
+              { state, parents: [previous], message: "MCP migration fixture", committedAt: 2 },
+              { state: previous, parents: [], message: "Initial MCP version", committedAt: 1 }
+            ];
+            if (code.includes(learning))
+              return {
+                root: learning,
+                items: [
+                  {
+                    state: learning,
+                    parents: [state],
+                    message: "Learning world updated",
+                    committedAt: 3
+                  },
+                  ...history
+                ]
+              };
+            return { root: state, items: history };
+          }
+          if (code.includes("evolution.get")) {
+            if (code.includes(learning)) return { state: learning };
+            if (code.includes(previous)) return { state: previous };
+            return { state };
+          }
+          return { defaultBranch: "novel", state };
+        }
         window.addEventListener("message", (event: MessageEvent) => {
           if (event.source !== frame.contentWindow) return;
           const message = event.data as {
@@ -140,14 +179,7 @@ for (const width of [375, 1100]) {
             };
           } else if (message.method === "tools/call") {
             const code = message.params?.arguments?.code ?? "";
-            let value: unknown = { defaultBranch: "main", state };
-            if (code.includes("branch.list")) value = { items: [{ name: "main", state }] };
-            else if (code.includes("tag.list")) value = { items: [] };
-            else if (code.includes("ancestry"))
-              value = {
-                root: state,
-                items: [{ state, parents: [], message: "MCP migration fixture", committedAt: 1 }]
-              };
+            const value = readVersionTool(code);
             result = { content: [{ type: "text", text: JSON.stringify({ result: value }) }] };
           }
           frame.contentWindow?.postMessage({ jsonrpc: "2.0", id: message.id, result }, "*");
@@ -162,11 +194,24 @@ for (const width of [375, 1100]) {
     await expect(app.locator(".authentication-dialog")).toHaveCount(0);
     if (width < 900)
       await app.getByRole("button", { name: "Version navigation", exact: true }).click();
-    const trigger = app.getByRole("button", { name: "Filter branches" });
+    const history = width < 900 ? app.locator(".version-drawer") : app.locator(".version-sidebar");
+    const novel = history.getByRole("button", { name: "novel", exact: true });
+    await expect(novel).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      history
+        .getByRole("region", { name: "Version history: novel", exact: true })
+        .locator('.commit-row[aria-pressed="true"]')
+    ).toContainText("MCP migration fixture");
+    const main = history.getByRole("button", { name: "main", exact: true });
+    await main.click();
+    const mainHistory = history.getByRole("region", { name: "Version history: main", exact: true });
+    await expect(mainHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(0);
+    await mainHistory.getByRole("button", { name: /MCP migration fixture/ }).click();
+    await expect(mainHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(1);
+    const trigger = history.getByRole("button", { name: "Knowledge world actions" });
     await trigger.click();
-    const choices = app.getByRole("group", { name: "Filter branches" });
-    await expect(choices.getByRole("checkbox", { name: "main" })).toBeChecked();
-    expect(await choices.evaluate((element) => getComputedStyle(element).colorScheme)).toBe(
+    const actions = app.getByRole("menu");
+    expect(await actions.evaluate((element) => getComputedStyle(element).colorScheme)).toBe(
       "light"
     );
     await page.evaluate(() => {
@@ -180,10 +225,41 @@ for (const width of [375, 1100]) {
       );
     });
     await expect(app.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
-    expect(await choices.evaluate((element) => getComputedStyle(element).colorScheme)).toBe("dark");
+    expect(await actions.evaluate((element) => getComputedStyle(element).colorScheme)).toBe("dark");
     await page.keyboard.press("Escape");
-    await expect(choices).toHaveCount(0);
+    await expect(actions).toHaveCount(0);
     await expect(trigger).toBeFocused();
+    await history.getByRole("button", { name: "learning", exact: true }).click();
+    const learningHistory = history.getByRole("region", {
+      name: "Version history: learning",
+      exact: true
+    });
+    await expect(learningHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(0);
+    await expect(history.locator(".commit-item")).toHaveCount(3);
+    const latest = learningHistory.getByRole("button", { name: /Learning world updated/ });
+    await latest.click();
+    await expect(latest).toHaveAttribute("aria-pressed", "true");
+    await history.getByRole("button", { name: /Initial MCP version/ }).click();
+    await expect(latest).toHaveAttribute("aria-pressed", "false");
+    await expect(latest).toContainText("Latest");
+    await history.getByRole("button", { name: "Back to latest" }).click();
+    await expect(latest).toHaveAttribute("aria-pressed", "true");
+    await history.getByRole("button", { name: "Knowledge world actions" }).click();
+    await app.getByRole("menuitem", { name: "View version relationships" }).click();
+    const relationships = app.getByRole("dialog", { name: "Version relationships", exact: true });
+    await expect(relationships).toBeVisible();
+    expect(await relationships.evaluate((element) => getComputedStyle(element).colorScheme)).toBe(
+      "dark"
+    );
+    await page.keyboard.press("Escape");
+    await expect(relationships).toBeHidden();
+    await history.getByRole("button", { name: "Settings", exact: true }).click();
+    const settings = app.getByRole("dialog", { name: "Settings", exact: true });
+    await expect(settings).toBeVisible();
+    await expect(settings.getByRole("group", { name: "Interface language" })).toBeVisible();
+    await settings.locator('[data-settings-category="connection"]').click();
+    await expect(settings).toContainText("Open KG OS in a separate browser");
+    await expect(settings.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
     expect(requests).toEqual([]);
   });
 }

@@ -1,10 +1,20 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
+import {
+  closePreferenceSettings,
+  openPreferenceSettings,
+  readOnlySettingsSnapshot,
+  selectChineseLanguage
+} from "./settings-navigation.js";
 import { mockVersionRoutes, states } from "./version-fixture.js";
 
 async function mockConnectedInstance(page: Page) {
   let requestCount = 0;
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith("/api/v1/evolution/") && !path.endsWith("/overview")) requestCount++;
+  });
   await page.route("**/api/v1/web/auth/login", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -35,6 +45,13 @@ async function mockConnectedInstance(page: Page) {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ defaultBranch: "main", state: states.main })
+    });
+  });
+  await page.route("**/api/v1/web/settings/read", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      headers: { "Cache-Control": "no-store" },
+      body: JSON.stringify(readOnlySettingsSnapshot())
     });
   });
   await mockVersionRoutes(page);
@@ -145,12 +162,23 @@ test("supports switching inside the mobile drawer at narrow widths", async ({ pa
   await page.getByRole("button", { name: "Version navigation" }).click();
   const drawer = page.getByRole("dialog", { name: "Mobile version navigation" });
   await expect(drawer).toBeVisible();
+  await expect(drawer.locator(".commit-item")).toHaveCount(6);
   const before = getRequestCount();
-  await drawer.getByRole("button", { name: "简体中文" }).click();
+  const settings = await openPreferenceSettings(page);
+  await expect(drawer).toBeHidden();
+  await selectChineseLanguage(settings);
+  await expect(page.getByRole("dialog", { name: "设置", exact: true })).toBeVisible();
+  await closePreferenceSettings(page);
+  await expect(page.getByRole("button", { name: "版本导航", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "版本导航", exact: true }).click();
   const chineseDrawer = page.getByRole("dialog", { name: "移动端版本导航" });
   await expect(chineseDrawer).toBeVisible();
-  await expect(chineseDrawer.locator(".version-tree-heading")).toHaveCount(0);
-  await expect(chineseDrawer.locator(".version-branch-trigger")).toBeVisible();
+  await expect(chineseDrawer.getByRole("heading", { name: "知识世界", exact: true })).toBeVisible();
+  await expect(chineseDrawer.getByRole("button", { name: "main", exact: true })).toHaveAttribute(
+    "aria-expanded",
+    "true"
+  );
+  await expect(chineseDrawer.locator(".world-section-trigger")).toHaveCount(4);
   expect(getRequestCount()).toBe(before);
   expect(
     await page.evaluate(

@@ -24,11 +24,11 @@ const (
 )
 
 type Config struct {
-	Server    *ServerConfig   `toml:"server,omitempty"`
-	Cache     CacheConfig     `toml:"cache"`
-	SQLite    SQLiteConfig    `toml:"sqlite"`
-	FullText  FullTextConfig  `toml:"fulltext"`
-	Embedding EmbeddingConfig `toml:"embedding"`
+	Server    *ServerConfig   `toml:"server,omitempty" json:"server"`
+	Cache     CacheConfig     `toml:"cache" json:"cache"`
+	SQLite    SQLiteConfig    `toml:"sqlite" json:"sqlite"`
+	FullText  FullTextConfig  `toml:"fulltext" json:"fulltext"`
+	Embedding EmbeddingConfig `toml:"embedding" json:"embedding"`
 }
 
 type ServerConfig struct {
@@ -36,31 +36,31 @@ type ServerConfig struct {
 }
 
 type CacheConfig struct {
-	Path      string `toml:"path"`
-	MaxSizeMB int64  `toml:"max_size_mb"`
+	Path      string `toml:"path" json:"path"`
+	MaxSizeMB int64  `toml:"max_size_mb" json:"max_size_mb"`
 }
 
 type SQLiteConfig struct {
-	Extensions []ExtensionConfig `toml:"extensions"`
+	Extensions []ExtensionConfig `toml:"extensions" json:"extensions"`
 }
 
 type ExtensionConfig struct {
-	Source     string `toml:"source"`
-	Library    string `toml:"library,omitempty"`
-	Entrypoint string `toml:"entrypoint"`
-	SHA256     string `toml:"sha256,omitempty"`
+	Source     string `toml:"source" json:"source"`
+	Library    string `toml:"library,omitempty" json:"library,omitempty"`
+	Entrypoint string `toml:"entrypoint" json:"entrypoint"`
+	SHA256     string `toml:"sha256,omitempty" json:"sha256,omitempty"`
 }
 
 type FullTextConfig struct {
-	Analyzer string `toml:"analyzer"`
+	Analyzer string `toml:"analyzer" json:"analyzer"`
 }
 
 type EmbeddingConfig struct {
-	BaseURL    string `toml:"base_url"`
-	Model      string `toml:"model"`
-	Dimensions int    `toml:"dimensions"`
-	Similarity string `toml:"similarity"`
-	APIKeyEnv  string `toml:"api_key_env"`
+	BaseURL    string `toml:"base_url" json:"base_url"`
+	Model      string `toml:"model" json:"model"`
+	Dimensions int    `toml:"dimensions" json:"dimensions"`
+	Similarity string `toml:"similarity" json:"similarity"`
+	APIKeyEnv  string `toml:"api_key_env" json:"api_key_env"`
 }
 
 type SemanticDefaults struct {

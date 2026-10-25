@@ -124,3 +124,50 @@ func TestDaemonOptionRejectsMalformedAndConflictingInput(t *testing.T) {
 		t.Fatalf("legacy OAuth flag must explain migration to Instance config: %v", err)
 	}
 }
+
+func TestDaemonOptionSourcesKeepWinningInputWithoutValues(t *testing.T) {
+	env := map[string]string{
+		"KGOSD_HOST": "127.0.0.2", "KGOSD_PORT": "4488",
+		"KGOSD_TLS_CERT": "private-cert.pem", "KGOSD_TLS_KEY": "private-key.pem",
+		"KGOS_MCP_MAX_CONCURRENCY": "24",
+	}
+	settings, _, err := parseDaemonSettings([]string{
+		"--root", testDaemonRoot, "--host", "0.0.0.0", "--tls-key", "override-private-key.pem",
+	}, optionLookup(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"root": "--root", "host": "--host", "port": "KGOSD_PORT",
+		"tls-cert": "KGOSD_TLS_CERT", "tls-key": "--tls-key",
+		"mcp-max-concurrency": "KGOS_MCP_MAX_CONCURRENCY", "mcp-path": "default",
+	}
+	for key, source := range want {
+		if settings.Sources[key] != source {
+			t.Errorf("source for %s = %q, want %q", key, settings.Sources[key], source)
+		}
+	}
+	if len(settings.Sources) != len(daemonFields) {
+		t.Fatalf("missing parameter sources: %v", settings.Sources)
+	}
+	// Mutating the lookup after parsing cannot change recorded provenance.
+	env["KGOSD_PORT"] = "4999"
+	delete(env, "KGOSD_TLS_CERT")
+	if settings.Port != 4488 || settings.Sources["port"] != "KGOSD_PORT" ||
+		settings.Sources["tls-cert"] != "KGOSD_TLS_CERT" {
+		t.Fatal("parsed settings did not preserve their startup inputs")
+	}
+	for _, source := range settings.Sources {
+		if strings.Contains(source, ".pem") || strings.Contains(source, "4488") {
+			t.Fatal("parameter provenance retained an input value")
+		}
+	}
+
+	defaults, _, err := parseDaemonSettings([]string{"--root", testDaemonRoot}, optionLookup(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaults.Sources["tls-cert"] != "default" || defaults.Sources["tls-key"] != "default" {
+		t.Fatal("absent TLS parameters did not record default provenance")
+	}
+}

@@ -13,6 +13,7 @@ export interface Connection {
   daemonBootId: string;
   storageStatus: WebDataInfoResult["storageStatus"];
   oauthFetch: (path: string, init?: RequestInit) => Promise<Response>;
+  settingsFetch: (path: string, init?: RequestInit) => Promise<Response>;
   check: () => Promise<void>;
   close: () => void;
 }
@@ -20,6 +21,13 @@ export interface Connection {
 const expectedBootHeader = "X-KGOS-Expected-Daemon-Boot";
 const uuidV4Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const storageStates: readonly string[] = ["ready", "unavailable", "unsupported", "mismatch"];
+const settingsPaths = new Set([
+  "/api/v1/web/settings/read",
+  "/api/v1/web/settings/update",
+  "/api/v1/web/settings/embedding-key",
+  "/api/v1/web/settings/test-embedding",
+  "/api/v1/system/diagnostics"
+]);
 
 function validInfo(value: unknown): value is WebDataInfoResult {
   if (typeof value !== "object" || value === null) return false;
@@ -125,6 +133,18 @@ async function activateWebAccess(
       state: overview.state,
       daemonBootId: bootID,
       storageStatus: info.storageStatus,
+      settingsFetch: (path, init) => {
+        if (!settingsPaths.has(path)) throw new Error("Unknown KG OS settings endpoint");
+        const headers = new Headers(init?.headers);
+        headers.set("Authorization", "Bearer " + access.accessToken);
+        return fetchWithGuard(endpoint + path, {
+          ...init,
+          method: "POST",
+          headers,
+          credentials: "same-origin",
+          redirect: "error"
+        });
+      },
       oauthFetch: (path, init) => {
         if (!path.startsWith("/oauth/request?request_id=") && path !== "/oauth/decision") {
           throw new Error("Unknown KG OS authorization endpoint");

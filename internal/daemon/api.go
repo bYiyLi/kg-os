@@ -28,6 +28,10 @@ type ExtraRoute struct {
 }
 
 func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler, extra ...ExtraRoute) http.Handler {
+	return NewHandlerWithSettings(runtime, fallback, SettingsOptions{}, extra...)
+}
+
+func NewHandlerWithSettings(runtime *runtimehost.Runtime, fallback http.Handler, settings SettingsOptions, extra ...ExtraRoute) http.Handler {
 	bootID := newDaemonBootID()
 	sessions := newWebSessionStore(runtime.Paths.Root, runtime.Credential.Token)
 	if fallback == nil {
@@ -35,6 +39,7 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler, extra ...Ex
 	}
 	mux := http.NewServeMux()
 	sessions.routes(mux, runtime.Credential.Token, bootID)
+	newSettingsService(runtime, settings).routes(mux)
 	mux.HandleFunc("/api/v1/system/diagnostics", postJSONHandler(
 		runtime.Credential.Token,
 		func(ctx context.Context, _ struct{}) (observability.Snapshot, error) {
@@ -248,7 +253,13 @@ func NewHandler(runtime *runtimehost.Runtime, fallback http.Handler, extra ...Ex
 		}
 	}
 	mux.Handle("/", fallback)
-	return sessions.webBearer(webConnectionGuard(mux, runtime.Credential.Token, bootID), runtime.Credential.Token)
+	dispatch := sessions.webBearer(webConnectionGuard(mux, runtime.Credential.Token, bootID), runtime.Credential.Token)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/web/settings/") {
+			webAuthHeaders(w)
+		}
+		dispatch.ServeHTTP(w, r)
+	})
 }
 
 func postJSONHandler[Request any, Result any](

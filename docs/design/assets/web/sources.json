@@ -247,6 +247,28 @@
       "width": 1536,
       "height": 1024,
       "sha256": "38f57e51840a49ce3776a27edc752909185c9b2b15cd7bf7642c02f2b6d3646a"
+    },
+    {
+      "board": "V5",
+      "role": "core",
+      "file": "V5-knowledge-world-sidebar.png",
+      "source": "image_gen",
+      "sourceFilename": "exec-178a4d33-cff3-4f67-991d-4065c746bb6f.png",
+      "bytes": 1527696,
+      "width": 1562,
+      "height": 1007,
+      "sha256": "f175537766dbd86f183ccddb860387a8cbc81f640bb2b10ab21827c05923217f"
+    },
+    {
+      "board": "V6",
+      "role": "core",
+      "file": "V6-flat-world-sidebar.png",
+      "source": "image_gen",
+      "sourceFilename": "exec-526f4f47-1363-4b97-9c69-2a792fcc5334.png",
+      "bytes": 1329391,
+      "width": 1504,
+      "height": 1046,
+      "sha256": "407e217c7abd05ecec88452f8a31c854a8d342a8e27941b361dc0324959f2646"
     }
   ],
   "documents": [

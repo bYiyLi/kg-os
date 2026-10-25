@@ -7,12 +7,15 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { expect, test } from "@playwright/test";
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import {
   expectPersistedOriginAndOAuth,
-  regenerateAndCheckOldToken
+  regenerateAndCheckOldToken,
+  waitReady
 } from "./setup-acceptance-helpers.js";
+
+import { expectRuntimeWorldNavigation } from "./world-runtime-acceptance.js";
 
 test.describe.configure({ mode: "serial" });
 
@@ -382,18 +385,6 @@ test("restarts the same initialized Instance without allowing a second setup", a
   expect(previous).toMatch(/^http:\/\//);
 });
 
-async function waitReady(url: string, request: APIRequestContext) {
-  await expect
-    .poll(
-      async () => {
-        const result = await request.get(url + "/api/v1/setup/status");
-        return ((await result.json()) as { state: string }).state;
-      },
-      { timeout: 35000 }
-    )
-    .toBe("ready");
-}
-
 test("manual TOML starts automatically and resumes with the existing database and Token", async ({
   request
 }) => {
@@ -529,4 +520,11 @@ test("invalid operator configuration never creates a database or completion rece
     if (child !== null) await stopDaemon(child);
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("knowledge world navigation reads real isolated Runtime history without protocol mocks", async ({
+  page,
+  request
+}) => {
+  await expectRuntimeWorldNavigation(page, request, endpoint, workspace);
 });

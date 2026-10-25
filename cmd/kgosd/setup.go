@@ -493,7 +493,7 @@ func (c *setupController) initialize() {
 	c.mu.Lock()
 	c.phase = "readiness"
 	c.mu.Unlock()
-	handler, err := readyHandler(rt, c.settings.MCP)
+	handler, err := readyHandler(rt, c.settings, c.lock.Endpoint)
 	if err == nil {
 		request := httptest.NewRequest(http.MethodPost, "/api/v1/evolution/overview", strings.NewReader("{}"))
 		request.Header.Set("Authorization", "Bearer "+rt.Credential.Token)

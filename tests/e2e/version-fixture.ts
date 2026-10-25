@@ -51,7 +51,7 @@ const items = {
   genesis: commit(states.genesis, "Initialize knowledge base", 120, [])
 };
 
-const ancestry = new Map<string, FixtureCommit[]>([
+export const versionAncestry = new Map<string, FixtureCommit[]>([
   [
     states.main,
     [items.main, items.merge, items.experiment, items.shared, items.index, items.genesis]
@@ -77,7 +77,7 @@ export async function mockVersionRoutes(page: Page) {
   await page.route("**/api/v1/evolution/ancestry", async (route) => {
     const request = route.request().postDataJSON() as { root: string; limit: number };
     const root = request.root.replace(/^commit\//, "");
-    await respond(route, { root, items: ancestry.get(root) ?? [] });
+    await respond(route, { root, items: versionAncestry.get(root) ?? [] });
   });
   await page.route("**/api/v1/evolution/get", async (route) => {
     const request = route.request().postDataJSON() as { state: string };

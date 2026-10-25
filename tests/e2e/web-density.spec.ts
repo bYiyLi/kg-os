@@ -43,7 +43,7 @@ test("100% browser zoom uses a compact desktop shell and readable authentication
   });
 
   expect(dimensions.scale).toBe(1);
-  expect(dimensions.sidebarWidth).toBe(240);
+  expect(dimensions.sidebarWidth).toBe(280);
   expect(dimensions.brandHeight).toBe(78);
   expect(dimensions.unloadedCount).toBe(0);
   expect(dimensions.dialogWidth).toBe(496);

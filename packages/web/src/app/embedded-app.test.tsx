@@ -17,6 +17,7 @@ const shared = vi.hoisted(() => "commit/" + "c".repeat(64));
 const textType = vi.hoisted(() => "text");
 const alertSelector = '[role="alert"]';
 const sidebarCommitSelector = ".version-sidebar .commit-row";
+const EXPERIMENT_UPDATE = "Experiment update";
 
 function reply(value: unknown): {
   content: { type: string; text: string }[];
@@ -47,7 +48,7 @@ function versionReply(code: string) {
           state: root,
           parents: [shared],
           committedAt: Date.now() * 1000,
-          message: main ? "Main update" : "Experiment update"
+          message: main ? "Main update" : EXPERIMENT_UPDATE
         },
         {
           state: shared,
@@ -59,6 +60,7 @@ function versionReply(code: string) {
     });
   }
   if (code.startsWith("const item = await evolution.get(")) {
+    if (code.includes(shared)) return reply({ state: shared });
     return reply({ state: code.includes(commitOne) ? commitOne : branchTwo });
   }
   return reply({ defaultBranch: "main", state: commitOne });
@@ -154,8 +156,11 @@ it("loads the existing read-only tool through the bridge with no Web login", asy
     arguments: { code: "return await evolution.overview()" }
   });
   expect(overviewCalls()).toBe(1);
-  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("2/2");
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
+  expect(button("main").getAttribute("aria-current")).toBe("page");
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
+  expect(document.body.querySelector(".version-sidebar")?.textContent).not.toContain(
+    EXPERIMENT_UPDATE
+  );
   expect(document.body.textContent).toContain("Shared history");
   expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_query")).toBe(
     true
@@ -163,10 +168,17 @@ it("loads the existing read-only tool through the bridge with no Web login", asy
   expect(bridge.addEventListener).toHaveBeenCalledWith("hostcontextchanged", expect.any(Function));
 });
 
-it("filters embedded Branch history and reads the selected Commit through MCP", async () => {
+it("filters embedded history across worlds and reads the selected version through MCP", async () => {
   await renderEmbedded();
   act(() => {
-    button("Filter branches").click();
+    button("Knowledge world actions").click();
+  });
+  act(() => {
+    button("View history across worlds").click();
+  });
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
+  act(() => {
+    button("Filter knowledge worlds").click();
   });
   const main = Array.from(
     document.body.querySelectorAll<HTMLElement>('.version-branch-option [role="checkbox"]')
@@ -178,15 +190,22 @@ it("filters embedded Branch history and reads the selected Commit through MCP", 
   });
   expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("1/2");
   expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
+  act(() => {
+    button("Filter knowledge worlds").click();
+  });
   const row = Array.from(
     document.body.querySelectorAll<HTMLButtonElement>(sidebarCommitSelector)
-  ).find((candidate) => candidate.textContent.includes("Experiment update"));
+  ).find((candidate) => candidate.textContent.includes(EXPERIMENT_UPDATE));
   if (row === undefined) throw new Error("Missing experiment Commit");
   await act(async () => {
     row.click();
     await Promise.resolve();
   });
   expect(row.getAttribute("aria-pressed")).toBe("true");
+  act(() => {
+    button("Back to world navigation").click();
+  });
+  expect(button("main").getAttribute("aria-current")).toBe("page");
   expect(
     bridge.callServerTool.mock.calls.some(([request]) =>
       request.arguments.code.startsWith("const item = await evolution.get(")
@@ -197,6 +216,60 @@ it("filters embedded Branch history and reads the selected Commit through MCP", 
   );
 });
 
+it("expands worlds without get and selects a world version through the read-only bridge", async () => {
+  await renderEmbedded();
+  const before = bridge.callServerTool.mock.calls.filter(([request]) =>
+    request.arguments.code.includes("evolution.get")
+  ).length;
+  act(() => {
+    button("experiment").click();
+  });
+  expect(button("main").getAttribute("aria-current")).toBe("page");
+  expect(button("experiment").getAttribute("aria-expanded")).toBe("true");
+  expect(
+    bridge.callServerTool.mock.calls.filter(([request]) =>
+      request.arguments.code.includes("evolution.get")
+    )
+  ).toHaveLength(before);
+  const head = [...document.body.querySelectorAll<HTMLButtonElement>(sidebarCommitSelector)].find(
+    (candidate) => candidate.textContent.includes(EXPERIMENT_UPDATE)
+  );
+  if (head === undefined) throw new Error("Missing experiment world head");
+  await act(async () => {
+    head.click();
+    await Promise.resolve();
+  });
+  expect(button("experiment").getAttribute("aria-current")).toBe("page");
+  const row = [...document.body.querySelectorAll<HTMLButtonElement>(sidebarCommitSelector)].find(
+    (candidate) => candidate.textContent.includes("Shared history")
+  );
+  if (row === undefined) throw new Error("Missing shared historical version");
+  await act(async () => {
+    row.click();
+    await Promise.resolve();
+  });
+  expect(row.getAttribute("aria-pressed")).toBe("true");
+  expect(document.body.textContent).toContain("Viewing a historical version");
+  await act(async () => {
+    button("Back to latest").click();
+    await Promise.resolve();
+  });
+  expect(
+    document.body.querySelector(`${sidebarCommitSelector}[aria-pressed="true"]`)?.textContent
+  ).toContain(EXPERIMENT_UPDATE);
+  expect(
+    bridge.callServerTool.mock.calls.some(
+      ([request]) =>
+        request.arguments.code.startsWith("const item = await evolution.get(") &&
+        request.arguments.code.includes(shared)
+    )
+  ).toBe(true);
+  expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_query")).toBe(
+    true
+  );
+  expect(document.body.querySelector(".authentication-dialog")).toBeNull();
+});
+
 it("keeps MCP tool errors local to the version list without losing overview", async () => {
   await renderEmbedded();
   bridge.callServerTool.mockResolvedValueOnce({
@@ -204,12 +277,12 @@ it("keeps MCP tool errors local to the version list without losing overview", as
     content: [{ type: textType, text: '{"code":"RESOURCE_ERROR","message":"quota"}' }]
   });
   await act(async () => {
-    button("Refresh versions").click();
+    button("Refresh knowledge worlds").click();
     await Promise.resolve();
   });
   expect(document.body.textContent).toContain(commitOne);
   expect(document.body.textContent).toContain("Could not load version history.");
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
 });
 
 it("clears stale embedded versions when MCP reports authentication failure", async () => {
@@ -219,7 +292,7 @@ it("clears stale embedded versions when MCP reports authentication failure", asy
     content: [{ type: textType, text: '{"code":"AUTHENTICATION_FAILED"}' }]
   });
   await act(async () => {
-    button("Refresh versions").click();
+    button("Refresh knowledge worlds").click();
     await Promise.resolve();
   });
   expect(document.body.querySelector(".embedded-connection [role='alert']")).not.toBeNull();
@@ -228,10 +301,10 @@ it("clears stale embedded versions when MCP reports authentication failure", asy
 
 it("invalidates the embedded connection and stale commits if the host revokes MCP access", async () => {
   await renderEmbedded();
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
+  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
   bridge.callServerTool.mockRejectedValueOnce(new Error("OAuth authorization revoked"));
   await act(async () => {
-    button("Refresh versions").click();
+    button("Refresh knowledge worlds").click();
     await Promise.resolve();
   });
   expect(document.body.querySelector(".embedded-connection [role='alert']")).not.toBeNull();
@@ -244,11 +317,19 @@ it("changes language without a new tool call, but refreshes only on explicit act
   await renderEmbedded();
   const before = bridge.callServerTool.mock.calls.length;
   await act(async () => {
+    button("Settings").click();
+    await Promise.resolve();
+  });
+  await act(async () => {
     button("简体中文").click();
     await Promise.resolve();
   });
   expect(document.body.textContent).toContain("当前知识版本");
   expect(bridge.callServerTool).toHaveBeenCalledTimes(before);
+  await act(async () => {
+    button("关闭设置").click();
+    await Promise.resolve();
+  });
   bridge.callServerTool.mockImplementation((request) =>
     Promise.resolve(
       request.arguments.code === "return await evolution.overview()"

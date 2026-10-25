@@ -56,3 +56,15 @@ export async function regenerateAndCheckOldToken(
   expect(obsoleteLogin.status()).toBe(401);
   return newToken;
 }
+
+export async function waitReady(url: string, request: APIRequestContext) {
+  await expect
+    .poll(
+      async () => {
+        const result = await request.get(url + "/api/v1/setup/status");
+        return ((await result.json()) as { state: string }).state;
+      },
+      { timeout: 35000 }
+    )
+    .toBe("ready");
+}

@@ -3,99 +3,49 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
-import { I18nextProvider } from "react-i18next";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { EvolutionGetResult } from "@kgos/sdk";
 
 import { i18n } from "../i18n/index.js";
-import { VersionTree as VersionBrowser } from "../../features/version/version-browser.js";
 import { stateRef, type VersionReader } from "../../features/version/version-data.js";
-import { useVersionHistory } from "../../features/version/use-version-history.js";
+import {
+  main,
+  develop,
+  experiment,
+  common,
+  genesis,
+  at,
+  ONTOLOGY_COMMIT,
+  WORLD_ACTIONS,
+  WORLD_REFRESH,
+  CROSS_WORLD_FILTER,
+  PRESSED_ATTRIBUTE,
+  SHARED_MESSAGE,
+  row,
+  mockReader,
+  VersionBrowserHarness,
+  findButton,
+  click,
+  checkbox,
+  rows,
+  namedRow,
+  worldButton,
+  inputValue,
+  resolved,
+  flush,
+  chooseWorld,
+  showAcrossWorlds,
+  openRelationships
+} from "../../../test/version-browser-fixture.js";
 
-const main = "a".repeat(64);
-const develop = "b".repeat(64);
-const experiment = "c".repeat(64);
-const feature = "d".repeat(64);
-const common = "f".repeat(64);
-const first = "e".repeat(64);
-const genesis = "0".repeat(64);
-const at = Date.now() * 1000;
-const ONTOLOGY_COMMIT = "Update ontology";
-const BRANCH_FILTER_LABEL = "Filter branches";
-const PRESSED_ATTRIBUTE = "aria-pressed";
-const SHARED_MESSAGE = "Shared commit";
-
-function row(state: string, message: string, offset: number, parents: string[]) {
-  return { state, message, committedAt: at + offset, parents };
-}
-
-function mockReader(): VersionReader {
-  return {
-    branch: {
-      list: vi.fn().mockResolvedValue({
-        items: [
-          { name: "main", state: main },
-          { name: "develop", state: develop },
-          { name: "experiment", state: experiment },
-          { name: "feature/search", state: feature }
-        ]
-      })
-    },
-    tag: { list: vi.fn().mockResolvedValue({ items: [{ name: "v1", state: common }] }) },
-    ancestry: vi.fn().mockImplementation((request: { root: string; cursor?: string }) => {
-      if (request.root === "commit/" + main) {
-        return Promise.resolve(
-          request.cursor === undefined
-            ? {
-                root: main,
-                items: [
-                  row(main, "Merge experiment", 4000, [first, experiment]),
-                  row(first, "Fix properties", 500, [common])
-                ],
-                cursor: "next-main"
-              }
-            : { root: main, items: [row(genesis, "Initial knowledge", -4000, [])] }
-        );
-      }
-      if (request.root === "commit/" + develop) {
-        return Promise.resolve({
-          root: develop,
-          items: [row(develop, ONTOLOGY_COMMIT, 3000, [common]), row(common, SHARED_MESSAGE, 0, [])]
-        });
-      }
-      if (request.root === "commit/" + experiment) {
-        return Promise.resolve({
-          root: experiment,
-          items: [row(experiment, "Experiment", 2000, [common]), row(common, SHARED_MESSAGE, 0, [])]
-        });
-      }
-      return Promise.resolve({
-        root: feature,
-        items: [row(feature, "Hybrid search", 1000, [common]), row(common, SHARED_MESSAGE, 0, [])]
-      });
-    }),
-    get: vi.fn().mockImplementation((request: { state: string }) =>
-      Promise.resolve({
-        state: request.state.slice(7),
-        parents: [],
-        committedAt: at,
-        consistency: { status: "valid", issues: [] },
-        hasData: false,
-        data: null
-      })
-    )
-  };
-}
-
-function Harness({ reader }: { reader: VersionReader | null }) {
-  const history = useVersionHistory(reader, main);
-  return (
-    <I18nextProvider i18n={i18n}>
-      <VersionBrowser history={history} />
-    </I18nextProvider>
-  );
-}
-
+const HEAD_MESSAGE = "Merge experiment";
+const FIX_MESSAGE = "Fix properties";
+const LOAD_EARLIER = "Load earlier versions";
+const FEATURE_WORLD = "feature/search";
+const WORLD_SEARCH = "Search knowledge worlds...";
+const BACK_TO_WORLDS = "Back to world navigation";
+const CURRENT_ATTRIBUTE = "aria-current";
+const EXPANDED_ATTRIBUTE = "aria-expanded";
 let host: HTMLDivElement;
 let root: Root;
 
@@ -106,218 +56,250 @@ beforeEach(async () => {
   document.body.append(host);
   root = createRoot(host);
 });
-
 afterEach(() => {
   act(() => {
     root.unmount();
   });
   host.remove();
 });
-
-async function render(reader: VersionReader | null) {
+async function render(
+  reader: VersionReader | null,
+  options: { defaultBranch?: string; initialState?: string } = {}
+) {
   await act(async () => {
-    root.render(<Harness reader={reader} />);
+    root.render(<VersionBrowserHarness reader={reader} {...options} />);
     await Promise.resolve();
   });
 }
 
-function click(text: string) {
-  const button = Array.from(document.body.querySelectorAll("button")).find(
-    (element) => element.getAttribute("aria-label") === text || element.textContent.trim() === text
-  );
-  if (button === undefined) throw new Error("Missing button " + text);
-  act(() => {
-    button.click();
-  });
-  return button;
-}
-
-function checkbox(name: string) {
-  const input = [...document.body.querySelectorAll<HTMLElement>('[role="checkbox"]')].find(
-    (item) => item.getAttribute("aria-label") === name
-  );
-  if (input === undefined) throw new Error("Missing checkbox: " + name);
-  return input;
-}
-
-function rows() {
-  return [...document.body.querySelectorAll<HTMLButtonElement>(".commit-row")];
-}
-
-function resolved(state: string): EvolutionGetResult {
-  return {
-    state: stateRef(state),
-    parents: [],
-    committedAt: at,
-    consistency: { status: "valid", issues: [] },
-    hasData: false,
-    data: null
-  };
-}
-
-async function flush() {
-  await act(async () => {
-    await Promise.resolve();
-  });
-}
-
-it("shows real branch heads and deduplicates shared commits", async () => {
+it("shows peer worlds and opens the actual default world without a merged history", async () => {
   const api = mockReader();
-  await render(api);
-  expect(rows()).toHaveLength(6);
-  expect(rows().filter((r) => r.textContent.includes(SHARED_MESSAGE))).toHaveLength(1);
-  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("4/4");
-  expect(
-    rows()
-      .find((r) => r.textContent.includes("Merge experiment"))
-      ?.getAttribute(PRESSED_ATTRIBUTE)
-  ).toBe("true");
-  expect(host.textContent).toContain("v1");
-  expect(api.ancestry).toHaveBeenCalledTimes(4);
+  await render(api, { defaultBranch: "develop", initialState: develop });
+  expect(host.querySelectorAll(".world-section")).toHaveLength(4);
+  expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(rows()).toHaveLength(2);
+  expect(host.textContent).not.toContain(HEAD_MESSAGE);
+  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(namedRow(ONTOLOGY_COMMIT).textContent).toContain("Latest");
+  expect(host.querySelector(".world-picker-trigger")).toBeNull();
   expect(api.tag.list).toHaveBeenCalledOnce();
 });
 
-it("filters branches and searches only the loaded union", async () => {
+it("expands or collapses one peer world without selecting a version or issuing get", async () => {
+  const api = mockReader();
+  await render(api);
+  act(() => {
+    worldButton("develop").click();
+  });
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(worldButton("main").getAttribute(EXPANDED_ATTRIBUTE)).toBe("false");
+  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  expect(api.get).not.toHaveBeenCalled();
+  const region = document.getElementById(
+    worldButton("develop").getAttribute("aria-controls") ?? ""
+  );
+  expect(region?.getAttribute("role")).toBe("region");
+  expect(region?.getAttribute("aria-label")).toBe("Version history: develop");
+  act(() => {
+    worldButton("develop").click();
+  });
+  expect(rows()).toHaveLength(0);
+  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("false");
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+});
+
+it("does not highlight another world that happens to share the selected head", async () => {
+  const api = mockReader();
+  vi.mocked(api.branch.list).mockResolvedValue({
+    items: [
+      { name: "main", state: stateRef(main) },
+      { name: "novel", state: stateRef(main) }
+    ]
+  });
+  await render(api, { defaultBranch: "novel" });
+  act(() => {
+    worldButton("main").click();
+  });
+  expect(worldButton("novel").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(namedRow(HEAD_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  await chooseWorld("main");
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(namedRow(HEAD_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+});
+
+it("searches loaded world names without searching versions or silently changing the browse context", async () => {
+  const api = mockReader();
+  await render(api);
+  inputValue(WORLD_SEARCH, "FEATURE/");
+  expect(host.querySelectorAll(".world-section")).toHaveLength(1);
+  expect(worldButton(FEATURE_WORLD).textContent).toContain(FEATURE_WORLD);
+  act(() => {
+    worldButton(FEATURE_WORLD).click();
+  });
+  expect(namedRow("Hybrid search").getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  expect(api.get).not.toHaveBeenCalled();
+  await chooseWorld(FEATURE_WORLD);
+  expect(worldButton(FEATURE_WORLD).getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  inputValue(WORLD_SEARCH, "no-such-world");
+  expect(host.textContent).toContain("No matching knowledge worlds.");
+  expect(rows()).toHaveLength(0);
+});
+
+it("keeps latest distinct from the historical selection and returns only by explicit action", async () => {
+  const api = mockReader();
+  await render(api);
+  act(() => {
+    namedRow(FIX_MESSAGE).click();
+  });
+  await flush();
+  expect(namedRow(FIX_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(namedRow(HEAD_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  expect(namedRow(HEAD_MESSAGE).textContent).toContain("Latest");
+  expect(host.textContent).toContain("Viewing a historical version");
+  click("Back to latest");
+  await flush();
+  expect(namedRow(HEAD_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(vi.mocked(api.get).mock.calls.at(-1)?.[0]).toEqual({ state: "commit/" + main });
+});
+
+it("retains browsing context and expansion while filtering the loaded cross-world union", async () => {
   await render(mockReader());
-  click(BRANCH_FILTER_LABEL);
-  act(() => {
-    checkbox("develop").click();
-  });
-  expect(rows()).toHaveLength(5);
-  act(() => {
-    checkbox("experiment").click();
-  });
-  act(() => {
-    checkbox("feature/search").click();
-  });
+  await showAcrossWorlds();
+  expect(rows()).toHaveLength(6);
+  expect(rows().filter((item) => item.textContent.includes(SHARED_MESSAGE))).toHaveLength(1);
+  click(CROSS_WORLD_FILTER);
+  for (const name of ["develop", "experiment", FEATURE_WORLD])
+    act(() => {
+      checkbox(name).click();
+    });
   expect(rows()).toHaveLength(2);
   act(() => {
     checkbox("main").click();
   });
   expect(rows()).toHaveLength(0);
-  expect(host.textContent).toContain("Select a branch to show commits.");
   click("Select all");
-  expect(rows()).toHaveLength(6);
-  click(BRANCH_FILTER_LABEL);
-  const input = document.body.querySelector<HTMLInputElement>('input[type="search"]');
-  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
-  if (input === null || descriptor?.set === undefined) throw new Error("Missing search input");
-  act(() => {
-    descriptor.set?.call(input, "ONTOLOGY");
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  click(CROSS_WORLD_FILTER);
+  inputValue("Search loaded versions...", "ONTOLOGY");
   expect(rows()).toHaveLength(1);
-  expect(rows()[0]?.textContent).toContain(ONTOLOGY_COMMIT);
+  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  inputValue("Search loaded versions...", "");
+  click(CROSS_WORLD_FILTER);
+  click("Clear all");
+  click(CROSS_WORLD_FILTER);
+  click(BACK_TO_WORLDS);
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(worldButton("main").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(rows()).toHaveLength(2);
+  expect(host.textContent).not.toContain("Select a knowledge world to show versions.");
 });
 
-it("continues immutable ancestry pagination and validates selection via get", async () => {
+it("continues the expanded world's immutable root through the version relationships view", async () => {
   const api = mockReader();
   await render(api);
-  click("Load more");
-  await act(async () => {
-    await Promise.resolve();
+  await openRelationships();
+  click(LOAD_EARLIER);
+  await flush();
+  expect(rows()).toHaveLength(3);
+  expect(vi.mocked(api.ancestry).mock.calls.at(-1)?.[0]).toEqual({
+    root: "commit/" + main,
+    limit: 20,
+    cursor: "next-main"
   });
-  expect(rows()).toHaveLength(7);
-  const pageCall = vi.mocked(api.ancestry).mock.calls.at(-1);
-  expect(pageCall?.[0]).toEqual({ root: "commit/" + main, limit: 20, cursor: "next-main" });
-  expect(pageCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
-  const selected = rows().find((row) => row.textContent.includes(ONTOLOGY_COMMIT));
-  if (selected === undefined) throw new Error("Missing commit row");
-  act(() => {
-    selected.click();
-  });
-  await act(async () => {
-    await Promise.resolve();
-  });
-  const getCall = vi.mocked(api.get).mock.calls.at(-1);
-  expect(getCall?.[0]).toEqual({ state: "commit/" + develop });
-  expect(getCall?.[1]?.signal).toBeInstanceOf(AbortSignal);
-  expect(selected.getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(vi.mocked(api.ancestry).mock.calls.at(-1)?.[1]?.signal).toBeInstanceOf(AbortSignal);
 });
 
-it("does not fake history when disconnected and keeps an accessible refresh action", async () => {
+it("does not fake world rows when disconnected and disables refresh", async () => {
   await render(null);
   expect(rows()).toHaveLength(0);
+  expect(host.querySelectorAll(".world-section")).toHaveLength(0);
   expect(host.textContent).toContain("Connect to view version history.");
-  expect(document.body.querySelector<HTMLButtonElement>(".version-refresh-button")?.disabled).toBe(
-    true
-  );
+  expect(findButton(WORLD_REFRESH)).toHaveProperty("disabled", true);
 });
 
-it("distinguishes an empty repository from a disconnected session", async () => {
+it("reports a genuinely empty directory without inventing world contents", async () => {
   const api = mockReader();
   vi.mocked(api.branch.list).mockResolvedValueOnce({ items: [] });
   await render(api);
-  expect(host.textContent).toContain("No branches are available.");
   expect(rows()).toHaveLength(0);
-  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("0/0");
+  expect(host.textContent).toContain("No knowledge worlds are available.");
   expect(api.ancestry).not.toHaveBeenCalled();
 });
 
-it("renders an immutable commit that has no message or parent", async () => {
+it("renders a real commit with no message or parent without inventing a description", async () => {
   const api = mockReader();
   vi.mocked(api.ancestry).mockResolvedValueOnce({
     root: stateRef(main),
     items: [{ state: main, committedAt: at, parents: null }] as never
   });
   await render(api);
-  expect(host.textContent).toContain("No commit message");
-  expect(rows().some((r) => r.textContent.includes("No commit message"))).toBe(true);
+  expect(rows().some((item) => item.textContent.includes("No version description"))).toBe(true);
 });
 
-it("retries a failed initial load and retains the previous history on refresh failure", async () => {
+it("uses meaningful immutable message content while preserving its full original text", async () => {
+  const api = mockReader();
+  const message = "## 简介\n\n小说创作经验与叙事原则。\n\n## 改动\n\n补充人物动机。";
+  vi.mocked(api.ancestry).mockResolvedValueOnce({
+    root: stateRef(main),
+    items: [row(main, message, 0, [])]
+  });
+  await render(api);
+  const item = namedRow("小说创作经验与叙事原则。");
+  expect(item.textContent).not.toContain("## 简介");
+  expect(item.querySelector(".commit-title")?.getAttribute("title")).toBe(message);
+});
+
+it("retries a failed initial directory load and retains the old list on refresh failure", async () => {
   const api = mockReader();
   vi.mocked(api.branch.list).mockRejectedValueOnce(new Error("offline"));
   await render(api);
-  expect(rows()).toHaveLength(0);
-  expect(host.textContent).toContain("Could not load version history.");
-  click("Refresh versions");
+  expect(host.querySelectorAll(".world-section")).toHaveLength(0);
+  expect(findButton(WORLD_REFRESH)).toHaveProperty("disabled", false);
+  click(WORLD_REFRESH);
   await flush();
-  expect(rows()).toHaveLength(6);
+  expect(rows()).toHaveLength(2);
   vi.mocked(api.branch.list).mockRejectedValueOnce(new Error("offline again"));
-  click("Refresh versions");
+  click(WORLD_REFRESH);
   await flush();
   expect(host.textContent).toContain("Could not load version history.");
-  expect(rows()).toHaveLength(6);
-  click("Refresh versions");
+  expect(rows()).toHaveLength(2);
+  click(WORLD_REFRESH);
   await flush();
-  expect(rows()).toHaveLength(6);
   expect(host.textContent).not.toContain("Could not load version history.");
 });
 
-it("preserves already loaded commits after a failed next page", async () => {
+it("keeps a failed page available for explicit retry without changing its cursor", async () => {
   const api = mockReader();
   await render(api);
+  await openRelationships();
   vi.mocked(api.ancestry).mockRejectedValueOnce(new Error("page timed out"));
-  click("Load more");
+  click(LOAD_EARLIER);
   await flush();
-  expect(rows()).toHaveLength(6);
-  expect(host.textContent).toContain("Could not load version history.");
-  click("Load more");
+  expect(rows()).toHaveLength(2);
+  click(LOAD_EARLIER);
   await flush();
-  expect(rows()).toHaveLength(7);
+  expect(rows()).toHaveLength(3);
+  expect(vi.mocked(api.ancestry).mock.calls.at(-1)?.[0].cursor).toBe("next-main");
 });
 
-it("keeps the selected commit on get failure or mismatched resolution", async () => {
+it("keeps the selected context when version get fails or resolves to a different immutable state", async () => {
   const api = mockReader();
   await render(api);
+  const selected = namedRow(FIX_MESSAGE);
   vi.mocked(api.get).mockRejectedValueOnce(new Error("offline"));
-  const selected = rows().find((item) => item.textContent.includes(ONTOLOGY_COMMIT));
-  if (selected === undefined) throw new Error("Missing history row");
   act(() => {
     selected.click();
   });
   await flush();
-  expect(host.textContent).toContain("Could not open this version.");
   expect(selected.getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
-
+  expect(host.textContent).toContain("Could not open this version.");
   vi.mocked(api.get).mockResolvedValueOnce(resolved(common));
   act(() => {
     selected.click();
   });
   await flush();
   expect(selected.getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
-  expect(host.textContent).toContain("Could not open this version.");
   act(() => {
     selected.click();
   });
@@ -325,85 +307,164 @@ it("keeps the selected commit on get failure or mismatched resolution", async ()
   expect(selected.getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
 });
 
-it("discards a delayed get response after the user selects another commit", async () => {
+it("does not change browsing world until a clicked version is verified", async () => {
+  const api = mockReader();
+  await render(api);
+  vi.mocked(api.get).mockRejectedValueOnce(new Error("world unavailable"));
+  await chooseWorld("develop");
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  await chooseWorld("develop");
+  expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+});
+
+it("does not reopen a world when its pending version resolves after another world was expanded", async () => {
   const api = mockReader();
   let finishSlow: ((data: EvolutionGetResult) => void) | undefined;
-  const slow = new Promise<EvolutionGetResult>((resolve) => {
-    finishSlow = resolve;
-  });
   await render(api);
-  vi.mocked(api.get).mockImplementationOnce(() => slow);
-  const oldRow = rows().find((item) => item.textContent.includes("Experiment"));
-  const newRow = rows().find((item) => item.textContent.includes(ONTOLOGY_COMMIT));
-  if (oldRow === undefined || newRow === undefined) throw new Error("Missing history rows");
+  vi.mocked(api.get).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishSlow = resolve;
+      })
+  );
+  await chooseWorld("experiment");
   act(() => {
-    oldRow.click();
-    newRow.click();
+    worldButton("develop").click();
   });
-  await flush();
-  expect(newRow.getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
-  expect(oldRow.getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
   await act(async () => {
     finishSlow?.(resolved(experiment));
     await Promise.resolve();
   });
-  expect(newRow.getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(worldButton("experiment").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
 });
 
-it("closes branch picker on outside interaction and Escape without clearing filters", async () => {
+it("ignores a late world version response after a newer choice has succeeded", async () => {
+  const api = mockReader();
+  let finishSlow: ((data: EvolutionGetResult) => void) | undefined;
+  await render(api);
+  vi.mocked(api.get).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishSlow = resolve;
+      })
+  );
+  await chooseWorld("experiment");
+  await chooseWorld("develop");
+  await act(async () => {
+    finishSlow?.(resolved(experiment));
+    await Promise.resolve();
+  });
+  expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+});
+
+it("opens the expanded world's DAG without selecting that world or changing its root", async () => {
+  const api = mockReader();
+  await render(api);
+  act(() => {
+    worldButton("develop").click();
+  });
+  await openRelationships();
+  expect(document.body.querySelector(".version-dag-world")?.textContent).toBe("develop");
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(api.get).not.toHaveBeenCalled();
+});
+
+it("does not reopen an old DAG after disconnect and reconnect", async () => {
+  const api = mockReader();
+  await render(api);
+  await openRelationships();
+  expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+  await render(null);
+  await render(api);
+  expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it("keeps advanced filters after their popover closes on Escape", async () => {
   await render(mockReader());
-  const trigger = click(BRANCH_FILTER_LABEL);
+  await showAcrossWorlds();
+  const trigger = click(CROSS_WORLD_FILTER);
   act(() => {
     checkbox("develop").click();
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
   });
-  expect(trigger.getAttribute("aria-expanded")).toBe("true");
-  act(() => {
-    document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    document.body.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-    document.body.click();
-  });
-  expect(trigger.getAttribute("aria-expanded")).toBe("false");
-  click(BRANCH_FILTER_LABEL);
   act(() => {
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   });
-  expect(trigger.getAttribute("aria-expanded")).toBe("false");
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-  expect(document.activeElement).toBe(trigger);
-  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("3/4");
-  click(BRANCH_FILTER_LABEL);
-  click("Select all");
-  click("Clear all");
-  expect(rows()).toHaveLength(0);
-  click("Select all");
-  expect(rows()).toHaveLength(6);
+  await flush();
+  expect(trigger.getAttribute(EXPANDED_ATTRIBUTE)).toBe("false");
+  click(CROSS_WORLD_FILTER);
+  expect(checkbox("develop").getAttribute("aria-checked")).toBe("false");
 });
 
-it("does not replace a new connection with a late old connection response", async () => {
+it("observes head movement without following it or rewriting the old paging root", async () => {
+  const api = mockReader();
+  await render(api);
+  act(() => {
+    namedRow(FIX_MESSAGE).click();
+  });
+  await flush();
+  const calls = vi.mocked(api.ancestry).mock.calls.length;
+  vi.mocked(api.branch.list).mockResolvedValue({
+    items: [{ name: "main", state: stateRef(develop) }]
+  });
+  act(() => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await flush();
+  expect(host.textContent).toMatch(/new version/i);
+  expect(namedRow(FIX_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(api.ancestry).toHaveBeenCalledTimes(calls);
+  await openRelationships();
+  click(LOAD_EARLIER);
+  await flush();
+  expect(vi.mocked(api.ancestry).mock.calls.at(-1)?.[0].root).toBe("commit/" + main);
+});
+
+it("retains a removed world's name and readable pinned history without falling back", async () => {
+  const api = mockReader();
+  await render(api);
+  act(() => {
+    namedRow(FIX_MESSAGE).click();
+  });
+  await flush();
+  vi.mocked(api.branch.list).mockResolvedValue({
+    items: [{ name: "develop", state: stateRef(develop) }]
+  });
+  act(() => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await flush();
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(host.textContent).toMatch(/no longer exists/i);
+  expect(namedRow(FIX_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  click(WORLD_ACTIONS);
+  expect(findButton("View version relationships").getAttribute("aria-disabled")).not.toBe("true");
+});
+
+it("does not replace a new connection with a late old directory response", async () => {
   const old = mockReader();
-  let resolveOld:
+  let finish:
     | ((response: { items: { name: string; state: ReturnType<typeof stateRef> }[] }) => void)
     | undefined;
-  const pending = new Promise<{ items: { name: string; state: ReturnType<typeof stateRef> }[] }>(
-    (resolve) => {
-      resolveOld = resolve;
-    }
+  vi.mocked(old.branch.list).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
   );
-  vi.mocked(old.branch.list).mockImplementationOnce(() => pending);
   await render(old);
-  expect(host.textContent).toContain("Loading history...");
   const oldSignal = vi.mocked(old.branch.list).mock.calls[0]?.[0]?.signal;
-  const next = mockReader();
-  await render(next);
+  await render(mockReader(), { defaultBranch: "develop", initialState: develop });
   expect(oldSignal?.aborted).toBe(true);
-  expect(rows()).toHaveLength(6);
   await act(async () => {
-    resolveOld?.({ items: [{ name: "main", state: stateRef(genesis) }] });
+    finish?.({ items: [{ name: "main", state: stateRef(genesis) }] });
     await Promise.resolve();
   });
-  expect(rows()).toHaveLength(6);
-  expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("4/4");
+  expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
 });

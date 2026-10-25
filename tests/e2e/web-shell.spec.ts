@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { closePreferenceSettings, openPreferenceSettings } from "./settings-navigation.js";
 import { authenticate, mockInstance, secondBootID } from "./web-shell-fixture.js";
 
 test.use({ colorScheme: "dark" });
@@ -10,18 +11,23 @@ test("renders API-backed versions with a blank graph canvas", async ({ page }) =
   await expect(page).toHaveTitle("KG OS");
   await expect(page.getByRole("heading", { name: "KG OS" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Version navigation" })).toBeVisible();
-  await expect(page.locator(".version-sidebar .commit-item")).toHaveCount(8);
-  await expect(page.locator(".version-sidebar .version-tree-heading")).toHaveCount(0);
+  await expect(page.locator(".version-sidebar .commit-item")).toHaveCount(6);
+  const sidebar = page.locator(".version-sidebar");
   await expect(
-    page.locator(".version-sidebar").getByRole("button", { name: "Filter branches" })
-  ).toContainText("All branches");
+    sidebar.getByRole("heading", { name: "Knowledge worlds", exact: true })
+  ).toBeVisible();
+  await expect(sidebar.locator(".world-section-trigger")).toHaveCount(4);
+  await expect(sidebar.getByRole("button", { name: "main", exact: true })).toHaveAttribute(
+    "aria-expanded",
+    "true"
+  );
+  await expect(sidebar.getByRole("region", { name: "Version history: main" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Graph canvas" })).toBeVisible();
   await expect(page.locator(".workspace-controls")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
   await expect(page.locator(".sidebar-collapse-button")).toHaveCount(0);
-  await expect(
-    page.locator(".version-sidebar").getByRole("group", { name: "Appearance theme" })
-  ).toBeVisible();
+  await expect(sidebar.locator(".sidebar-settings-button")).toHaveText("Settings");
+  await expect(sidebar.locator(".sidebar-bottom button")).toHaveCount(1);
   await expect(page.locator(".canvas-toolbar button:disabled")).toHaveCount(5);
 
   const metrics = await page.evaluate(() => {
@@ -56,69 +62,24 @@ test("renders API-backed versions with a blank graph canvas", async ({ page }) =
   await expect(page.getByText("Connected")).toHaveCount(0);
 });
 
-test("filters real Evolution-shaped commits across branches without changing the canvas", async ({
-  page
-}) => {
-  await authenticate(page);
-  const sidebar = page.locator(".version-sidebar");
-  const branchFilter = sidebar.getByRole("button", { name: "Filter branches" });
-  const history = sidebar.locator(".commit-item");
-
-  await expect(history).toHaveCount(8);
-  await branchFilter.click();
-  const choices = page.getByRole("group", { name: "Filter branches" });
-  await expect(choices.getByRole("checkbox")).toHaveCount(4);
-  await expect(choices.getByRole("checkbox", { name: "main" })).toBeChecked();
-
-  await choices.getByRole("checkbox", { name: "develop" }).uncheck();
-  await expect(history).toHaveCount(7);
-  await choices.getByRole("checkbox", { name: "experiment" }).uncheck();
-  await expect(history).toHaveCount(7);
-  await choices.getByRole("checkbox", { name: "main" }).uncheck();
-  await expect(history).toHaveCount(4);
-  await expect(sidebar.getByText("Update knowledge model")).toHaveCount(0);
-  await choices.getByRole("checkbox", { name: "feature/search" }).uncheck();
-  await expect(history).toHaveCount(0);
-  await expect(sidebar.getByText("Select a branch to show commits.")).toBeVisible();
-
-  await choices.getByRole("button", { name: "Select all" }).click();
-  await expect(history).toHaveCount(8);
-  await branchFilter.click();
-  const search = sidebar.getByRole("searchbox", { name: "Search commits..." });
-  await search.fill("7A1D9E");
-  await expect(history).toHaveCount(1);
-  await expect(sidebar.getByText("Add knowledge sources")).toBeVisible();
-  await search.fill("unknown-hash");
-  await expect(history).toHaveCount(0);
-  await expect(sidebar.getByText("No matching commits.")).toBeVisible();
-  await search.clear();
-  await sidebar.getByRole("button", { name: /Fix node properties/ }).click();
-  await expect(sidebar.getByRole("button", { name: /Fix node properties/ })).toHaveAttribute(
-    "aria-pressed",
-    "true"
-  );
-  await expect(page.getByRole("region", { name: "Graph canvas" })).toBeVisible();
-  await expect(page.locator(".canvas-stage .commit-item")).toHaveCount(0);
-});
-
 test("follows system appearance until a persistent user override is chosen", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
   await authenticate(page);
   const shell = page.locator(".app-shell");
-  const toggle = page.locator(".version-sidebar").getByRole("group", { name: "Appearance theme" });
+  let settings = await openPreferenceSettings(page);
   await expect(shell).toHaveAttribute("data-theme", "light");
-  await expect(toggle.getByRole("button", { name: "Follow system theme" })).toHaveAttribute(
-    "aria-pressed",
-    "true"
-  );
+  await expect(
+    settings.getByRole("button", { name: "Follow system", exact: true })
+  ).toHaveAttribute("aria-pressed", "true");
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(shell).toHaveAttribute("data-theme", "dark");
-  await toggle.getByRole("button", { name: "Light theme" }).click();
+  await settings.getByRole("button", { name: "Light", exact: true }).click();
   await expect(shell).toHaveAttribute("data-theme", "light");
   expect(await page.evaluate(() => localStorage.getItem("kgos.web.theme"))).toBe("light");
   await page.reload();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "light");
-  await toggle.getByRole("button", { name: "Follow system theme" }).click();
+  settings = await openPreferenceSettings(page);
+  await settings.getByRole("button", { name: "Follow system", exact: true }).click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
   expect(await page.evaluate(() => localStorage.getItem("kgos.web.theme"))).toBeNull();
 });
@@ -164,11 +125,12 @@ test("switches themes and hides the entire sidebar from the canvas border", asyn
     )
   ).toBeLessThan(3);
 
-  const group = sidebar.getByRole("group", { name: "Appearance theme" });
-  await group.getByRole("button", { name: "Light theme" }).click();
+  const settings = await openPreferenceSettings(page);
+  await settings.getByRole("button", { name: "Light", exact: true }).click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "light");
-  await group.getByRole("button", { name: "Dark theme" }).click();
+  await settings.getByRole("button", { name: "Dark", exact: true }).click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
+  await closePreferenceSettings(page);
 
   await handle.click();
   await expect(page.locator(".app-shell")).toHaveClass(/is-sidebar-collapsed/);
@@ -263,17 +225,43 @@ test("keeps version navigation available at 320 CSS px without horizontal overfl
   expect(bounds?.height).toBe(44);
   await navigation.click();
   await expect(page.getByRole("dialog", { name: "Mobile version navigation" })).toBeVisible();
-  await expect(page.locator(".version-drawer .commit-item")).toHaveCount(8);
+  await expect(page.locator(".version-drawer .commit-item")).toHaveCount(6);
+  const drawer = page.getByRole("dialog", { name: "Mobile version navigation" });
+  const featureWorld = drawer.getByRole("button", { name: "feature/search", exact: true });
+  await expect(featureWorld).toBeVisible();
+  await featureWorld.click();
+  await expect(featureWorld).toHaveAttribute("aria-expanded", "true");
+  await expect(drawer.getByRole("button", { name: "main", exact: true })).toHaveAttribute(
+    "aria-expanded",
+    "false"
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+    )
+  ).toBe(false);
+  const featureHistory = drawer.getByRole("region", { name: "Version history: feature/search" });
+  await expect(featureHistory.locator(".commit-item")).toHaveCount(4);
+  await expect(featureHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(0);
+  await featureHistory.locator(".commit-row").first().click();
+  await expect(featureHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(1);
+  await drawer.getByRole("button", { name: "Knowledge world actions" }).click();
+  await page.getByRole("menuitem", { name: "View version relationships" }).click();
+  const relationships = page.getByRole("dialog", { name: "Version relationships", exact: true });
+  await expect(relationships).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(relationships).toBeHidden();
+  await expect(drawer).toBeVisible();
   const drawerBounds = await page.locator(".version-drawer").boundingBox();
   expect(drawerBounds?.x).toBe(0);
   expect(drawerBounds?.y).toBe(0);
-  await page
-    .getByRole("dialog", { name: "Mobile version navigation" })
-    .getByRole("button", { name: "Light theme" })
-    .click();
+  const settings = await openPreferenceSettings(page);
+  await expect(drawer).toBeHidden();
+  await settings.getByRole("button", { name: "Light", exact: true }).click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "light");
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Mobile version navigation" })).toBeHidden();
+  await closePreferenceSettings(page);
+  await expect(navigation).toBeFocused();
+  await expect(drawer).toBeHidden();
 
   await page.getByRole("button", { name: "Version navigation" }).click();
   await page.getByRole("button", { name: "Close version navigation" }).click();
@@ -310,10 +298,9 @@ test("requires authentication and cannot dismiss or interact with the background
   await expect(dialog).toBeVisible();
   await page.mouse.click(16, 16);
   await expect(dialog).toBeVisible();
-  const backgroundTheme = page.locator(".version-sidebar").getByRole("button", {
-    name: "Light theme"
-  });
-  await expect(backgroundTheme.click({ timeout: 500 })).rejects.toThrow();
+  const backgroundSettings = page.locator(".version-sidebar .sidebar-settings-button");
+  await expect(backgroundSettings.click({ timeout: 500 })).rejects.toThrow();
+  await expect(page.locator(".settings-dialog")).toHaveCount(0);
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
 
   const token = page.getByLabel("Access Token", { exact: true });
@@ -356,10 +343,17 @@ test("authenticates with Bearer token, can disconnect, and never persists the to
 }) => {
   await authenticate(page);
   await expect(page.locator(".app-shell")).not.toHaveClass(/is-auth-required/);
-  await expect(page.getByRole("button", { name: "Disconnect" })).toBeVisible();
+  await expect(page.locator(".sidebar-settings-button:visible")).toHaveText("Settings");
   expect(await page.evaluate(() => Object.keys(localStorage))).toEqual([]);
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([]);
-  await page.getByRole("button", { name: "Disconnect" }).click();
+  const settings = await openPreferenceSettings(page);
+  await settings.locator('[data-settings-category="connection"]').click();
+  const logout = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/web/auth/logout")
+  );
+  await settings.getByRole("button", { name: "Sign out", exact: true }).click();
+  expect((await logout).status()).toBe(204);
+  await expect(settings).toBeHidden();
   await expect(page.getByRole("dialog", { name: "Authentication Required" })).toBeVisible();
   await expect(page.locator(".app-shell")).toHaveClass(/is-auth-required/);
   await page.reload();
@@ -458,7 +452,7 @@ test("restores a valid Web Session after refresh without re-entering the root to
   expect(cookie?.sameSite).toBe("Strict");
   await page.reload();
   await expect(page.getByRole("dialog", { name: "Authentication Required" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Disconnect" })).toBeVisible();
+  await expect(page.locator(".sidebar-settings-button:visible")).toHaveText("Settings");
   await expect(page.getByLabel("Access Token", { exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([]);
 });

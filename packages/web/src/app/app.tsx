@@ -94,9 +94,11 @@ function BrowserApp() {
 
   return (
     <WorkspaceShell
+      connection={connection}
       authenticationRequired={connection === null}
       versionReader={connection?.client.evolution ?? null}
       initialVersionState={connection?.state ?? null}
+      defaultVersionBranch={connection?.defaultBranch ?? null}
       onDisconnect={
         connection === null
           ? undefined

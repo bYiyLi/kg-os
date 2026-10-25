@@ -137,6 +137,7 @@ function EmbeddedWorkspace() {
       hostTheme={hostTheme}
       versionReader={connection.status === "ready" ? connection.versionReader : null}
       initialVersionState={connection.status === "ready" ? connection.data.state : null}
+      defaultVersionBranch={connection.status === "ready" ? connection.data.defaultBranch : null}
       canvasChildren={
         <ConnectionPanel
           connection={connection}

@@ -14,6 +14,8 @@ type DaemonSettings struct {
 	TLSCert string
 	TLSKey  string
 	MCP     DaemonMCPSettings
+	// Sources records the winning input at parse time, without retaining values.
+	Sources map[string]string
 }
 type DaemonMCPSettings struct {
 	Path                 string
@@ -91,8 +93,10 @@ func parseDaemonSettings(args []string, lookup func(string) (string, bool)) (Dae
 	if root == "" {
 		return DaemonSettings{}, "", errors.New("--root <absolute-workspace-root> is required")
 	}
+	sources := map[string]string{"root": "--root"}
 	value := func(key string) (string, error) {
 		if v, ok := fields[key]; ok {
+			sources[key] = "--" + key
 			return v, nil
 		}
 		def := daemonFields[key]
@@ -100,17 +104,22 @@ func parseDaemonSettings(args []string, lookup func(string) (string, bool)) (Dae
 			if v == "" {
 				return "", fmt.Errorf("empty environment value for %s", def.env)
 			}
+			sources[key] = def.env
 			return v, nil
 		}
+		sources[key] = "default"
 		return def.def, nil
 	}
 	optional := func(key string) (string, error) {
 		if v, ok := fields[key]; ok {
+			sources[key] = "--" + key
 			return v, nil
 		}
 		if v, ok := lookup(daemonFields[key].env); ok {
+			sources[key] = daemonFields[key].env
 			return v, nil
 		}
+		sources[key] = "default"
 		return "", nil
 	}
 	num := func(key string) (int, error) {
@@ -191,5 +200,6 @@ func parseDaemonSettings(args []string, lookup func(string) (string, bool)) (Dae
 		return DaemonSettings{}, "", err
 	}
 
+	settings.Sources = sources
 	return settings, root, nil
 }

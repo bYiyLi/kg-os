@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { App } from "./app.js";
 import { i18n, selectLocale } from "./i18n/index.js";
+import { snapshot as settingsSnapshot } from "../../test/settings-fixture.js";
 
 const TOKEN_INPUT = "#kgos-access-token";
 const AUTH_DIALOG = ".authentication-dialog";
@@ -61,6 +62,13 @@ beforeEach(async () => {
       if (target.includes("/api/v1/setup/status"))
         return Promise.resolve(
           new Response(JSON.stringify({ state: "ready", credentialConfigured: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          })
+        );
+      if (target.includes("/web/settings/read"))
+        return Promise.resolve(
+          new Response(JSON.stringify(settingsSnapshot()), {
             status: 200,
             headers: { "Content-Type": "application/json" }
           })
@@ -146,6 +154,14 @@ function buttonByName(label: string) {
   return button;
 }
 
+async function openSettings() {
+  await act(async () => {
+    buttonByName("Settings").click();
+    await Promise.resolve();
+  });
+  expect(document.body.querySelector(".settings-dialog")).not.toBeNull();
+}
+
 function appShell() {
   return document.body.querySelector(".app-shell");
 }
@@ -172,9 +188,9 @@ it("requires authentication before the static shell can be used", async () => {
   expect(document.body.querySelector(".sidebar-brand h1")?.textContent).toBe("KG OS");
   expect(document.body.querySelector('[aria-label="Version navigation"]')).not.toBeNull();
   expect(document.body.querySelectorAll(".version-sidebar .commit-item")).toHaveLength(0);
-  expect(
-    document.body.querySelector(".version-sidebar .version-branch-trigger")?.textContent
-  ).toContain("All branches");
+  expect(document.body.querySelector(".world-picker-trigger")).toBeNull();
+  expect(document.body.querySelectorAll(".world-section")).toHaveLength(0);
+  expect(document.body.textContent).toContain("Knowledge worlds");
   expect(document.body.querySelector(".version-tree-heading")).toBeNull();
   expect(document.body.querySelector('[aria-label="Graph canvas"]')).not.toBeNull();
   expect(document.body.textContent).not.toContain("Welcome");
@@ -183,8 +199,9 @@ it("requires authentication before the static shell can be used", async () => {
   expect(document.body.querySelector("input")).not.toBeNull();
   expect(document.body.querySelector(".global-header")).toBeNull();
   expect(document.body.querySelector(".workspace-controls")).toBeNull();
-  expect(document.body.querySelector(".version-sidebar .theme-toggle")).not.toBeNull();
-  expect(document.body.querySelectorAll(".version-sidebar .theme-option")).toHaveLength(3);
+  expect(document.body.querySelectorAll(".sidebar-bottom button")).toHaveLength(0);
+  expect(document.body.querySelector(".version-sidebar .theme-toggle")).toBeNull();
+  expect(document.body.querySelector(".version-sidebar .language-switcher")).toBeNull();
   expect(document.body.querySelector(".sidebar-handle")).not.toBeNull();
   expect(document.body.querySelector(".sidebar-collapse-button")).toBeNull();
   expect(document.body.querySelector(".canvas-stage .mobile-versions-button")).not.toBeNull();
@@ -196,36 +213,39 @@ it("requires authentication before the static shell can be used", async () => {
   expect(document.body.querySelectorAll(".canvas-toolbar button:disabled")).toHaveLength(5);
 });
 
-it("supports automatic and manually selected themes without external requests", async () => {
+it("applies automatic and manual theme preferences through the settings dialog", async () => {
   await renderConnectedApp();
+  expect(document.body.querySelectorAll(".sidebar-bottom button")).toHaveLength(1);
+  expect(document.body.querySelector(".sidebar-bottom")?.textContent).toBe("Settings");
+  await openSettings();
   expect(currentTheme()).toBe("dark");
-  expect(buttonByName("Follow system theme").getAttribute("aria-pressed")).toBe("true");
-  expect(buttonByName("Dark theme").getAttribute("aria-pressed")).toBe("false");
+  expect(buttonByName("Follow system").getAttribute("aria-pressed")).toBe("true");
+  expect(buttonByName("Dark").getAttribute("aria-pressed")).toBe("false");
   act(() => {
-    buttonByName("Dark theme").click();
+    buttonByName("Dark").click();
   });
   expect(currentTheme()).toBe("dark");
   act(() => {
-    buttonByName("Light theme").click();
+    buttonByName("Light").click();
   });
   expect(currentTheme()).toBe("light");
   expect(localStorage.getItem("kgos.web.theme")).toBe("light");
-  expect(buttonByName("Light theme").getAttribute("aria-pressed")).toBe("true");
+  expect(buttonByName("Light").getAttribute("aria-pressed")).toBe("true");
   act(() => {
-    buttonByName("Light theme").click();
+    buttonByName("Light").click();
   });
   expect(currentTheme()).toBe("light");
   act(() => {
-    buttonByName("Dark theme").click();
+    buttonByName("Dark").click();
   });
   expect(currentTheme()).toBe("dark");
   expect(localStorage.getItem("kgos.web.theme")).toBe("dark");
   act(() => {
-    buttonByName("Follow system theme").click();
+    buttonByName("Follow system").click();
   });
   expect(currentTheme()).toBe("dark");
   expect(localStorage.getItem("kgos.web.theme")).toBeNull();
-  expect(buttonByName("Follow system theme").getAttribute("aria-pressed")).toBe("true");
+  expect(buttonByName("Follow system").getAttribute("aria-pressed")).toBe("true");
 });
 
 it("fully hides and restores the version sidebar from the canvas-border handle", async () => {
@@ -252,15 +272,15 @@ it("fully hides and restores the version sidebar from the canvas-border handle",
 it("resizes the sidebar by keyboard while keeping the canvas in place", async () => {
   await renderConnectedApp();
   const handle = buttonByName("Collapse sidebar");
-  expect(appShell()?.getAttribute("style")).toContain("--sidebar-width: 240px");
+  expect(appShell()?.getAttribute("style")).toContain("--sidebar-width: 280px");
   act(() => {
     handle.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
   });
-  expect(appShell()?.getAttribute("style")).toContain("--sidebar-width: 256px");
+  expect(appShell()?.getAttribute("style")).toContain("--sidebar-width: 296px");
   act(() => {
     handle.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
   });
-  expect(appShell()?.getAttribute("style")).toContain("--sidebar-width: 240px");
+  expect(appShell()?.getAttribute("style")).toContain("--sidebar-width: 280px");
   expect(appShell()?.classList.contains("is-sidebar-collapsed")).toBe(false);
 });
 
@@ -274,7 +294,9 @@ it("opens a mobile version drawer and closes using the close control", async () 
   expect(dialog.getAttribute("role")).toBe("dialog");
   expect(dialog.hasAttribute("data-open")).toBe(true);
   expect(dialog.querySelectorAll(".commit-item")).toHaveLength(1);
-  expect(dialog.querySelectorAll(".theme-option")).toHaveLength(3);
+  expect(dialog.querySelectorAll(".sidebar-settings-button")).toHaveLength(1);
+  expect(dialog.querySelector(".theme-toggle")).toBeNull();
+  expect(dialog.querySelector(".language-switcher")).toBeNull();
   await act(async () => {
     buttonByName("Close version navigation").click();
     await Promise.resolve();
@@ -329,14 +351,19 @@ it("switches language without losing authentication input or the connected works
     await Promise.resolve();
   });
   expect(document.body.querySelector(AUTH_DIALOG)).toBeNull();
-  const connectedLanguage = document.body.querySelector(".version-sidebar .language-switcher");
+  await openSettings();
+  const connectedLanguage = document.body.querySelector(".settings-dialog .language-switcher");
   await act(async () => {
     connectedLanguage?.querySelector<HTMLButtonElement>('[lang="zh-CN"]')?.click();
     await Promise.resolve();
   });
   expect(document.body.textContent).not.toContain("模拟数据");
   expect(document.body.textContent).toContain("2小时前");
-  expect(document.body.textContent).toContain("全部分支");
+  expect(document.body.textContent).toContain("知识世界");
+  expect(document.body.querySelector(".history-region")?.getAttribute("aria-label")).toContain(
+    "main"
+  );
+  expect(buttonByName("main").getAttribute("aria-expanded")).toBe("true");
   expect(currentTheme()).toBe("dark");
   expect(
     vi.mocked(fetch).mock.calls.some(([url]) => {
@@ -396,8 +423,13 @@ it("requires a new token after a connected API returns 401", async () => {
 
 it("disconnects explicitly and discards the established client", async () => {
   await renderConnectedApp();
+  await openSettings();
   await act(async () => {
-    buttonByName("Disconnect").click();
+    buttonByName("Connection & access").click();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    buttonByName("Sign out").click();
     await Promise.resolve();
   });
   expect(document.body.querySelector<HTMLElement>(AUTH_DIALOG)?.hasAttribute("data-open")).toBe(

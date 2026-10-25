@@ -1,54 +1,68 @@
 import { expect } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
+import { readOnlySettingsSnapshot } from "./settings-navigation.js";
 import { mockVersionRoutes, states } from "./version-fixture.js";
 
 const testBootID = "e48245ac-51a4-4b6b-93ba-07bb4d0626a6";
 export const secondBootID = "b6f0ba69-d40a-4819-9ed0-f09759c17292";
 const webAccess = "kgws_" + "A".repeat(43);
 
+interface InstanceState {
+  bootID: string;
+  online: boolean;
+  token: string;
+  rootAtLogin: string;
+  sessionValid: boolean;
+}
+type ReadKind = "info" | "overview" | "settings";
+
+function readBody(kind: ReadKind, bootID: string) {
+  if (kind === "info") return { daemonBootId: bootID, storageStatus: "unsupported" };
+  if (kind === "overview") return { defaultBranch: "main", state: states.main };
+  return readOnlySettingsSnapshot();
+}
+
+async function respond(route: Route, kind: ReadKind, state: InstanceState) {
+  const headers = route.request().headers();
+  if (!state.online) {
+    await route.abort("failed");
+  } else if (
+    headers["authorization"] !== "Bearer " + webAccess ||
+    state.rootAtLogin !== state.token
+  ) {
+    await route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "AUTHENTICATION_FAILED", message: "authentication failed" })
+    });
+  } else if (
+    headers["x-kgos-expected-daemon-boot"] !== undefined &&
+    headers["x-kgos-expected-daemon-boot"] !== state.bootID
+  ) {
+    await route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "WEB_CONNECTION_CHANGED", message: "web connection changed" })
+    });
+  } else {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Cache-Control": "no-store" },
+      body: JSON.stringify(readBody(kind, state.bootID))
+    });
+  }
+}
+
 export async function mockInstance(page: Page) {
-  const state = {
+  const state: InstanceState = {
     bootID: testBootID,
     online: true,
     token: "valid-token",
     rootAtLogin: "valid-token",
     sessionValid: false
   };
-  async function respond(route: Route, kind: "info" | "overview") {
-    const headers = route.request().headers();
-    if (!state.online) {
-      await route.abort("failed");
-    } else if (
-      headers["authorization"] !== "Bearer " + webAccess ||
-      state.rootAtLogin !== state.token
-    ) {
-      await route.fulfill({
-        status: 401,
-        contentType: "application/json",
-        body: JSON.stringify({ code: "AUTHENTICATION_FAILED", message: "authentication failed" })
-      });
-    } else if (
-      headers["x-kgos-expected-daemon-boot"] !== undefined &&
-      headers["x-kgos-expected-daemon-boot"] !== state.bootID
-    ) {
-      await route.fulfill({
-        status: 409,
-        contentType: "application/json",
-        body: JSON.stringify({ code: "WEB_CONNECTION_CHANGED", message: "web connection changed" })
-      });
-    } else {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(
-          kind === "info"
-            ? { daemonBootId: state.bootID, storageStatus: "unsupported" }
-            : { defaultBranch: "main", state: states.main }
-        )
-      });
-    }
-  }
   await page.route("**/api/v1/web/auth/*", async (route) => {
     const name = new URL(route.request().url()).pathname.split("/").at(-1);
     const headers = route.request().headers();
@@ -91,8 +105,13 @@ export async function mockInstance(page: Page) {
       });
     }
   });
-  await page.route("**/api/v1/web/data/info", async (route) => respond(route, "info"));
-  await page.route("**/api/v1/evolution/overview", async (route) => respond(route, "overview"));
+  await page.route("**/api/v1/web/data/info", async (route) => respond(route, "info", state));
+  await page.route("**/api/v1/evolution/overview", async (route) =>
+    respond(route, "overview", state)
+  );
+  await page.route("**/api/v1/web/settings/read", async (route) =>
+    respond(route, "settings", state)
+  );
   await mockVersionRoutes(page);
   return state;
 }

@@ -257,7 +257,7 @@ KG OS 正式 Docker 只运行**一个 `kgosd`、一个 HTTP listener、一个 Wo
 
 Web 第二步与第三步只在浏览器本次向导内保存未提交草稿，**点击“下一步”不创建半成品 `config.toml`**。第五步请求提交经过严格类型/范围/未知字段校验的完整 `[server]` 与 Cache、SQLite、Full-text、Embedding 配置：Web 默认提供 `cache.path=cache/openai-compatible.db`、`cache.max_size_mb=4096`、`fulltext.analyzer=jieba`、额外 `sqlite.extensions=[]`；Embedding 要求完整 URL、模型、维度、`cosine|euclidean` 及凭证模式。它们是 Web UI 显式生成的值，不改变手工 `config.toml` 必须完整的合同，也不允许用缺字段表示关闭 Embedding、Full-text 或 Cache。
 
-**凭证分工**：第四步生成/复用的管理员 Token 只归 `auth.json`；第三步填写的 Embedding API Key 不得进入 `config.toml`、IndexDefinition、版本历史、响应日志或诊断。手工配置继续使用当前 `embedding.api_key_env` + 宿主环境变量，不要求 Web secret 文件。Web setup 则把 Key 原子写入 `<workspace>/.kgos/embedding-api-key`（文件权限 0600、目录私有），生成的 `embedding.api_key_env` 固定使用专用名字 `KGOS_WEB_EMBEDDING_API_KEY`；仅当 config 显式指向此专用名字时，Runtime 才在 Provider 初始化之前安全读取私有文件并注入该**单个 daemon 进程**的对应环境变量，之后仍由既有 Provider operation-time 解析，不增加通用密钥注册中心或内联 `api_key`。该保留环境变量若同时由宿主设置，应报明确配置冲突而非悄悄选一边。Web API Key 留空即为无需认证的 endpoint（`api_key_env=""`，不创建 Key 文件）。若私有 Key 文件缺失/权限错误，保留已有配置，报告错误，不假装服务已就绪；Web 不提供已初始化后的任意密钥改写接口。**首次保存先原子发布并校验私有 Key 文件，再原子发布完整 config**；中断后的孤立私有文件不构成初始化完成，config 已发布但 Key 不可读取时 fail closed，不删除配置/已有数据，也不因重试暴露旧 Key。
+**凭证分工**：第四步生成/复用的管理员 Token 只归 `auth.json`；第三步填写的 Embedding API Key 不得进入 `config.toml`、IndexDefinition、版本历史、响应日志或诊断。手工配置继续使用当前 `embedding.api_key_env` + 宿主环境变量，不要求 Web secret 文件。Web setup 则把 Key 原子写入 `<workspace>/.kgos/embedding-api-key`（文件权限 0600、目录私有），生成的 `embedding.api_key_env` 固定使用专用名字 `KGOS_WEB_EMBEDDING_API_KEY`；仅当 config 显式指向此专用名字时，Runtime 才在 Provider 初始化之前安全读取私有文件并注入该**单个 daemon 进程**的对应环境变量，之后仍由既有 Provider operation-time 解析，不增加通用密钥注册中心或内联 `api_key`。该保留环境变量若同时由宿主设置，应报明确配置冲突而非悄悄选一边。Web API Key 留空即为无需认证的 endpoint（`api_key_env=""`，不创建 Key 文件）。若私有 Key 文件缺失/权限错误，保留已有配置，报告错误，不假装服务已就绪；已初始化后的 Web 仅允许按[设置管理](#已初始化实例的-web-设置管理)更新同一实例私有文件中的密钥，不改写外部环境变量或凭证模式。**首次保存先原子发布并校验私有 Key 文件，再原子发布完整 config**；中断后的孤立私有文件不构成初始化完成，config 已发布但 Key 不可读取时 fail closed，不删除配置/已有数据，也不因重试暴露旧 Key。
 
 当前 `auth.json` 原子生成 / root Token 只持一份，不新增账号、密码、角色或一套安装 Token。首次匿名 `claim` 仍只可成功一次；已有 Token 且**尚未提交初始化配置**时，可通过同源 `rotate-token` 无须旧凭证直接重新生成。服务端串行检查 `setup_required`、尚无 `config.toml`、磁盘旧凭证与当前内存凭证一致，再通过私有临时文件原子替换为新随机 Token；旧 Token 与旧 Web Session 失效，只有新 Token 能重新登录。配置已发布、初始化中、ready 或凭证/文件异常时不得轮换。每次新 Token 只在成功创建响应中显示一次，普通状态和登录接口不会回显旧明文。**未初始化前匿名轮换属于明确的安全取舍**：任何能通过同源限制访问该接口的人，都可能使已认领的管理员 Token 失效并获得新的管理员凭证；因此初始化入口必须仅对可信环境开放。保留现有 Origin / Sec-Fetch-Site 检查、文件权限及部署边界，不为此增加额外认证。
 
@@ -509,7 +509,26 @@ KG OS 在 Provider/IndexDefinition 层仍只保留 `api_key_env` 这一认证输
 - 不触发当前进程自动退出；
 - `cache`、caller `sqlite.extensions`、`fulltext` 与 `embedding` 的新文件值只在下一次 `kgosd` 启动时被读取。
 
-KG OS 不检测运行中的 `config.toml` 是否被修改，也不因为文件变化自行 hot-reload / restart daemon。下一次进程启动读取当前文件；其中 `[fulltext]` / `[embedding]` 虽然属于“初始化后禁止修改”的 Instance 初始化合同，Runtime 仍不保存旧值进行比较。
+KG OS 不主动监视运行中的 `config.toml`，也不因为文件变化自行 hot-reload / restart daemon；设置页面显式读取时可比较 saved 与当前 effective config。下一次进程启动读取当前文件；其中 `[fulltext]` / `[embedding]` 虽然属于“初始化后禁止修改”的 Instance 初始化合同，Runtime 仍不保存旧值进行比较。
+
+### 已初始化实例的 Web 设置管理
+
+2026-10-25 用户批准五分类设置页后，受认证的同源 Web 新增实例配置读取、按组保存、当前 Embedding 连接测试和私有凭证更新接口。沿用 Web Bearer、同源校验与 daemon boot guard，不开放匿名、跨域或任意文件操作；响应不缓存，不返回根 Token、API Key 或原始环境变量集合。部署参数只投影实际生效值，不获得部署修改或重启权限。
+
+| 同源 POST 接口 | 输入与结果 |
+| --- | --- |
+| `/api/v1/web/settings/read` | `{}`；返回 `revision`、`effective`、`saved`、`pendingRestart`、凭证状态/来源、数据库路径与实际运行参数 |
+| `/api/v1/web/settings/update` | `revision` 加本次要保存的 `server`、`cache` 或 `sqlite` 组；返回更新后的设置快照 |
+| `/api/v1/web/settings/embedding-key` | `revision` 与新 `apiKey`；返回状态快照，不包含秘密 |
+| `/api/v1/web/settings/test-embedding` | `{}`；仅验证当前 effective 配置，返回 `ok`、实际维度或稳定失败原因，不写配置 |
+
+配置组沿用 TOML 的 snake case 字段，`server` 在旧配置中可为 `null`，扩展列表为空时为 `[]`。页面复用已有 `/api/v1/system/diagnostics` 取得本次进程汇总，不把诊断描述为全库健康检查。实例设置不加入 AI-facing SDK 或 MCP 的业务能力。
+
+旧手工配置中 URL userinfo 只在响应副本脱敏，服务器保留原始值；保存其它组不能改写该凭证。额外扩展的脱敏地址往返可唯一定位旧地址时保留其原凭证，存在歧义时拒绝保存，新增扩展不接受内联 userinfo。此规则不改变旧配置的启动兼容性。
+
+设置读取分别返回 Runtime 打开时的 effective config 与磁盘 saved config、opaque revision 和待重启状态。更新携带读取时 revision，串行检查后只允许修改 `server.public_origin`、`cache` 和 caller `sqlite.extensions`，复用完整配置校验，私有临时文件落盘后原子替换；冲突或非法输入不覆盖原文件。保留原有 `[embedding]` / `[fulltext]` 初始化固定合同及历史索引配置，不提供自动迁移。缓存修改仍遵守本节既有新建/替换索引的适用范围。
+
+凭证更新是本次单独新增的维护能力：仅当 effective 与 saved 配置均引用 `KGOS_WEB_EMBEDDING_API_KEY` 时，允许替换已有的实例私有 Key 文件，保持 0600、同目录原子发布及目录同步，绝不改变 `api_key_env`、模型或向量空间。更新后需重启，当前进程仍使用启动时凭证；页面单独反馈待重启。外部环境变量管理与无需认证的实例只显示来源，不由 Web 接管或回显秘密。当前连接测试只使用服务端当前 effective 配置与凭证，沿用首次初始化的有界 Embedding 验证出口与非泄密失败原因，不把已保存待生效配置称为已验证。
 
 ### `extensions/`
 

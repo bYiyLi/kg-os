@@ -1,29 +1,23 @@
 import { Dialog, DialogContent, DialogTitle } from "../../shared/ui/dialog.js";
 import { Button } from "../../shared/ui/button.js";
-import { ThemeToggle } from "../../shared/ui/theme-toggle.js";
-import type { ThemePreference } from "../../shared/lib/use-theme-preference.js";
 import { useTranslation } from "react-i18next";
+import { Settings2 } from "lucide-react";
 
 import { Icon } from "../../shared/ui/icon.js";
 import { VersionTree } from "../../features/version/version-browser.js";
 import type { VersionHistory } from "../../features/version/use-version-history.js";
 
 import { AppBrand } from "./header.js";
-import { LanguageSwitcher } from "./language-switcher.js";
 
 export function VersionDrawer({
   open,
   onOpenChange,
-  preference,
-  onSelectTheme,
-  onDisconnect,
+  onOpenSettings,
   history
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  preference: ThemePreference;
-  onSelectTheme: (value: ThemePreference) => void;
-  onDisconnect?: (() => void) | undefined;
+  onOpenSettings?: (() => void) | undefined;
   history: VersionHistory;
 }) {
   const { t } = useTranslation();
@@ -52,19 +46,17 @@ export function VersionDrawer({
           <VersionTree history={history} />
         </div>
         <div className="drawer-bottom">
-          {onDisconnect !== undefined && (
+          {onOpenSettings !== undefined && (
             <Button
               variant="ghost"
-              className="connection-disconnect"
+              className="sidebar-settings-button"
               type="button"
-              onClick={onDisconnect}
+              onClick={onOpenSettings}
             >
-              <Icon name="lock" />
-              <span>{t("versions.disconnect")}</span>
+              <Settings2 className="icon" aria-hidden="true" />
+              <span>{t("settings.title")}</span>
             </Button>
           )}
-          <ThemeToggle preference={preference} onSelect={onSelectTheme} />
-          <LanguageSwitcher />
         </div>
       </DialogContent>
     </Dialog>

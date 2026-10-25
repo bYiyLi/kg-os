@@ -88,7 +88,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 
 // readyHandler is shared by the normal listener and the process-local
 // authenticated readiness probe. It has no separate listener or Instance lock.
-func readyHandler(runtime *runtimehost.Runtime, mcpSettings command.DaemonMCPSettings) (http.Handler, error) {
+func readyHandler(runtime *runtimehost.Runtime, settings command.DaemonSettings, endpoint func() (string, error)) (http.Handler, error) {
+	mcpSettings := settings.MCP
 	issuer := ""
 	if runtime.Config.Server != nil {
 		issuer = runtime.Config.Server.PublicOrigin
@@ -122,7 +123,7 @@ func readyHandler(runtime *runtimehost.Runtime, mcpSettings command.DaemonMCPSet
 	for path, route := range mcpService.OAuthRoutes() {
 		extra = append(extra, daemon.ExtraRoute{Path: path, Handler: route})
 	}
-	return daemon.NewHandler(runtime, handler, extra...), nil
+	return daemon.NewHandlerWithSettings(runtime, handler, runtimeSettingsOptions(runtime.Config, settings, endpoint), extra...), nil
 }
 
 func main() {

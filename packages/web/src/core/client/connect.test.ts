@@ -203,3 +203,29 @@ it("rejects malformed bootstrap responses before enabling any business API", asy
   );
   expect(server.fetcher).toHaveBeenCalledOnce();
 });
+
+it("binds settings calls to the authenticated daemon and rejects other destinations", async () => {
+  const server = instance();
+  const connection = await connectToCurrentInstance("secret", new AbortController().signal);
+  await connection.settingsFetch("/api/v1/web/settings/read", {
+    headers: { "Content-Type": "application/json", Authorization: "Bearer untrusted" },
+    body: "{}"
+  });
+  expect(server.calls.at(-1)).toEqual({
+    path: "/api/v1/web/settings/read",
+    boot: bootA,
+    bearer: "Bearer " + webAccess
+  });
+  const count = server.calls.length;
+  for (const path of [
+    "https://example.com",
+    "/api/v1/graph/execute",
+    "/api/v1/web/settings/read?x=1"
+  ]) {
+    expect(() => connection.settingsFetch(path)).toThrow("Unknown KG OS settings endpoint");
+  }
+  expect(server.calls).toHaveLength(count);
+  connection.close();
+  await expect(connection.settingsFetch("/api/v1/web/settings/update")).rejects.toThrow();
+  expect(server.calls).toHaveLength(count);
+});
