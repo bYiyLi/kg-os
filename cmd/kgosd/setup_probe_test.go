@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/netip"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -126,42 +124,23 @@ func TestEmbeddingProbeRejectsRedirects(t *testing.T) {
 	}
 }
 
-func TestEmbeddingProbeIPPolicy(t *testing.T) {
-	for _, address := range []string{
-		"127.0.0.1", "169.254.169.254",
-		"100.64.10.10", "198.18.0.4", "192.0.2.10", "203.0.113.2", "0.0.0.0",
-		"::1", "fe80::1", "::ffff:127.0.0.1", "64:ff9b::7f00:1", "2002:7f00:1::",
-	} {
-		if allowedProbeIP(netip.MustParseAddr(address)) {
-			t.Errorf("non-public IP permitted: %s", address)
-		}
-	}
-	for _, address := range []string{"1.1.1.1", "8.8.8.8", "2606:4700:4700::1111",
-		"10.168.155.234", "192.168.1.7", "172.16.0.1", "fc00::1"} {
-		if !allowedProbeIP(netip.MustParseAddr(address)) {
-			t.Errorf("public IP blocked: %s", address)
-		}
-	}
-}
-
-func TestUnauthenticatedProbeCannotDialLoopback(t *testing.T) {
-	var reached atomic.Bool
-	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		reached.Store(true)
+func TestEmbeddingProbeAllowsLocalEndpoint(t *testing.T) {
+	var called atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called.Store(true)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"embedding":[0.1,0.2,0.3]}]}`))
 	}))
-	defer srv.Close()
-	result := probeEmbeddingWithClient(context.Background(), probeSample(srv.URL, "", 3), newEmbeddingProbeClient())
-	if result.Reason != "address_not_allowed" || reached.Load() {
-		t.Fatalf("unauthenticated probe accessed the loopback network: %#v", result)
-	}
-	conn, err := dialAllowedProbe(context.Background(), "tcp", net.JoinHostPort("127.0.0.1", "80"))
-	if err == nil || conn != nil {
-		t.Fatal("direct loopback dial was not denied")
+	defer server.Close()
+	result := probeEmbeddingWithClient(context.Background(), probeSample(server.URL+"/v1", "", 3), newEmbeddingProbeClient())
+	if !result.OK || result.Dimensions != 3 || !called.Load() {
+		t.Fatalf("local endpoint was not probed: %+v", result)
 	}
 }
 
 func TestSetupEmbeddingValidationStatusAndNoPersistence(t *testing.T) {
 	c := newTestSetup(t)
+	mustCreateSetupToken(t, c)
 	const credential = "never-echo-this-provider-key"
 	input := probeSample("https://provider.example/v1", credential, 3)
 	body, _ := json.Marshal(input)
@@ -171,20 +150,20 @@ func TestSetupEmbeddingValidationStatusAndNoPersistence(t *testing.T) {
 		}
 		return embeddingProbeResult{OK: true, Dimensions: 3}
 	}
-	valid := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(body))
+	valid := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, string(body))
 	if valid.Code != http.StatusOK || !strings.Contains(valid.Body.String(), `"ok":true`) {
 		t.Fatalf("valid provider response HTTP %d: %s", valid.Code, valid.Body.String())
 	}
 	if strings.Contains(valid.Body.String(), credential) {
 		t.Fatal("the provider key leaked from the test endpoint")
 	}
-	for _, filename := range []string{c.paths.Config, c.paths.Auth, c.paths.Database} {
+	for _, filename := range []string{c.paths.Config, c.paths.Database} {
 		if _, err := os.Stat(filename); !os.IsNotExist(err) {
 			t.Fatalf("validation created a persistent Instance file: %s", filename)
 		}
 	}
 	for _, payload := range []string{`{}`, `{"base_url":"http://127.0.0.1","model":"a","dimensions":0,"similarity":"cosine","apiKey":null}`, string(body) + "garbage"} {
-		bad := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", payload)
+		bad := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, payload)
 		if bad.Code != http.StatusBadRequest {
 			t.Fatalf("bad probe input HTTP %d: %s", bad.Code, bad.Body.String())
 		}
@@ -192,7 +171,7 @@ func TestSetupEmbeddingValidationStatusAndNoPersistence(t *testing.T) {
 	c.probe = func(context.Context, embeddingProbeInput) embeddingProbeResult {
 		return probeFailure("authentication_failed")
 	}
-	failed := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(body))
+	failed := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, string(body))
 	if failed.Code != http.StatusUnprocessableEntity || !strings.Contains(failed.Body.String(), "authentication_failed") {
 		t.Fatalf("failed remote probe was treated as successful: %d: %s", failed.Code, failed.Body.String())
 	}
@@ -200,27 +179,36 @@ func TestSetupEmbeddingValidationStatusAndNoPersistence(t *testing.T) {
 	c.status = "ready"
 	c.business = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	c.mu.Unlock()
-	ready := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(body))
+	ready := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, string(body))
 	if ready.Code != http.StatusConflict {
 		t.Fatalf("ready Instance can still be probed: HTTP %d", ready.Code)
 	}
 }
 
-func TestDefaultSetupProbeRejectsPrivateDestinationWithoutPersisting(t *testing.T) {
+func TestDefaultSetupProbeAllowsLocalDestinationWithoutPersisting(t *testing.T) {
 	c := newTestSetup(t)
-	raw, _ := json.Marshal(probeSample("http://127.0.0.1:9999/v1", "", 3))
-	response := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(raw))
-	if response.Code != http.StatusUnprocessableEntity ||
-		!strings.Contains(response.Body.String(), "address_not_allowed") {
-		t.Fatalf("unsafe validation HTTP %d: %s", response.Code, response.Body.String())
+	mustCreateSetupToken(t, c)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"embedding":[0.1,0.2,0.3]}]}`))
+	}))
+	defer server.Close()
+	raw, _ := json.Marshal(probeSample(server.URL+"/v1", "", 3))
+	if unauth := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(raw)); unauth.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous provider probe was allowed: %d", unauth.Code)
+	}
+	response := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, string(raw))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"ok":true`) {
+		t.Fatalf("local validation HTTP %d: %s", response.Code, response.Body.String())
 	}
 	if _, err := os.Stat(c.paths.Config); !os.IsNotExist(err) {
-		t.Fatal("remote validation unexpectedly published config")
+		t.Fatal("local validation unexpectedly published config")
 	}
 }
 
-func TestEmbeddingProbeSerializesConcurrentUnauthenticatedCalls(t *testing.T) {
+func TestEmbeddingProbeSerializesConcurrentAuthenticatedCalls(t *testing.T) {
 	c := newTestSetup(t)
+	mustCreateSetupToken(t, c)
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	c.probe = func(_ context.Context, _ embeddingProbeInput) embeddingProbeResult {
@@ -231,10 +219,10 @@ func TestEmbeddingProbeSerializesConcurrentUnauthenticatedCalls(t *testing.T) {
 	body, _ := json.Marshal(probeSample("https://provider.example/v1", "", 3))
 	done := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
-		done <- setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(body))
+		done <- setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, string(body))
 	}()
 	<-entered
-	busy := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(body))
+	busy := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, string(body))
 	if busy.Code != http.StatusTooManyRequests || !strings.Contains(busy.Body.String(), "busy") {
 		t.Fatalf("concurrent probe should be rejected: %d %s", busy.Code, busy.Body.String())
 	}
@@ -246,6 +234,7 @@ func TestEmbeddingProbeSerializesConcurrentUnauthenticatedCalls(t *testing.T) {
 
 func TestSetupEmbeddingProbeRequiresSameOriginAndExplicitCredentialMode(t *testing.T) {
 	c := newTestSetup(t)
+	mustCreateSetupToken(t, c)
 	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:4173/api/v1/setup/validate-embedding", strings.NewReader("{}"))
 	req.Header.Set("Origin", "https://untrusted.example")
 	rec := httptest.NewRecorder()
@@ -259,7 +248,7 @@ func TestSetupEmbeddingProbeRequiresSameOriginAndExplicitCredentialMode(t *testi
 		`{"base_url":"https://example.com/v1","model":"m","dimensions":3,"similarity":"cosine","apiKey":9}`,
 		`{"base_url":"https://example.com/v1","model":"m","dimensions":3,"similarity":"cosine","apiKey":null,"unexpected":1}`,
 	} {
-		rec := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", raw)
+		rec := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, raw)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("invalid payload accepted: %d %s", rec.Code, rec.Body.String())
 		}
@@ -275,7 +264,7 @@ func TestEmbeddingProbeAllowsRevalidationAfterAdministratorClaim(t *testing.T) {
 			name: "claimed through setup API",
 			prepare: func(t *testing.T, c *setupController) {
 				t.Helper()
-				result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/claim", "", "")
+				result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/rotate-token", "", "")
 				if result.Code != http.StatusCreated {
 					t.Fatalf("claim failed: HTTP %d", result.Code)
 				}
@@ -306,7 +295,7 @@ func TestEmbeddingProbeAllowsRevalidationAfterAdministratorClaim(t *testing.T) {
 				t.Fatal(err)
 			}
 			for i := 0; i < 2; i++ {
-				result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(body))
+				result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, string(body))
 				if result.Code != http.StatusOK || !strings.Contains(result.Body.String(), `"ok":true`) {
 					t.Fatalf("claimed Instance could not revalidate: HTTP %d %s", result.Code, result.Body.String())
 				}
@@ -342,7 +331,7 @@ func TestEmbeddingProbeDeniedOnceInstanceLeavesConfigurationStage(t *testing.T) 
 			name: "claimed administrator credential was replaced on disk",
 			prepare: func(t *testing.T, c *setupController) {
 				t.Helper()
-				result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/claim", "", "")
+				result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/rotate-token", "", "")
 				if result.Code != http.StatusCreated {
 					t.Fatalf("claim failed: HTTP %d", result.Code)
 				}
@@ -388,8 +377,12 @@ func TestEmbeddingProbeDeniedOnceInstanceLeavesConfigurationStage(t *testing.T) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(body))
-			if result.Code != http.StatusConflict || !strings.Contains(result.Body.String(), "SETUP_CONFLICT") {
+			result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, string(body))
+			expected := http.StatusConflict
+			if c.token == "" {
+				expected = http.StatusUnauthorized
+			}
+			if result.Code != expected {
 				t.Fatalf("configured instance allowed validation: HTTP %d %s", result.Code, result.Body.String())
 			}
 			if calls.Load() != 0 {
@@ -401,6 +394,7 @@ func TestEmbeddingProbeDeniedOnceInstanceLeavesConfigurationStage(t *testing.T) 
 
 func TestEmbeddingProbeDeniedDuringInitialization(t *testing.T) {
 	c := newTestSetup(t)
+	mustCreateSetupToken(t, c)
 	var calls atomic.Int32
 	c.probe = func(context.Context, embeddingProbeInput) embeddingProbeResult {
 		calls.Add(1)
@@ -411,7 +405,7 @@ func TestEmbeddingProbeDeniedDuringInitialization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", "", string(body))
+	result := setupTestRequest(c, http.MethodPost, "/api/v1/setup/validate-embedding", c.token, string(body))
 	if result.Code != http.StatusConflict || calls.Load() != 0 {
 		t.Fatalf("probe escaped initializing gate: HTTP %d, calls %d", result.Code, calls.Load())
 	}

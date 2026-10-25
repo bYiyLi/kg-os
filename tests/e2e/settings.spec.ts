@@ -91,7 +91,7 @@ test("uses real configuration in all five categories and applies saved values on
   await dialog.getByRole("button", { name: "Test connection", exact: true }).click();
   expect(await (await testResponse).json()).toMatchObject({
     ok: false,
-    reason: "address_not_allowed"
+    reason: "connection_failed"
   });
   const replacementKey = settingsRuntime.privateKey + "-rotated";
   await dialog.getByRole("button", { name: "Update key", exact: true }).click();

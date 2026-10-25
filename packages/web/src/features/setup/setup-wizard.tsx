@@ -11,13 +11,12 @@ import { Icon } from "../../shared/ui/icon.js";
 import { VectorFields } from "./setup-steps.js";
 import { SetupAuthFields } from "./setup-auth.js";
 import { SetupInitializeFields } from "./setup-initialize.js";
-import { SetupWelcome } from "./setup-welcome.js";
 import { SetupPublicOrigin, normalizePublicOrigin } from "./setup-public-origin.js";
 import { useSetupFlow } from "./use-setup-flow.js";
 import type { SetupStatus } from "./setup-api.js";
 import "./setup-wizard.css";
 
-const stages = ["welcome", "publicOrigin", "vector", "auth", "initialize"] as const;
+const stages = ["auth", "publicOrigin", "vector", "initialize"] as const;
 
 function SetupArt() {
   return (
@@ -184,7 +183,7 @@ function SetupStepDescription({
       </>
     );
   }
-  if (flow.step === 3) {
+  if (flow.step === 0) {
     return (
       <>
         <p className="setup-auth-tagline">{t("setup.authTagline")}</p>
@@ -193,7 +192,7 @@ function SetupStepDescription({
       </>
     );
   }
-  if (flow.step === 4) {
+  if (flow.step === 3) {
     const copy = reviewCopy(flow.status.state);
     return (
       <>
@@ -227,7 +226,7 @@ function SetupFooter({
           variant="ghost"
           type="button"
           className="setup-button setup-button-secondary"
-          disabled={step === 0 || disabled}
+          disabled={step === 0 || disabled || (step === 1 && access === null)}
           onClick={flow.back}
         >
           <Icon name="chevronLeft" /> {t("setup.back")}
@@ -243,6 +242,7 @@ function SetupFooter({
           }}
           disabled={
             disabled ||
+            (step === 0 && access === null && !flow.previewOnly) ||
             (step === 1 && normalizePublicOrigin(draft.publicOrigin) === null) ||
             (step === 3 && access === null)
           }
@@ -260,32 +260,25 @@ function SetupForm({ flow }: SetupFormProps) {
   const { step, draft, status, access, claimedToken, busy, error } = flow;
   const stage = stages[step] ?? stages[0];
   let primaryAction = "setup.next";
-  if (step === 0) primaryAction = "setup.start";
   if (step === 2 && !flow.verified)
     primaryAction = flow.verifying ? "setup.vector.testing" : "setup.vector.test";
-  if (step === 4) primaryAction = "setup.initialize";
+  if (step === 3) primaryAction = "setup.initialize";
 
   return (
     <form noValidate onSubmit={flow.forward}>
       <SetupVectorMessage flow={flow} />
       <div key={stage} className="setup-form-content">
-        <div
-          className={step === 0 ? "setup-form-inner setup-form-inner-welcome" : "setup-form-inner"}
-        >
-          {step === 0 ? (
-            <SetupWelcome />
-          ) : (
-            <div
-              className={
-                step === 1 || step === 2 || step === 4
-                  ? "setup-title setup-title-vector"
-                  : "setup-title"
-              }
-            >
-              <SetupHeading stage={stage} state={status.state} />
-              <SetupStepDescription flow={flow} stage={stage} />
-            </div>
-          )}
+        <div className="setup-form-inner">
+          <div
+            className={
+              step === 1 || step === 2 || step === 3
+                ? "setup-title setup-title-vector"
+                : "setup-title"
+            }
+          >
+            <SetupHeading stage={stage} state={status.state} />
+            <SetupStepDescription flow={flow} stage={stage} />
+          </div>
           {step === 1 && (
             <SetupPublicOrigin
               value={draft.publicOrigin}
@@ -305,18 +298,18 @@ function SetupForm({ flow }: SetupFormProps) {
               }}
             />
           )}
-          {step === 3 && (
+          {step === 0 && (
             <SetupAuthFields
               status={status}
               access={access}
               claimedToken={claimedToken}
               busy={busy}
-              onClaim={flow.claim}
+              onCreate={flow.create}
               onRotate={flow.rotate}
               onLogin={flow.login}
             />
           )}
-          {step === 4 && (
+          {step === 3 && (
             <SetupInitializeFields status={status} draft={draft} verified={flow.verified} />
           )}
           {step !== 2 && error !== "" && (

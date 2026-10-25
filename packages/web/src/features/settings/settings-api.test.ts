@@ -139,7 +139,7 @@ it("sends a replacement credential only to its separate maintenance endpoint", a
 
 it.each([
   { status: 200, body: { ok: true, dimensions: 1536 } },
-  { status: 422, body: { ok: false, reason: "address_not_allowed" } },
+  { status: 422, body: { ok: false, reason: "connection_failed" } },
   { status: 429, body: { ok: false, reason: "busy" } }
 ])(
   "preserves structured connection verification results for HTTP $status",

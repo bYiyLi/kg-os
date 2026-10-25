@@ -10,6 +10,19 @@ export interface SetupStatus {
 }
 export type SetupAccess = WebAccess;
 
+export class SetupAuthenticationRequired extends Error {
+  constructor() {
+    super("Setup authentication required");
+  }
+}
+
+function authenticatedHeaders(access: SetupAccess): Record<string, string> {
+  return {
+    Authorization: "Bearer " + access.accessToken,
+    "X-KGOS-Expected-Daemon-Boot": access.daemonBootId
+  };
+}
+
 export interface EmbeddingTestResult {
   ok: boolean;
   dimensions?: number;
@@ -19,13 +32,14 @@ export interface EmbeddingTestResult {
 
 export async function testEmbeddingProvider(
   params: { url: string; key: string; model: string; dimensions: string; similarity: string },
-  signal: AbortSignal
+  signal: AbortSignal,
+  access: SetupAccess
 ): Promise<EmbeddingTestResult> {
   const response = await fetch("/api/v1/setup/validate-embedding", {
     method: "POST",
     cache: "no-store",
     credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authenticatedHeaders(access) },
     signal,
     body: JSON.stringify({
       base_url: params.url,
@@ -43,6 +57,9 @@ export async function testEmbeddingProvider(
     "code" in body &&
     body.code === "SETUP_CONFLICT"
   ) {
+    return { ok: false, reason: "setup_unavailable" };
+  }
+  if (response.status === 401 || response.status === 403) {
     return { ok: false, reason: "setup_unavailable" };
   }
   if (
@@ -69,6 +86,7 @@ async function setupRequest(path: string, options: RequestInit = {}) {
     ...options
   });
   if (!response.ok) {
+    if (response.status === 401) throw new SetupAuthenticationRequired();
     let message = "The setup request could not be completed";
     try {
       const result: unknown = await response.json();
@@ -87,9 +105,15 @@ async function setupRequest(path: string, options: RequestInit = {}) {
   return response;
 }
 
-export async function readSetupStatus(signal?: AbortSignal): Promise<SetupStatus> {
+export async function readSetupStatus(
+  signal?: AbortSignal,
+  access?: SetupAccess
+): Promise<SetupStatus> {
   const result: unknown = await (
-    await setupRequest("status", signal === undefined ? {} : { signal })
+    await setupRequest("status", {
+      ...(signal === undefined ? {} : { signal }),
+      ...(access === undefined ? {} : { headers: authenticatedHeaders(access) })
+    })
   ).json();
   if (typeof result !== "object" || result === null) throw new Error("Invalid setup status");
   const data = result as Record<string, unknown>;
@@ -107,23 +131,11 @@ export async function readSetupStatus(signal?: AbortSignal): Promise<SetupStatus
   };
 }
 
-export async function claimSetupToken(): Promise<string> {
-  const value: unknown = await (await setupRequest("claim", { method: "POST" })).json();
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !("token" in value) ||
-    typeof value.token !== "string" ||
-    value.token.length === 0
-  )
-    throw new Error("Invalid setup credential");
-  return value.token;
-}
-
-export async function rotateSetupToken(): Promise<string> {
+export async function rotateSetupToken(access?: SetupAccess): Promise<string> {
   const value: unknown = await (
     await setupRequest("rotate-token", {
-      method: "POST"
+      method: "POST",
+      ...(access === undefined ? {} : { headers: authenticatedHeaders(access) })
     })
   ).json();
   if (
@@ -161,11 +173,7 @@ export async function submitSetup(
   const payload = config === undefined ? {} : { config, apiKey };
   await setupRequest("initialize", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + access.accessToken,
-      "X-KGOS-Expected-Daemon-Boot": access.daemonBootId
-    },
+    headers: { "Content-Type": "application/json", ...authenticatedHeaders(access) },
     body: JSON.stringify(payload)
   });
 }

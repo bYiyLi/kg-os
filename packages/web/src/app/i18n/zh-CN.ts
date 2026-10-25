@@ -28,7 +28,6 @@ export const zhCN = {
     setupLabel: "初始化设置",
     progress: "第 {{current}} 步，共 {{total}} 步",
     stages: {
-      welcome: "欢迎使用 KG OS",
       publicOrigin: "配置对外访问地址",
       vector: "配置向量服务",
       auth: "保护您的 KG OS 实例",
@@ -37,7 +36,6 @@ export const zhCN = {
     description: {
       publicOrigin:
         "对外访问地址是 KG OS 的统一服务入口。Web、API 和 MCP 共用这个根地址，ChatGPT 也通过它连接实例并完成授权。",
-      welcome: "为 AI 准备一个属于你的知识世界。只需几个简单步骤，就能开始使用。",
       vector: "连接向量服务，让 KG OS 能够根据内容的含义查找知识。",
       auth: "管理员访问令牌相当于当前 KG OS 实例的主钥匙。您可以用它登录 Web 管理界面，并授权受保护的 API 和客户端操作知识与配置。持有令牌的人可能拥有实例管理权限，请像保管密码一样妥善保管，切勿公开分享。",
       initialize: "确认配置，完成知识库初始化，随后就可以使用了。"
@@ -94,7 +92,6 @@ export const zhCN = {
       testErrors: {
         setup_unavailable: "实例已不再接受向量验证，请刷新页面检查当前初始化状态。",
         invalid_fields: "请检查 URL、模型和向量维度。",
-        address_not_allowed: "无法验证本机回环地址或特殊保留地址，请检查 API 地址。",
         timeout: "向量服务响应超时，请稍后重试。",
         connection_failed: "无法连接到向量服务，请检查 API 地址和网络。",
         redirect_not_allowed: "向量服务返回了重定向，请填写最终 API 地址。",
@@ -124,33 +121,6 @@ export const zhCN = {
         "当前为本机地址，仅适用于本地开发。ChatGPT 云端无法通过此地址连接，请在正式接入前配置可公开访问的 HTTPS 域名。",
       help: "请确认 HTTPS 域名与反向代理已正确配置，并且外部客户端能够实际访问。填写地址不会自动创建公网入口。"
     },
-    welcome: {
-      tagline: "为 AI 构建可持续演进的知识世界",
-      intro:
-        "KG OS 是面向 AI 的可编程知识图基础设施。你可以自由定义知识模型，将对象、属性与关系组织成知识图谱，并通过图查询、全文检索和向量检索访问知识。",
-      evolution:
-        "每一次变更都可以进入版本历史。AI 通过统一接口使用和维护知识，而你可以在 Web 中查看、管理与修正。",
-      featuresTitle: "KG OS 能为你做什么",
-      features: {
-        structure: {
-          title: "自由定义知识结构",
-          description: "通过 Ontology 自定义对象、关系、属性与约束，不受预设领域模型限制。"
-        },
-        discovery: {
-          title: "连接、查询与发现知识",
-          description: "结合图查询、全文检索与向量检索，发现知识之间的关联。"
-        },
-        evolution: {
-          title: "让知识持续演进",
-          description: "借助 Commit、Branch 与 Diff 保留历史、比较差异和追溯变化。"
-        },
-        ai: {
-          title: "为 AI 而设计，由人掌控",
-          description: "AI 通过 CLI、Skill 和 MCP 使用知识，人通过 Web 管理和纠正。"
-        }
-      },
-      nextTitle: "接下来，只需完成四个步骤"
-    },
     url: "API 地址",
     key: "API Key",
     keyPlaceholder: "请输入向量服务 API Key",
@@ -169,7 +139,8 @@ export const zhCN = {
     authIntroductionSecond:
       "KG OS 会自动生成高强度随机令牌，无需另设账号或密码。每次生成后立即生效，Web 仅在创建时展示完整令牌；刷新或离开此步骤后，您仍可从实例目录 .kgos/auth.json 中找回。重新生成将使旧令牌及其登录会话失效，其他客户端需要更新凭证才能继续连接。",
     authGenerateDescription:
-      "完成初始化前，可直接重新生成访问令牌，无需输入旧令牌。生成后，当前浏览器将自动尝试连接。请复制新令牌并妥善保存，再继续初始化知识库。",
+      "首次生成管理员令牌后即可开始设置；此后必须使用已有令牌登录，才能继续初始化或重新生成令牌。请妥善保存每次生成的新令牌。",
+    authExistingTokenLabel: "已有管理员访问令牌",
     authCreatedTitle: "访问令牌已创建",
     authTokenCreated: "实例访问令牌",
     generateToken: "生成访问令牌",
@@ -195,7 +166,6 @@ export const zhCN = {
       readiness: "检查就绪"
     },
     back: "上一步",
-    start: "开始设置",
     next: "下一步",
     initialize: "开始初始化"
   },

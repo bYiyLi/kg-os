@@ -4,7 +4,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 
 import {
-  claimSetupToken,
+  SetupAuthenticationRequired,
   loginSetup,
   readSetupStatus,
   restoreSetup,
@@ -46,10 +46,11 @@ function stubJSON(body: unknown, status = 200) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-it("reads and validates all setup status variants without sending a credential", async () => {
+it("reads initial state anonymously, then sends Web Bearer for protected setup status", async () => {
   for (const state of ["setup_required", "initializing", "ready", "error"] as const) {
     const mock = stubJSON({ state, credentialConfigured: state !== "setup_required" });
-    await expect(readSetupStatus()).resolves.toMatchObject({
+    const access = state === "setup_required" ? undefined : validAccess;
+    await expect(readSetupStatus(undefined, access)).resolves.toMatchObject({
       state,
       credentialConfigured: state !== "setup_required"
     });
@@ -58,7 +59,14 @@ it("reads and validates all setup status variants without sending a credential",
       cache: "no-store",
       credentials: "same-origin"
     });
-    expect(mock.mock.calls[0]?.[1]).not.toHaveProperty("headers");
+    expect(mock.mock.calls[0]?.[1]?.headers).toEqual(
+      access === undefined
+        ? undefined
+        : {
+            Authorization: "Bearer " + access.accessToken,
+            "X-KGOS-Expected-Daemon-Boot": access.daemonBootId
+          }
+    );
   }
 
   const controller = new AbortController();
@@ -76,6 +84,18 @@ it("reads and validates all setup status variants without sending a credential",
     message: "Only a public status note"
   });
   expect(vi.mocked(fetch).mock.calls[0]?.[1]).toMatchObject({ signal: controller.signal });
+});
+
+it("requires authentication to read claimed setup state and retains the custom MCP path", async () => {
+  stubJSON({ code: "AUTHENTICATION_FAILED", message: "authentication failed" }, 401);
+  await expect(readSetupStatus()).rejects.toBeInstanceOf(SetupAuthenticationRequired);
+
+  stubJSON({ state: "setup_required", credentialConfigured: true, mcpPath: "/custom-mcp" });
+  await expect(readSetupStatus(undefined, validAccess)).resolves.toEqual({
+    state: "setup_required",
+    credentialConfigured: true,
+    mcpPath: "/custom-mcp"
+  });
 });
 
 it("rejects invalid setup status shapes rather than opening the workspace", async () => {
@@ -106,27 +126,30 @@ it("rejects invalid setup status shapes rather than opening the workspace", asyn
   await expect(readSetupStatus()).rejects.toThrow();
 });
 
-it("accepts only a nonempty one-time administrator token", async () => {
+it("creates an initial administrator token only through rotate-token", async () => {
   const mock = stubJSON({ token: "generated-root-token" }, 201);
-  await expect(claimSetupToken()).resolves.toBe("generated-root-token");
+  await expect(rotateSetupToken()).resolves.toBe("generated-root-token");
   expect(mock.mock.calls[0]).toMatchObject([
-    "/api/v1/setup/claim",
+    "/api/v1/setup/rotate-token",
     { method: "POST", credentials: "same-origin", cache: "no-store" }
   ]);
   for (const body of [null, false, [], {}, { token: null }, { token: 1 }, { token: "" }]) {
     stubJSON(body);
-    await expect(claimSetupToken()).rejects.toThrow("Invalid setup credential");
+    await expect(rotateSetupToken()).rejects.toThrow("Invalid setup credential");
   }
 });
 
-it("rotates a Token through the same-origin endpoint without existing credentials", async () => {
+it("requires Web Access headers to rotate an existing Token", async () => {
   const mock = stubJSON({ token: "next-instance-token" }, 201);
-  await expect(rotateSetupToken()).resolves.toBe("next-instance-token");
+  await expect(rotateSetupToken(validAccess)).resolves.toBe("next-instance-token");
   expect(mock.mock.calls[0]).toMatchObject([
     "/api/v1/setup/rotate-token",
     { method: "POST", cache: "no-store", credentials: "same-origin" }
   ]);
-  expect(mock.mock.calls[0]?.[1]).not.toHaveProperty("headers");
+  expect(mock.mock.calls[0]?.[1]?.headers).toEqual({
+    Authorization: "Bearer " + validAccess.accessToken,
+    "X-KGOS-Expected-Daemon-Boot": validAccess.daemonBootId
+  });
   expect(mock.mock.calls[0]?.[1]).not.toHaveProperty("body");
   stubJSON({ code: "SETUP_CONFLICT", message: "Already initialized" }, 409);
   await expect(rotateSetupToken()).rejects.toThrow("Already initialized");
@@ -134,7 +157,7 @@ it("rotates a Token through the same-origin endpoint without existing credential
 
 it("surfaces server-provided public errors and safely handles invalid error bodies", async () => {
   stubJSON({ code: "SETUP_CONFLICT", message: "Existing Instance configuration" }, 409);
-  await expect(claimSetupToken()).rejects.toThrow("Existing Instance configuration");
+  await expect(rotateSetupToken()).rejects.toThrow("Existing Instance configuration");
 
   for (const body of [{}, null, { message: 9 }, { message: null }, { error: "untrusted HTML" }]) {
     stubJSON(body, 503);
@@ -145,7 +168,7 @@ it("surfaces server-provided public errors and safely handles invalid error bodi
     "fetch",
     vi.fn<typeof fetch>().mockResolvedValue(new Response("<html>not JSON</html>", { status: 502 }))
   );
-  await expect(claimSetupToken()).rejects.toThrow("The setup request could not be completed");
+  await expect(rotateSetupToken()).rejects.toThrow("The setup request could not be completed");
 
   vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockRejectedValue(new TypeError("offline")));
   await expect(readSetupStatus()).rejects.toThrow("offline");
@@ -206,7 +229,7 @@ it("tests current Embedding settings, sending null when API Key is blank", async
     dimensions: "4096",
     similarity: "cosine"
   };
-  await expect(testEmbeddingProvider(draft, controller.signal)).resolves.toEqual({
+  await expect(testEmbeddingProvider(draft, controller.signal, validAccess)).resolves.toEqual({
     ok: true,
     dimensions: 4096
   });
@@ -227,18 +250,44 @@ it("tests current Embedding settings, sending null when API Key is blank", async
 
   stubJSON({ ok: false, reason: "authentication_failed", httpStatus: 401 }, 422);
   await expect(
-    testEmbeddingProvider({ ...draft, key: "private-provider-key" }, controller.signal)
+    testEmbeddingProvider({ ...draft, key: "private-provider-key" }, controller.signal, validAccess)
   ).resolves.toEqual({ ok: false, reason: "authentication_failed", httpStatus: 401 });
   expect(JSON.parse(vi.mocked(fetch).mock.calls[0]?.[1]?.body as string)).toMatchObject({
     apiKey: "private-provider-key"
   });
   stubJSON({ code: "SETUP_CONFLICT", message: "Instance initialization already started" }, 409);
-  await expect(testEmbeddingProvider(draft, controller.signal)).resolves.toEqual({
+  await expect(testEmbeddingProvider(draft, controller.signal, validAccess)).resolves.toEqual({
     ok: false,
     reason: "setup_unavailable"
   });
   stubJSON({ invalid: "data" });
-  await expect(testEmbeddingProvider(draft, controller.signal)).rejects.toThrow(
+  await expect(testEmbeddingProvider(draft, controller.signal, validAccess)).rejects.toThrow(
     "Invalid embedding test response"
   );
 });
+
+it.each([401, 403])(
+  "treats denied Setup verification (HTTP %i) as unavailable, not a provider error",
+  async (status) => {
+    const mock = stubJSON(
+      { code: "AUTHENTICATION_FAILED", message: "authentication failed" },
+      status
+    );
+    const controller = new AbortController();
+    await expect(
+      testEmbeddingProvider(
+        {
+          url: "http://127.0.0.1:9000/v1",
+          key: "private-provider-key",
+          model: "local-model",
+          dimensions: "3",
+          similarity: "cosine"
+        },
+        controller.signal,
+        validAccess
+      )
+    ).resolves.toEqual({ ok: false, reason: "setup_unavailable" });
+    expect(mock).toHaveBeenCalledTimes(1);
+    expect(mock.mock.calls[0]?.[0]).toBe("/api/v1/setup/validate-embedding");
+  }
+);

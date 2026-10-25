@@ -453,7 +453,9 @@ it("checks first-run status before opening the regular authentication dialog", a
   await renderApp();
   expect(window.location.pathname).toBe("/setup");
   expect(document.body.querySelector(".setup-page")).not.toBeNull();
-  expect(document.body.querySelector(".setup-welcome h1")?.textContent).toBe("Welcome to KG OS");
+  expect(document.body.querySelector(".setup-form-content h1")?.textContent).toBe(
+    "Protect your KG OS Instance"
+  );
   expect(document.body.querySelector(AUTH_DIALOG)).toBeNull();
   expect(document.body.querySelector(".app-shell")).toBeNull();
   window.history.replaceState(null, "", "/");

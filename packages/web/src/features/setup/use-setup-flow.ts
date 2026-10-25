@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SyntheticEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,8 +10,7 @@ import { useEmbeddingVerification } from "./use-embedding-verification.js";
 import { useSetupSession } from "./use-setup-session.js";
 
 function firstStep(state: SetupStatus["state"]) {
-  if (state === "initializing") return 4;
-  if (state === "error") return 3;
+  if (state === "initializing") return 3;
   return 0;
 }
 
@@ -23,13 +22,21 @@ export function useSetupFlow(
   const { t } = useTranslation();
   const session = useSetupSession(initialStatus, previewOnly);
   const [step, setStep] = useState(
-    previewOnly && previewStep === 4 ? 4 : firstStep(initialStatus.state)
+    previewOnly && previewStep === 3 ? 3 : firstStep(initialStatus.state)
   );
+  useEffect(() => {
+    if (!previewOnly && session.status.state === "initializing") {
+      // A config-first daemon can create auth.json before its normal Web
+      // Session becomes available. Offer existing-token sign-in instead of
+      // trapping the browser on an unauthenticated progress screen.
+      setStep(session.access === null ? 0 : 3);
+    }
+  }, [previewOnly, session.status.state, session.access]);
   const [draft, setDraft] = useState(() => ({
     ...initialDraft,
     publicOrigin: window.location.origin
   }));
-  const verification = useEmbeddingVerification(draft, previewOnly);
+  const verification = useEmbeddingVerification(draft, previewOnly, session.access);
   const busy = session.busy || verification.verifying;
 
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
@@ -47,6 +54,10 @@ export function useSetupFlow(
   function forward(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || session.status.state === "initializing") return;
+    if (step === 0 && session.access === null && !previewOnly) {
+      session.setError(t("setup.authRequired"));
+      return;
+    }
     if (step === 1) {
       const origin = normalizePublicOrigin(draft.publicOrigin);
       if (origin === null) return;
@@ -57,17 +68,13 @@ export function useSetupFlow(
       verification.verify();
       return;
     }
-    if (step === 3 && session.access === null) {
-      session.setError(t("setup.authRequired"));
-      return;
-    }
-    if (step < 4) {
-      if (step === 3) session.setClaimedToken(null);
-      setStep(step + 1);
+    if (step < 3) {
+      if (step === 0) session.setClaimedToken(null);
+      setStep(session.status.state === "error" ? 3 : step + 1);
       return;
     }
     session.initialize(draft);
   }
 
-  return { ...session, ...verification, busy, step, draft, update, back, forward };
+  return { ...session, ...verification, busy, step, draft, update, back, forward, previewOnly };
 }

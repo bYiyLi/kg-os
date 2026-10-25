@@ -70,12 +70,12 @@ it("explains administrator Token use, recovery and regeneration in both language
   expect(en.setup.authTagline).toContain("secure administrator access");
   expect(english).toContain("administrator credential");
   expect(english).toContain(".kgos/auth.json");
-  expect(english).toContain("without entering the old one");
+  expect(english).toContain("sign in with the existing token");
   expect(zhCN.setup.authTagline).toBe("为知识库建立安全的管理员访问入口");
   expect(chinese).toContain("主钥匙");
   expect(chinese).toContain(".kgos/auth.json");
   expect(chinese).toContain("登录会话失效");
-  expect(chinese).toContain("无需输入旧令牌");
+  expect(chinese).toContain("使用已有令牌登录");
 });
 
 it("honors an explicit supported preference before the browser languages", () => {

@@ -2,13 +2,18 @@ import { useEffect, useRef, useState } from "react";
 
 import { testEmbeddingProvider } from "./setup-api.js";
 import type { EmbeddingTestResult } from "./setup-api.js";
+import type { SetupAccess } from "./setup-api.js";
 import { isValidVectorDraft } from "./setup-steps.js";
 import type { Draft } from "./setup-steps.js";
 
 export type VerificationFailure =
   { kind: "invalid" | "preview" | "network" } | { kind: "probe"; result: EmbeddingTestResult };
 
-export function useEmbeddingVerification(draft: Draft, previewOnly: boolean) {
+export function useEmbeddingVerification(
+  draft: Draft,
+  previewOnly: boolean,
+  access: SetupAccess | null
+) {
   const [verificationError, setVerificationError] = useState<VerificationFailure | null>(null);
   const [checkedDraft, setCheckedDraft] = useState<Draft | null>(null);
   const [verifying, setVerifying] = useState(false);
@@ -42,13 +47,17 @@ export function useEmbeddingVerification(draft: Draft, previewOnly: boolean) {
       setVerificationError({ kind: "preview" });
       return;
     }
+    if (access === null) {
+      setVerificationError({ kind: "network" });
+      return;
+    }
     active.current?.abort();
     const controller = new AbortController();
     active.current = controller;
     setVerifying(true);
     setFailed(false);
     setVerificationError(null);
-    void testEmbeddingProvider(draft, controller.signal).then(
+    void testEmbeddingProvider(draft, controller.signal, access).then(
       (result) => {
         if (active.current !== controller) return;
         if (result.ok && result.dimensions === Number(draft.dimensions)) {

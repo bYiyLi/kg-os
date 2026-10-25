@@ -140,8 +140,6 @@ export const settingsEnglish = {
     "Complete the extension source and entrypoint, and the required archive or checksum fields.",
   invalidKey: "Enter a new API key without line breaks.",
   sourceUnavailable: "Unavailable",
-  test_address_not_allowed:
-    "This service address is blocked by the connection verification policy.",
   test_busy: "Another verification is in progress. Try again shortly.",
   test_connection_failed: "The service could not be reached from the KG OS server.",
   test_invalid_fields: "The effective service configuration is invalid.",
@@ -298,7 +296,6 @@ export const settingsChinese: Record<keyof typeof settingsEnglish, string> = {
   invalidExtension: "请补全扩展来源、入口函数，以及归档路径或校验值。",
   invalidKey: "请填写不含换行的新 API Key。",
   sourceUnavailable: "不可用",
-  test_address_not_allowed: "当前服务地址不符合连接验证的访问规则。",
   test_busy: "另一个验证正在执行，请稍后再试。",
   test_connection_failed: "KG OS 服务器无法连接到向量服务。",
   test_invalid_fields: "当前生效的向量服务配置无效。",

@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createServer, request as httpRequest } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -37,9 +37,30 @@ try {
     if (child.exitCode !== null || child.signalCode !== null) {
       throw new Error("E2E Runtime exited before initialization completed");
     }
+    let token;
+    try {
+      const credential = JSON.parse(
+        await readFile(join(workspaceRoot, ".kgos", "auth.json"), "utf8")
+      );
+      token = credential.token;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      await new Promise((resolveReady) => setTimeout(resolveReady, 50));
+      continue;
+    }
+    if (typeof token !== "string" || token === "") {
+      throw new Error("E2E Runtime administrator credential invalid");
+    }
     const response = await fetch(endpoint + "/api/v1/setup/status", {
-      signal: AbortSignal.timeout(2_000)
+      signal: AbortSignal.timeout(2_000),
+      headers: { Authorization: "Bearer " + token }
     });
+    // Auto-initialization may have written auth.json before the controller
+    // switches to its authenticated ready Session. Wait for that transition.
+    if (response.status === 401) {
+      await new Promise((resolveReady) => setTimeout(resolveReady, 250));
+      continue;
+    }
     if (!response.ok) throw new Error("E2E Runtime setup status unavailable");
     const status = await response.json();
     if (status.state === "error") throw new Error("E2E Runtime initialization failed");

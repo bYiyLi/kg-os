@@ -6,11 +6,25 @@ import type { Page } from "@playwright/test";
 const activeToast = '[data-slot="toast"]:not([data-ending-style])';
 
 async function vectorStep(page: Page) {
+  let issued = false;
   await page.route("**/api/v1/setup/status", (route) =>
-    route.fulfill({ json: { state: "setup_required", credentialConfigured: false } })
+    route.fulfill({ json: { state: "setup_required", credentialConfigured: issued } })
+  );
+  await page.route("**/api/v1/setup/rotate-token", async (route) => {
+    issued = true;
+    await route.fulfill({ status: 201, json: { token: "A".repeat(43) } });
+  });
+  await page.route("**/api/v1/web/auth/login", (route) =>
+    route.fulfill({
+      json: {
+        accessToken: "kgws_" + "A".repeat(43),
+        daemonBootId: "4ce99373-4158-4ed1-8309-b55ea866b023"
+      }
+    })
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Get started" }).click();
+  await page.getByRole("button", { name: "Generate access token" }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.locator("#setup-url")).toBeVisible();
   await page.locator("#setup-url").fill("https://embedding.example.test/v1");

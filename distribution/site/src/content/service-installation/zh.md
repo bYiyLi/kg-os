@@ -214,16 +214,29 @@ docker logs --tail 80 kgos
 先在服务主机查询：
 
 ```bash
-curl --fail --silent --show-error http://127.0.0.1:3777/api/v1/setup/status
+curl --silent --show-error --write-out '\nHTTP %{http_code}\n' http://127.0.0.1:3777/api/v1/setup/status
 ```
 
 - Web 路径预期 `state="setup_required"`，接着使用下面的向导。
-- 配置文件路径预期先 `initializing`，最终 `ready`；跳到[配置文件路径的检查](#file-check)。
-- 返回 `error` 时读公开 `message` 和容器日志，按文末恢复；请求受理或容器运行不等于完成。
+- 配置文件路径自动初始化时会生成管理员 Token，此后匿名状态查询返回 **401**。使用下方认证后的状态查询确认 `initializing` → `ready`，再跳到[配置文件路径的检查](#file-check)。
+- 首次查询若返回 `error`，按文末排查；Token 存在后的 HTTP 401 是认证门禁生效，并不表示初始化失败。容器运行也不等于初始化完成。
+
+`auth.json` 创建后，在可信的主机终端使用现有根 Token **认证查询状态，不打印 Token，也不把 Token 放在命令参数中**（从 `~/kgos` 执行）：
+
+```bash
+sudo python3 - <<'PY'
+import json, pathlib, urllib.request
+credential = json.loads(pathlib.Path("workspace/.kgos/auth.json").read_text())
+req = urllib.request.Request("http://127.0.0.1:3777/api/v1/setup/status",
+    headers={"Authorization": "Bearer " + credential["token"]})
+with urllib.request.urlopen(req, timeout=10) as response:
+    print(response.read().decode())
+PY
+```
 
 <a id="web-init"></a>
 
-### Web 路径：五步初始化
+### Web 路径：四步 Token-first 初始化
 
 在服务主机的浏览器打开 `http://127.0.0.1:3777/setup`。若服务在远程主机，在**你的电脑**另开终端建立 SSH 转发，将用户名和主机替换为你已有的 SSH 连接：
 
@@ -233,17 +246,16 @@ ssh -N -L 13777:127.0.0.1:3777 your-user@your-server
 
 保持 SSH 终端运行，在本机浏览器打开 `http://127.0.0.1:13777/setup`。浏览器不需要直接访问服务器 `3777` 公网端口。
 
-依次完成页面的五步：
+依次完成页面的四步：
 
-1. **欢迎**：确认这是你要初始化的独立实例。
+1. **管理员凭证**：首次通过 `rotate-token` 生成实例管理员 Token 并保存在自己的密码管理器中；第一次创建后立即生效。此后包括再次生成 Token、查询初始化状态、测试向量服务在内的所有 Setup API 都要求已登录。已有实例须使用原 Token 登录，不能匿名重新生成；Web 自动恢复有效 Session，也提供输入已有 Token 的登录入口。不要将 Token 放入聊天。
 2. **公网地址**：把 loopback 预填值改为最终 `https://kgos.example.com`，替换成你实际的域名。不是浏览器当前的 SSH 转发地址。
-3. **向量模型**：填写你选定的 Base URL、模型、实际维度、算法及 API Key；无需认证时留空。点击连接测试，必须实际请求成功且返回维度匹配后继续。页面预填供应商只是示例，不代表你的选择。测试地址必须从容器可达；向导会拒绝 loopback、链路本地及特殊保留地址。
-4. **管理员凭证**：生成管理员 Token，立即保存到你自己的密码管理器。同一浏览器已有有效 Session 时会自动恢复；向导不提供手动输入旧 Token 的入口。Token 只在可信本地或 SSH 转发页面输入，不粘贴到聊天。
-5. **确认并初始化**：核对配置后提交，等待状态变为 `ready`；失败时保留配置与数据，按文末诊断原因后重启原容器恢复，不重新建库。
+3. **向量模型**：填写你选定的 Base URL、模型、实际维度、算法及 API Key；无需认证时留空。点击连接测试，必须实际请求成功且返回维度匹配后继续。页面预填供应商只是示例，不代表你的选择。已登录管理员可使用包括本机、私网、Fake-IP 在内的合法 HTTP(S) 地址；服务须从容器可达，仍限制超时、并发、请求大小且禁止重定向。
+4. **确认并初始化**：核对配置后提交，等待状态变为 `ready`；失败时保留配置与数据，按文末诊断原因后重启原容器恢复，不重新建库。
 
-Web 会保存完整配置；Embedding Key 单独保存在私有文件中，不写入 TOML。未提交配置且浏览器 Session 已丢失时，由你决定是否通过向导重新生成 Token；这会使旧 Token 和 Session 失效，必须重新安全保存。配置已提交后，不再提供此操作；出现 `error` 应保留配置和 `auth.json`，查明原因后重启原容器恢复。
+Web 会保存完整配置；Embedding Key 单独保存在私有文件中，不写入 TOML。未提交配置且浏览器 Session 丢失时，必须使用已有 Token 重新登录，才能调用 `rotate-token`；成功轮换将使旧 Token 与 Session 失效，须重新保存新 Token。配置已提交后，不再提供此操作；出现 `error` 应保留配置和 `auth.json`，查明原因后重启原容器恢复。
 
-**继续条件**：真实 Embedding 测试通过、Token 已安全保存、`setup/status` 为 `ready`。满足后进入第 5 步。
+**继续条件**：真实 Embedding 测试通过、Token 已安全保存、`setup/status` 为 `ready`。这四步完成后才进行后续持久化验收。
 
 <a id="file-check"></a>
 
@@ -383,7 +395,7 @@ docker logs --tail 80 kgos-caddy
 在能够访问公网的客户端执行，替换示例域名；不要使用 `-k` 跳过证书检查：
 
 ```bash
-curl --fail --silent --show-error https://kgos.example.com/api/v1/setup/status
+curl --silent --show-error --write-out '\nHTTP %{http_code}\n' https://kgos.example.com/api/v1/setup/status
 curl --silent --show-error -D - -o /dev/null https://kgos.example.com/mcp
 curl --fail --silent --show-error https://kgos.example.com/.well-known/oauth-authorization-server
 curl --fail --silent --show-error https://kgos.example.com/.well-known/oauth-protected-resource/mcp
@@ -391,7 +403,7 @@ curl --fail --silent --show-error https://kgos.example.com/.well-known/oauth-pro
 
 验收结果应同时满足：
 
-- HTTPS 证书可信，公开 `setup/status` 返回 `ready`，并且 MCP 路径为 `/mcp`。
+- HTTPS 证书可信；已生成 Token 时，公网匿名访问 `setup/status` 应返回 **401**，不得泄漏 `ready`。通过第 4 步的已认证状态查询或 Web 登录确认 `ready`，并核对 MCP 路径为 `/mcp`。
 - 匿名 `/mcp` 返回 **401**，`WWW-Authenticate` 指向正确的 OAuth 资源元数据；匿名拒绝是预期。
 - OAuth 元数据的 `issuer`、授权/Token 地址和资源地址均指向你填写的公网根地址。
 - 浏览器打开 `https://kgos.example.com`，使用你保存的管理员 Token 正常登录；确认进入正确实例并可读取现有版本和知识视图。空知识库允许通过，不创建测试业务数据。
@@ -445,7 +457,7 @@ Docker 命令路径：
 docker restart kgos
 ```
 
-只执行所选路径的命令。重新查询 `setup/status`，待 `ready` 后执行：
+只执行所选路径的命令。按第 4 步的已认证状态查询确认 `ready` 后执行：
 
 ```bash
 sudo python3 acceptance.py > acceptance-after.json
@@ -658,10 +670,9 @@ Caddy 的证书卷不在此归档中，本次保持原样；若要迁移整台�
 
 ### 升级验收与 Plugin 升级
 
-查看日志与状态，等待 `ready` 后执行后两行：
+查看日志，并按第 4 步的已认证状态查询确认 `ready` 后执行：
 
 ```bash
-curl --fail --silent --show-error http://127.0.0.1:3777/api/v1/setup/status
 sudo python3 acceptance.py > acceptance-upgrade.json
 diff -u acceptance-before-upgrade.json acceptance-upgrade.json
 ```
@@ -787,7 +798,7 @@ diff -u acceptance-before-upgrade.json acceptance-upgrade.json
 | `error`                                  | 记录不含密钥的公开 `message` 和相关日志；检查完整 TOML、权限、磁盘和模型凭证。保留数据，修复原因后重启原容器；配置已发布时保留原配置与 `auth.json`，查因后重启同一容器恢复，不重复提交新配置 |
 | 容器退出或权限拒绝                       | 检查挂载是否为这次新建目录、UID/GID 是否为 `10001:10001`、目录可遍历且文件可读写；不要对未知目录递归 `chown` 或改为 `777`                                                                    |
 | 名称、目录、端口或网络冲突               | 先确定归属，选择复用或完整更换新安装名称；不要自动删除旧资源。SSH 本地 `13777` 冲突可换本地端口，同时修改浏览器地址                                                                          |
-| Embedding 失败                           | 核对容器可达的 URL、模型、实际维度、算法、凭证及服务配额；Web 不接受 loopback/特殊保留目标。不要在日志或求助消息中贴 API Key                                                                 |
+| Embedding 失败                           | 核对容器可达的 URL、模型、实际维度、算法、凭证及服务配额；管理员验证允许本机、私网和 Fake-IP 等合法 HTTP(S) 地址；检查实际容器网络与代理/DNS。不要在日志或求助消息中贴 API Key                                                                 |
 | 证书失败或公网不可达                     | 核对 DNS A/AAAA、NAT、80/443、安全组及 Caddy 日志。先修网络与证书，不跳过 TLS 检查，也不把未初始化服务暴露出去                                                                               |
 | OAuth 地址不正确                         | 核对实例内 `[server].public_origin`，按下方受控配置编辑步骤修正为实际根 Origin，重启服务后重新检查元数据                                                                                     |
 | ChatGPT 缺少自定义 MCP 或 Plugin Creator | 核对当前账户、Workspace 与管理员策略，由你选择申请权限、使用另一个获准账户或先只完成服务；不自动切换账户或谎报完整安装                                                                       |

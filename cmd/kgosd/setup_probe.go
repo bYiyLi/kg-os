@@ -9,9 +9,7 @@ import (
 	"errors"
 	"io"
 	"math"
-	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"os"
 	"strconv"
@@ -28,8 +26,6 @@ const (
 	probeMaxRequest    = 16 * 1024
 	probeMaxCredential = 8192
 )
-
-var errProbeBlocked = errors.New("embedding probe destination is not permitted")
 
 type embeddingProbeInput struct {
 	BaseURL    string          `json:"base_url"`
@@ -83,73 +79,6 @@ func (input embeddingProbeInput) validate() (string, error) {
 	return key, nil
 }
 
-// Permit ordinary private embedding endpoints while excluding loopback,
-// link-local/metadata and special-purpose address ranges.
-var probeExcludedNetworks = []netip.Prefix{
-	netip.MustParsePrefix("0.0.0.0/8"),
-	netip.MustParsePrefix("100.64.0.0/10"),
-	netip.MustParsePrefix("192.0.0.0/24"),
-	netip.MustParsePrefix("192.0.2.0/24"),
-	netip.MustParsePrefix("192.88.99.0/24"),
-	netip.MustParsePrefix("198.18.0.0/15"),
-	netip.MustParsePrefix("198.51.100.0/24"),
-	netip.MustParsePrefix("203.0.113.0/24"),
-	netip.MustParsePrefix("240.0.0.0/4"),
-	netip.MustParsePrefix("64:ff9b::/96"),
-	netip.MustParsePrefix("64:ff9b:1::/48"),
-	netip.MustParsePrefix("2001::/32"),
-	netip.MustParsePrefix("2001:db8::/32"),
-	netip.MustParsePrefix("2002::/16"),
-}
-
-func allowedProbeIP(address netip.Addr) bool {
-	if !address.IsValid() {
-		return false
-	}
-	ip := address.Unmap()
-	if !ip.IsGlobalUnicast() || ip.IsLoopback() ||
-		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return false
-	}
-	for _, prefix := range probeExcludedNetworks {
-		if prefix.Contains(ip) {
-			return false
-		}
-	}
-	return true
-}
-
-func dialAllowedProbe(ctx context.Context, network, address string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, errProbeBlocked
-	}
-	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
-	if err != nil {
-		return nil, err
-	}
-	if len(ips) == 0 {
-		return nil, errProbeBlocked
-	}
-	// Reject mixed allowed/reserved answers, and re-resolve on the actual dial
-	// rather than checking one IP then letting the HTTP stack dial another.
-	for _, ip := range ips {
-		if !allowedProbeIP(ip) {
-			return nil, errProbeBlocked
-		}
-	}
-	dialer := net.Dialer{Timeout: 3 * time.Second}
-	var lastErr error
-	for _, ip := range ips {
-		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
-		if dialErr == nil {
-			return conn, nil
-		}
-		lastErr = dialErr
-	}
-	return nil, lastErr
-}
-
 func newEmbeddingProbeClient() *http.Client {
 	return &http.Client{
 		Timeout: probeTimeout,
@@ -158,7 +87,6 @@ func newEmbeddingProbeClient() *http.Client {
 		},
 		Transport: &http.Transport{
 			Proxy:                 nil,
-			DialContext:           dialAllowedProbe,
 			DisableKeepAlives:     true,
 			TLSHandshakeTimeout:   3 * time.Second,
 			ResponseHeaderTimeout: 5 * time.Second,
@@ -195,9 +123,6 @@ func probeEmbeddingWithClient(ctx context.Context, input embeddingProbeInput, cl
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		if errors.Is(err, errProbeBlocked) {
-			return probeFailure("address_not_allowed")
-		}
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return probeFailure("timeout")
 		}

@@ -39,6 +39,19 @@ func setupTestRequest(c *setupController, method, path, token, body string) *htt
 	return w
 }
 
+func mustCreateSetupToken(t *testing.T, c *setupController) string {
+	t.Helper()
+	response := setupTestRequest(c, http.MethodPost, "/api/v1/setup/rotate-token", "", "")
+	if response.Code != http.StatusCreated {
+		t.Fatalf("first token creation: %d %s", response.Code, response.Body.String())
+	}
+	var token runtimeprofile.Credential
+	if err := json.Unmarshal(response.Body.Bytes(), &token); err != nil || token.Token == "" {
+		t.Fatal("token creation response invalid")
+	}
+	return token.Token
+}
+
 func TestRestrictedSetupGateAndFirstTokenClaim(t *testing.T) {
 	c := newTestSetup(t)
 	status := setupTestRequest(c, "GET", "/api/v1/setup/status", "", "")
@@ -58,7 +71,7 @@ func TestRestrictedSetupGateAndFirstTokenClaim(t *testing.T) {
 	if page := setupTestRequest(c, "GET", "/setup", "", ""); page.Code != 200 {
 		t.Fatalf("setup Web unavailable: %d %q", page.Code, page.Body.String())
 	}
-	claim := setupTestRequest(c, "POST", "/api/v1/setup/claim", "", "")
+	claim := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", "")
 	if claim.Code != 201 || claim.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("claim = %d %s", claim.Code, claim.Body.String())
 	}
@@ -66,7 +79,7 @@ func TestRestrictedSetupGateAndFirstTokenClaim(t *testing.T) {
 	if err := json.Unmarshal(claim.Body.Bytes(), &got); err != nil || len(got.Token) != 43 {
 		t.Fatal("missing one-time token")
 	}
-	if second := setupTestRequest(c, "POST", "/api/v1/setup/claim", "", ""); second.Code != 409 ||
+	if second := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", ""); second.Code != 401 ||
 		strings.Contains(second.Body.String(), got.Token) {
 		t.Fatal("duplicate claim leaked or overwrote token")
 	}
@@ -87,10 +100,7 @@ func TestRestrictedSetupGateAndFirstTokenClaim(t *testing.T) {
 
 func TestPreInitializationTokenRotationRevokesPreviousAccess(t *testing.T) {
 	c := newTestSetup(t)
-	if response := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", ""); response.Code != 409 {
-		t.Fatalf("rotation before first claim = %d", response.Code)
-	}
-	claim := setupTestRequest(c, "POST", "/api/v1/setup/claim", "", "")
+	claim := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", "")
 	var first struct{ Token string }
 	if err := json.Unmarshal(claim.Body.Bytes(), &first); err != nil || first.Token == "" {
 		t.Fatal("first claim failed")
@@ -118,9 +128,9 @@ func TestPreInitializationTokenRotationRevokesPreviousAccess(t *testing.T) {
 	if len(cookies) == 0 {
 		t.Fatal("Web login did not create a Cookie")
 	}
-	response := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", "")
+	response := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", first.Token, "")
 	if response.Code != 201 || response.Header().Get("Cache-Control") != "no-store" {
-		t.Fatalf("pre-initialization rotation without credential failed: HTTP %d %s", response.Code, response.Body.String())
+		t.Fatalf("authenticated pre-initialization rotation failed: HTTP %d %s", response.Code, response.Body.String())
 	}
 	var second struct{ Token string }
 	if err := json.Unmarshal(response.Body.Bytes(), &second); err != nil ||
@@ -150,14 +160,8 @@ func TestPreInitializationTokenRotationRevokesPreviousAccess(t *testing.T) {
 	if staleResponse.Code != 401 {
 		t.Fatalf("old Web Bearer initialized after rotation: HTTP %d", staleResponse.Code)
 	}
-	if repeated := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", ""); repeated.Code != 201 {
-		t.Fatalf("repeated anonymous rotation failed: %d", repeated.Code)
-	} else {
-		var third struct{ Token string }
-		if err := json.Unmarshal(repeated.Body.Bytes(), &third); err != nil || third.Token == second.Token {
-			t.Fatal("repeated rotation did not replace the previous token")
-		}
-		second.Token = third.Token
+	if repeated := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", ""); repeated.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous rotation after claim: %d", repeated.Code)
 	}
 	if permitted := setupTestRequest(c, "POST", "/api/v1/setup/initialize", second.Token, `{"config":{}}`); permitted.Code != 400 {
 		t.Fatal("new Token did not authorize setup validation")
@@ -165,7 +169,7 @@ func TestPreInitializationTokenRotationRevokesPreviousAccess(t *testing.T) {
 	if _, err := os.Stat(c.paths.Config); !os.IsNotExist(err) {
 		t.Fatal("Token rotation unexpectedly published Instance config")
 	}
-	if rejected := setupTestRequest(c, "POST", "/api/v1/setup/claim", "", ""); rejected.Code != 409 {
+	if rejected := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", ""); rejected.Code != 401 {
 		t.Fatal("rotation reopened anonymous claim")
 	}
 	if err := os.WriteFile(c.paths.Config, []byte("operator-owned"), 0600); err != nil {
@@ -182,10 +186,13 @@ func TestPreInitializationTokenRotationRevokesPreviousAccess(t *testing.T) {
 func TestSetupFileExistingAndReadyCannotOverwrite(t *testing.T) {
 	c := newTestSetup(t)
 	config := c.paths.Config
+	claim := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", "")
+	if claim.Code != http.StatusCreated {
+		t.Fatal("could not create first Token")
+	}
 	if err := os.WriteFile(config, []byte("invalid"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	claim := setupTestRequest(c, "POST", "/api/v1/setup/claim", "", "")
 	var token struct{ Token string }
 	_ = json.Unmarshal(claim.Body.Bytes(), &token)
 	old, err := os.ReadFile(config)
@@ -205,7 +212,7 @@ func TestSetupFileExistingAndReadyCannotOverwrite(t *testing.T) {
 	c.status = "ready"
 	c.business = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	c.mu.Unlock()
-	if w := setupTestRequest(c, "POST", "/api/v1/setup/claim", "", ""); w.Code != 409 {
+	if w := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", token.Token, ""); w.Code != 409 {
 		t.Fatal("claim allowed after ready")
 	}
 	if w := setupTestRequest(c, "GET", "/setup", "", ""); w.Code != 302 {
@@ -272,15 +279,96 @@ func TestSetupClaimNeverRevealsCredentialCreatedAfterDaemonStartup(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result := setupTestRequest(setup, http.MethodPost, "/api/v1/setup/claim", "", "")
-	if result.Code != http.StatusConflict ||
-		!strings.Contains(result.Body.String(), "SETUP_CONFLICT") ||
+	result := setupTestRequest(setup, http.MethodPost, "/api/v1/setup/rotate-token", "", "")
+	if result.Code != http.StatusUnauthorized ||
+		!strings.Contains(result.Body.String(), "AUTHENTICATION_FAILED") ||
 		strings.Contains(result.Body.String(), external.Token) {
 		t.Fatalf("external credential must not be revealed: HTTP %d", result.Code)
 	}
 	persisted, err := runtimeprofile.LoadCredential(setup.paths)
 	if err != nil || persisted.Token != external.Token {
 		t.Fatal("operator-owned Instance Token was changed")
+	}
+}
+
+func TestTokenFirstStatusAndRotationRequireAuthentication(t *testing.T) {
+	c := newTestSetup(t)
+	statusPath := "/api/v1/setup/status"
+	if got := setupTestRequest(c, http.MethodGet, statusPath, "", ""); got.Code != http.StatusOK {
+		t.Fatalf("unclaimed status must be readable: %d", got.Code)
+	}
+	oldToken := mustCreateSetupToken(t, c)
+	if got := setupTestRequest(c, http.MethodGet, statusPath, "", ""); got.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous status exposed claimed instance: %d", got.Code)
+	}
+	if got := setupTestRequest(c, http.MethodPost, "/api/v1/setup/rotate-token", "", ""); got.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous rotation after first Token: %d", got.Code)
+	}
+	if got := setupTestRequest(c, http.MethodGet, statusPath, oldToken, ""); got.Code != http.StatusOK ||
+		strings.Contains(got.Body.String(), oldToken) {
+		t.Fatalf("authorized setup status failed or leaked root Token: %d", got.Code)
+	}
+	rotated := setupTestRequest(c, http.MethodPost, "/api/v1/setup/rotate-token", oldToken, "")
+	if rotated.Code != http.StatusCreated {
+		t.Fatalf("authorized rotation failed: %d %s", rotated.Code, rotated.Body.String())
+	}
+	var current runtimeprofile.Credential
+	if err := json.Unmarshal(rotated.Body.Bytes(), &current); err != nil || current.Token == "" ||
+		current.Token == oldToken {
+		t.Fatal("new root Token missing or unchanged")
+	}
+	if got := setupTestRequest(c, http.MethodGet, statusPath, oldToken, ""); got.Code != http.StatusUnauthorized {
+		t.Fatalf("old Token still works after rotation: %d", got.Code)
+	}
+	if got := setupTestRequest(c, http.MethodGet, statusPath, current.Token, ""); got.Code != http.StatusOK {
+		t.Fatalf("new Token cannot read status: %d", got.Code)
+	}
+}
+
+func TestConcurrentInitialTokenCreationCanOnlySucceedOnce(t *testing.T) {
+	c := newTestSetup(t)
+	results := make(chan int, 12)
+	for i := 0; i < cap(results); i++ {
+		go func() {
+			response := setupTestRequest(c, http.MethodPost, "/api/v1/setup/rotate-token", "", "")
+			results <- response.Code
+		}()
+	}
+	created, rejected := 0, 0
+	for i := 0; i < cap(results); i++ {
+		switch code := <-results; code {
+		case http.StatusCreated:
+			created++
+		case http.StatusUnauthorized:
+			rejected++
+		default:
+			t.Fatalf("unexpected concurrent HTTP status: %d", code)
+		}
+	}
+	if created != 1 || rejected != cap(results)-1 {
+		t.Fatalf("initial creations %d rejected %d", created, rejected)
+	}
+}
+
+func TestExternalCredentialCannotEnableAnonymousSetup(t *testing.T) {
+	c := newTestSetup(t)
+	operatorToken, err := runtimeprofile.ClaimCredential(c.paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/api/v1/setup/status", "/api/v1/setup/rotate-token"} {
+		method := http.MethodGet
+		if path == "/api/v1/setup/rotate-token" {
+			method = http.MethodPost
+		}
+		response := setupTestRequest(c, method, path, "", "")
+		if response.Code != http.StatusUnauthorized || strings.Contains(response.Body.String(), operatorToken.Token) {
+			t.Fatalf("unauthenticated %s: %d", path, response.Code)
+		}
+	}
+	persisted, err := runtimeprofile.LoadCredential(c.paths)
+	if err != nil || persisted.Token != operatorToken.Token {
+		t.Fatal("external operator credential was replaced")
 	}
 }
 
@@ -306,7 +394,7 @@ func TestCustomMCPPathIsGatedBeforeAuthentication(t *testing.T) {
 
 func TestSetupClaimRejectsCrossOriginWithoutCreatingCredential(t *testing.T) {
 	setup := newTestSetup(t)
-	request := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:4173/api/v1/setup/claim", nil)
+	request := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:4173/api/v1/setup/rotate-token", nil)
 	request.Header.Set("Origin", "https://unexpected.example")
 	response := httptest.NewRecorder()
 	setup.ServeHTTP(response, request)
@@ -400,7 +488,7 @@ func TestWebConfigPublishesPrivateKeyBeforeTOML(t *testing.T) {
 
 func TestSetupAPIInputValidationAndAcceptedBootstrap(t *testing.T) {
 	c := newTestSetup(t)
-	claim := setupTestRequest(c, "POST", "/api/v1/setup/claim", "", "")
+	claim := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", "")
 	var secret struct{ Token string }
 	if err := json.Unmarshal(claim.Body.Bytes(), &secret); err != nil {
 		t.Fatal(err)

@@ -1,12 +1,12 @@
-# Phase 26：Web-first 五步初始化与无配置 Runtime 启动
+# Phase 26：Web-first 初始化与无配置 Runtime 启动
 
 ## 目标、基线与阶段边界
 
-**状态：`in_progress`（2026-10-20，本地开发和验收进行中；未提交、未推送、未部署，最终 CI 尚未执行）。** 在**一个现有 KG OS Docker / `kgosd` 进程**中，支持缺少 `config.toml` 的受限 Web 启动、五步首次初始化、预先手工配置后的启动自动初始化，并共用现有 Kernel/Lithograph Bootstrap 与 `initialized.json` 就绪证明。未初始化时所有普通业务 API/MCP 在认证前报告未就绪；完成后恢复现有正常认证和业务能力。保留用户认可的全屏高保真布局，重做五步内容。
+**状态：`in_progress`（2026-10-20，本地开发和验收进行中；未提交、未推送、未部署，最终 CI 尚未执行）。** 在**一个现有 KG OS Docker / `kgosd` 进程**中，支持缺少 `config.toml` 的受限 Web 启动、D110 四步 Token-first 初始化、预先手工配置后的启动自动初始化，并共用现有 Kernel/Lithograph Bootstrap 与 `initialized.json` 就绪证明。未初始化时所有普通业务 API/MCP 在认证前报告未就绪；完成后恢复现有正常认证和业务能力。保留用户认可的全屏高保真布局，采用 Token-first 四步内容。
 
 **实现前代码基线（历史对照）**：`internal/runtime/runtime.go:OpenWithOfficialExtensions` 在 HTTP listener 建立前先 `LoadConfig`，缺 TOML 就失败；`cmd/kgosd/main.go` 同样先打开完整 Runtime；`cmd/kgosd/init.go` 当前独立执行初始化 readiness/receipt；`internal/runtimeprofile/initialized.go` 提供版本化 receipt；`internal/runtimeprofile/auth.go` 已有单 Token 原子生成；`internal/daemon/web_auth.go` 已有 Web Session 与 Origin 保护；`packages/web/src/features/setup/`、`?preview=setup` 是**尚未提交的纯 UI 演示**（原四步内容），不具备本阶段的后端初始化。既有 [Phase 25 Doctor](25-kgos-doctor.md) 属于独立 `planned` 工作，不混合任务或覆盖其未提交文档。
 
-**设计真源**：[D105](../../design/decisions.md#d105-web-first-run-and-runtime-bootstrap)、[Runtime 首次启动、受限路由与认证](../../design/runtime.md#web-first-run-bootstrap)、[Web 五步与路由](../../design/web.md#web-first-run-setup)、[Setup 错误](../../design/contracts.md#初始化门禁与-setup-错误)、[CLI Init](../../design/cli.md#init)。历史 [D82 / Phase 12](12-first-run-cli-productization.md) 的“完成才算 ready”、[D84 / Phase 13](13-init-wizard-credential-boundary.md) 的 operation-time Key、[Phase 17](17-mcp-web-authorization.md) 的 Web Session、[Phase 16](16-kgosd-unified-mcp.md) 的单进程都必须保留。修改源码前复查当前仓库和最新配置合同，不能把历史验收误报为本阶段成功。
+**设计真源**：[D110](../../design/decisions.md#d110-token-first-setup)、[D105](../../design/decisions.md#d105-web-first-run-and-runtime-bootstrap)、[Runtime 首次启动、受限路由与认证](../../design/runtime.md#web-first-run-bootstrap)、[Web Token-first 四步与路由](../../design/web.md#web-first-run-setup)、[Setup 错误](../../design/contracts.md#初始化门禁与-setup-错误)、[CLI Init](../../design/cli.md#init)。历史 [D82 / Phase 12](12-first-run-cli-productization.md) 的“完成才算 ready”、[D84 / Phase 13](13-init-wizard-credential-boundary.md) 的 operation-time Key、[Phase 17](17-mcp-web-authorization.md) 的 Web Session、[Phase 16](16-kgosd-unified-mcp.md) 的单进程都必须保留。修改源码前复查当前仓库和最新配置合同，不能把历史验收误报为本阶段成功。
 
 **排除**：不新增账号/密码/角色、部署证明或管理员认领一次性口令；不建设通用 Secret Manager、配置热重载、实例数据重置/迁移 UI、多库发现、第二个进程/端口、额外数据库、Agent/Scheduler、Lithograph 业务语义、MCP Tool 或新的 npm 发行物。界面测试不使用真实生产实例或覆盖用户凭证。配置改动不包含现有业务模型、31 SDK 方法和 SQL Graph 行为改写。
 
@@ -15,9 +15,9 @@
 | Feature | 工作与责任边界 | 验收 |
 | --- | --- | --- |
 | **P26-01 状态/受限启动** | Go Runtime 将 HTTP/Web 最小宿主与完整 Kernel 打开分开；在一个 Instance lock/listener 下识别无配置、无 receipt、存在合法/非法 config、已完成/损坏数据库；完整 config 自动执行共享初始化。主业务请求的初始化状态门禁位于鉴权之前 | A26-01、A26-02 |
-| **P26-02 Setup API/受限认证** | `setup/status`、`setup/claim`、`setup/initialize` 三个接口的严格状态转移、同源输入、重复/并发保护；复用现有 `auth.json` Token 生成、Web Session 登录/恢复与权限保护；无新账号或 claim code | A26-02、A26-03 |
+| **P26-02 Setup API/受限认证** | `setup/status`、`setup/rotate-token`、`setup/validate-embedding`、`setup/initialize` 接口的严格状态转移、同源输入、重复/并发保护；复用现有 `auth.json` Token 生成、Web Session 登录/恢复与权限保护；无新账号或 claim code | A26-02、A26-03 |
 | **P26-03 配置、Web Secret 与统一初始化** | Web 第二/第三步输入映射完整 `config.toml`，默认 Jieba/cache/无自定义扩展；独立 0600 API Key 文件/固定 `api_key_env` 和 no-auth 分支；同一初始化器用于 daemon 自动初始化、Web 与显式 Go/CLI init；已发布合法 config 仅通过已认证 `{}` resume，不覆写；使用正式业务 Handler **进程内 authenticated readiness** 打破外部 503 门禁与完成验收的循环依赖；原子写 config、真实 readiness 后发布 receipt、再开放外部业务；启动中的 daemon 不嵌套启动第二个 daemon | A26-03、A26-04 |
-| **P26-04 Web 五步交互与状态路由** | 正式替换原 `?preview=setup` 演示入口（不留生产绕行）；欢迎→对外 Origin→向量→Instance 认证→初始化进度；i18n、主题、预填/输入校验、成功/失败/已有配置/恢复/认证过期态；先读 setup 状态再恢复普通 Session；静态资源、首页与 setup 双向跳转；桌面/窄屏底部进度和按钮位置稳定 | A26-01、A26-05 |
+| **P26-04 Web 四步交互与状态路由** | 正式替换原 `?preview=setup` 演示入口（不留生产绕行）；Token → 对外 Origin → 向量 → 初始化进度；i18n、主题、预填/输入校验、成功/失败/已有配置/恢复/认证过期态；先读 setup 状态再恢复普通 Session；静态资源、首页与 setup 双向跳转；桌面/窄屏底部进度和按钮位置稳定 | A26-01、A26-05 |
 | **P26-05 兼容/异常与隔离验收** | 完整配置直接启动、真正的 fresh Docker Volume、双页竞争、初始化中 crash/restart、旧合法库重启/缺文件、缺 Key、配置/权限/Remote Provider 故障、失联返回、OAuth/MCP/静态资源/业务状态恢复；不删除用户数据 | A26-01–07 |
 | **P26-06 Review 与交付** | Mac 定向与 `pnpm validate`，OpenClaw 隔离 Linux amd64 正式 Dockerfile/临时 Volume，按授权提交/推送后最终 SHA 的 GitHub 两 Job CI，最终 diff 与文档/代码一致性 Review；更新操作指南仅在真实实现后 | A26-06、A26-07 |
 
@@ -33,13 +33,13 @@
 
 ### A26-02 初始化先于鉴权、MCP/OAuth 和身份
 
-1. 对未 ready 实例，以**不带 Bearer 与带错误 Bearer**分别访问真实 Graph/Object/Ontology/Evolution API、MCP Tool 调用/Resource/OAuth：先返回符合接口内容类型的 `503 INSTANCE_NOT_INITIALIZED`，不出现优先级颠倒的 401/302、不执行 Kernel/MCP；`GET setup/status` 始终可只读。原先已有 receipt 但真实 Runtime 文件缺失/坏库的异常不得发引导新建，使用 `INSTANCE_UNAVAILABLE`。
-2. 未认领且没有 `auth.json` 时两浏览器并发 claim：只允许一个原子成功并以 `201` **仅一次**返回 Token；其他请求 `409 SETUP_CONFLICT`，原 Token 不被覆盖或匿名再次读出。`GET setup/status` 的 `credentialConfigured` 只能反映有效凭证是否已存在；初始化提交返回 `202 initializing` 不能冒充最终成功。无额外 setup password/claim token，Origin/Host/HTTP method 与返回头保持既有 Web 安全边界；提示未初始化公开监听存在抢先认领风险，但不引入用户已否决的额外验证。
+1. 对未 ready 实例，以**不带 Bearer 与带错误 Bearer**分别访问真实 Graph/Object/Ontology/Evolution API、MCP Tool 调用/Resource/OAuth：先返回符合接口内容类型的 `503 INSTANCE_NOT_INITIALIZED`，不出现优先级颠倒的 401/302、不执行 Kernel/MCP；`GET setup/status` 仅无 Token 时匿名只读；Token 已存在必须认证。原先已有 receipt 但真实 Runtime 文件缺失/坏库的异常不得发引导新建，使用 `INSTANCE_UNAVAILABLE`。
+2. 未认领且没有 `auth.json` 时两浏览器并发首次 `rotate-token`：只允许一个原子成功并以 `201` **仅一次**返回 Token；其它未认证请求 `401 AUTHENTICATION_FAILED`，原 Token 不被覆盖或匿名再次读出。`GET setup/status` 的 `credentialConfigured` 只能反映有效凭证是否已存在；初始化提交返回 `202 initializing` 不能冒充最终成功。无额外 setup password/claim token，Origin/Host/HTTP method 与返回头保持既有 Web 安全边界；提示未初始化公开监听存在抢先认领风险，但不引入用户已否决的额外验证。
 3. root Token 存在时 Session/login/logout 在受限模式沿用原规则，未 ready 的业务 API 即使拿到 Web Bearer 也必须 503；没有合法凭证尝试 `setup/initialize` 必须 401，认证后的并发提交只允许一个初始化；ready 后所有 setup 写入返回 409，普通 API 恢复真实 401/正常授权行为，MCP OAuth 与 Tool 清单不回归。
 
 ### A26-03 配置、私有凭证和边界
 
-1. Web 第二、第三步输入仅为未提交草稿（前后页可返回），第五步才能提交完整显式配置；生成的 TOML 满足 Go / CLI 同一解析器：`cache` 路径和 4096 MiB、`fulltext.analyzer=jieba`、合法 `embedding`、空 third-party extensions。非法 URL、模型、维度非 1..4096、`dot` 算法、未知字段及非法 FTS5/extension 均按真实配置校验拒绝，不留下半配置。现有手工 TOML 可使用全套自定义值。
+1. Web 第二、第三步输入仅为未提交草稿（前后页可返回），第四步才能提交完整显式配置；生成的 TOML 满足 Go / CLI 同一解析器：`cache` 路径和 4096 MiB、`fulltext.analyzer=jieba`、合法 `embedding`、空 third-party extensions。非法 URL、模型、维度非 1..4096、`dot` 算法、未知字段及非法 FTS5/extension 均按真实配置校验拒绝，不留下半配置。现有手工 TOML 可使用全套自定义值。
 2. Web API Key 保存于独立 Instance-private 0600 文件，**先持久化私有 Key，再原子发布完整配置**；针对崩溃后孤立 Key 文件、config 已有但 Key 缺失两个顺序边界定向测试，不能把任何残留当 ready；TOML/IndexDefinition/错误、日志、MCP/SDK、浏览器存储或普通 HTTP 响应均不得出现明文（仅用户输入及必要的传输时刻持有）。下次重启时固定 `KGOS_WEB_EMBEDDING_API_KEY` 能被现有 Provider 按需解析；文件缺失、非法权限或同名环境变量冲突安全失败；手工 `api_key_env` 依旧从 daemon 环境读取，不依赖该文件。无认证 endpoint `api_key_env=""` 不存 Key。远端 Provider 不可达不虚构“连接成功”，也不将其当作普通数据库/Graph readiness 的必需前置。
 3. 现存 `auth.json` 格式、单 Token、Session Cookie/boot guard 及现有业务认证均不改；没有 root Token/Session 的第四步拒绝，初始化失败不得把已创建的 Token 清空或重新生成。Web/CLI/MCP 不能通过接受配置的 Setup 路由替代普通有鉴权业务写入。
 
@@ -51,10 +51,10 @@
 
 ### A26-05 真实浏览器可用性、可访问性和文案
 
-1. English/简体中文、深浅主题和 320px–1920px 范围：五步欢迎、外部地址、向量字段、认领/登录、初始化进度和错误/完成态均可真实使用；左侧紧凑步骤栏、中间表单、底部步骤信息与前/后按钮位置不随步骤内容/滚动跳动；内容超长只在表单滚动，移动端不遮挡按钮。不把未连接按钮显示为绿色成功。
-2. 完成 Token 创建时可复制并明确提示只展示一次；已有 Token / Web Session 可以恢复第三步而不匿名读 secret，带 Key 的错误文案不泄漏密钥；初始化成功直接去主页，已 ready 输入 `/setup` 无法重新初始化。普通业务登录只在 ready 后出现。
+1. English/简体中文、深浅主题和 320px–1920px 范围：四步 Token-first、外部地址、向量字段、初始化进度和错误/完成态均可真实使用；左侧紧凑步骤栏、中间表单、底部步骤信息与前/后按钮位置不随步骤内容/滚动跳动；内容超长只在表单滚动，移动端不遮挡按钮。不把未连接按钮显示为绿色成功。
+2. 完成 Token 创建时可复制并明确提示只展示一次；已有 Token / Web Session 可以恢复第一步认证而不匿名读 secret，带 Key 的错误文案不泄漏密钥；初始化成功直接去主页，已 ready 输入 `/setup` 无法重新初始化。普通业务登录只在 ready 后出现。
 3. 浏览器真实 API 状态接口、初始化终态及新进程重启的 ready 恢复均经 Playwright 验证，所有初始化接口禁用缓存和页面本地 Key 持久化；临时 `?preview=setup` 不能构成生产绕行。
-4. 第三步 API Key 输入留空即为 no-auth，移除重复解释和独立开关；仅当前草稿通过一次真实 Embeddings 请求且返回维度一致时，`验证配置` 才转为 `下一步`。任何 URL/Key/模型/维度/算法修改立即清除成功结果；401、404、429、超时、非法 JSON、实际维度不符均须保留在第二步，提示有界真实失败原因。未认证验证接口仅可访问公网地址，DNS/Dial 不得触达私网/本机/元数据、不得跟随重定向或使用环境代理，不持久化任何凭证；隔离 HTTP fixture 与真实浏览器调用分别证明网络请求形状和 UI 状态门禁。
+4. 第三步 API Key 输入留空即为 no-auth，移除重复解释和独立开关；仅当前草稿通过一次真实 Embeddings 请求且返回维度一致时，`验证配置` 才转为 `下一步`。任何 URL/Key/模型/维度/算法修改立即清除成功结果；401、404、429、超时、非法 JSON、实际维度不符均须保留在第二步，提示有界真实失败原因。已认证验证接口允许任意合法 HTTP(S) 目标地址（包括私网、本机和 Fake-IP），未经认证绝不拨号、不得跟随重定向或使用环境代理，不持久化任何凭证；隔离 HTTP fixture 与真实浏览器调用分别证明网络请求形状和 UI 状态门禁。
 
 ### A26-06 Mac / Linux Docker / CI 与旧功能回归
 
@@ -69,16 +69,42 @@
 ## 设计 Review 清单（开发前）
 
 - **状态闭环**：config 缺失、完整、非法；receipt 缺失、有效、损坏；Token/DB 部分存在；自动初始化失败/重试，在表中是否每种都有明确状态？不能用 `config.toml` existence 覆盖 receipt 的意义。
-- **身份闭环**：先于鉴权的只是初始化路由门禁，不意味着 Session 和 Setup finalization 可以匿名；第三步仅第一次根 Token 创建可匿名，没有新增一次性证明的部署风险在 D105 明确。
+- **身份闭环**：先于鉴权的只是普通业务初始化路由门禁，不意味着 Session 和 Setup finalization 可以匿名；第一步只有一次根 Token 创建可匿名，没有新增一次性证明的部署风险在 D105 明确。
 - **技术闭环**：单 Go 进程初始化不能调用原有第二个 daemon 或争抢自己持有的 lock，HTTP listener 上早期 setup API 不能提前构造 Kernel；自动/manual/Web 全走相同 readiness 与 receipt；进程内 authenticated readiness 必须可执行且不得借外部 503 门禁开放匿名旁路；远端 Embedding 测试不作为本地就绪的硬依赖。
 - **文件闭环**：Web Key 文件与 `auth.json` 互不复用，Web 写完整 config 而非变更旧格式，人工 TOML 不依赖新 secret，现场已有库不被初始化覆盖；旧 Phase 12/13/16/17 成功仍是历史证据。
 - **用户体验闭环**：没有重新出现独立“检索存储”“额外扩展”步骤；首页 / setup 导航互斥、普通 API 不 302；暗/亮、中英文、窄屏/footer 与表单保持已确认视觉基线。
+
+## 2026-10-25 D110 Token-first Setup 增量设计与开发计划
+
+**输入与状态**：本增量与现有 Phase 26 同属一次 Web-first 初始化功能，不新增独立 Phase。依据 [D110](../../design/decisions.md#d110-token-first-setup) 和 [Runtime](../../design/runtime.md#web-first-run-bootstrap)、[Web](../../design/web.md#web-first-run-setup) 覆盖下述旧 A26-02/03/05 中匿名 claim/rotate/validate 与五步顺序的预期；后面的 2026-10-20/21 记录是**当时实现的历史证据**，不是本次新行为验收。阶段仍为 `in_progress`，Commit/Push/Dev 部署/最终 CI 各自需要单独授权。
+
+| Feature | 最小交付 | Acceptance |
+| --- | --- | --- |
+| P26-D110-01 Token-first 身份状态 | 后端 `rotate-token` 首次无 Token/无 config/合法 Origin 才可匿名原子创建；之后状态、轮换、验证、初始化使用现有 Instance/Web Bearer+Boot Guard；移除匿名 `claim`，保护已有 `auth.json`、同源和并发、旧凭证/Session 失效 | A26-D110-01 |
+| P26-D110-02 自由 Embedding 出口 | 删除预检与设置页共用探测器的 IP/网络类型拦截，仍限制 URL 语法、HTTP 重定向、环境代理、单次并发、10s 超时、请求响应大小和密钥回显/落盘 | A26-D110-02 |
+| P26-D110-03 Web 四步 | 第一屏直接生成/恢复 Token，已认领但无有效 Session 时输入旧凭证登录（不得匿名重新生成），登录后进入 Origin、向量、初始化。Status 遇 401 后通过服务器 HTML 路由决定 UI 外壳，登录后再读取真实状态；预览和中英/深浅主题保持可用 | A26-D110-03 |
+| P26-D110-04 完整闭环 | 更新中英文可编辑安装模板，旧版归档保持不变；Go/TS/E2E 否定用例、原有配置/Session/重启回归、Mac 质量和最终 diff；Docker/远程 CI 按独立范围/授权交付 | A26-D110-04 |
+
+**A26-D110-01**：并发首次 `rotate-token` 仅一个 201、其余未认证 401，不生成第二个 Token；重复匿名、旧 Root/Cookie/Web Access 401；已认证轮换 201 且仅一次回显，保留旧 Auth 文件权限/格式；`claim` 不再是合法匿名入口；认证后的非法状态/已发布 config/ready 409，不改磁盘。Token 已存在时 `status`、`validate-embedding` 均要求认证；测试未经认证不会触达模拟目标或修改配置，普通业务仍 503；手工 TOML 自动初始化、ready 旧实例导航和旧库完整性不回归。
+
+**A26-D110-02**：在无外部秘密的隔离测试中，回环 IPv4/IPv6、普通私网、Fake-IP、特殊保留目标地址允许真实 HTTP 请求（或网络拨号尝试）且不会返回 `address_not_allowed`；无效 URL、重定向、超时、超大响应/并发、认证失败和维度不匹配仍拒绝，Key 不进入响应/日志/配置。正常受认证 settings 测试遵守同一地址规则。
+
+**A26-D110-03**：四步顺序、首次自动登录、已认领 Session 恢复或手动登录、复制/重试/轮换、旧 Token 失效、刷新和已有配置 resume 通过 Web 单元与真实浏览器场景；无 Token 不能推进对外地址/向量测试；向量当前草稿变更使旧验证失效；登录态不保存根 Token 在浏览器持久存储。已 ready 时 `/setup` 服务器直接跳转首页，初始化中的状态轮询要求 Session。
+
+**A26-D110-04**：Go 定向及 race，Web typecheck/lint/Vitest、Playwright 实际浏览器路径、Mac `pnpm validate` 和文档一致性、diff --check 均有当前工作树证据；完整 Linux Docker 隔离构建/31 SDK、最终 pushed SHA 的两 Job CI/Dev 环境验证分别明确执行状态。当前任务只授权设计、开发、必要本地验证，不含 Commit/Push/部署；Phase 26 尚有其它历史阶段验收范围，不得据本增量通过擅标为 done。
+
+### D110 实施与 Mac 验收记录（2026-10-25）
+
+- **代码**：当前 Mac `main@fc819d4` 未提交工作树实现一次匿名 `rotate-token` 原子创建、已认领状态下全部 Setup API 鉴权及旧凭证/Session 失效；`claim` 不再作为 Setup 入口；已认证的 Embedding Setup/Settings 连接测试不再按目的 IP 类型拒绝，仍有同源、请求超时、大小/并发与禁止重定向保护。Web 使用四步 Token-first 向导，允许已有 Token 登录、Cookie Session 恢复与进度/就绪导航；删除旧欢迎页组件、孤立样式及对应文案。
+- **Review 修复**：内存凭证尚未刷新但 `auth.json` 已由其它进程创建时，匿名状态/重新认领拒绝；并发首次认领仅一个成功。config-first 的集成测试与 E2E 启动器改用现有 Token 读 `setup/status`。完成真实 Bootstrap 后保留原 Setup Session 直到浏览器读取 `ready`，避免前端被意外踢出；Session 恢复已就绪时导航回主页。定向 Go、Web 与浏览器回归覆盖这些边界。
+- **本地验收**：Mac 完整 `pnpm validate` **退出码 0**：Go 全包、`-race`、覆盖率门禁（≥90%）、安全检查通过，TypeScript 类型/Lint/格式、Markdown/CSpell/Secrets、依赖许可、重复代码与未使用代码检查通过；Web 定向 **345/345** Vitest 与完整 Playwright **56/56** 通过。依赖审计通过 High 以上阈值，保留 **3 Low / 5 Moderate** 非阻断告警。完整验收后对 Session 已 ready 恢复导航补了一处局部修正，按相关 Web 检查单独复验；该增量不自动等同于再次运行全部质量门禁。
+- **未执行**：未对该 D110 工作树做新的 Linux amd64 隔离 Docker/31 SDK 验收，也未对真实 Dev Instance 做变更；未 Commit、Push、Tag、发布或运行最终 pushed SHA 的公开仓库两 Job CI。因此仅确认**本地实施与测试完成**，Phase 26 仍为 `in_progress`，不得借用历史 Docker/CI 结果关闭阶段。
 
 ## 实施进展与本地验证（2026-10-20）
 
 **阶段状态：`in_progress`。** 该记录来自 Mac 上 `main@d62dc0c` 的未提交工作树与 OpenClaw 独立临时测试容器；**不是已提交/已推送版本的 CI 或 Dev/生产部署**，Phase 25/27/28 与 Plugin 的既有用户改动均未触碰。
 
-- **P26-01/02 已实现**：`cmd/kgosd/setup.go`、`internal/runtime/runtime.go`、`internal/daemon/setup_session.go` 实现单进程/单 Instance Lock、无配置受限 HTTP、状态查询、初始化先于业务鉴权、503、原有 Web Session/根 Token 认证、一次性 Claim、重复/跨域/竞态保护；已支持手工完整 TOML 自动 Bootstrap 与现有数据库恢复，旧实例异常 fail closed。
+- **P26-01/02 已实现**：`cmd/kgosd/setup.go`、`internal/runtime/runtime.go`、`internal/daemon/setup_session.go` 实现单进程/单 Instance Lock、无配置受限 HTTP、状态查询、初始化先于业务鉴权、503、原有 Web Session/根 Token 认证、D110 首次匿名 rotate-token、重复/跨域/竞态保护；已支持手工完整 TOML 自动 Bootstrap 与现有数据库恢复，旧实例异常 fail closed。
 - **P26-03 已实现**：完成设置后通过同一 Lithograph/Kernel Runtime 与进程内 authenticated overview 证明真实就绪，只在成功后发布原版 `initialized.json` 并开放业务；Web API Key 0600 私有落盘和专用环境变量映射，TOML/Token no-replace 写入，手工 `api_key_env` 独立保留。
 - **P26-04 已实现**：React 欢迎→向量→Instance 认证→真实初始化四步，与 `setup/status|claim|initialize`、原 Web Session 相连；中英、深浅色、手机/桌面布局保持左侧步骤与 Footer 按钮位置稳定；非法旧实例不暴露重新认领入口。
 - **此前 Mac 质量基线（早于后续 Embedding 验证及其它并行改动）**：完整 `pnpm validate` **退出码 0**；Web Check **146/146**、全仓 Vitest **248/248**、完整 Playwright **33/33**（其中 Setup 真实数据库 E2E **7/7**，验证 Session 登录失败后使用原 Token 重试）；Go `-race` 通过、整体覆盖率 **90.1%**；TypeScript 覆盖率依次为语句 **95.40%**、分支 **90.57%**、函数 **96.95%**、行 **97.39%**，均满足 ≥90%。以上为真实历史证据，**不得用于宣称最新工作树的完整验证通过**。

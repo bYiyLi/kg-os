@@ -69,7 +69,17 @@ func TestPhase16UnifiedKGOSDHTTPAuthAndOAuthRoutes(t *testing.T) {
 	readyDeadline := time.Now().Add(30 * time.Second)
 	ready := false
 	for time.Now().Before(readyDeadline) {
-		result, requestErr := client.Get(locator.Endpoint + "/api/v1/setup/status")
+		credential, loadErr := runtimeprofile.LoadCredential(paths)
+		if loadErr != nil {
+			time.Sleep(25 * time.Millisecond)
+			continue
+		}
+		statusRequest, newErr := http.NewRequest(http.MethodGet, locator.Endpoint+"/api/v1/setup/status", nil)
+		if newErr != nil {
+			t.Fatal(newErr)
+		}
+		statusRequest.Header.Set("Authorization", "Bearer "+credential.Token)
+		result, requestErr := client.Do(statusRequest)
 		if requestErr == nil {
 			var state struct {
 				State string `json:"state"`

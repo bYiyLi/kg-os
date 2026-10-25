@@ -214,16 +214,29 @@ Expect the container to remain running with no permission or initialization erro
 First query status on the service host:
 
 ```bash
-curl --fail --silent --show-error http://127.0.0.1:3777/api/v1/setup/status
+curl --silent --show-error --write-out '\nHTTP %{http_code}\n' http://127.0.0.1:3777/api/v1/setup/status
 ```
 
 - Web setup should report `state="setup_required"`; proceed with the wizard below.
-- The configuration-file path should move from `initializing` to `ready`; skip to [configuration-file checks](#file-check).
-- For `error`, read the public `message` and container logs and use the recovery table below. An accepted request or a running container is not completion.
+- The configuration-file path creates its administrator Token during automatic initialization; an unauthenticated status request then returns **401**. Use the authenticated status check below to confirm `initializing` → `ready`, then continue to [configuration-file checks](#file-check).
+- If initial status is `error`, follow the recovery table. HTTP 401 after a credential exists is not an initialization failure; it indicates the authentication boundary is active. A running container alone is not completion.
+
+When `auth.json` exists, inspect status from a trusted host using the existing root credential **without printing it or placing it in a command argument** (run from `~/kgos`):
+
+```bash
+sudo python3 - <<'PY'
+import json, pathlib, urllib.request
+credential = json.loads(pathlib.Path("workspace/.kgos/auth.json").read_text())
+req = urllib.request.Request("http://127.0.0.1:3777/api/v1/setup/status",
+    headers={"Authorization": "Bearer " + credential["token"]})
+with urllib.request.urlopen(req, timeout=10) as response:
+    print(response.read().decode())
+PY
+```
 
 <a id="web-init"></a>
 
-### Web path: the five-step setup
+### Web path: the four-step Token-first setup
 
 On the service host, open `http://127.0.0.1:3777/setup` in a browser. For a remote host, open another terminal **on your computer** and forward SSH, replacing the username and host with your existing SSH connection:
 
@@ -233,17 +246,16 @@ ssh -N -L 13777:127.0.0.1:3777 your-user@your-server
 
 Keep this terminal open and visit `http://127.0.0.1:13777/setup` in your local browser. The browser does not need direct access to a public server port `3777`.
 
-Complete the five screen steps:
+Complete the four screen steps:
 
-1. **Welcome**: confirm this is the separate instance you intend to initialize.
+1. **Administrator credential**: on a new instance, call `rotate-token` through the first Setup screen to generate and save the administrator Token once. It takes effect immediately. Thereafter all Setup APIs, including status, rotation, and Embedding validation, require valid administrator authentication. For an existing instance, enter the original Token to log in or restore an existing Session; anonymous regeneration is prohibited. Do not share your Token in chat.
 2. **Public address**: replace the loopback suggestion with your final `https://kgos.example.com`, using your actual domain. Do not use the browser's SSH-forwarding address.
-3. **Vector model**: enter your chosen Base URL, model, actual dimensions, similarity and API Key; leave the key empty for no authentication. Run the connection test and continue only after a real successful request with matching dimensions. A suggested provider is an example, not your selection. The endpoint must be reachable from the container; the wizard rejects loopback, link-local and special reserved addresses.
-4. **Administrator credential**: generate the administrator Token and immediately save it in your password manager. An existing valid Session is restored automatically in the same browser; the wizard has no field for manually entering an old Token. Enter Tokens only in the trusted local or SSH-forwarded interface, never in chat.
-5. **Review and initialize**: review and submit the configuration, then wait for `ready`. If it fails, preserve configuration and data, diagnose the cause below and restart the original container rather than creating a fresh database.
+3. **Vector model**: enter your chosen Base URL, model, actual dimensions, similarity and API Key; leave the key empty for no authentication. Run the connection test and continue only after a real successful request with matching dimensions. Any HTTP(S) target is allowed for an authenticated administrator, including loopback, private networks and Fake-IP. Ensure the endpoint is reachable from the container; timeouts, size limits, concurrency limits and redirect protection remain.
+4. **Review and initialize**: review and submit the configuration, then wait for `ready`. If it fails, preserve configuration and data, diagnose the cause below and restart the original container rather than creating a fresh database.
 
-Web setup saves a complete configuration and stores the Embedding Key separately in a private file, not in TOML. If the browser Session is lost before configuration is submitted, you decide whether to generate a replacement Token in the wizard. This invalidates the old Token and Sessions, so save the replacement securely. The action is unavailable after configuration is submitted. For `error`, preserve configuration and `auth.json`, diagnose the cause and restart the original container.
+Web setup saves a complete configuration and stores the Embedding Key separately in a private file, not in TOML. If the browser Session is lost before configuration is submitted, log in using the existing Token before invoking `rotate-token`. An authenticated rotation invalidates the old Token and Sessions, so save the replacement securely. The action is unavailable after configuration is submitted. For `error`, preserve configuration and `auth.json`, diagnose the cause and restart the original container.
 
-**Continue only when** the real Embedding test has passed, the Token is safely saved, and `setup/status` reports `ready`. Then go to step 5.
+**Continue only when** the real Embedding test has passed, the Token is safely saved, and `setup/status` reports `ready`. Only after all four screens succeed should you proceed to persistent checks.
 
 <a id="file-check"></a>
 
@@ -383,7 +395,7 @@ The first start requests a certificate; do not continue until it succeeds. Caddy
 From a client with public internet access, replace the example domain and run these commands. Do not bypass certificate validation with `-k`:
 
 ```bash
-curl --fail --silent --show-error https://kgos.example.com/api/v1/setup/status
+curl --silent --show-error --write-out '\nHTTP %{http_code}\n' https://kgos.example.com/api/v1/setup/status
 curl --silent --show-error -D - -o /dev/null https://kgos.example.com/mcp
 curl --fail --silent --show-error https://kgos.example.com/.well-known/oauth-authorization-server
 curl --fail --silent --show-error https://kgos.example.com/.well-known/oauth-protected-resource/mcp
@@ -391,7 +403,7 @@ curl --fail --silent --show-error https://kgos.example.com/.well-known/oauth-pro
 
 All of the following must hold:
 
-- HTTPS has a trusted certificate, public `setup/status` returns `ready`, and the MCP path is `/mcp`.
+- HTTPS has a trusted certificate; unauthenticated public `setup/status` returns **401** once a Token exists (it must not expose `ready`). Verify `ready` through the authenticated step 4 status check or by signing in to Web, and confirm MCP path `/mcp`.
 - Anonymous `/mcp` returns **401**, with `WWW-Authenticate` pointing to the correct OAuth resource metadata. Rejection of anonymous access is expected.
 - OAuth metadata `issuer`, authorization/token URLs and the resource address point to your chosen public root.
 - Open `https://kgos.example.com` in a browser and log in with the saved administrator Token. Confirm the intended instance and readable existing versions and knowledge views. An empty knowledge base can pass; do not create business test data.
@@ -445,7 +457,7 @@ Docker command path:
 docker restart kgos
 ```
 
-Run only the line matching your chosen method. Query `setup/status` again; once it returns `ready`, run:
+Run only the line matching your chosen method. Confirm `ready` through the authenticated status check from step 4, then run:
 
 ```bash
 sudo python3 acceptance.py > acceptance-after.json
@@ -658,10 +670,9 @@ If creation fails, the old container remains under the name recorded in `.previo
 
 ### Verify the upgrade and upgrade the Plugin
 
-Check logs/status, wait for `ready`, then run the last two lines:
+Check logs and confirm `ready` through the authenticated status check from step 4, then run:
 
 ```bash
-curl --fail --silent --show-error http://127.0.0.1:3777/api/v1/setup/status
 sudo python3 acceptance.py > acceptance-upgrade.json
 diff -u acceptance-before-upgrade.json acceptance-upgrade.json
 ```

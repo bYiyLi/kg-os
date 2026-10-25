@@ -24,7 +24,6 @@ export const en = {
     setupLabel: "Initial setup",
     progress: "Step {{current}} of {{total}}",
     stages: {
-      welcome: "Welcome to KG OS",
       publicOrigin: "Configure external access",
       vector: "Connect your vector service",
       auth: "Protect your KG OS Instance",
@@ -33,8 +32,6 @@ export const en = {
     description: {
       publicOrigin:
         "Your public address is the single entry point for KG OS. Web, API, and MCP share this origin, which ChatGPT also uses to connect and request authorization.",
-      welcome:
-        "Your own knowledge graph, ready for AI. We'll get everything set up in a few steps.",
       vector: "Set up the embedding service that enables KG OS to search knowledge by meaning.",
       auth: "The access token is the administrator credential for this KG OS Instance—like a master key to your knowledge base. Use it to sign in to the Web interface and authorize protected API or client operations on knowledge and configuration. Anyone holding it may act as an administrator, so keep it private and never share it publicly.",
       initialize: "Check your configuration, then prepare your knowledge base."
@@ -94,8 +91,6 @@ export const en = {
         setup_unavailable:
           "This Instance is no longer accepting verification. Refresh the page to check its setup status.",
         invalid_fields: "Check the URL, model, and dimensions.",
-        address_not_allowed:
-          "Loopback and special-purpose addresses cannot be tested. Check the API URL.",
         timeout: "The embedding service timed out. Try again.",
         connection_failed: "Could not connect to the embedding service.",
         redirect_not_allowed:
@@ -128,37 +123,6 @@ export const en = {
         "This is a local address for development only. ChatGPT Cloud cannot connect to it. Configure a publicly reachable HTTPS domain before connecting ChatGPT.",
       help: "Make sure your HTTPS domain and reverse proxy are configured and reachable by external clients. Entering an address does not create public access."
     },
-    welcome: {
-      tagline: "Build an evolving world of knowledge for AI",
-      intro:
-        "KG OS is programmable knowledge graph infrastructure for AI. Define your own knowledge models, organize objects, properties, and relationships into a connected graph, and explore knowledge with graph queries, full-text search, and vector search.",
-      evolution:
-        "Keep changes in version history. AI works with knowledge through consistent interfaces, while you can review, manage, and correct it in the Web app.",
-      featuresTitle: "What can KG OS do for you?",
-      features: {
-        structure: {
-          title: "Define your knowledge structure",
-          description:
-            "Model objects, relationships, properties, and constraints with Ontology, without a fixed domain schema."
-        },
-        discovery: {
-          title: "Connect, query, and discover",
-          description:
-            "Combine graph queries, full-text search, and vector search to discover related knowledge."
-        },
-        evolution: {
-          title: "Let knowledge evolve",
-          description:
-            "Use Commit, Branch, and Diff to preserve history, compare changes, and track evolution."
-        },
-        ai: {
-          title: "AI-first, human oversight",
-          description:
-            "AI works through CLI, Skill, and MCP; you manage and correct knowledge through the Web app."
-        }
-      },
-      nextTitle: "Just four steps to get started"
-    },
     url: "API URL",
     key: "API Key",
     keyPlaceholder: "Enter your embedding API key",
@@ -177,7 +141,8 @@ export const en = {
     authIntroductionSecond:
       "KG OS generates a strong random token automatically; you don't need to create an account or set a password. Each token takes effect immediately, and its full value appears in the Web app only when created. After leaving or refreshing this step, an administrator with access to the Instance files can retrieve it from .kgos/auth.json. Regenerating revokes the old token and its login sessions, so other clients will need updated credentials.",
     authGenerateDescription:
-      "Before setup is completed, you can regenerate the access token without entering the old one. This browser will then try to connect automatically. Copy and securely save the new token before continuing.",
+      "Generate your administrator token once to begin setup. After that, sign in with the existing token to continue or regenerate it. Copy and securely save each new token before continuing.",
+    authExistingTokenLabel: "Existing administrator token",
     authCreatedTitle: "Access token created",
     authTokenCreated: "Instance access token",
     generateToken: "Generate access token",
@@ -206,7 +171,6 @@ export const en = {
       readiness: "Readiness"
     },
     back: "Back",
-    start: "Get started",
     next: "Next",
     initialize: "Initialize knowledge base"
   },

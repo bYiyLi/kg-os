@@ -7,7 +7,6 @@ import type { useSetupFlow } from "./use-setup-flow.js";
 
 const reasons = [
   "invalid_fields",
-  "address_not_allowed",
   "timeout",
   "connection_failed",
   "redirect_not_allowed",

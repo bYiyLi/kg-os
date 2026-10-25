@@ -10,7 +10,6 @@ import type { SettingsDraft } from "./use-settings-draft.js";
 import { SettingsInfo, SettingsSection } from "./settings-ui.js";
 
 const knownReasons = new Set([
-  "address_not_allowed",
   "busy",
   "connection_failed",
   "invalid_fields",

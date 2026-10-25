@@ -28,9 +28,13 @@ func (s *SetupSession) ServeAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SetupSession) Authorize(w http.ResponseWriter, r *http.Request, next http.Handler) {
-	if _, ok := validWebOrigin(r); !ok {
-		http.Error(w, "origin not allowed", http.StatusForbidden)
-		return
+	// Read-only setup status is accessible to authenticated API clients that
+	// do not send an Origin header. Mutating setup requests remain same-origin.
+	if r.Method != http.MethodGet || r.Header.Get("Origin") != "" {
+		if _, ok := validWebOrigin(r); !ok {
+			http.Error(w, "origin not allowed", http.StatusForbidden)
+			return
+		}
 	}
 	s.store.webBearer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !authenticate(w, r, s.root) {

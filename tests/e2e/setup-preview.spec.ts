@@ -1,16 +1,19 @@
 // cspell:words qwen qwen3
 
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
 
 import {
+  enterOriginStep,
+  startDaemon,
+  useEmbeddingFixture,
+  enterVectorStep,
   expectPersistedOriginAndOAuth,
+  mockSetupSessionForLayout,
   regenerateAndCheckOldToken,
   waitReady
 } from "./setup-acceptance-helpers.js";
@@ -22,36 +25,6 @@ test.describe.configure({ mode: "serial" });
 let workspace: string;
 let daemon: ChildProcess;
 let endpoint: string;
-
-async function startDaemon(root: string): Promise<{ child: ChildProcess; url: string }> {
-  const bin = resolve(
-    "artifacts",
-    "runtime",
-    process.platform + "-" + process.arch,
-    process.platform === "win32" ? "kgosd.exe" : "kgosd"
-  );
-  const child = spawn(bin, ["--root", root], { stdio: "ignore" });
-  const locator = join(root, ".kgos", "kgosd.lock");
-  const limit = Date.now() + 20000;
-  while (Date.now() < limit && child.exitCode === null) {
-    try {
-      const data: unknown = JSON.parse(await readFile(locator, "utf8"));
-      if (
-        typeof data === "object" &&
-        data !== null &&
-        "endpoint" in data &&
-        typeof data.endpoint === "string" &&
-        data.endpoint.startsWith("http://")
-      ) {
-        return { child, url: data.endpoint };
-      }
-    } catch {
-      // Wait for the daemon to atomically publish its locator.
-    }
-    await new Promise((done) => setTimeout(done, 60));
-  }
-  throw new Error("KG OS setup daemon did not start");
-}
 
 async function stopDaemon(child: ChildProcess) {
   if (child.exitCode !== null || child.signalCode !== null) return;
@@ -76,17 +49,6 @@ test.afterAll(async () => {
   await rm(workspace, { recursive: true, force: true });
 });
 
-async function useEmbeddingFixture(page: Page) {
-  await page.route("**/api/v1/setup/validate-embedding", async (route) => {
-    const request = route.request().postDataJSON() as { dimensions: number };
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, dimensions: request.dimensions })
-    });
-  });
-}
-
 test("uninitialized Instance serves setup but gates every business API before authentication", async ({
   page,
   request
@@ -105,19 +67,21 @@ test("uninitialized Instance serves setup but gates every business API before au
 
   await page.goto(endpoint + "/");
   await expect(page).toHaveURL(/\/setup$/);
-  await expect(page.getByRole("heading", { name: "Welcome to KG OS" })).toBeVisible();
-  await expect(page.locator(".setup-step-dot")).toHaveCount(5);
+  await expect(page.getByRole("heading", { name: "Protect your KG OS Instance" })).toBeVisible();
+  await expect(page.locator(".setup-step-dot")).toHaveCount(4);
 });
 
 test("setup keeps its step rail, progress and buttons anchored across screen sizes", async ({
   page
 }) => {
   await useEmbeddingFixture(page);
+  const reset = await mockSetupSessionForLayout(page);
   for (const viewport of [
     { width: 1440, height: 900 },
     { width: 375, height: 812 },
     { width: 320, height: 700 }
   ]) {
+    reset();
     await page.setViewportSize(viewport);
     await page.goto(endpoint + "/setup");
     await expect(page.locator(".setup-stepper ol")).toBeVisible();
@@ -139,16 +103,14 @@ test("setup keeps its step rail, progress and buttons anchored across screen siz
       });
     const start = await anchors();
     expect(start.overflow).toBe(false);
-    await page.getByRole("button", { name: "Get started" }).click();
-    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await enterOriginStep(page);
     expect(await anchors()).toEqual(start);
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.getByRole("button", { name: "Test connection" }).click();
     await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Next", exact: true }).click();
     expect(await anchors()).toEqual(start);
-    await expect(page.locator(".setup-auth-tagline")).toBeVisible();
-    await expect(page.locator(".setup-auth-intro")).toHaveCount(2);
-    await expect(page.locator(".setup-auth-guidance")).toBeVisible();
+    await expect(page.locator(".setup-review-card")).toHaveCount(2);
     await page.locator(".setup-form-content").evaluate((element) => {
       element.scrollTop = element.scrollHeight;
     });
@@ -159,8 +121,9 @@ test("setup keeps its step rail, progress and buttons anchored across screen siz
 test("public origin is prefilled, editable and rejects non-HTTPS external addresses", async ({
   page
 }) => {
+  await mockSetupSessionForLayout(page);
   await page.goto(endpoint + "/setup");
-  await page.getByRole("button", { name: "Get started" }).click();
+  await enterOriginStep(page);
   const origin = page.locator("#setup-public-origin");
   const next = page.getByRole("button", { name: "Next", exact: true });
   await expect(origin).toHaveValue(endpoint);
@@ -194,9 +157,9 @@ test("public origin is prefilled, editable and rejects non-HTTPS external addres
 test("vector verification errors use the Base UI Toast component, not inline feedback", async ({
   page
 }) => {
+  await mockSetupSessionForLayout(page);
   await page.goto(endpoint + "/setup");
-  await page.getByRole("button", { name: "Get started" }).click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await enterVectorStep(page);
   await page.route("**/api/v1/setup/validate-embedding", async (route) => {
     await route.fulfill({
       status: 422,
@@ -215,45 +178,17 @@ test("vector verification errors use the Base UI Toast component, not inline fee
   await expect(page.locator(".setup-vector-immutable")).toHaveCount(0);
 });
 
-test("Web wizard claims administrator token and bootstraps the real database", async ({
+test("Web wizard protects Setup with the first Token and bootstraps the real database", async ({
   page,
   request
 }) => {
   test.setTimeout(120000);
   await page.goto(endpoint + "/setup");
-  await page.getByRole("button", { name: "Get started" }).click();
-  await expect(page.getByRole("heading", { name: "Configure external access" })).toBeVisible();
-  await expect(page.locator("#setup-public-origin")).toHaveValue(endpoint);
-  await page.locator("#setup-public-origin").fill("https://kgos.example.com/");
-  await expect(page.locator(".setup-public-preview code")).toHaveText(
-    "https://kgos.example.com/mcp"
-  );
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Connect your vector service" })).toBeVisible();
-  await expect(page.locator(".setup-vector-tagline")).toContainText("Find knowledge by meaning");
-  await expect(page.locator(".setup-vector-card-header p")).toHaveCount(2);
-  await expect(page.getByRole("heading", { name: "Verify your vector service" })).toBeVisible();
-  await expect(page.locator("#setup-url")).toHaveValue("https://newapi.y2l.top/v1");
-  await expect(page.locator("#setup-model")).toHaveValue("qwen/qwen3-embedding-8b");
-  await expect(page.locator("#setup-dimensions")).toHaveValue("4096");
-  await useEmbeddingFixture(page);
-  await expect(page.getByRole("button", { name: "Next", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Test connection" }).click();
-  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
-  await expect(page.locator("[data-slot=toast]:not([data-ending-style])")).toContainText(
-    "Model output 4096 dimensions"
-  );
-  await expect(page.locator("[data-slot=toast]:not([data-ending-style])")).not.toContainText(
-    "Missing or invalid API key"
-  );
-  await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Protect your KG OS Instance" })).toBeVisible();
-  await expect(page.locator(".setup-auth-tagline")).toContainText("secure administrator access");
-  await expect(page.locator(".setup-auth-intro")).toHaveCount(2);
-  await expect(page.getByText("administrator credential", { exact: false })).toBeVisible();
-  await expect(page.getByText("takes effect immediately", { exact: false })).toBeVisible();
-  await expect(page.getByText(".kgos/auth.json", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+
+  // A failed first Web login must retain the one-time Token so that the same
+  // owner can sign in again. Anonymous regeneration is not the recovery path.
   let rejectFirstSession = true;
   await page.route("**/api/v1/web/auth/login", async (route) => {
     if (rejectFirstSession) {
@@ -269,83 +204,104 @@ test("Web wizard claims administrator token and bootstraps the real database", a
   });
   await page.getByRole("button", { name: "Generate access token" }).click();
   await expect(page.getByRole("heading", { name: "Access token created" })).toBeVisible();
-  await expect(page.getByText("takes effect immediately", { exact: false })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
-  await expect(page.getByText("not signed in", { exact: false })).toBeVisible();
   const firstToken = await page.locator("#setup-issued-token").inputValue();
-  // The initial Web login failed: regeneration must still work without the
-  // previous Token or an authenticated Web Session.
-  await page.getByRole("button", { name: "Regenerate access token" }).click();
-  await expect(page.locator("#setup-issued-token")).not.toHaveValue(firstToken);
-  await expect(page.locator("#setup-existing-token")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
-  // Real daemon route: claimed Token must not block setup validation before config is published.
-  // The loopback destination is denied locally, so no provider request or secret is sent.
-  const afterClaimProbe = await request.post(endpoint + "/api/v1/setup/validate-embedding", {
-    headers: { Origin: endpoint, "Sec-Fetch-Site": "same-origin" },
+  expect(firstToken.length).toBe(43);
+  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+
+  const repeatAnonymous = await request.post(endpoint + "/api/v1/setup/rotate-token", {
+    headers: { Origin: endpoint }
+  });
+  expect(repeatAnonymous.status()).toBe(401);
+  expect((await request.get(endpoint + "/api/v1/setup/status")).status()).toBe(401);
+  const anonymousProbe = await request.post(endpoint + "/api/v1/setup/validate-embedding", {
+    headers: { Origin: endpoint },
     data: {
-      base_url: "https://127.0.0.1/v1",
+      base_url: "http://127.0.0.1:1/v1",
       model: "test-model",
       dimensions: 3,
       similarity: "cosine",
       apiKey: null
     }
   });
-  expect(afterClaimProbe.status()).toBe(422);
-  expect(await afterClaimProbe.json()).toMatchObject({
-    ok: false,
-    reason: "address_not_allowed"
+  expect(anonymousProbe.status()).toBe(401);
+
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "Copy token" }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(firstToken);
+
+  // Regeneration now requires an authenticated Session and revokes the old token.
+  const issuedToken = await regenerateAndCheckOldToken(page, request, endpoint);
+  const localProbe = await request.post(endpoint + "/api/v1/setup/validate-embedding", {
+    headers: { Origin: endpoint, Authorization: "Bearer " + issuedToken },
+    data: {
+      base_url: "http://127.0.0.1:1/v1",
+      model: "test-model",
+      dimensions: 3,
+      similarity: "cosine",
+      apiKey: null
+    }
   });
+  expect(localProbe.status()).toBe(422);
+  expect(await localProbe.json()).toMatchObject({
+    ok: false,
+    reason: "connection_failed"
+  });
+
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Configure external access" })).toBeVisible();
+  await expect(page.locator("#setup-public-origin")).toHaveValue(endpoint);
+  await page.locator("#setup-public-origin").fill("https://kgos.example.com/");
+  await expect(page.locator(".setup-public-preview code")).toHaveText(
+    "https://kgos.example.com/mcp"
+  );
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Connect your vector service" })).toBeVisible();
+  await expect(page.locator("#setup-url")).toHaveValue("https://newapi.y2l.top/v1");
+  await expect(page.locator("#setup-model")).toHaveValue("qwen/qwen3-embedding-8b");
+  await expect(page.locator("#setup-dimensions")).toHaveValue("4096");
+  await useEmbeddingFixture(page);
+  await page.getByRole("button", { name: "Test connection" }).click();
+  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Review settings and initialize" })).toBeVisible();
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await page.locator("#setup-model").fill("reverified-model");
   await page.getByRole("button", { name: "Test connection" }).click();
   await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Generate access token", exact: true })
-  ).toHaveCount(0);
-  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.getByRole("button", { name: "Copy token" }).click();
-  await expect(
-    page.locator('[data-slot="toast"][data-type="success"]:not([data-ending-style])')
-  ).toContainText("Token copied");
-  const claimedToken = await page.locator("#setup-issued-token").inputValue();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(claimedToken);
-  await expect(page.getByRole("status", { name: "" })).toContainText(
-    "Instance authentication is complete."
-  );
-  await expect(page.locator("#setup-issued-token")).toHaveValue(/.{40,}/);
-  const issuedToken = await regenerateAndCheckOldToken(page, request, endpoint);
-  await expect(page.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Review settings and initialize" })).toBeVisible();
-  await expect(page.locator(".setup-review-card")).toHaveCount(2);
-  await expect(page.locator(".setup-review-basics dl > div")).toHaveCount(3);
   await expect(page.locator(".setup-review-verified")).toContainText("Vector service verified");
   await page.getByRole("button", { name: "Initialize knowledge base", exact: true }).click();
 
   await expect
     .poll(
       async () => {
-        const response = await request.get(endpoint + "/api/v1/setup/status");
+        const response = await request.get(endpoint + "/api/v1/setup/status", {
+          headers: { Authorization: "Bearer " + issuedToken }
+        });
+        expect(response.status()).toBe(200);
         return ((await response.json()) as { state: string }).state;
       },
       { timeout: 80000 }
     )
     .toBe("ready");
-
   await expect.poll(() => page.url(), { timeout: 15000 }).not.toContain("/setup");
   await expect(page.locator(".authentication-dialog")).toHaveCount(0);
-  await expect(page.locator(".app-shell.is-auth-required")).toHaveCount(0);
   const receipt = JSON.parse(
     await readFile(join(workspace, ".kgos", "initialized.json"), "utf8")
   ) as { version: number };
   expect(receipt.version).toBe(1);
   await expectPersistedOriginAndOAuth(request, endpoint, workspace);
   await stat(join(workspace, ".kgos", "kgos.db"));
-  expect((await request.post(endpoint + "/api/v1/setup/claim")).status()).toBe(409);
-  expect((await request.post(endpoint + "/api/v1/setup/rotate-token")).status()).toBe(409);
+  expect((await request.get(endpoint + "/api/v1/setup/status")).status()).toBe(401);
+  expect(
+    (
+      await request.post(endpoint + "/api/v1/setup/rotate-token", {
+        headers: { Origin: endpoint }
+      })
+    ).status()
+  ).toBe(401);
   const authorized = await request.post(endpoint + "/api/v1/evolution/overview", {
     headers: { Authorization: "Bearer " + issuedToken },
     data: {}
@@ -367,7 +323,12 @@ test("restarts the same initialized Instance without allowing a second setup", a
   await expect
     .poll(
       async () => {
-        const ready = await request.get(endpoint + "/api/v1/setup/status");
+        const credentials = JSON.parse(
+          await readFile(join(workspace, ".kgos", "auth.json"), "utf8")
+        ) as { token: string };
+        const ready = await request.get(endpoint + "/api/v1/setup/status", {
+          headers: { Authorization: "Bearer " + credentials.token }
+        });
         return ((await ready.json()) as { state: string }).state;
       },
       { timeout: 15000 }
@@ -411,7 +372,7 @@ test("manual TOML starts automatically and resumes with the existing database an
     await writeFile(join(root, ".kgos", "config.toml"), config, { mode: 0o600 });
     const first = await startDaemon(root);
     child = first.child;
-    await waitReady(first.url, request);
+    await waitReady(first.url, request, root);
     const credential = JSON.parse(await readFile(join(root, ".kgos", "auth.json"), "utf8")) as {
       token: string;
     };
@@ -425,7 +386,7 @@ test("manual TOML starts automatically and resumes with the existing database an
     await unlink(join(root, ".kgos", "initialized.json"));
     const resumed = await startDaemon(root);
     child = resumed.child;
-    await waitReady(resumed.url, request);
+    await waitReady(resumed.url, request, root);
     const after = await request.post(resumed.url + "/api/v1/evolution/overview", {
       headers: { Authorization: "Bearer " + credential.token },
       data: {}
@@ -455,17 +416,16 @@ test("Web-provided embedding key stays private and survives a restart", async ({
     child = first.child;
     await page.goto(first.url + "/setup");
     await useEmbeddingFixture(page);
-    await page.getByRole("button", { name: "Get started" }).click();
+    await page.getByRole("button", { name: "Generate access token" }).click();
+    await expect(page.locator("#setup-issued-token")).toHaveValue(/.{40,}/);
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.locator("#setup-key").fill(key);
     await page.getByRole("button", { name: "Test connection" }).click();
     await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Next", exact: true }).click();
-    await page.getByRole("button", { name: "Generate access token" }).click();
-    await expect(page.locator("#setup-issued-token")).toHaveValue(/.{40,}/);
-    await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.getByRole("button", { name: "Initialize knowledge base", exact: true }).click();
-    await waitReady(first.url, request);
+    await waitReady(first.url, request, root);
 
     const config = await readFile(join(root, ".kgos", "config.toml"), "utf8");
     expect(config).toContain('api_key_env = "KGOS_WEB_EMBEDDING_API_KEY"');
@@ -477,7 +437,7 @@ test("Web-provided embedding key stays private and survives a restart", async ({
     await stopDaemon(child);
     const resumed = await startDaemon(root);
     child = resumed.child;
-    await waitReady(resumed.url, request);
+    await waitReady(resumed.url, request, root);
     expect(await readFile(join(root, ".kgos", "embedding-api-key"), "utf8")).toBe(key);
   } finally {
     if (child !== null) await stopDaemon(child);

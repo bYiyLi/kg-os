@@ -1126,3 +1126,14 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **Plugin/Skill 同步**：只公开 `plugins/kgos/plugin.json`、不含用户凭证的 `.app.json.example` 和七个目标 Skill 的所有必要 Markdown 资源，同时公开适用许可文本。Plugin Manifest 版本须与 KG OS 产品包版本相同。历史过渡通用 `skills/kgos` 不进入公开候选包（后续已从私有源码删除）；旧私人 Plugin 不自动更新或移除，真实七 Skill/Doctor 客户端验收仍按 Phase 25/27/28 独立完成，不能以文件导出代替。
 - **发布**：普通 Private `main` Push 只同步公开候选内容，公开 CI 执行测试；获得独立授权的 Private `v*` Tag 对应公开同名版本，正式 Release 除 Docker 外必须提供包含一份 `INSTALL.md`、Plugin Manifest、无凭证配置样例、七个 Skill 与许可的归档；后续 Release 另附同版双语用户安装 Markdown。AGPL 与商业双授权的二进制发布合规前置和 `KGOS_BINARY_DISTRIBUTION_APPROVED` 门禁继续有效；不把尚未发行的 GHCR Tag 当作用户可安装镜像。
 - **验证归属**：渲染白名单、拒绝秘密/额外 Skill、单安装文档、产品版本一致性及归档完整性属于当前发布链可验证合同，维护于 [Client](client.md#私有源码与公开分发仓库)、[MCP Plugin](mcp.md#最终官方-skill-清单与通用-skill-退役d107目标方案) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。不为这些文件建立第二套技术或设计真源。
+
+<a id="d110-token-first-setup"></a>
+
+### D110 Token-first Setup 与 Embedding 出口自主配置（2026-10-25）
+
+- **决定**：未配置且没有管理员凭证的 Instance，用户打开 Web Setup 后，第一步通过 `POST /api/v1/setup/rotate-token` **仅匿名成功一次**创建并持久化原有 256-bit Instance Token，响应仅此一次显示新 Token。随后在同一 Web Session 中完成对外 Origin、向量验证和 Knowledge Base 初始化；不再提供独立匿名 `setup/claim`。
+- **鉴权**：Token 一旦存在，所有 Setup API（包括状态查询、`rotate-token`、Embedding 验证与初始化）要求有效的既有 Instance Bearer 或 Web Access Bearer + Boot Guard；未授权返回 401，不调用目标服务或更改磁盘。Web 静态页面、用于登录/恢复的现有 `web/auth/*` 按本身认证合同继续工作。先判断 Instance 状态，再完成受保护的 Setup 操作；其他未 ready 业务 API/MCP 仍返回 503。首个 Token 原子创建前的匿名状态查询是唯一引导例外，创建后直接受保护。浏览器收到状态 401 时根据服务端 HTML 路由（未 ready 重定向 `/setup`，ready 回首页）进入登录/恢复界面，持有 Session 后重新读取真实状态，不猜测已初始化成功。
+- **轮换**：现有管理员必须先登录才能调用 `rotate-token`；仅在 `setup_required` 且尚无 `config.toml` 时允许，串行检查当前 Token/落盘凭证，原子替换并废止旧 Root Token、Cookie Session 和 Web Access Bearer；新 Token 再展示一次。无效/缺失凭证、旧 Token、并发请求不得轮换或匿名重新认领；已有 `auth.json` 的旧未初始化 Instance 必须以原 Token 登录，不自动重置。进入 `initializing`、`ready`、错误或配置已保存状态时禁止轮换。
+- **Embedding 出口**：在已认证 Setup 验证和已认证设置页连接测试中，不按目标 IP 类型拦截 loopback、普通私网、Fake-IP、链路本地、特殊保留地址或元数据地址；调用方负责其服务器网络和目标的信任。仍仅接受合法 HTTP(S) URL/端口、不接受 URL 内凭证或 query/fragment；保留同源、已认证、禁止 HTTP 重定向、环境代理禁用、并发/超时/请求响应大小上限及密钥不持久化的探测规则。目标域名的解析与连接必须保持一致，不能把安全地址列表简单转成别名绕过规则。正式 Runtime 的 Provider 配置和 HTTP 调用权限不受此 Setup 流程修改。
+- **接受的风险**：首次匿名创建凭证前仍有公开部署被第三方抢先领取的有限窗口；HTTPS、受控暴露和及时认领由操作者负责。认证管理员可以使用任意 Embedding 目标，认证凭证泄漏仍可能产生 SSRF/内部网络访问风险；这不等于网络对所有威胁绝对安全。旧发行版保持原行为，变更仅在包含本实现的后续版本生效。
+- **取代范围**：本决定取代 D105 中匿名 `claim`、匿名 `rotate-token`、未认证向量验证与五步“Token 第四步”的**后续产品目标**；D105 的历史决定及其它 Runtime/Bootstrap/Session/数据恢复合同仍有效。详细接口由 [Runtime](runtime.md#web-first-run-bootstrap) 拥有，UI 顺序由 [Web](web.md#web-first-run-setup) 拥有，实施与验收由 [Phase 26](../development/phases/26-web-first-run-bootstrap.md) 拥有。

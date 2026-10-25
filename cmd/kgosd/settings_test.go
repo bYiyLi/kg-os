@@ -79,10 +79,12 @@ func TestRuntimeSettingsNoAuthProbeRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
-func TestRuntimeSettingsProbeDoesNotContactBlockedEndpoint(t *testing.T) {
-	var reached atomic.Bool
-	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		reached.Store(true)
+func TestRuntimeSettingsProbeAllowsLocalEndpoint(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"embedding":[0.1,0.2,0.3]}]}`))
 	}))
 	defer server.Close()
 	t.Setenv("KGOS_TEST_SETTINGS_PROBE_KEY", "private-settings-probe-value")
@@ -93,12 +95,15 @@ func TestRuntimeSettingsProbeDoesNotContactBlockedEndpoint(t *testing.T) {
 		}}
 		options := runtimeSettingsOptions(config, command.DaemonSettings{}, nil)
 		result := options.ProbeEmbedding(context.Background())
-		if result.OK || result.Reason != "address_not_allowed" || reached.Load() {
-			t.Fatalf("settings probe did not retain the restricted network boundary: %+v reached=%v", result, reached.Load())
+		if !result.OK || result.Dimensions != 3 {
+			t.Fatalf("settings probe could not reach local Embedding endpoint: %+v", result)
 		}
 		body, err := json.Marshal(result)
 		if err != nil || strings.Contains(string(body), "private-settings-probe-value") {
-			t.Fatal("blocked settings probe exposed its credential")
+			t.Fatal("settings probe exposed its credential")
 		}
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("expected two requests, got %d", calls.Load())
 	}
 }

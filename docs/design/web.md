@@ -37,25 +37,20 @@
 
 <a id="web-first-run-setup"></a>
 
-### 五步首次初始化引导与路由（D105，扩展对外 Origin 配置）
+### 四步 Token-first 初始化与路由（D110）
 
-**这是部署后的独立全屏引导，不是正常工作区的欢迎页、可关闭弹窗或新的账号系统。** `kgosd` 未初始化也能提供 Web 静态资源，页面在恢复已有 Web Session 或显示常规登录弹窗**之前**先读取同源 `GET /api/v1/setup/status`：`setup_required/initializing` 导航到 `/setup`，`ready` 导航到首页（包括用户手动输入 `/setup` 时），`error` 展示有界错误及恢复说明，不把配置损坏或已有数据丢失误当作新空库。状态失败不能乐观跳进工作区；服务器也执行相同的页面导航门禁，避免仅依赖前端。普通 API/MCP 错误走 Runtime/Contracts，不在前端把 JSON 503 当作页面 302。
+Web Setup 是部署后独立的全屏向导，不是新的账号体系。当前版本以 **管理员 Token → 对外访问地址 → Embedding → 初始化知识库** 为四步；用户进入未初始化实例的 `/setup` 首先领取并保存唯一根 Token、自动建立 Session，成功登录后才能继续。没有额外欢迎步骤；Token 第一步和前端主题/语言、桌面/移动布局继续复用现有已确认的视觉规范。
 
-| 阶段 | 页面核心内容 | 动作与状态 |
+| 阶段 | UI 与交互 | 验证条件 |
 | --- | --- | --- |
-| **1 · 欢迎使用 KG OS** | 简短介绍系统与后续四步配置目标，不要求填写目录、部署端口、Token 等技术项 | “开始设置”进入第二步；没有关闭/取消或提前进入工作区 |
-| **2 · 配置对外访问地址** | 必填 `server.public_origin`，由浏览器 `location.origin` 自动预填、可编辑。只允许 HTTPS Origin 或本机 loopback HTTP，拒绝用户名、路径、query 和 fragment；展示真实 MCP Path 派生地址 | 标题层级、卡片边框、底色与第三步向量配置保持一致；明确说明统一入口、预填、可达性与本机限制。只校验格式而不声称自动建立公网链路；地址随最终配置一次提交并由 MCP OAuth 使用，修改后通过重启生效 |
-| **3 · 配置向量服务** | `API URL`、可留空的 `API Key`、`Embedding 模型 ID`、`向量维度 1..4096`、`cosine / euclidean`；模型 ID 可自由填写 | 去掉无密钥切换开关：留空表示 no-auth。点击“验证配置”通过新的受限 Setup API 对用户所填 Embedding URL、模型、密钥执行真实测试，验证成功后才展示“下一步”；任何向量参数修改立即使旧验证失效，不把格式合格视为远端验证成功；已认领管理员 Token 但尚未提交配置时，返回本步骤仍可重新验证 |
-| **4 · 保护您的 KG OS 实例** | 标题、副标题、两段介绍及安全提示始终一致，说明管理员权限与用途、安全保管、仅创建时回显、从本地 `.kgos/auth.json` 找回及轮换后旧会话失效。首次按钮为「生成访问令牌」，已有 Token 时直接显示「重新生成访问令牌」，不提供输入已有令牌的路径；新令牌仅在本次创建响应中展示，可显隐、复制及保存 | 在尚未提交配置的 `setup_required` 状态直接生成或重新生成，无须输入旧 Token、登录或进行人工认证；服务端依然限制同源，配置提交后不允许重新生成。新令牌生成后浏览器自动建立 Web Session，成功后才允许进入第五步；失败时可直接再次重新生成或使用本次已展示的新令牌重试连接 |
-| **5 · 初始化知识库** | 使用「确认配置，开始初始化」标题、明确的副标题与操作说明；按「服务访问 / 语义检索」两张与第三步统一风格的卡片突出对外地址、MCP URL、Embedding 模型/维度/算法，下面集中显示 API 凭证、Jieba 分词与缓存上限，敏感凭证只显示配置状态。仅在当前草稿实际完成远端验证时显示“向量服务已验证”，本机 Origin 提示外部不可连接；操作前说明可以返回修改配置。初始化过程中沿用相同内容结构与真实 `配置 → Extensions → Instance Auth → Knowledge Base Bootstrap → Ready` 阶段标识；失败说明旧配置与数据会保留，并提供既有恢复入口 | 获认证后首次提交完整配置；若配置已合法发布而执行中断，重试仅按原 Session 调用不携带新配置的 `{}` resume；只有 daemon authenticated readiness 成功才显示完成并进入首页；失败不显示伪成功、不重建旧数据。继续复用固定 Footer 与深浅主题，不增设另一套提交接口或模拟进度 |
+| **1 · 保护您的 KG OS 实例** | 没有 `auth.json` 时显示「生成访问令牌」，第一次调用 `POST setup/rotate-token` 原子生成并只回显一次；可显隐、复制并自动登录。已有 Token 时恢复现有 Session 或提示用户输入**已有管理员 Token**登录；没有旧凭证不能匿名再生成。认证成功才允许「下一步」，已有 Token 且已登录才显示「重新生成访问令牌」；轮换需要旧有效 Session，成功使旧 Token、Cookie 和 Web Access Bearer 失效，自动用新 Token 登录；失败不谎称登录成功。 | Token 缺失时仅首次匿名生成；已存在时必须有效 Root Token 或 Web Session，拒绝未认证轮换；刷新不重新认领 |
+| **2 · 配置对外访问地址** | 必填 `server.public_origin`，默认 `location.origin`，只接受裸 HTTPS Origin 或本机 loopback HTTP，显示派生 MCP URL。 | 仅格式合法才能继续；不自动建立 DNS、HTTPS 或反向代理 |
+| **3 · 配置向量服务** | URL、可留空 API Key、自选模型 ID、1..4096 维度及 cosine/euclidean；默认 `https://newapi.y2l.top/v1`、`qwen/qwen3-embedding-8b`、4096、cosine。 | 用当前 Web Bearer + Boot Guard 请求受认证的 `setup/validate-embedding`；真实验证成功且维度符合才进入下一步，参数修改使旧结果立即失效。允许管理员指定任意合法 HTTP(S) 地址，包含 Fake-IP、回环、私网与特殊地址；后端仍执行请求时长、大小、同源、禁止重定向、无环境代理保护 |
+| **4 · 初始化知识库** | 对外 Origin、Embedding/Key 状态、Jieba 和缓存预览；真实配置提交、状态进度、失败恢复与完成态，保留原版画面风格和单一 Footer。 | 有效 Session 才能提交完整配置；合法 config 已发布但 receipt 缺失时仅可认证 `{}` resume；成功须经过当前 Runtime/Kernel authenticated readiness 与 receipt，不能伪造成功 |
 
-第三步的 **Web 向导预填值**为 `base_url=https://newapi.y2l.top/v1`、`model=qwen/qwen3-embedding-8b`、`dimensions=4096`、`similarity=cosine`；它们都可在提交初始化前修改，不代表 Runtime/手工 TOML 新增隐式默认或某个远端服务已验证可用。文案密度与欢迎页相近：先用简短的定位与两段介绍说明语义检索价值，再按“服务连接 / 模型配置”两栏分别解释服务和模型的作用，不给每个输入框重复附加技术帮助文本；底部仅保留真实验证过程的说明，不显示“初始化完成后不可修改”的提示。验证中、成功、失败及错误原因使用 shadcn/ui 基于 Base UI 的 Toast，不把结果插入正文，不移动固定 Footer；消息支持深浅主题和中英文，改变任一配置即取消过期结果。验证流程不写配置、不保存 API Key、不自动认领管理员 Token；密钥留空时验证与第五步提交均按显式 no-auth 处理。仅在相同向量参数通过真实测试后允许进入第四步，修改任一参数（包括密钥、维度或算法）均需要重新验证。受限出口与错误详情由 [Runtime](runtime.md#web-first-run-bootstrap) 统一拥有，不增加假 Provider Registry 或模型列表。
+**状态与导航**：首次无 Token 可公开读取最小 `setup/status`。Token 一旦存在，`setup/status`、测试/轮换/初始化全部要求当前 Instance 或 Web Bearer，未认证返回 401；普通 Web Session 的 `login|session|logout` 仍按现有合同提供登录与恢复。浏览器启动时读状态，遇到 401 时使用已由服务端决定的页面路径：未 ready 的 `/setup` 显示第一步登录，已 ready 的 `/` 进入现有业务登录；成功恢复 Session 后再读真实状态，不把路径当成业务就绪证明。初始化/ready 与异常场景沿用原 Runtime 状态/503 门禁。已有已初始化实例访问 `/setup` 由服务器重定向首页，未授权不能用 Setup 改写旧实例。
 
-Web 表单将对外地址和向量配置分为第二、第三步，不重新增加“检索/存储”“自定义扩展”两个独立步骤。`fulltext.analyzer=jieba`、`cache.path=cache/openai-compatible.db`、`cache.max_size_mb=4096` 与无额外扩展作为**完整显式值**写入配置；自定义 FTS5 tokenizer / SQLite extension、缓存路径等高级首次配置由直接编辑 `config.toml` 的用户管理，不在首版 Web 向导平铺。向量服务与全文分词仍遵守初始化后禁止修改的配置合同，但不在第三步页面重复展示限制文案；配置一旦写入后的操作不承诺动态修改或索引迁移。Web API Key 的私有文件保存、`api_key_env` 映射与无认证 endpoint 的执行语义只由 [Runtime](runtime.md#web-first-run-bootstrap) 定义，前端不直接处理文件或暴露秘密。
-
-初次浏览器状态检查、第四步已建立的 Web Session 与第五步初始化状态都属于**同一个 Instance / HTTP listener**。重复刷新或跳转不会重新认领已有 Token；Web Step 3 的未提交输入属于本次内存草稿，返回上一步可修改，页面刷新不声称已经持久化。已存在合法配置且在启动时自动初始化的手工文件用户**跳过 Web 问卷**：进行中显示进度，成功进入常规认证/首页；失败时显示可恢复诊断，不要求用户重新填一遍现有文件。已有完整实例直接访问 `/setup` 只能被导航回首页，不可激活第五步写入接口。现有 `?preview=setup` 前端开关只是未接后端的设计预览；正式接入时应移除该生产绕行或限定为开发态静态展示，不能成为已初始化实例的真实 setup 入口。
-
-布局沿用当前已确认的深/浅主题 Token、13px 基础字号、**窄左侧垂直编号导航 + 右侧内容垂直居中 + 底部左侧状态/右侧按钮**；手机按宽度重新排列，不允许步骤变更让步骤条、按钮或状态栏乱跳，长表单仅内容区滚动。欢迎、认证、初始化执行与错误态也必须遵守同一套布局和 English/简体中文 i18n。**本节是 Phase 26 正在实现的正式初始化合同**：当前未提交工作树已经将 `packages/web/src/features/setup/` 接入真实状态、Session 与五步 Setup API，并在正常工作区恢复 Session 之前检查初始化状态；但最终 CI、部署和生产验收仍未完成，不能把本地实现冒称已正式发布。服务端状态/安全约束参见 [Runtime](runtime.md#web-first-run-bootstrap)，实现任务见 [Phase 26](../development/phases/26-web-first-run-bootstrap.md)。
+**视觉与文案**：保留暗/亮主题、简体中文/English、左侧紧凑进度与右侧表单的高保真风格；底部固定按钮不因已认证/未认证跳动。管理员 Token 只在本次生成时展示，不写浏览器持久存储。向量测试状态使用 Toast 提示，并在验证期间阻止重复提交；错误码与安全限制 owner 在 [Runtime](runtime.md#web-first-run-bootstrap)。Web 草稿只在内存中保持，单击下一步不写 config；仅最后一步提交完整显式 `server`、`embedding`、`cache`、`fulltext` 与空 extensions。配置损坏和旧数据不允许通过本向导重置。
 
 ### 前端代码架构
 
@@ -537,7 +532,7 @@ resolve / finalize / abort 都携带最后观察到的 `expectedRevision`。reso
 
 ## 连接、认证与恢复
 
-**D105 新入口顺序（目标，尚未实现）**：本节以下内容继续是已初始化业务工作区的现有 Session/Bearer/Boot Guard 合同；但首次页面加载必须先执行 [Web-first Setup 状态检查](#web-first-run-setup)，只有 `ready` 才继续本节的 Session 恢复和普通认证弹窗。未 ready 时只显示初始化/进度/不可用指引，其中第四步生成 Token 并建立 Web Session；不能因为旧 Session 不可恢复就抢先弹业务认证框，更不能从 `/setup` 绕过已初始化实例的登录流程。
+**D110 当前入口顺序**：本节以下内容继续是已初始化业务工作区的现有 Session/Bearer/Boot Guard 合同；但首次页面加载必须先执行 [Web-first Setup 状态检查](#web-first-run-setup)，只有 `ready` 才继续本节的 Session 恢复和普通认证弹窗。未 ready 时只显示初始化/进度/不可用指引，第一步生成或登录管理员 Token 后才允许继续配置/探测；不能因为旧 Session 不可恢复就抢先弹业务认证框，更不能从 `/setup` 绕过已初始化实例的登录流程。
 
 沿用 [Runtime 单 Token 实例认证](runtime.md#单-token-实例认证)与 [SDK 显式 token](client.md#kgossdk)。正式 Web 与 API 使用当前 daemon 的同源动态 loopback endpoint；浏览器没有读取 `.kgos/kgosd.lock / auth.json` 的特权，不默认扫描端口、自动启动 daemon 或重新定位另一个 workspace。
 

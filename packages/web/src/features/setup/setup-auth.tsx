@@ -13,7 +13,7 @@ export interface AuthProps {
   access: SetupAccess | null;
   claimedToken: string | null;
   busy: boolean;
-  onClaim: () => void;
+  onCreate: () => void;
   onRotate: () => void;
   onLogin: (token: string) => void;
 }
@@ -98,11 +98,12 @@ export function SetupAuthFields({
   access,
   claimedToken,
   busy,
-  onClaim,
+  onCreate,
   onRotate,
   onLogin
 }: AuthProps) {
   const { t } = useTranslation();
+  const [existingToken, setExistingToken] = useState("");
   return (
     <div className="setup-fields setup-auth-fields">
       {status.state === "error" && (
@@ -122,13 +123,39 @@ export function SetupAuthFields({
           onLogin={onLogin}
         />
       )}
+      {status.credentialConfigured && access === null && claimedToken === null && (
+        <div className="setup-field">
+          <label htmlFor="setup-existing-token">{t("setup.authExistingTokenLabel")}</label>
+          <Input
+            id="setup-existing-token"
+            type="password"
+            value={existingToken}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => {
+              setExistingToken(event.currentTarget.value);
+            }}
+          />
+          <Button
+            variant="ghost"
+            type="button"
+            className="setup-check-button"
+            disabled={busy || existingToken.trim() === ""}
+            onClick={() => {
+              onLogin(existingToken.trim());
+            }}
+          >
+            {t("setup.signIn")}
+          </Button>
+        </div>
+      )}
       {status.state === "setup_required" && (
         <Button
           variant="ghost"
           className="setup-check-button"
           type="button"
-          disabled={busy}
-          onClick={status.credentialConfigured ? onRotate : onClaim}
+          disabled={busy || (status.credentialConfigured && access === null)}
+          onClick={status.credentialConfigured ? onRotate : onCreate}
         >
           {t(status.credentialConfigured ? "setup.regenerateToken" : "setup.generateToken")}
         </Button>

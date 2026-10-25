@@ -23,8 +23,8 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [cli.md](design/cli.md) | AI-first CLI command tree、`--root` / `KGOS_ROOT`、分层 help、`doctor/init` setup、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听与 [D105 Web-first 初始化门禁](design/runtime.md#web-first-run-bootstrap)、`auth.json` / `initialized.json`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
 | [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |
-| [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、[D105 五步首次初始化页面](design/web.md#web-first-run-setup)、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
-| [decisions.md](design/decisions.md) | D1–D109 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、[D110 四步 Token-first 初始化页面](design/web.md#web-first-run-setup)、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
+| [decisions.md](design/decisions.md) | D1–D110 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 ## 从配置到调用
@@ -34,7 +34,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 当前 Docker 怎么发布和运行 | [Client Docker-only](design/client.md#docker-only-交付)、[MCP 部署](design/mcp.md#docker-only-交付)、[D99](design/decisions.md#d99-linux-amd64-docker-only-distribution) |
 | 旧 v0.2.1 npm 如何定位 | [历史 npm 分发](design/client.md#npm-package-topology)、[历史 CLI](design/cli.md) |
 | 第一次怎么定位并初始化 KG OS Instance | [CLI Global root](design/cli.md#global-root)、[Doctor](design/cli.md#doctor)、[Init](design/cli.md#init)、[Workspace Root / Instance](design/runtime.md#instance-root) |
-| 未配置也启动 Web / 手工 TOML 自动初始化 / Setup API 如何先于鉴权 | [D105](design/decisions.md#d105-web-first-run-and-runtime-bootstrap)、[Runtime 状态/路由](design/runtime.md#web-first-run-bootstrap)、[Web 五步](design/web.md#web-first-run-setup)、[Setup 错误](design/contracts.md#初始化门禁与-setup-错误)、[Phase 26](development/phases/26-web-first-run-bootstrap.md)（尚未实现） |
+| 未配置也启动 Web / 手工 TOML 自动初始化 / Token-first Setup 鉴权 | [D110](design/decisions.md#d110-token-first-setup)、[D105](design/decisions.md#d105-web-first-run-and-runtime-bootstrap)、[Runtime 状态/路由](design/runtime.md#web-first-run-bootstrap)、[Web 四步](design/web.md#web-first-run-setup)、[Setup 错误](design/contracts.md#初始化门禁与-setup-错误)、[Phase 26](development/phases/26-web-first-run-bootstrap.md)（实施与验收进行中） |
 | kgosd 怎么配置扩展、模型和凭证 | [Runtime config](design/runtime.md#configtoml)、[Embedding 配置映射](design/runtime.md#embedding-配置与索引映射) |
 | 使用方怎么定义模型和索引 | [Ontology 公共格式](design/ontology.md#公共可编辑格式)、[完整编辑示例](design/ontology.md#编辑示例) |
 | 调用方怎么保存正文和查询 | [Graph 合同](design/graph.md#graph-公共调用合同)、[CLI query](design/cli.md#query)、[CLI execute](design/cli.md#execute) |

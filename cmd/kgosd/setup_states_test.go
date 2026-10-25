@@ -80,7 +80,7 @@ func TestFirstRunRoutesAreStatusFirstAndMethodsRestricted(t *testing.T) {
 	}{
 		{"GET", "/api/v1/setup/status", 200},
 		{"POST", "/api/v1/setup/status", 405},
-		{"GET", "/api/v1/setup/claim", 405},
+		{"GET", "/api/v1/setup/rotate-token", 405},
 		{"GET", "/api/v1/setup/initialize", 405},
 		{"POST", "/api/v1/setup/initialize", 401},
 		{"POST", "/api/v1/ontology/read", 503},
@@ -101,7 +101,7 @@ func TestFirstRunRoutesAreStatusFirstAndMethodsRestricted(t *testing.T) {
 
 func TestFirstRunExistingConfigResumeAndRequestSafety(t *testing.T) {
 	c := newTestSetup(t)
-	claimed := setupTestRequest(c, "POST", "/api/v1/setup/claim", "", "")
+	claimed := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", "")
 	if claimed.Code != 201 {
 		t.Fatalf("claim: HTTP %d", claimed.Code)
 	}
@@ -147,7 +147,7 @@ func TestFirstRunExistingConfigResumeAndRequestSafety(t *testing.T) {
 
 func TestFirstRunPreReadyWebSessionRestoresCredential(t *testing.T) {
 	c := newTestSetup(t)
-	claimed := setupTestRequest(c, "POST", "/api/v1/setup/claim", "", "")
+	claimed := setupTestRequest(c, "POST", "/api/v1/setup/rotate-token", "", "")
 	if claimed.Code != 201 {
 		t.Fatalf("claim failed: %d", claimed.Code)
 	}

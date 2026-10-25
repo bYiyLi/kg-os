@@ -185,30 +185,42 @@ func (c *setupController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		writeSetupJSON(w, http.StatusOK, c.state())
+		c.mu.RLock()
+		session := c.session
+		if session == nil {
+			_, err := os.Lstat(c.paths.Auth)
+			if !errors.Is(err, os.ErrNotExist) {
+				c.mu.RUnlock()
+				setupFailure(w, http.StatusUnauthorized, kernel.CodeAuthenticationFailed, "authentication failed")
+				return
+			}
+			view := setupView{State: c.status, CredentialConfigured: false, MCPPath: c.settings.MCP.Path, Phase: c.phase, Message: c.message}
+			c.mu.RUnlock()
+			writeSetupJSON(w, http.StatusOK, view)
+			return
+		}
+		c.mu.RUnlock()
+		session.Authorize(w, r, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			c.mu.RLock()
+			valid := c.currentRootAuthorized(r)
+			c.mu.RUnlock()
+			if !valid {
+				setupFailure(w, http.StatusUnauthorized, kernel.CodeAuthenticationFailed, "authentication failed")
+				return
+			}
+			writeSetupJSON(w, http.StatusOK, c.state())
+		}))
 		return
 	}
 	c.mu.RLock()
 	state, unavailable, session, business := c.status, c.completed, c.session, c.business
 	c.mu.RUnlock()
-	if path == "/api/v1/setup/claim" || path == "/api/v1/setup/rotate-token" || path == "/api/v1/setup/initialize" || path == "/api/v1/setup/validate-embedding" {
+	if path == "/api/v1/setup/rotate-token" || path == "/api/v1/setup/initialize" || path == "/api/v1/setup/validate-embedding" {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		if state == "ready" {
-			setupFailure(w, http.StatusConflict, kernel.CodeSetupConflict, "Instance has already been initialized")
-			return
-		}
-		if path == "/api/v1/setup/validate-embedding" {
-			c.validateEmbedding(w, r)
-			return
-		}
-		if path == "/api/v1/setup/claim" {
-			c.claim(w, r)
-			return
-		}
-		if path == "/api/v1/setup/rotate-token" {
+		if session == nil && path == "/api/v1/setup/rotate-token" && state == "setup_required" {
 			c.rotateToken(w, r)
 			return
 		}
@@ -216,7 +228,27 @@ func (c *setupController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			setupFailure(w, http.StatusUnauthorized, kernel.CodeAuthenticationFailed, "authentication failed")
 			return
 		}
-		session.Authorize(w, r, http.HandlerFunc(c.acceptInitialization))
+		session.Authorize(w, r, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			c.mu.RLock()
+			valid, currentState := c.currentRootAuthorized(r), c.status
+			c.mu.RUnlock()
+			if !valid {
+				setupFailure(w, http.StatusUnauthorized, kernel.CodeAuthenticationFailed, "authentication failed")
+				return
+			}
+			if currentState == "ready" {
+				setupFailure(w, http.StatusConflict, kernel.CodeSetupConflict, "Instance has already been initialized")
+				return
+			}
+			switch path {
+			case "/api/v1/setup/rotate-token":
+				c.rotateToken(w, r)
+			case "/api/v1/setup/validate-embedding":
+				c.validateEmbedding(w, r)
+			case "/api/v1/setup/initialize":
+				c.acceptInitialization(w, r)
+			}
+		}))
 		return
 	}
 	if state == "ready" {
@@ -282,32 +314,6 @@ func writeSetupJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-func (c *setupController) claim(w http.ResponseWriter, r *http.Request) {
-	if !validSetupOrigin(r) {
-		http.Error(w, "origin not allowed", http.StatusForbidden)
-		return
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.status != "setup_required" || c.token != "" {
-		setupFailure(w, http.StatusConflict, kernel.CodeSetupConflict, "Administrator credential is already configured")
-		return
-	}
-	credential, err := runtimeprofile.ClaimCredential(c.paths)
-	if err != nil {
-		if errors.Is(err, runtimeprofile.ErrCredentialAlreadyExists) {
-			setupFailure(w, http.StatusConflict, kernel.CodeSetupConflict, "Administrator credential already exists")
-			return
-		}
-		setupFailure(w, http.StatusInternalServerError, kernel.CodeIO, "Cannot create Instance credential")
-		return
-	}
-	c.setToken(credential.Token)
-	writeSetupJSON(w, http.StatusCreated, struct {
-		Token string `json:"token"`
-	}{Token: credential.Token})
-}
-
 // Called after SetupSession.Authorize when accepting initialization.
 // Recheck the current credential under the controller lock: an old in-flight
 // Session must not mutate a rotated Instance.
@@ -326,12 +332,26 @@ func (c *setupController) rotateToken(w http.ResponseWriter, r *http.Request) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	_, statErr := os.Lstat(c.paths.Config)
-	if c.status != "setup_required" || c.completed || c.token == "" || !errors.Is(statErr, os.ErrNotExist) {
+	if c.status != "setup_required" || c.completed || !errors.Is(statErr, os.ErrNotExist) {
 		setupFailure(w, http.StatusConflict, kernel.CodeSetupConflict, "Administrator Token can only be regenerated before configuration is saved")
 		return
 	}
-	credential, err := runtimeprofile.RotateCredential(c.paths, c.token)
+	if c.token != "" && !c.currentRootAuthorized(r) {
+		setupFailure(w, http.StatusUnauthorized, kernel.CodeAuthenticationFailed, "authentication failed")
+		return
+	}
+	var credential runtimeprofile.Credential
+	var err error
+	if c.token == "" {
+		credential, err = runtimeprofile.ClaimCredential(c.paths)
+	} else {
+		credential, err = runtimeprofile.RotateCredential(c.paths, c.token)
+	}
 	if err != nil {
+		if errors.Is(err, runtimeprofile.ErrCredentialAlreadyExists) {
+			setupFailure(w, http.StatusUnauthorized, kernel.CodeAuthenticationFailed, "authentication failed")
+			return
+		}
 		if errors.Is(err, runtimeprofile.ErrCredentialChanged) || errors.Is(err, os.ErrNotExist) {
 			setupFailure(w, http.StatusConflict, kernel.CodeSetupConflict, "Instance credential has changed")
 			return
@@ -511,6 +531,13 @@ func (c *setupController) initialize() {
 		}
 	}
 	if err == nil && c.ctx.Err() == nil {
+		c.mu.RLock()
+		if c.token != "" && c.token != rt.Credential.Token {
+			err = errors.New("instance administrator credential changed during initialization")
+		}
+		c.mu.RUnlock()
+	}
+	if err == nil && c.ctx.Err() == nil {
 		err = runtimeprofile.PublishInitializationReceipt(c.paths)
 	}
 	if err != nil || c.ctx.Err() != nil {
@@ -523,7 +550,12 @@ func (c *setupController) initialize() {
 	c.mu.Lock()
 	c.runtime = rt
 	c.business = handler
-	c.setToken(rt.Credential.Token)
+	// Preserve the pre-ready Web Access Bearer while the browser observes
+	// readiness. Reloading the completed Web application will then restore a
+	// fresh business Session from the existing HttpOnly Cookie.
+	if c.token == "" {
+		c.setToken(rt.Credential.Token)
+	}
 	c.completed = true
 	c.status, c.phase, c.message = "ready", "", ""
 	c.mu.Unlock()

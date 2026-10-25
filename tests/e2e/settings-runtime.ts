@@ -54,7 +54,13 @@ async function start(workspace: string, request: APIRequestContext) {
             ) as { endpoint?: string; pid?: number };
             endpoint = locator.pid === child.pid ? (locator.endpoint ?? "") : "";
             if (endpoint === "") return "starting";
-            const response = await request.get(endpoint + "/api/v1/setup/status");
+            const credential = JSON.parse(
+              await readFile(join(workspace, ".kgos/auth.json"), "utf8")
+            ) as { token: string };
+            const response = await request.get(endpoint + "/api/v1/setup/status", {
+              headers: { Authorization: "Bearer " + credential.token }
+            });
+            if (response.status() === 401) return "starting";
             return ((await response.json()) as { state: string }).state;
           } catch {
             return "starting";
