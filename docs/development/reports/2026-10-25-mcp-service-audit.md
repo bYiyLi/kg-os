@@ -9,7 +9,8 @@
 所列服务场景、完整质量门禁分项和 Linux Docker 回归均已通过，
 本轮覆盖范围内没有尚未修复的已知服务本体缺陷。具体失败、修复和验证边界如下。
 
-源码基线为 `main@cdab276546db1e76702de1edbeed6f6747f32c7f` 加本轮未提交修改。
+测试时的源码基线为 `main@cdab276546db1e76702de1edbeed6f6747f32c7f` 加本轮修改；
+后续独立提交及远程 CI 记录见下文。
 测试期间主工作树另有并行 Web 业务与设计修改；这些修改原样保留，
 不纳入本轮独立副本的整仓验收。Mac、Linux 所用的九个服务修改文件逐项 SHA-256 一致。
 测试对象包含 MCP HTTP/JSON-RPC、Instance/OAuth 认证、五个 AI Tool、工作区 UI Resource、
@@ -106,8 +107,9 @@ APT 签名拒绝没有被豁免。测试镜像实际 ID 为
 
 ## 交付状态与覆盖边界
 
-本轮服务和测试修改共 17 个文件，已进行上述实际测试；主工作树未创建提交或推送，也未执行 Tag、GHCR 发布，
-也未更新长期 Dev 或生产 Instance。新修复对应的 GitHub CI 尚未运行，旧 main 的绿灯不替代它。
+本轮服务和测试修改共 17 个文件，已进行上述实际测试。测试阶段结束时尚未创建提交或推送，
+当时没有新修复对应的 GitHub CI；后续授权交付的实际证据见下节。
+本轮未执行 Tag、GHCR 发布，也未更新长期 Dev 或生产 Instance。
 OpenClaw 长期 Dev 在测试前运行 2026-10-19 的 d62dc0c 镜像；本轮对临时实例写入，
 不向长期知识库写入测试数据。
 临时运行进程、容器、Volume、合成数据及本轮测试镜像已清理；独立验证工作树保留。
@@ -126,3 +128,22 @@ OpenClaw 长期 Dev 在测试前运行 2026-10-19 的 d62dc0c 镜像；本轮对
 
 协议依据：[MCP Streamable HTTP Origin 要求](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#security-warning)、
 [RFC 9110 认证 scheme](https://www.rfc-editor.org/rfc/rfc9110.html#section-11.1)。
+
+## 独立提交与远程 CI
+
+按后续交付授权，17 个文件已独立提交为
+[`25c8401899e349b15a4d844b6c037937007bc904`](https://github.com/bYiyLi/kg-os/commit/25c8401899e349b15a4d844b6c037937007bc904)，
+提交前的 `pnpm check:quick` 通过，并已推送至私有源码仓库 `main`。
+提交在隔离工作树完成，再快进同步主工作树；并行 Web／Settings 修改未进入提交。
+合并前后对当时排除的 77 个文件逐项比较 SHA-256，内容完全一致；
+后续并行新增修改继续保留，不将并行工作的数量变化当作本轮改动。
+
+| 环节 | 精确版本与实际结果 |
+| --- | --- |
+| 私有源码同步 | [Sync 40165172020](https://github.com/bYiyLi/kg-os/actions/runs/40165172020) 成功 |
+| 公开 CI 源码绑定 | 生成提交 `f2eca202af4893e716ce08e22ccc2ac87b4b9674` 的 [source.json](https://github.com/bYiyLi/kg-releases/blob/f2eca202af4893e716ce08e22ccc2ac87b4b9674/source.json) 明确绑定上述私有源码 SHA |
+| Linux Docker 集成 | [CI 40165194164](https://github.com/bYiyLi/kg-releases/actions/runs/40165194164) 的 Docker Linux amd64 integration 成功，包含正式镜像构建和 31/31 SDK 隔离验证 |
+| 完整质量检查 | 同一 CI 的 Validate private source 成功，完整 pnpm validate 通过；该 Job 耗时 17 分 48 秒 |
+
+本节所述远程验证针对上述实现提交；报告证据补录后的最终提交将另外跟进其自身 CI，
+最终状态随交付回复给出。交付期间未增加付费 Embedding 请求。
