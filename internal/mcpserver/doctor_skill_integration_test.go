@@ -76,12 +76,24 @@ func TestDoctorSkillReadProbe(t *testing.T) {
 			docs, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "kgos_docs", Arguments: map[string]any{
 				"paths": []string{"guides/reading.md", "guides/evolution.md", "sdk/evolution/get.md", "sdk/ontology/read.md"},
 			}})
-			if err != nil || docs.IsError {
-				t.Fatalf("read documentation: %v %#v", err, docs)
+			if err != nil {
+				t.Fatalf("read documentation transport: %v", err)
+			}
+			if docs == nil {
+				t.Fatal("read documentation returned no MCP result")
+			}
+			if docs.IsError {
+				t.Fatalf("read documentation MCP error: %#v", mcpText(t, docs))
 			}
 			reply, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "kgos_query", Arguments: map[string]any{"code": doctorSkillProbe(t)}})
-			if err != nil || reply.IsError {
-				t.Fatalf("literal Doctor probe: %v %#v", err, reply)
+			if err != nil {
+				t.Fatalf("literal Doctor probe transport: %v", err)
+			}
+			if reply == nil {
+				t.Fatal("literal Doctor probe returned no MCP result")
+			}
+			if reply.IsError {
+				t.Fatalf("literal Doctor probe MCP error: %#v", mcpText(t, reply))
 			}
 			got := object(t, mcpText(t, reply)["result"])
 			if got["state"] != head.State || got["inspectedState"] != head.State || got["defaultBranch"] != head.DefaultBranch {

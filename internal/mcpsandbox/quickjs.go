@@ -20,8 +20,43 @@ type guest struct {
 	driver uint64
 }
 
+var (
+	// Only the fixed engine's compiled code lives for the process lifetime.
+	// Each guest still owns its runtime, decoded module, memory and JS state.
+	quickJSCompilationCache = wazero.NewCompilationCache()
+	quickJSCompileSlot      = make(chan struct{}, 1)
+	quickJSCompiledPin      wazero.CompiledModule // guarded by quickJSCompileSlot
+)
+
+func compileQuickJS(ctx context.Context, rt wazero.Runtime) (wazero.CompiledModule, bool, error) {
+	// wazero's cache does not merge concurrent cold compilations. Waiting for
+	// this slot remains part of the invocation's existing cancellation budget.
+	select {
+	case quickJSCompileSlot <- struct{}{}:
+		defer func() { <-quickJSCompileSlot }()
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+	// Decode for each runtime so its memory limit and store type IDs apply;
+	// the cache reuses only the expensive compilation of the fixed WASM code.
+	compiled, err := rt.CompileModule(ctx, qjs.QuickJSWASM)
+	if err != nil {
+		return nil, false, err
+	}
+	if quickJSCompiledPin == nil {
+		// Closing the last CompiledModule evicts wazero's cached code. Retain
+		// just the first successful handle; failures never poison later calls.
+		quickJSCompiledPin = compiled
+		return compiled, true, nil
+	}
+	return compiled, false, nil
+}
+
 func newGuest(ctx context.Context, memoryPages uint32) (_ *guest, err error) {
-	g := &guest{rt: wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCloseOnContextDone(true).WithMemoryLimitPages(memoryPages))}
+	g := &guest{rt: wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCompilationCache(quickJSCompilationCache).WithCloseOnContextDone(true).WithMemoryLimitPages(memoryPages))}
 	defer func() {
 		if err != nil {
 			_ = g.Close(context.Background())
@@ -30,11 +65,13 @@ func newGuest(ctx context.Context, memoryPages uint32) (_ *guest, err error) {
 	if _, err = wasi_snapshot_preview1.Instantiate(ctx, g.rt); err != nil {
 		return nil, err
 	}
-	compiled, e := g.rt.CompileModule(ctx, qjs.QuickJSWASM)
+	compiled, pinned, e := compileQuickJS(ctx, g.rt)
 	if e != nil {
 		return nil, e
 	}
-	defer compiled.Close(ctx)
+	if !pinned {
+		defer compiled.Close(ctx)
+	}
 	g.mod, err = g.rt.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName("qjs-wasi"))
 	if err != nil {
 		return nil, err
@@ -170,7 +207,9 @@ func (g *guest) jsError(ctx context.Context) error {
 	return fmt.Errorf("QuickJS exception: %s", s)
 }
 func (g *guest) eval(ctx context.Context, code string) (uint64, error) {
-	p, err := g.alloc(ctx, []byte(code))
+	// JS_Eval requires a trailing NUL even with an explicit source length.
+	// Without it, the parser can read reused heap bytes after valid source.
+	p, err := g.alloc(ctx, append([]byte(code), 0))
 	if err != nil {
 		return 0, err
 	}
