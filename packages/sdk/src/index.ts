@@ -1,4 +1,4 @@
-export const KGOS_VERSION = "0.3.1";
+export const KGOS_VERSION = "0.3.2";
 export const PRODUCT_NAME = "KG OS";
 
 export {

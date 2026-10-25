@@ -263,7 +263,9 @@ jobs:
               fi
               echo "The public release tag belongs to this distribution repository, not the private source."
             } > "$RUNNER_TEMP/kgos-release-notes.md"
-            RELEASE_FLAGS=()
+            # Keep the release flags nonempty: macOS Bash 3.2 treats an
+            # empty array expansion under nounset as an unbound variable.
+            RELEASE_FLAGS=(--latest)
             if [ "$EXPECTED_PRERELEASE" = true ]; then
               RELEASE_FLAGS=(--prerelease --latest=false)
             fi
