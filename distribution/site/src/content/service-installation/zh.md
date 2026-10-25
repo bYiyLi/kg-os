@@ -1,7 +1,7 @@
 ---
 title: "安装 KG OS"
 description: "部署 KG OS、连接 ChatGPT、制作私人 Plugin，并完成自检、升级与恢复。"
-version: "0.3.0"
+version: "0.3.1"
 ---
 
 <!-- cspell:words newurl rstrip isfinite hashlib pathlib urlopen hexdigest sudoedit xattrs getpass fileno -->
@@ -36,15 +36,15 @@ docker compose version
 
 ### 版本与镜像
 
-**适用版本：KG OS v0.3.0。** 镜像与官方 Plugin 来自 [正式 Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.0)，命令固定版本和不可变 digest：
+**适用版本：KG OS v0.3.1。** 镜像与官方 Plugin 来自 [正式 Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.1)，命令固定版本和不可变 digest：
 
 ```text
-ghcr.io/byiyli/kgos:v0.3.0@sha256:f5a3a9c7a343bd073584f82cb4abac25aab916455509f8d9474c188f919e654b
+ghcr.io/byiyli/kgos:v0.3.1@sha256:ea11a7d8ffcd352f237248d9221733d8c580a0cd5354abe7c5c153be9ebaa3b2
 ```
 
 该镜像仅支持 `linux/amd64`，默认端口 `3777`，运行身份 `10001:10001`。容器 `/workspace` 对应你的持久目录，实例配置与数据位于其下的 `.kgos`。官方当前不提供 `:latest` 浮动标签。已有实例先按[升级流程](#upgrade)核对兼容性，不直接套用新安装步骤。
 
-通过页面版本菜单查看各个正式发布版本的完整手册；切换语言时保持所选版本。本版中英文手册、[AI 安装指南](https://kgos.sites.y2l.top/install/v0.3.0/INSTALL.md)和[官方 Plugin](https://github.com/bYiyLi/kg-releases/releases/download/v0.3.0/kgos-plugin-v0.3.0.zip)均适用于 KG OS v0.3.0。新版本发布不会覆盖本版正文；升级前查看目标版本说明。官方 Plugin 包用于取得 Skill 与资源，AI 安装流程以本版配套指南为准。
+通过页面版本菜单查看各个正式发布版本的完整手册；切换语言时保持所选版本。本版中英文手册、[AI 安装指南](https://kgos.sites.y2l.top/install/v0.3.1/INSTALL.md)和[官方 Plugin](https://github.com/bYiyLi/kg-releases/releases/download/v0.3.1/kgos-plugin-v0.3.1.zip)均适用于 KG OS v0.3.1。新版本发布不会覆盖本版正文；升级前查看目标版本说明。官方 Plugin 包用于取得 Skill 与资源，AI 安装流程以本版配套指南为准。
 
 ### 建立独立安装目录
 
@@ -71,7 +71,7 @@ ss -ltn
   sudo install -d -m 0700 -o 10001 -g 10001 "$PWD/workspace" "$PWD/workspace/.kgos"
   install -m 0600 /dev/null embedding.env
   docker network create kgos-net
-  docker pull ghcr.io/byiyli/kgos:v0.3.0@sha256:f5a3a9c7a343bd073584f82cb4abac25aab916455509f8d9474c188f919e654b
+  docker pull ghcr.io/byiyli/kgos:v0.3.1@sha256:ea11a7d8ffcd352f237248d9221733d8c580a0cd5354abe7c5c153be9ebaa3b2
 )
 ```
 
@@ -157,7 +157,7 @@ sudo install -m 0600 -o 10001 -g 10001 config.toml workspace/.kgos/config.toml
 ```yaml
 services:
   kgos:
-    image: ghcr.io/byiyli/kgos:v0.3.0@sha256:f5a3a9c7a343bd073584f82cb4abac25aab916455509f8d9474c188f919e654b
+    image: ghcr.io/byiyli/kgos:v0.3.1@sha256:ea11a7d8ffcd352f237248d9221733d8c580a0cd5354abe7c5c153be9ebaa3b2
     platform: linux/amd64
     container_name: kgos
     user: "10001:10001"
@@ -203,7 +203,7 @@ docker run -d \
   -p 127.0.0.1:3777:3777 \
   --mount type=bind,src="$PWD/workspace",dst=/workspace \
   --env-file "$PWD/embedding.env" \
-  ghcr.io/byiyli/kgos:v0.3.0@sha256:f5a3a9c7a343bd073584f82cb4abac25aab916455509f8d9474c188f919e654b
+  ghcr.io/byiyli/kgos:v0.3.1@sha256:ea11a7d8ffcd352f237248d9221733d8c580a0cd5354abe7c5c153be9ebaa3b2
 docker logs --tail 80 kgos
 ```
 
@@ -500,7 +500,7 @@ KG OS 当前连接权限包含读写；安装验收只执行只读调用，后�
 
 ```markdown
 请按照官方 KG OS 私人 Plugin 安装手册协助安装：
-https://kgos.sites.y2l.top/install/v0.3.0/INSTALL.md
+https://kgos.sites.y2l.top/install/v0.3.1/INSTALL.md
 
 已验证的 ChatGPT KG OS 应用：[应用名称]
 公网服务：https://[我的域名]
@@ -513,7 +513,7 @@ https://kgos.sites.y2l.top/install/v0.3.0/INSTALL.md
 提供完整官方全局引导词与 ChatGPT 配置步骤，最后完成安装自检。不要让我在聊天中提供凭证，已授权步骤不要重复确认。
 ```
 
-接下来由 AI 按唯一 [INSTALL.md](https://kgos.sites.y2l.top/install/v0.3.0/INSTALL.md)协助完成：
+接下来由 AI 按唯一 [INSTALL.md](https://kgos.sites.y2l.top/install/v0.3.1/INSTALL.md)协助完成：
 
 1. **确认方案**：核对服务与同版官方资源；如有旧私人 Plugin，读取旧版内容并与旧官方基线比较，列出定制迁移与冲突。你选择目标、迁移内容、权限与安装范围，确认具体方案后执行。已授权步骤不重复确认。
 2. **创建并安装新版本**：每次新建名称带官方版本号的私人 Plugin，同版重做增加修订号；复用基础应用的真实连接，保留七个官方 Skill 与资源。旧 Plugin 先保留，发生冲突由你选择，不原地覆盖。

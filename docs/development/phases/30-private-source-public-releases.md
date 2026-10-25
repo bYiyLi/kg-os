@@ -59,6 +59,15 @@
 - **公开发行物**：[GitHub Release v0.3.0](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.0) 已发布（非 draft/prerelease），资产 `kgos-plugin-v0.3.0.zip` 可公开下载。实际下载 ZIP 后**不解压执行**，检查根 `plugin.json`、唯一 `INSTALL.md`、精确七个官方 `skills/<name>/SKILL.md`，确认没有 `.app.json` 或额外嵌套 Plugin 根。Release 说明已根据首发情况完善为中英文，并保留完整镜像 digest、Tag 和私有来源 SHA。
 - **状态与边界**：首个正式 Docker + Plugin 分发已完成；没有同时部署生产 KG OS Instance，也没有修改 OpenClaw 长期 Dev 的数据。安装方应由有权限的外部 Agent 阅读公开 INSTALL，验证 Docker Linux amd64 环境、具体 MCP 连接及用户授予的权限；公开 CI/Smoke 不代表任何第三方主机已安装成功。
 
+## 2026-10-25 v0.3.1 补丁发行复核
+
+- **来源与前置 CI**：私有 `main@d670b9009dc4b41b0b474a1bb572b3f62e0583ce` 提交并推送；[公开 CI #40173974145](https://github.com/bYiyLi/kg-releases/actions/runs/40173974145) 的源码 Validate 与 Linux amd64 Docker 集成均成功。本机另有 Go race、455 个 Web 单元测试、56 个浏览器 E2E 和分发专项 12/12 通过；本地整仓 `pnpm validate` 曾在覆盖率阶段触及单次执行超时，不冒充本地整仓验收完成。
+- **不可变 Tag / 分发同步**：私有 annotated `v0.3.1` Tag 解引用为上述源码 SHA，已推送；[私有 Tag Sync #40174860416](https://github.com/bYiyLi/kg-os/actions/runs/40174860416) 成功同步公开同名 Tag。公开该 Tag 下的 `source.json` 为 `ref=refs/tags/v0.3.1`，`revision=d670b9009dc4b41b0b474a1bb572b3f62e0583ce`。
+- **正式发行**：[公开 Release #40174882319](https://github.com/bYiyLi/kg-releases/actions/runs/40174882319) 的源码 Validate、Docker Linux amd64 集成、实际镜像发布三个 Job 均 success；发布前对精确镜像完成 Smoke，发布后核对匿名拉取、镜像平台、Tag、来源 SHA 和 digest。另在 GitHub Actions 之外以匿名 GHCR Token 读取 Manifest，独立确认 `v0.3.1` 的 digest 一致。正式镜像 `ghcr.io/byiyli/kgos:v0.3.1`，digest 为 `sha256:ea11a7d8ffcd352f237248d9221733d8c580a0cd5354abe7c5c153be9ebaa3b2`。
+- **发行物复核**：[GitHub Release v0.3.1](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.1) 已公开发布（非草稿/预发布），含官方 Plugin ZIP、中文版、英文版、AI 安装指南及 SHA256 校验文件共五个资产。独立下载后验证三份指南校验通过、ZIP 内 `INSTALL.md` 与 AI 发行指南字节相同、Manifest 版本为 `0.3.1`、恰好七个官方 Skill 且无私有连接配置。
+- **官网版本归档**：将上述已验证的三份 Release 指南保留为 `distribution/site/src/content/service-installation/v0.3.1/` 不可变快照，官网 catalog 的最新版本升为 `v0.3.1` 且保留 `v0.3.0`；编辑模板和公开 README 对齐到新版本。归档本地校验与公开 Pages 实际部署属于独立验收，不从 Release 结论推断网站已上线。
+- **边界**：没有移动旧版 Tag、重写旧 Release 或修改 Lithograph，也未部署或升级任何运行中的 KG OS 用户实例。
+
 ## Review / Constraints
 
 - 只构建发布基础设施，不变动 KG OS Kernel/Web/MCP 的业务实现，也不改变 Lithograph。
