@@ -5,10 +5,15 @@ const driverScript = `(() => {
   const parse = JSON.parse.bind(JSON), stringify = JSON.stringify.bind(JSON);
   const keys = Reflect.ownKeys.bind(Reflect), descriptors = Object.getOwnPropertyDescriptors.bind(Object);
   const prototype = Object.getPrototypeOf.bind(Object), isArray = Array.isArray.bind(Array);
+  const isFinite = Number.isFinite.bind(Number), create = Object.create.bind(Object), NativeError = Error;
+  const stringSlice = Function.prototype.call.bind(String.prototype.slice);
   const plain = Object.prototype, arrayProto = Array.prototype;
   Object.freeze(plain); Object.freeze(arrayProto);
   const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
   const queue = [], pending = new Map();
+  // Keep the host error receipt separate from mutable errors visible to scripts.
+  const publicErrors = new WeakMap();
+  const publicErrorGet = publicErrors.get.bind(publicErrors), publicErrorSet = publicErrors.set.bind(publicErrors);
   let next = 0, started = false, state = { done: false };
   const call = (method, ...args) => {
     // Serialize inside the guest: Go never receives JS objects, functions, or host handles.
@@ -77,31 +82,48 @@ const driverScript = `(() => {
   });
   const check = (v, stack = new Set(), depth = 0) => {
     if (depth > 64) throw new TypeError('JSON depth exceeded');
-    if (v === null || typeof v === 'string' || typeof v === 'boolean') return;
-    if (typeof v === 'number' && Number.isFinite(v)) return;
+    if (v === null || typeof v === 'string' || typeof v === 'boolean') return v;
+    if (typeof v === 'number' && isFinite(v)) return v;
     if (typeof v !== 'object') throw new TypeError('Script result is not JSON-compatible');
     if (stack.has(v)) throw new TypeError('Circular reference');
-    if (!isArray(v) && prototype(v) !== plain && prototype(v) !== null)
+    const array = isArray(v), proto = prototype(v);
+    if (array ? proto !== arrayProto : proto !== plain && proto !== null)
       throw new TypeError('Script result must be a plain object');
     stack.add(v);
-    for (const name of keys(descriptors(v))) {
+    // Serialize a descriptor snapshot, never the guest object's getters or hooks.
+    const entries = descriptors(v), names = keys(entries), result = array ? [] : create(null);
+    const length = array ? entries.length.value : 0;
+    let count = 0;
+    for (let position = 0; position < names.length; position++) {
+      const name = names[position];
       if (typeof name !== 'string' || name === 'toJSON' || name === '__proto__')
         throw new TypeError('Unsupported result property');
-      if (isArray(v) && name === 'length') continue;
-      const entry = descriptors(v)[name];
+      if (array && name === 'length') continue;
+      const entry = entries[name];
       if (!entry || !('value' in entry)) throw new TypeError('Accessors not supported');
-      check(entry.value, stack, depth+1);
+      if (array) {
+        const index = +name;
+        if (index < 0 || index >= length || index % 1 !== 0 || ''+index !== name)
+          throw new TypeError('Unsupported array property');
+        count++;
+      } else if (!entry.enumerable) throw new TypeError('Non-enumerable result properties not supported');
+      result[name] = check(entry.value, stack, depth+1);
     }
-    if (isArray(v)) for (let i = 0; i < v.length; i++) if (!(i in v))
+    if (array && count !== length)
       throw new TypeError('Sparse arrays not supported');
     stack.delete(v);
+    return result;
   };
   const failure = (error) => {
-    const message = error instanceof Error ? error.message : 'Script threw non-Error value';
-    const code = error && typeof error.code === 'string' ? error.code : 'SCRIPT_ERROR';
-    state = { done:true, ok:false, code, message:String(message).slice(0,1024) };
-    if (error && error.details !== undefined) {
-      try { check(error.details); state.details=error.details; } catch(_) {}
+    const publicError = publicErrorGet(error);
+    let message = 'Script threw non-Error value';
+    try {
+      if (publicError) message = publicError.message;
+      else if (error instanceof NativeError && typeof error.message === 'string') message = error.message;
+    } catch(_) {}
+    state = { done:true, ok:false, code:publicError ? publicError.code : 'SCRIPT_ERROR', message:stringSlice(message,0,1024) };
+    if (publicError && publicError.detailsJSON) {
+      try { state.details=check(parse(publicError.detailsJSON)); } catch(_) {}
     }
   };
   return freeze({
@@ -111,7 +133,7 @@ const driverScript = `(() => {
       try {
         const fn = new AsyncFunction(code);
         Promise.resolve(fn()).then(value => {
-          try { check(value); state = {done:true, ok:true, result:value}; }
+          try { state = {done:true, ok:true, result:check(value)}; }
           catch(err) { failure(err); }
         }, failure);
       } catch(error) { failure(error); }
@@ -123,9 +145,10 @@ const driverScript = `(() => {
       if (!p) return 'false';
       pending.delete(id);
       if (code) {
-        const e = new Error(message || 'SDK operation failed');
+        const e = new NativeError(message || 'SDK operation failed');
         e.code = code;
         if (detailsJSON) e.details = parse(detailsJSON);
+        publicErrorSet(e, {code, message:message || 'SDK operation failed', detailsJSON});
         p.reject(e);
       } else p.resolve(parse(resultJSON));
       return 'true';

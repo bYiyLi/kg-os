@@ -47,10 +47,14 @@ func readOAuthForm(w http.ResponseWriter, r *http.Request) (url.Values, bool) {
 // OAuth delegates UI and login to the existing KG OS Web. A request ID alone
 // can neither display a request nor grant permission without Web authentication.
 func (o *oauthBroker) validWebBearer(header string) bool {
-	if !strings.HasPrefix(header, "Bearer ") || len(header) > 4103 {
+	if len(header) > 4103 {
 		return false
 	}
-	token := strings.TrimPrefix(header, "Bearer ")
+	fields := strings.Fields(header)
+	if len(fields) != 2 || !strings.EqualFold(fields[0], "Bearer") {
+		return false
+	}
+	token := fields[1]
 	hash := sha256.Sum256([]byte(token))
 	return token != "" && subtle.ConstantTimeCompare(hash[:], o.instanceDigest[:]) == 1
 }

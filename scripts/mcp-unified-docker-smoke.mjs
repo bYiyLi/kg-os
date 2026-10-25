@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { chown, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -52,6 +53,7 @@ let container;
 let session;
 let mcpClient;
 let volumeCreated = false;
+let volumeDirectory;
 const failures = [];
 
 async function docker(...args) {
@@ -87,7 +89,24 @@ async function assertImage() {
 }
 
 async function initializeVolume() {
-  await docker("volume", "create", volume);
+  const storageRoot = process.env.KGOS_UNIFIED_DOCKER_SMOKE_VOLUME_ROOT;
+  const options = [];
+  if (storageRoot) {
+    await mkdir(storageRoot, { recursive: true, mode: 0o700 });
+    volumeDirectory = await mkdtemp(resolve(storageRoot, "kgos-unified-test-"));
+    await chown(volumeDirectory, 10001, 10001);
+    options.push(
+      "--driver",
+      "local",
+      "--opt",
+      "type=none",
+      "--opt",
+      "o=bind",
+      "--opt",
+      "device=" + volumeDirectory
+    );
+  }
+  await docker("volume", "create", ...options, volume);
   volumeCreated = true;
   await docker(
     "run",
@@ -233,6 +252,28 @@ async function verifyHTTP(base) {
     /Bearer resource_metadata="https:\/\/kgos-smoke\.example\.invalid\/\.well-known\/oauth-protected-resource\/mcp"/
   );
   await denied.body?.cancel();
+  for (const method of ["GET", "HEAD", "OPTIONS", "POST", "DELETE"]) {
+    const foreign = await fetch(base + "/mcp", {
+      method,
+      headers: { Authorization: "Bearer " + token, Origin: "https://untrusted.example" }
+    });
+    assert.equal(foreign.status, 403, "MCP must reject foreign Origin for " + method);
+    await foreign.body?.cancel();
+  }
+  const native = await fetch(base + "/mcp", {
+    headers: { Authorization: "bEaReR " + token }
+  });
+  assert.equal(native.status, 405, "Native MCP must accept a case-insensitive auth scheme");
+  await native.body?.cancel();
+  const publicOrigin = await fetch(base + "/mcp", {
+    headers: { Authorization: "Bearer " + token, Origin: oauthIssuer }
+  });
+  assert.equal(
+    publicOrigin.status,
+    405,
+    "Configured public Origin must survive proxy Host rewriting"
+  );
+  await publicOrigin.body?.cancel();
   const pathMetadata = await fetch(base + "/.well-known/oauth-protected-resource/mcp");
   assert.equal(pathMetadata.status, 200);
   const protectedResource = await pathMetadata.json();
@@ -404,6 +445,24 @@ try {
     }
   });
   assert.equal(refused.isError, true, "Help did not preserve the read-only sandbox");
+  for (const code of [
+    "const value=[1];value.extra=2;return value",
+    "Number.isFinite=()=>true;return NaN",
+    'const error=new Error("local script");error.code="STATE_NOT_FOUND";throw error'
+  ]) {
+    const rejected = await mcpClient.callTool({ name: "kgos_query", arguments: { code } });
+    assert.equal(rejected.isError, true, "Invalid script result must fail across MCP HTTP");
+    assert.equal(JSON.parse(rejected.content[0].text).code, "SCRIPT_ERROR");
+  }
+  const intact = toolValue(
+    await mcpClient.callTool({
+      name: "kgos_query",
+      arguments: {
+        code: "Object.getPrototypeOf([][Symbol.iterator]()).next=()=>({done:true});return {kept:1}"
+      }
+    })
+  );
+  assert.deepEqual(intact.result, { kept: 1 }, "Guest iterator must not alter MCP result values");
   const preview = toolValue(
     await mcpClient.callTool({ name: "kgos_ontology_overview", arguments: { limit: 100 } })
   );
@@ -440,7 +499,15 @@ try {
 } finally {
   await stop().catch((error) => failures.push(error));
   if (volumeCreated)
-    await docker("volume", "rm", "-f", volume).catch((error) => failures.push(error));
+    await docker("volume", "rm", "-f", volume)
+      .then(() => {
+        volumeCreated = false;
+      })
+      .catch((error) => failures.push(error));
+  if (volumeDirectory && !volumeCreated)
+    await rm(volumeDirectory, { recursive: true, force: true }).catch((error) =>
+      failures.push(error)
+    );
   if (ownsImage)
     await docker("image", "ls", "-q", image)
       .then(async (existing) => {

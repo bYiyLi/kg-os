@@ -104,3 +104,9 @@
 - **OpenClaw 原样 Linux amd64 Docker 验收**：宿主通过 Docker 标准代理构建参数解决外部 npm tarball 下载阻塞，使用仓库**未修改的 `Dockerfile.unified`** 构建成功（镜像 `sha256:3bf623b99854224934a6ac6c5d8101bf840c0a77d5e9aafc16a7234b2f372b46`），在独立临时 Volume 中执行 `scripts/mcp-unified-docker-smoke.mjs` **exit 0、31/31 SDK、OAuth/Web/API/MCP/UI Resource、non-root、Node-free、重启持久化通过**。开发 Dev 已部署较早的已验证修复镜像 `sha256:bd06c022043006d2fed05cbc2cb29499e2d316ed1ba8e095e3c4614b84602f2f`，保持 `healthy`，没有把原样隔离测试错误描述为新一次长期 Dev 部署。
 - **真实客户端验收边界**：用户提供的修复后 ChatGPT 桌面 MCP 端到端报告，五 Tool/31 SDK 实际调用、Ontology → Knowledge → Patch → Graph → Evolution/Merge、权限与恢复均有证据，默认 `main` Head 未变；前次 P23-DOC-01/02 已修复且本轮未再现。用户报告的总体标签为 `PARTIAL`，主要因为一次未经目录确认的无效文档路径（后自行纠正）、未做破坏性 4 MiB 负载、外部 Provider / Search 条件、和 app-only UI 实际打开。这些不冒充客户端完整 PASS；4 MiB 服务端资源边界、UI Tool/Resource 则由独立 Go MCP/Docker 验证，不把非本阶段的外部 Provider 或 UI 主动交互要求新增为当前 Phase 的完成门槛。
 - **GitHub CI 完成**：最终实现提交 **[`cfa39173020523b127982f196fd54f7b64905f04`](https://github.com/bYiyLi/kg-os/commit/cfa39173020523b127982f196fd54f7b64905f04)** 的 [CI Run #39001850377](https://github.com/bYiyLi/kg-os/actions/runs/39001850377) 已逐 Job 确认 **Ubuntu Validate success + Unified Docker / Linux amd64 success（2/2）**，其中 Docker Job 按原样 `Dockerfile.unified` 构建并完成完整隔离 Smoke。旧失败的 [CI Run #38996756140](https://github.com/bYiyLi/kg-os/actions/runs/38996756140) 保留为超时修复前历史，不当作本版本失败。正式 Tag、GHCR 发布及生产部署均未执行，亦不属于本次 Phase 关闭。
+
+## 后续服务本体回归（2026-10-25）
+
+用户授权的 MCP 服务测试、最小修复、独立复审、真实语义检索和隔离 Docker 证据见
+[MCP 服务本体测试与修复报告](../reports/2026-10-25-mcp-service-audit.md)。
+本次修改及交付状态由该报告单独记录，既有阶段关闭记录保持其原 revision 和验收范围。

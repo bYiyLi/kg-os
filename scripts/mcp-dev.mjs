@@ -10,7 +10,7 @@ const remoteRunner = "cd " + remoteSource + " && sh scripts/mcp-dev-remote.sh";
 
 const exclude = [
   ".git",
-  "native",
+  "native/jieba/target",
   ".kgos",
   ".kgos-*",
   ".kgos-dev",
@@ -86,6 +86,7 @@ async function syncSource() {
       "-az",
       "--delete",
       "--safe-links",
+      "--include=/native/jieba/Cargo.lock",
       ...exclude.map((pattern) => "--exclude=" + pattern),
       root + "/",
       remote + ":" + remoteSource + "/"

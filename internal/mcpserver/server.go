@@ -103,6 +103,14 @@ func New(k *kernel.Service, settings Options) (*Server, error) {
 	}
 	mcpHTTP := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.toolServer() }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, MaxRequestBodyBytes: settings.MaxRequestBytes, PropagateRequestCancellation: true})
 	s.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
+		defer cancel()
+		deadline, _ := ctx.Deadline()
+		boundMCPRequestIO(w, deadline)
+		if !s.allowedOrigin(r) {
+			http.Error(w, "MCP origin not allowed", http.StatusForbidden)
+			return
+		}
 		principal, authorized := s.principal(r.Header.Get("Authorization"))
 		if !authorized {
 			if s.oauth != nil {
@@ -117,8 +125,7 @@ func New(k *kernel.Service, settings Options) (*Server, error) {
 			http.NotFound(w, r)
 			return
 		}
-		ctx, cancel := context.WithTimeout(observability.WithSurface(context.WithValue(r.Context(), oauthPrincipalKey{}, principal), "mcp"), s.timeout)
-		defer cancel()
+		ctx = observability.WithSurface(context.WithValue(ctx, oauthPrincipalKey{}, principal), "mcp")
 		select {
 		case s.semaphore <- struct{}{}:
 			defer func() { <-s.semaphore }()
@@ -145,13 +152,14 @@ func (s *Server) authorized(value string) bool {
 	return ok
 }
 func (s *Server) principal(value string) (string, bool) {
-	if !strings.HasPrefix(value, "Bearer ") || len(value) > 4103 {
+	if len(value) > 4103 {
 		return "", false
 	}
-	provided := strings.TrimPrefix(value, "Bearer ")
-	if provided == "" {
+	fields := strings.Fields(value)
+	if len(fields) != 2 || !strings.EqualFold(fields[0], "Bearer") {
 		return "", false
 	}
+	provided := fields[1]
 	hash := sha256.Sum256([]byte(provided))
 	if subtle.ConstantTimeCompare(hash[:], s.digest[:]) == 1 {
 		return fmt.Sprintf("%x", s.digest), true
