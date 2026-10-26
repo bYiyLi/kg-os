@@ -663,6 +663,12 @@ tx_commit → 一个新 State
 
 compiler 必须按 Lithograph immediate constraint semantics 安排 DDL/DML；必要的临时 Schema 替换只存在同一 transaction 内。任一 statement/validation/commit 失败整体 rollback，不允许先提交中间状态再 squash。Branch 前进返回 STALE_BASE_STATE；纯格式变化或语义无变化在 strict base check 后返回原 State，不建立 transaction。
 
+### 增量扩展保持既有定义
+
+新增独立 Definition 时，未被显式修改且不需要引用维护的既有 Definition 必须保持公共逻辑值、约束来源与名称。既有单字段或联合 KEY 不是禁止扩展模型的前置条件；KEY 的有效存在性/唯一性不得在重建 Graph Type 或回读时误变为另一份显式声明。
+
+合法新增仍在单个 Object Patch transaction 内完成，提交前比较不能跳过旧定义，失败整体回滚。通过相关定义的计划值与实际值差异定位编译、底层行为或解码问题，不以删除约束、忽略校验、改写无关定义规避。Issue 1 的实测和修复证据由 [Phase 32](../development/phases/32-knowledge-use-readiness.md) 记录，根因未证实前不写成设计事实。
+
 ### Rename
 
 顶层 Definition / Domain 改名复用 Git Rename entry；单纯改 body 的顶层 name 不是隐式 rename。Property 内嵌在 Definition 中，用最小显式输入标记 `renameFrom` 解决“改名还是删旧建新”的歧义：新名称条目携带 baseState 中的旧 Property name，旧条目同时移除。该标记只存在本次 Patch 输入，成功后不持久化、不出现在 canonical read。

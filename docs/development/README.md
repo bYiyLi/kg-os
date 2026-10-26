@@ -147,6 +147,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [28 Official Seven Skills & Legacy kgos Retirement](phases/28-official-skill-roster.md) | `in_progress` | 源码已收敛七个、旧通用 Skill 已清理、MCP 指南已补缺；私人 Plugin 更新、真实客户端选用/写入和最终阶段验收待完成 | [D107](../design/decisions.md#d107-final-seven-official-skills)、[最终七 Skill](../design/mcp.md#kgos-seven-skills) |
 | [29 Web shadcn/ui Migration](phases/29-web-shadcn-ui.md) | `in_progress` | 组件迁移已实现，39 项 Web E2E 与本地视觉验收通过；整仓质量门禁及已有开发依赖审计问题见 Phase 29，未执行提交或部署 | [Web UI 体系](../design/web.md#通用-ui-组件体系) |
 
+新增独立改进阶段：[Phase 32：知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md)（`planned`）。覆盖模型扩展异常、初始化环境/多库加载、用户表达及检索/合并边界；与Phase 25/27/28原有验收分开，不以新文档关闭旧阶段。
+
 当前实现依赖顺序：
 
 ```text
@@ -267,5 +269,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 28：官方七 Skill 清单收敛与通用 Skill 退役](phases/28-official-skill-roster.md)
 - [Phase 30：私有代码真源与自动生成的公开 kg-releases](phases/30-private-source-public-releases.md)
 - [Phase 31：KG OS 公开产品官网与 GitHub Pages](phases/31-public-product-website.md)
+- [Phase 32：知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

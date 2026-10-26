@@ -24,8 +24,10 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听与 [D105 Web-first 初始化门禁](design/runtime.md#web-first-run-bootstrap)、`auth.json` / `initialized.json`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
 | [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |
 | [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、[D110 四步 Token-first 初始化页面](design/web.md#web-first-run-setup)、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
-| [decisions.md](design/decisions.md) | D1–D110 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [decisions.md](design/decisions.md) | D1–D111 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
+
+本轮知识使用改进：[初始化加载与用户表达](design/mcp.md#task-scoped-knowledge-loading)、[D111](design/decisions.md#d111-task-scoped-knowledge-loading)；模型扩展与场景验收由[Phase 32](development/phases/32-knowledge-use-readiness.md)跟踪。当前仅设计/计划增量，不代表实现、私人安装或发布已完成。
 
 ## 从配置到调用
 

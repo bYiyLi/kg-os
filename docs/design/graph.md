@@ -152,6 +152,14 @@ Lithograph Semantic Index 的 embedding 是非图属性派生数据；`RETURN n`
 
 大型结果可以按 `columns`、多条 `row`、最终 `summary` 流式传输。streaming 只改变 transport，不改变值编码或底层事务语义；没有最终 summary 表示调用方未获得完整成功结果，不证明任意 Cypher 都没有已提交副作用。HTTP adapter在 stream开始后的 daemon failure使用 terminal `error` framing，并以逐 event write/flush 对 SQLite pull施加 backpressure；这些 transport规则由 [Runtime](runtime.md#graph-http-streaming-framing)拥有，不把 `error` 当成 Graph query row。
 
+### 检索组合与属性边界
+
+搜索结果是候选，不保证身份、业务范围或答案成立；组合关系查询仍遵循当前 Lithograph 的类型与 procedure 合同。KG OS 不为某个失败写法解析或重写 Cypher。用同一 State 和实际索引复现失败及合法替代写法，再区分调用误用、底层限制与缺陷；示例和错误指导由 MCP 文档维护，不能把未核实的组合问题概括为语义搜索不可用。
+
+普通 Knowledge 的属性集合沿用 Property Graph 和实际 Schema 约束，不能把 Definition 的字段列表直接宣称为 KG OS 新增的封闭白名单。Object 顶层未知字段拒绝、保留标识保护、属性值编码和已声明类型/约束分别适用。实例规范仍要求忠实于模型含义，工具接受额外属性不构成语义或修改模型的许可；本增量不新增封闭模型开关或改变既有数据合法性。
+
+经 MCP 调用时还受 [MCP 沙箱预算](mcp.md) 限制。整段脚本的时限不是各 SDK 方法独立时限；单次慢检索、组合查询与 Provider 外部 I/O 要分别测量。超时不伪装成零结果，包含写入时先核对实际状态再重试；不以取消预算或承诺可抢占第三方 HTTP 调用来解决耗时。
+
 ### Graph 能力边界
 
 - KG OS 不建立 query language、Search DSL、Traversal DSL、Cypher parser、AST 或 query rewrite。
