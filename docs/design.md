@@ -27,7 +27,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [decisions.md](design/decisions.md) | D1–D111 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
-本轮知识使用改进：[初始化加载与用户表达](design/mcp.md#task-scoped-knowledge-loading)、[D111](design/decisions.md#d111-task-scoped-knowledge-loading)；模型扩展与场景验收由[Phase 32](development/phases/32-knowledge-use-readiness.md)跟踪。当前仅设计/计划增量，不代表实现、私人安装或发布已完成。
+本轮知识使用改进：[初始化加载与知识记录质量](design/mcp.md#task-scoped-knowledge-loading)、[D111](design/decisions.md#d111-task-scoped-knowledge-loading)；模型扩展与场景验收由[Phase 32](development/phases/32-knowledge-use-readiness.md)跟踪。当前仅设计/计划增量，不代表实现、私人安装或发布已完成。
 
 ## 从配置到调用
 
