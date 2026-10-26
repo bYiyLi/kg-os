@@ -287,6 +287,12 @@ Review 已修正：D1 的缺节/不配对判定邻接完整可见范围条件；
 
 原 A32-02/03/04 的真实跨连接/客户端验收及其它阶段缺项继续保留；本轮未运行完整 `pnpm validate`、Docker/远端 CI 或真实 ChatGPT 自动选用评测，不由本地文档增量关闭整个 Phase。
 
+## v0.3.5 正式发布与官网归档（2026-10-26）
+
+本轮全局引导与官方 Skill 优化以 `6d8b4096d1b2baeda42437e9814975eb0c15de75` 提交；Release 版本预备提交为 `81adcb7526d45bc3111d6b390b770aac5470633c`。私有 `main` 推送、`v0.3.5` 注释 Tag 及公开同名 Tag/Manifest 已验证，公开主分支两项 CI 通过，正式 [Release CI](https://github.com/bYiyLi/kg-releases/actions/runs/40353232170) 的验证、Docker 集成与镜像发布三个 Job 均成功。不可变镜像 `ghcr.io/byiyli/kgos@sha256:24306c7341004b9b2e5cb5b10c68d809f1812851def0aec06f649e130da5dacc` 已通过独立匿名 OCI Manifest/配置读取，核实 Linux amd64 与精确私有 SHA。
+
+[公开 GitHub Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.5) 实际已发布五个附件：一个七 Skill 的 Plugin ZIP、三份同版安装手册及手册校验清单。逐字节核验清单 SHA-256、ZIP 中唯一 `INSTALL.md` 与独立 AI 指南一致、Plugin Manifest `0.3.5`、七份 Skill 入口与无退役通用 Skill。将已验证的三个官方手册字节原样归档到 `distribution/site/src/content/service-installation/v0.3.5/`，切换网站 `catalog.latest`，同步双语可编辑模板中已验证 Digest 及 README 的示例链接；旧版快照保留。官网 Pages CI、远端当前页面和历史版本切换，须以本次归档提交后的实际证据另行核对，不以 GitHub Release 成功代替网站上线。服务 Dev/Prod 升级、用户私人 Plugin/持久引导配置与完整 Phase 32 其他验收仍不属于本次发布的完成声明。
+
 ## Review 与完成条件
 
 每轮Review以当前变更为准，检查需求覆盖、所有权、现有合同、失败路径、兼容及可执行验收；记录具体发现和修改，再重新检查受影响项。新证据或真实未闭合问题驱动后续轮次，不预定轮数，也不无限重复无变化检查。

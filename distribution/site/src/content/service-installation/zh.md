@@ -39,7 +39,7 @@ docker compose version
 **适用版本：KG OS v0.3.5。** 镜像与官方 Plugin 来自 [正式 Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.5)，命令固定版本和不可变 digest：
 
 ```text
-ghcr.io/byiyli/kgos:v0.3.5@sha256:a153a03ab8e1c71a52563d9dbaa0ad3d8720c769f470637100d92ae26fed51cb
+ghcr.io/byiyli/kgos:v0.3.5@sha256:24306c7341004b9b2e5cb5b10c68d809f1812851def0aec06f649e130da5dacc
 ```
 
 该镜像仅支持 `linux/amd64`，默认端口 `3777`，运行身份 `10001:10001`。容器 `/workspace` 对应你的持久目录，实例配置与数据位于其下的 `.kgos`。官方当前不提供 `:latest` 浮动标签。已有实例先按[升级流程](#upgrade)核对兼容性，不直接套用新安装步骤。
@@ -71,7 +71,7 @@ ss -ltn
   sudo install -d -m 0700 -o 10001 -g 10001 "$PWD/workspace" "$PWD/workspace/.kgos"
   install -m 0600 /dev/null embedding.env
   docker network create kgos-net
-  docker pull ghcr.io/byiyli/kgos:v0.3.5@sha256:a153a03ab8e1c71a52563d9dbaa0ad3d8720c769f470637100d92ae26fed51cb
+  docker pull ghcr.io/byiyli/kgos:v0.3.5@sha256:24306c7341004b9b2e5cb5b10c68d809f1812851def0aec06f649e130da5dacc
 )
 ```
 
@@ -157,7 +157,7 @@ sudo install -m 0600 -o 10001 -g 10001 config.toml workspace/.kgos/config.toml
 ```yaml
 services:
   kgos:
-    image: ghcr.io/byiyli/kgos:v0.3.5@sha256:a153a03ab8e1c71a52563d9dbaa0ad3d8720c769f470637100d92ae26fed51cb
+    image: ghcr.io/byiyli/kgos:v0.3.5@sha256:24306c7341004b9b2e5cb5b10c68d809f1812851def0aec06f649e130da5dacc
     platform: linux/amd64
     container_name: kgos
     user: "10001:10001"
@@ -203,7 +203,7 @@ docker run -d \
   -p 127.0.0.1:3777:3777 \
   --mount type=bind,src="$PWD/workspace",dst=/workspace \
   --env-file "$PWD/embedding.env" \
-  ghcr.io/byiyli/kgos:v0.3.5@sha256:a153a03ab8e1c71a52563d9dbaa0ad3d8720c769f470637100d92ae26fed51cb
+  ghcr.io/byiyli/kgos:v0.3.5@sha256:24306c7341004b9b2e5cb5b10c68d809f1812851def0aec06f649e130da5dacc
 docker logs --tail 80 kgos
 ```
 

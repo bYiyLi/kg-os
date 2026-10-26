@@ -39,7 +39,7 @@ Expect `x86_64` and Docker output that includes Server. Skip the Compose check i
 **Applies to: KG OS v0.3.5.** The image and official Plugin come from the [formal Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.5). Commands pin the version and immutable digest:
 
 ```text
-ghcr.io/byiyli/kgos:v0.3.5@sha256:a153a03ab8e1c71a52563d9dbaa0ad3d8720c769f470637100d92ae26fed51cb
+ghcr.io/byiyli/kgos:v0.3.5@sha256:24306c7341004b9b2e5cb5b10c68d809f1812851def0aec06f649e130da5dacc
 ```
 
 The image supports only `linux/amd64`, listens on port `3777` by default and runs as `10001:10001`. Container `/workspace` maps to your persistent directory; configuration and data live in its `.kgos` subdirectory. There is currently no official floating `:latest` tag. For an existing instance, check compatibility in the [upgrade procedure](#upgrade) instead of applying new-install commands.
@@ -71,7 +71,7 @@ After confirming these names are free, run the following in the same terminal. S
   sudo install -d -m 0700 -o 10001 -g 10001 "$PWD/workspace" "$PWD/workspace/.kgos"
   install -m 0600 /dev/null embedding.env
   docker network create kgos-net
-  docker pull ghcr.io/byiyli/kgos:v0.3.5@sha256:a153a03ab8e1c71a52563d9dbaa0ad3d8720c769f470637100d92ae26fed51cb
+  docker pull ghcr.io/byiyli/kgos:v0.3.5@sha256:24306c7341004b9b2e5cb5b10c68d809f1812851def0aec06f649e130da5dacc
 )
 ```
 
@@ -157,7 +157,7 @@ Save this complete configuration as `~/kgos/compose.yaml`:
 ```yaml
 services:
   kgos:
-    image: ghcr.io/byiyli/kgos:v0.3.5@sha256:a153a03ab8e1c71a52563d9dbaa0ad3d8720c769f470637100d92ae26fed51cb
+    image: ghcr.io/byiyli/kgos:v0.3.5@sha256:24306c7341004b9b2e5cb5b10c68d809f1812851def0aec06f649e130da5dacc
     platform: linux/amd64
     container_name: kgos
     user: "10001:10001"
@@ -203,7 +203,7 @@ docker run -d \
   -p 127.0.0.1:3777:3777 \
   --mount type=bind,src="$PWD/workspace",dst=/workspace \
   --env-file "$PWD/embedding.env" \
-  ghcr.io/byiyli/kgos:v0.3.5@sha256:a153a03ab8e1c71a52563d9dbaa0ad3d8720c769f470637100d92ae26fed51cb
+  ghcr.io/byiyli/kgos:v0.3.5@sha256:24306c7341004b9b2e5cb5b10c68d809f1812851def0aec06f649e130da5dacc
 docker logs --tail 80 kgos
 ```
 
