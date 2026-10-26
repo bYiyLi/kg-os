@@ -17,7 +17,7 @@ func TestRunMetadataModes(t *testing.T) {
 		wantStderr string
 	}{
 		{name: "help", args: []string{"--help"}, wantStdout: "KG OS daemon"},
-		{name: "version", args: []string{"--version"}, wantStdout: "0.3.2"},
+		{name: "version", args: []string{"--version"}, wantStdout: "0.3.3"},
 		{name: "unsupported", args: []string{"--phase0-shell"}, wantCode: 2, wantStderr: "unknown option"},
 		{name: "missing root", wantCode: 2, wantStderr: "--root"},
 	}
