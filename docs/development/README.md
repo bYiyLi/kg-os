@@ -146,9 +146,9 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [27 KG OS Knowledge Standards Skills](phases/27-knowledge-standards-skills.md) | `in_progress` | 六规范源码已创作，VLog补充单一可选建模参考；Doctor衔接、六规范整包安装及真实客户端验收未完成，无固定官方VLog模型要求 | [D106](../design/decisions.md#d106-six-kgos-standards-skills)、[MCP规范体系](../design/mcp.md#kgos-standards-skill-suite) |
 | [28 Official Seven Skills & Legacy kgos Retirement](phases/28-official-skill-roster.md) | `in_progress` | 源码已收敛七个、旧通用 Skill 已清理、MCP 指南已补缺；私人 Plugin 更新、真实客户端选用/写入和最终阶段验收待完成 | [D107](../design/decisions.md#d107-final-seven-official-skills)、[最终七 Skill](../design/mcp.md#kgos-seven-skills) |
 | [29 Web shadcn/ui Migration](phases/29-web-shadcn-ui.md) | `in_progress` | 组件迁移已实现，39 项 Web E2E 与本地视觉验收通过；整仓质量门禁及已有开发依赖审计问题见 Phase 29，未执行提交或部署 | [Web UI 体系](../design/web.md#通用-ui-组件体系) |
-| [32 知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md) | `planned` | 模型增量扩展修复、初始化环境/多库加载、用户表达及检索/合并边界；实现与验收未执行 | [D111](../design/decisions.md#d111-task-scoped-knowledge-loading)、[MCP 初始化加载](../design/mcp.md#task-scoped-knowledge-loading)、既有 Ontology/Graph/Evolution 合同 |
+| [32 知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md) | `planned` | 模型增量扩展修复、初始化环境/多库加载、用户表达、检索/合并边界及登录弹窗主题一致性；实现与验收未执行 | [D111](../design/decisions.md#d111-task-scoped-knowledge-loading)、[MCP 初始化加载](../design/mcp.md#task-scoped-knowledge-loading)、既有 Ontology/Graph/Evolution 合同 |
 
-新增独立改进阶段：[Phase 32：知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md)（`planned`）。覆盖模型扩展异常、初始化环境/多库加载、用户表达及检索/合并边界；与Phase 25/27/28原有验收分开，不以新文档关闭旧阶段。
+新增独立改进阶段：[Phase 32：知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md)（`planned`）。覆盖模型扩展异常、初始化环境/多库加载、用户表达、检索/合并边界及登录弹窗主题一致性；与Phase 25/27/28原有验收分开，不以新文档关闭旧阶段。
 
 当前实现依赖顺序：
 
