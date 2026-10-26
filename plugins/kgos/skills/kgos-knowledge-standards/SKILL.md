@@ -1,8 +1,8 @@
 ---
 name: kgos-knowledge-standards
-description: Guide the accuracy of KG OS knowledge instance creation, review and updates under an existing ontology. Use when saving information, matching entities, asserting relationships, correcting facts or resolving conflicting updates. Covers instance content and evidence, not schema design, query-only answers, branch administration or scheduled whole-library maintenance.
+description: Guide accurate KG OS knowledge records under an existing ontology. Use for requested saves and durable decisions, preferences, progress, corrections or lessons identified during authorized daily work, including entity matching, relationships and conflicting updates. Covers instance content and evidence, not schema design, retrieval answers or knowledge-world quality reviews.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # KG OS 知识实例质量规范
@@ -11,7 +11,7 @@ metadata:
 
 ## 职责、权限与前提
 
-用户要求评审、讨论或准备内容时不写库；明确授权创建或更新时，不为普通已授权步骤重复索取批准。保存范围以用户任务为准，不用主观“长期价值不高”否决合法保存，不擅自扩充为全库去重、定时任务、分支调整或 VLog 记录。密钥及未经授权的敏感内容不因出现在材料中就获得持久化许可。
+评审、讨论或准备内容本身不产生写权限；当前任务或已适用的持续管理授权覆盖保存目标时，直接完成相应记录与核实，不等待逐条保存提醒。遵守当前只读、不查库、不保存及范围限制。日常沉淀判断长期价值，在信息明确或阶段结束时及时处理；明确合法保存请求不因主观“长期价值不高”被否决。不擅自扩充为全库去重、定时任务、分支调整或 VLog 记录，不保存密码、令牌等秘密。
 
 先理解与目标实例有关的模型含义和身份规则，按它们填写值、复用对象及建立关系；不重新决定概念粒度、组织方式、Definition、字段、索引或通用领域模型。不要把“工具可以接受”误当作“模型已允许这种含义”。现有模型不能忠实表达必要条件时，指出缺口，保留受影响内容未写入；不能发明字段、抹掉不确定性或绕过 Schema。宿主另有模型修改授权时按相应建模职责解决，不因本 Skill 的边界阻止其它已授权工作。
 
@@ -56,4 +56,4 @@ K1–K6 是本规范的审查定位符，不是要求所有实例增加的字段
 
 案例里的模型、名称、来源和数据都是给定的教学条件，不是建议部署的 Ontology，也不是当前用户库事实。已有模型怎样表达来源/时间/状态，就怎样保存有依据的值；无需为每条知识凑齐统一元数据，更不能在实例中复制 Definition 描述作为第二份模型真源。
 
-核实范围与影响相称：单个明确对象的合法小修改不升级成全库审计；身份或证据不足只阻断依赖它的操作。按当前任务返回实际结果，区分拟保存、已写入、已回读、拒绝、未决和未执行；不额外制造固定评分、报告模板或独立审批步骤。对已存在且内容相同的对象，可说明无需重复写入，不能虚报新增。
+核实范围与影响相称：单个明确对象的合法小修改不升级成全库审计；身份或证据不足只阻断依赖它的操作。用户请求的保存返回实际结果，区分拟保存、已写入、已回读、拒绝、未决和未执行；日常授权记录不逐条播报，影响结论的纠正、未决冲突、失败和待决定事项须简要说明。不额外制造固定评分、报告模板或独立审批步骤。对已存在且内容相同的对象不重复写入，不能虚报新增。

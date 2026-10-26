@@ -246,6 +246,35 @@
       "mustInclude": ["kgos-retrieval-standards"],
       "mustExclude": [],
       "criteria": ["可按示例结束", "不承诺全量", "不无端扩检"]
+    },
+    {
+      "id": "daily-cross-topic-preference",
+      "prompt": "任务是给项目P推荐沟通形式。已有获准入口显示一条跨项目适用的稳定无障碍偏好，正文尚未读取。可以只按P的关键词查记录后直接回答吗？",
+      "mustInclude": ["kgos-retrieval-standards"],
+      "mustExclude": [],
+      "criteria": [
+        "读取已发现且适用的跨主题偏好",
+        "限定获准范围，按需渐进加载",
+        "不以项目关键词排除适用知识"
+      ]
+    },
+    {
+      "id": "simple-greeting",
+      "prompt": "用户只说“早上好”，没有知识任务或诊断请求，当前也没有依赖历史的结论。是否必须读取所有知识正文并加载检索规范？",
+      "mustInclude": [],
+      "mustExclude": ["kgos-retrieval-standards", "kgos-doctor"],
+      "criteria": ["简单交流无需加载正文", "不强制全量Skill或Doctor"]
+    },
+    {
+      "id": "sufficient-valid-context",
+      "prompt": "当前任务需依据项目P的决定给建议。相关正文、适用跨主题偏好和来源已经读取，范围及不可变State匹配，所需最新版本已核对且没有变化，证据足够。是否必须重新查询并运行一轮维护？",
+      "mustInclude": ["kgos-retrieval-standards"],
+      "mustExclude": ["kgos-maintenance-standards", "kgos-doctor"],
+      "criteria": [
+        "复用有效且足够的知识完成建议",
+        "不以工具调用数量或固定清单判完成",
+        "没有有据缺口不制造维护动作"
+      ]
     }
   ]
 }

@@ -1,8 +1,8 @@
 ---
 name: kgos-vlog-standards
-description: "Guide drafting, review and updates of KG OS system knowledge records: what to retain, event continuity, outcomes and provenance. Not maintenance execution, scheduling or schema design."
+description: "Guide KG OS system knowledge records, including durable decisions, progress, validation and lessons identified during authorized daily work: what to retain, event continuity, outcomes and provenance. Use for drafting, review or updates. Not maintenance execution, scheduling, schema design or ordinary domain facts."
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # KG OS 系统知识记录规范
@@ -15,7 +15,7 @@ VLog面向系统运行、诊断维护、模型演进、重要决定及可复用�
 
 **模型使用原则**：记录前按实际目标 `branch/vlog` 的 State 检查现有 Ontology；已有模型足以忠实表达所需事实就复用，不为了模板统一迁移既有记录。确实缺合适模型且宿主已获得对应建模授权时，才按需参考**一套可选** `VLogEntry` 方案，并按真实需求调整；参考模型不是 KG OS 内置/官方固定 Schema，也不因安装 Skill 自动创建。实际模型设计与修改遵循 Ontology 职责，VLog 本身只规范记录质量。
 
-讨论、起草和评审不授权写入。重要发现也不自行产生记录权限；当前任务或已适用的明确授权覆盖“维护并记录”时，可以继续，不重复索取普通批准。记录授权不包含重新运行故障操作、修复系统、创建调度、迁移或合并来源世界。宿主已获其它相应授权时按原职责推进，不把本规范结束当整个任务结束。
+讨论、起草和评审本身不授权写入，重要发现也不自行产生权限；当前任务或已适用的持续管理授权覆盖目标时，在信息明确或阶段结束时及时记录，不等逐条提醒或统一拖到会话结束。当前只读、不保存及范围限制仍适用。记录授权不包含重新运行故障操作、修复系统、创建调度、迁移或合并来源世界；其它动作已有相应授权时由宿主按原职责继续。
 
 官方约定的 `branch/vlog` 是每个Knowledge Base内的普通长期Branch，不是专用数据库或权限区；`docs/vlog/` 不是运行时记录位置。实际目标、模型和可见范围先据现有配置/任务核对，不能把继承来的业务数据自动认作VLog，不能静默写入main替代缺失目标。Branch或模型准备本身需要对应授权与检查，不由本Skill预置；不要求其它Skill已安装或自动激活。
 
@@ -58,4 +58,4 @@ V1–V6仅为规范定位符，不是必填字段或评分。必须/不得在相
 
 记录不是每个工具调用之后的附加动作。按已有模型表达所需含义：有合适结构就使用；文本允许完整证据说明时不因缺少某个专用字段就拒绝。需要新结构由获授权的建模任务解决，不吞掉失败、时间或归属来迁就现有字段。
 
-业务活动结果与VLog保存结果分别核实。草稿、已写入、回读未完成、记录失败/未知不能混写；写VLog成功也不能证明源活动成功。按用户要求交付相应内容和限制，不强制固定报告、复盘模板或“记录本次记录”的无限递归。
+业务活动结果与VLog保存结果分别核实。草稿、已写入、回读未完成、记录失败/未知不能混写；写VLog成功也不能证明源活动成功。用户请求记录时交付结果；日常授权记录不逐条播报，影响结论的纠正、未决冲突、失败和待决定事项须简要说明。连接不可用时继续独立工作，指出未完成保存。不强制固定报告、复盘模板或“记录本次记录”的无限递归。

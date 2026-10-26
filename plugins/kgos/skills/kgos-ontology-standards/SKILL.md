@@ -1,8 +1,8 @@
 ---
 name: kgos-ontology-standards
-description: Guide the design, review, modification and maintenance of KG OS ontology models. Use for choosing node, relationship and property definitions, clarifying model semantics, constraints and indexes, or assessing schema evolution. Not for ordinary instance edits, query-only tasks, branch administration or environment diagnosis.
+description: Guide KG OS ontology design, review and evolution, including modeling gaps discovered while supporting a task or known goal. Use for node, relationship and property definitions, model semantics, constraints and indexes. Not for ordinary instance edits, sufficient-model retrieval, branch administration or environment diagnosis.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # KG OS 本体建模规范
@@ -12,6 +12,8 @@ metadata:
 ## 范围与依据
 
 先区分当前请求是设计、评审还是实际修改。设计/评审不授权写入；已经明确授权的修改无需为普通建模细节重复索取批准。涉及未授权的数据删除、含义改变或无法从现有事实裁决的业务取舍，只暂停受影响部分并说明缺口。
+
+日常任务发现真实表达缺口时也可应用本规范，不必等待用户点名建模。先核对当前需求、对话及已知目标与实际模型；已有模型足够则复用，不为体现管理责任新增结构。有据缺口在适用建模授权内作最小必要设计、修改和核实；授权或必要业务含义仍缺失时，说明具体阻塞、已尝试方法、推荐方案及影响，只暂停依赖部分，不预置通用模型。
 
 本规范中的“必须/不得”是适用范围内的要求；“优先/建议”允许有证据的例外；案例只约束其明确假设，不是用户的领域事实。用户确认的领域语义和当前 KG OS 公共合同优先于案例。发现业务要求与技术能力不相容时，说明差异并给可行选项，不静默丢失要求。
 

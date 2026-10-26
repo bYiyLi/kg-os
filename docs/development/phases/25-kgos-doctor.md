@@ -20,7 +20,7 @@
 
 **已确认输入与待实际验证的能力**：
 
-1. **引导词**：用户已确认 [Global AI Guidance v1](../../../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance-v1.md) 正文及成对标记。D1 只把它作为对照；实际指令来源、完整加载和行为证据分开验证，不复制第二份正文，不自动安装。
+1. **引导词**：当时用户已确认初版引导词及成对标记，其原始内容由相应 Git 历史/Tag 追溯；当前仅维护 [Global AI Guidance](../../../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md)。D1 只把它作为对照；实际指令来源、完整加载和行为证据分开验证，不复制第二份正文，不自动安装。
 2. **独立规范**：Phase 27 六项源码已存在；Doctor 只消费目标宿主实际可用、版本可辨的有关规则。源码存在不证明安装/发布，缺规则时规范符合性为 `UNKNOWN`。
 3. **VLog**：按目标 Branch 的真实模型辨认记录、运行、时间、结果和源 State；不要求统一 `VLogEntry` Schema。不同模型与覆盖不足的判断需分别验收。
 4. **宿主能力**：只检查当次实际暴露的指令来源、Skill/版本/轨迹、MCP 连接和外部任务信息；隐藏/不开放的部分未知。没有单一跨宿主配置 API 或自动调度前置。
@@ -97,7 +97,7 @@
 
 ### 交付与职责
 
-[kgos-doctor](../../../plugins/kgos/skills/kgos-doctor/SKILL.md) 为独立只读诊断 **workflow**，拥有诊断结果而非规范转发、修复或维护执行。运行时包共五个 Markdown 文件：入口、宿主证据（D1/D3）、知识就绪性（D2/D4）、维护证据（D5）和独立 [Global AI Guidance v1](../../../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance-v1.md) 对照资产。用户已确认的起止标签及区块正文逐字保留；文件标题仅用于文档呈现，不属于宿主配置正文，不因读取资产而判断已注入。完整/定向诊断、依赖失败、不可见信息、四种结果及结束边界均在包内可达。
+[kgos-doctor](../../../plugins/kgos/skills/kgos-doctor/SKILL.md) 为独立只读诊断 **workflow**，拥有诊断结果而非规范转发、修复或维护执行。当时的运行时包为入口、宿主证据（D1/D3）、知识就绪性（D2/D4）、维护证据（D5）及引导对照资产共五个 Markdown 文件；历史正文由对应 Git 历史/Tag 保留，当前入口为 [Global AI Guidance](../../../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md)。旧版标签和正文在其历史版本中原样保留；文件标题仅用于文档呈现，不属于宿主配置正文，不因读取资产而判断已注入。完整/定向诊断、依赖失败、不可见信息、四种结果及结束边界均在包内可达。
 
 D4 不接管深度知识治理，D5 不要求统一 VLog Model、Scheduler 或固定过期天数；没有新增业务代码、Kernel 模型、API、宿主设置或后台任务。六个既有规范与过渡通用 `kgos` 未修改。最终七个目标已有源码，不等于 Phase 28 的实际迁移已完成。
 

@@ -24,10 +24,10 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听与 [D105 Web-first 初始化门禁](design/runtime.md#web-first-run-bootstrap)、`auth.json` / `initialized.json`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
 | [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |
 | [web.md](design/web.md) | 面向人的图谱优先界面、版本列表 / 覆盖式 DAG、独立查询结果帧、本体视图、草稿与连接交互、[D110 四步 Token-first 初始化页面](design/web.md#web-first-run-setup)、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
-| [decisions.md](design/decisions.md) | D1–D111 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [decisions.md](design/decisions.md) | D1–D112 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
-本轮知识使用改进：[初始化加载与知识记录质量](design/mcp.md#task-scoped-knowledge-loading)、[D111](design/decisions.md#d111-task-scoped-knowledge-loading)；模型扩展与场景验收由[Phase 32](development/phases/32-knowledge-use-readiness.md)跟踪。当前仅设计/计划增量，不代表实现、私人安装或发布已完成。
+本轮知识使用改进：[初始化加载与知识记录质量](design/mcp.md#task-scoped-knowledge-loading)、[六部分引导与知识持续可用责任](design/mcp.md#global-ai-guidance-and-daily-responsibility)、[D111](design/decisions.md#d111-task-scoped-knowledge-loading) / [D112](design/decisions.md#d112-global-ai-guidance-and-daily-responsibility)；模型扩展与场景验收由[Phase 32](development/phases/32-knowledge-use-readiness.md)跟踪。源码、本地验证、私人安装与发布分别取证，不由设计同步推定已完成。
 
 ## 从配置到调用
 
@@ -41,7 +41,7 @@ KG OS 不再把全部设计维护在一个超大文件中。`docs/design/` 下�
 | 使用方怎么定义模型和索引 | [Ontology 公共格式](design/ontology.md#公共可编辑格式)、[完整编辑示例](design/ontology.md#编辑示例) |
 | 调用方怎么保存正文和查询 | [Graph 合同](design/graph.md#graph-公共调用合同)、[CLI query](design/cli.md#query)、[CLI execute](design/cli.md#execute) |
 | AI 如何通过 MCP / 私人 Plugin 预览知识库及执行受控 SDK | [MCP / Plugin 设计](design/mcp.md) |
-| AI 默认知识发现使用哪份全局指令 | [Global AI Guidance v1 唯一正文](../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance-v1.md)，读取对照不等于宿主已加载 |
+| AI 日常知识管理使用哪份全局指令 | [Global AI Guidance 唯一正文](../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md)及[职责与版本边界](design/mcp.md#global-ai-guidance-and-daily-responsibility)；发行版按同包基线，读取对照不等于宿主已加载 |
 | AI 如何诊断 KG OS 引导提示词、MCP/知识库、Skill、知识内容及持续维护 | [Doctor v1 设计](design/mcp.md#kgos-doctor-v1)、[D104](design/decisions.md#d104-kgos-doctor-v1-and-vlog)、[Phase 25](development/phases/25-kgos-doctor.md) |
 | AI 应依循哪些独立知识创建、建模、检索、版本、维护及 VLog 规范 | [六个官方规范 Skill 职责](design/mcp.md#kgos-standards-skill-suite)、[D106](design/decisions.md#d106-six-kgos-standards-skills)、[Phase 27](development/phases/27-knowledge-standards-skills.md)；已创作 [Ontology](../plugins/kgos/skills/kgos-ontology-standards/SKILL.md)、[Knowledge](../plugins/kgos/skills/kgos-knowledge-standards/SKILL.md)、[Retrieval](../plugins/kgos/skills/kgos-retrieval-standards/SKILL.md)、[Branch](../plugins/kgos/skills/kgos-branch-standards/SKILL.md)、[VLog](../plugins/kgos/skills/kgos-vlog-standards/SKILL.md) 和 [Maintenance](../plugins/kgos/skills/kgos-maintenance-standards/SKILL.md)，实际安装与整包验收仍见阶段证据 |
 | 官方保留哪七个 Skill、历史 `kgos` 退役与私人安装如何迁移 | [七 Skill 最终清单](design/mcp.md#kgos-seven-skills)、[D107](design/decisions.md#d107-final-seven-official-skills)、[Phase 28](development/phases/28-official-skill-roster.md)（源码已清理，客户端验收未关闭） |

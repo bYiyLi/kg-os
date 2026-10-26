@@ -23,7 +23,7 @@ KG OS 是面向 AI 的可编程知识图基础设施。你可以按自己的工�
 
 按照[安装教程](https://kgos.sites.y2l.top/zh/install/)完成：**部署服务 → 初始化 → 公网 HTTPS → 连接 ChatGPT → 安装私人 Plugin → 自检与开始使用**。推荐 **Docker Compose + Web 初始化**，也支持 Docker 命令与配置文件初始化。已有服务和连接可复用；[Markdown 原文](https://kgos.sites.y2l.top/zh/install.md)与网页来自同一份内容。
 
-教程先引导你在 ChatGPT 创建或复用基础 MCP 应用，并验证真实调用，再提供可复制的 AI 安装提示词。使用**所选版本手册提供的 INSTALL.md**（[v0.3.3 AI 指南](https://kgos.sites.y2l.top/install/v0.3.3/INSTALL.md)），引导 AI 读取对应发行资源、识别旧 Plugin 定制，并在你确认方案后新建带版本号的私人 Plugin，协助安装七个官方 Skill、配置 Global AI Guidance v1 并自检。新版验收通过后，由你选择是否卸载旧版；共享应用与 MCP 连接保留。
+教程先引导你在 ChatGPT 创建或复用基础 MCP 应用，并验证真实调用，再提供可复制的 AI 安装提示词。使用**所选版本手册提供的 INSTALL.md**（[v0.3.3 AI 指南](https://kgos.sites.y2l.top/install/v0.3.3/INSTALL.md)），引导 AI 读取对应发行资源、识别旧 Plugin 定制，并在你确认方案后新建带版本号的私人 Plugin，协助安装七个官方 Skill、配置 Global AI Guidance 并自检。新版验收通过后，由你选择是否卸载旧版；共享应用与 MCP 连接保留。
 
 完整安装包含就绪服务、ChatGPT 应用、私人 Plugin、七个官方 Skill 和全局引导词；只需基础 MCP 的用户可在连接验收通过后开始使用。
 

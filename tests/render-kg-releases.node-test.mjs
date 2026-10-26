@@ -844,13 +844,50 @@ test("user-facing documentation is bilingual without exposing maintainer operati
 test("agent installer has one installation flow and preserves official guidance", async () => {
   const installer = await readFile(join(root, "plugins/kgos/INSTALL.md"), "utf8");
   assert.doesNotMatch(installer, /^## (?:English|简体中文)$/m);
+  assert.deepEqual(
+    await readdir(join(root, "plugins/kgos/skills/kgos-doctor/assets")),
+    ["global-ai-guidance.md"],
+    "Only the current guidance source is packaged; Git tags preserve historical versions"
+  );
   const guidance = await readFile(
-    join(root, "plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance-v1.md"),
+    join(root, "plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md"),
     "utf8"
   );
-  const block = /\[KGOS_GUIDANCE_BEGIN:v1\][\s\S]*?\[KGOS_GUIDANCE_END:v1\]/g;
+  const block = /\[KGOS_GUIDANCE_BEGIN\][\s\S]*?\[KGOS_GUIDANCE_END\]/g;
   assert.deepEqual(
     [...installer.matchAll(block)].map((match) => match[0]),
     [guidance.match(block)[0]]
   );
+  const rendered = renderInstaller(installer, {
+    tag: "v0.3.4",
+    digestRef: `ghcr.io/byiyli/kgos@sha256:${"a".repeat(64)}`
+  });
+  assert.deepEqual(
+    [...rendered.matchAll(block)].map((match) => match[0]),
+    [guidance.match(block)[0]]
+  );
+  for (const locale of ["zh", "en"]) {
+    const template = await readFile(
+      join(root, `distribution/site/src/content/service-installation/${locale}.md`),
+      "utf8"
+    );
+    assert.match(template, /Global AI Guidance/);
+  }
+});
+
+test("published installer snapshots retain their original guidance baseline", async () => {
+  const directory = join(root, "distribution/site/src/content/service-installation");
+  const catalog = JSON.parse(await readFile(join(directory, "catalog.json"), "utf8"));
+  // Historical release artifacts are immutable; current Doctor carries only one guidance asset.
+  const guidance = await readFile(join(directory, "v0.3.0/INSTALL.md"), "utf8");
+  const block = /\[KGOS_GUIDANCE_BEGIN:v1\][\s\S]*?\[KGOS_GUIDANCE_END:v1\]/g;
+  for (const tag of ["v0.3.0", "v0.3.1", "v0.3.2", "v0.3.3"]) {
+    assert.ok(catalog.versions.includes(tag));
+    const installer = await readFile(join(directory, tag, "INSTALL.md"), "utf8");
+    assert.deepEqual(
+      [...installer.matchAll(block)].map((match) => match[0]),
+      [guidance.match(block)[0]]
+    );
+    assert.doesNotMatch(installer, /\[KGOS_GUIDANCE_BEGIN\]/);
+  }
 });

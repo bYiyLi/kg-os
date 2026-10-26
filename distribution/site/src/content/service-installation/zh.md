@@ -529,7 +529,7 @@ https://kgos.sites.y2l.top/install/v0.3.3/INSTALL.md
 
 1. **确认方案**：核对服务与同版官方资源；如有旧私人 Plugin，读取旧版内容并与旧官方基线比较，列出定制迁移与冲突。你选择目标、迁移内容、权限与安装范围，确认具体方案后执行。已授权步骤不重复确认。
 2. **创建并安装新版本**：每次新建名称带官方版本号的私人 Plugin，同版重做增加修订号；复用基础应用的真实连接，保留七个官方 Skill 与资源。旧 Plugin 先保留，发生冲突由你选择，不原地覆盖。
-3. **配置全局引导词**：AI 给出完整官方 Global AI Guidance v1。按 [ChatGPT 个性化设置](https://learn.chatgpt.com/docs/prompting)打开 **Settings → Personalization → Custom instructions**，查看现有内容，由你选择追加、合并或替换冲突部分并保存；不静默覆盖原指令。字段长度不足时保留官方正文，先决定如何精简已有内容，不将删节版声称为完整官方引导词。
+3. **配置全局引导词**：AI 给出完整官方 Global AI Guidance。按 [ChatGPT 个性化设置](https://learn.chatgpt.com/docs/prompting)打开 **Settings → Personalization → Custom instructions**，查看现有内容，由你选择追加、合并或替换冲突部分并保存；不静默覆盖原指令。字段长度不足时保留六部分完整正文，选择宿主可承载全文的持久指令入口或解决已有内容冲突；无法完整保存则保留未配置状态，不压缩为 800 字稿或将单次贴入当全局加载。
 4. **新会话自检**：安装新 Plugin，确认其启用后新建会话并通过 `@` 选中；不在会话中重新粘贴引导词作为“已生效”的证明。发送：
 
 ```markdown

@@ -380,6 +380,46 @@
       "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
       "criteria": ["按当前维护批次继续", "先查并发的S1变化", "保留其它证据、仅处理授权目标并验证"]
+    },
+    {
+      "id": "daily-related-candidates",
+      "prompt": "已持续授权维护学习世界并修复相关质量问题。普通任务中发现一组疑似重复记录和过时关联，尚未确认身份或业务时间。接下来如何处理？",
+      "mustInclude": ["kgos-maintenance-standards"],
+      "mustExclude": [],
+      "criteria": [
+        "先核实疑似问题与合理差异",
+        "授权内相关范围最小处置并验证",
+        "不等待逐条提醒，不扩展为全库清理"
+      ]
+    },
+    {
+      "id": "daily-readonly-finding",
+      "prompt": "此前有持续知识维护授权；用户本轮限定只读评审。发现几条确已错误的关系。请完成本次评审。",
+      "mustInclude": ["kgos-maintenance-standards"],
+      "mustExclude": [],
+      "criteria": ["当前只读边界优先", "报告错误与最小方案而不修复", "不为验证运行写入探针"]
+    },
+    {
+      "id": "daily-unresolved-conflict",
+      "prompt": "持续授权维护项目知识。日常任务发现同一对象、同一时点的两份可靠来源互相冲突；已核对身份、业务时间和可访问原文，仍无法裁决。现有模型允许保留不同来源主张，另有明确事实可继续用于任务。",
+      "mustInclude": ["kgos-maintenance-standards"],
+      "mustExclude": [],
+      "criteria": [
+        "确认冲突并保留来源与未决，不强迫统一或删除",
+        "授权内最小维护，继续使用独立可靠事实",
+        "如任务确需单一结论才提出具体缺失决定、已尝试方式和推荐处理"
+      ]
+    },
+    {
+      "id": "daily-adequate-no-repair",
+      "prompt": "已授权维护项目知识。普通任务中两条内容看似冲突，经核实分别适用于不同时间和主体，当前记录和关系已准确表达差异，任务所需知识充分。请完成本次处理。",
+      "mustInclude": ["kgos-maintenance-standards"],
+      "mustExclude": [],
+      "criteria": [
+        "确认合理差异并保留，无需制造修复",
+        "不为完成维护而删改或造新模型",
+        "必要结论按任务交付，不宣称全库质量通过"
+      ]
     }
   ]
 }

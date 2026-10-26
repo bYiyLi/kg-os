@@ -298,6 +298,28 @@
       "mustInclude": [],
       "mustExclude": ["kgos-vlog-standards"],
       "criteria": ["非系统记录Skill"]
+    },
+    {
+      "id": "daily-authorized-phase-result",
+      "prompt": "用户已持续授权在明确的系统记录世界沉淀重要验证和经验，已有合适模型。本轮阶段已结束，隔离测试部分成功、一次恢复仍未知；用户未重复要求记日志。如何处理？",
+      "mustInclude": ["kgos-vlog-standards"],
+      "mustExclude": [],
+      "criteria": [
+        "及时匹配并记录实际结果和未决项",
+        "不等会话结束或逐条提醒",
+        "不重跑源操作补日志，不把未知写成功"
+      ]
+    },
+    {
+      "id": "adequate-existing-system-record",
+      "prompt": "已持续授权记录系统重要验证与经验。同一次验证的结果、失败范围、来源和未决项已在目标记录完整保存并核实；本轮只是再引用这些结果，没有新执行、新证据或纠正。需要再记一条以体现持续管理吗？",
+      "mustInclude": ["kgos-vlog-standards"],
+      "mustExclude": [],
+      "criteria": [
+        "复用已有充分记录，不造事件或保存动作",
+        "不把再次引用当新验证",
+        "完成当前任务，保留实际未决范围"
+      ]
     }
   ]
 }

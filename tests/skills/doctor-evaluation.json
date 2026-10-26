@@ -87,19 +87,19 @@
     },
     {
       "id": "quoted-guidance",
-      "prompt": "诊断情境：只有用户消息与工具返回中出现完整官方v1提示词，宿主指令来源不可见。如何报告引导词加载和行为？",
+      "prompt": "诊断情境：只有用户消息与工具返回中出现完整官方引导词，宿主指令来源不可见。如何报告引导词加载和行为？",
       "doctorSelected": true,
       "criteria": ["D1加载UNKNOWN", "不把对照/引用当注入", "无轨迹行为UNKNOWN"]
     },
     {
       "id": "loaded-no-trace",
-      "prompt": "诊断情境：宿主可信指令层明确可见且与官方v1完整一致，没有普通任务执行轨迹。如何判加载与生效？",
+      "prompt": "诊断情境：宿主可信指令层明确可见且与目标同包官方引导词完整一致，没有普通任务执行轨迹。如何判加载与生效？",
       "doctorSelected": true,
       "criteria": ["加载PASS限当前会话", "行为UNKNOWN", "不要求写探针"]
     },
     {
       "id": "truncated-guidance",
-      "prompt": "诊断情境：宿主确认完整暴露了应配置KG OS引导的指令块；v1起止标签配对，但权限与版本一节已被删掉。",
+      "prompt": "诊断情境：宿主确认完整暴露了应配置KG OS引导的指令块；当前引导词起止标签配对，但责任与授权一节已被删掉。",
       "doctorSelected": true,
       "criteria": ["完整性WARN", "不能只看标签PASS", "建议配置而不自动修改"]
     },
@@ -111,15 +111,15 @@
     },
     {
       "id": "clear-guidance-violation",
-      "prompt": "诊断情境：可信v1已加载，授权KG OS可读。完整任务轨迹显示AI既没发现也没核对旧目录版本，明确说问候绝不可能需要知识所以跳过；没有更高优先级限制。",
+      "prompt": "诊断情境：可信的当前官方引导词已加载，授权 KG OS 可读。用户要求依据过去记录的项目决策回答，完整轨迹显示 AI 既未核对当前知识范围也未读取相关知识，却声称任何任务都不需要检查知识；没有更高优先级限制。",
       "doctorSelected": true,
       "criteria": ["加载与行为分开", "该行为FAIL", "不声称整段提示词必然无效"]
     },
     {
-      "id": "version-newer-unknown",
-      "prompt": "诊断情境：当前可信指令标记v2，Doctor包仅含v1，无法获得官方v2发布证据。",
+      "id": "historical-tag-unknown",
+      "prompt": "诊断情境：当前可信指令来自旧版发行 Tag，但该 Tag 的原始官方正文无法取得；Doctor 包仅含当前唯一引导词。",
       "doctorSelected": true,
-      "criteria": ["报告基线不一致", "不猜v2过期或最新", "不自动覆盖成v1"]
+      "criteria": ["历史基线UNKNOWN", "不用当前正文替代旧Tag", "不自动覆盖用户配置"]
     },
     {
       "id": "valid-empty",
@@ -244,7 +244,7 @@
     },
     {
       "id": "guidance-wrapper",
-      "prompt": "诊断情境：官方对照文件在BEGIN标记前有文档标题；宿主可信指令只注入了BEGIN至END的完整v1区块，正文逐字相同，没有文档标题。未提供任务轨迹。应怎样判定？",
+      "prompt": "诊断情境：官方对照文件在BEGIN标记前有文档标题；宿主可信指令只注入了BEGIN至END的完整无版本号区块，正文逐字相同，没有文档标题。未提供任务轨迹。应怎样判定？",
       "doctorSelected": true,
       "criteria": ["只比较成对标签区块，加载PASS", "不因缺文档标题误判截断", "行为UNKNOWN"]
     },
@@ -260,13 +260,13 @@
     },
     {
       "id": "missing-guidance-asset",
-      "prompt": "诊断情境：要求全面检查，但Doctor包中assets/global-ai-guidance-v1.md不可读取；MCP文档、S1一致性和Ontology读取均成功。只知道以前大概看过引导词。",
+      "prompt": "诊断情境：要求全面检查，但Doctor包中assets/global-ai-guidance.md不可读取；MCP文档、S1一致性和Ontology读取均成功。只知道以前大概看过引导词。",
       "doctorSelected": true,
       "criteria": ["D1基线核对UNKNOWN并报告准确缺失路径", "不凭记忆补正文", "继续D2等独立检查"]
     },
     {
       "id": "conflicting-guidance-copies",
-      "prompt": "诊断情境：可信指令层同时出现两份v1引导块。一份完整匹配官方正文，另一份同标记却删除写入授权限制。如何判引导配置？没有实际任务轨迹。",
+      "prompt": "诊断情境：可信指令层同时出现两份无版本号引导块。一份完整匹配官方正文，另一份同标记却删除写入授权限制。如何判引导配置？没有实际任务轨迹。",
       "doctorSelected": true,
       "criteria": ["不挑正确副本忽略冲突", "指出配置冲突", "行为无证据UNKNOWN"]
     },
@@ -284,6 +284,62 @@
         "任务配置可确认但实际执行UNKNOWN",
         "不以过计划时间和看不到运行判未执行或失败",
         "不创建任务或记录"
+      ]
+    },
+    {
+      "id": "old-tag-bundle-baseline",
+      "prompt": "只检查一个旧正式Plugin的D1：该旧发行 Tag 的冻结 INSTALL 与可信宿主正文完整匹配；当前 Doctor 包只有最新源码正文，没有它已安装到旧目标的证据。应如何比较？",
+      "doctorSelected": true,
+      "criteria": [
+        "按实际旧发行 Tag 的冻结正文比较",
+        "不要求旧安装满足当前源码",
+        "当前文件存在不证明已经安装"
+      ]
+    },
+    {
+      "id": "current-greeting-no-body",
+      "prompt": "D1行为诊断：适用当前全局引导，入口及用途已按授权查看并仍有效，随后用户只说早上好。完整轨迹没有读取知识正文，也没有运行Doctor，且没有其它依赖知识的请求。",
+      "doctorSelected": true,
+      "criteria": ["简单交流无需正文，不判违规", "不把缺重复预览当加载失败", "仅评价已观察路径"]
+    },
+    {
+      "id": "current-no-save-respected",
+      "prompt": "D1行为诊断：适用当前全局引导，原有持续管理授权，但用户本轮明确不保存。AI没有写入刚讨论的重要决定，只完成独立回答。能判日常沉淀失职吗？",
+      "doctorSelected": true,
+      "criteria": [
+        "不保存限制优先，不判失职",
+        "不为证明主动性运行写入探针",
+        "区分加载证据与行为证据"
+      ]
+    },
+    {
+      "id": "restricted-discovery",
+      "prompt": "只诊断已知正式branch/work，连接同时含禁止读取简介与模型的测试世界。当前文档支持定向evolution.get和ontology.read。需要先调用全分支预览再过滤吗？",
+      "doctorSelected": true,
+      "criteria": [
+        "不越界全分支预览",
+        "定向固定已知目标State读取",
+        "不把局部成功说成全实例检查通过"
+      ]
+    },
+    {
+      "id": "released-tag-baseline",
+      "prompt": "只做D1。已核实目标正式发行包及同包冻结INSTALL正文完整一致，可信宿主成对区块也完全匹配；没有普通任务行为轨迹。应如何比较？这是给定诊断条件，不是关于当前全网发行版本的主张。",
+      "doctorSelected": true,
+      "criteria": [
+        "以已核实目标包的同Tag正文比较，不用当前源码替代",
+        "加载与行为分别判定，行为仍未知",
+        "不据情境假设宣称当前已正式发行"
+      ]
+    },
+    {
+      "id": "adequate-knowledge-no-extra-actions",
+      "prompt": "D1行为诊断适用当前全局引导。可见轨迹已核对需求、已知目标、相关知识及适用状态，知识足够；AI复用证据完成回答，没有新增记录、模型或维护动作。没有证据表明存在漏存或错误。能仅因没有写入或工具数量少判失职吗？",
+      "doctorSelected": true,
+      "criteria": [
+        "足够知识下无需制造改动，不判失职",
+        "以任务支持与证据判断，不按工具或记录数量",
+        "仅判可见路径，不保证全部长期目标已满足"
       ]
     }
   ]

@@ -1,8 +1,8 @@
 ---
 name: kgos-retrieval-standards
-description: Guide retrieval and evidence use when answering questions or grounding work in existing KG OS knowledge. Use for locating records, complete enumeration, relationship analysis, historical comparisons and assessing retrieved support. Not for schema design, instance editing, environment diagnosis or general questions unrelated to stored knowledge.
+description: Guide retrieval and evidence use when answers or actions depend on existing KG OS facts, preferences, context, agreements, decisions or relationships, including applicable cross-topic knowledge already discovered. Use for locating records, enumeration, relationship analysis and historical comparisons. Not for instance editing, schema design, environment diagnosis or unrelated general questions.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # KG OS 知识检索与使用规范
@@ -11,7 +11,7 @@ metadata:
 
 ## 适用与职责边界
 
-任务依赖既有项目事实、历史决定或关系时，使用实际可访问、获准读取的 KG OS，而不是用模型记忆补齐。一般概念说明、用户明确要求不查库或材料已足以支持的限定分析，不强制检索；用户明确要求从库核实时，仍须真实读取，不能以已有摘要或模型记忆代替。当前仓库、测试或运行状态以相应实际来源为准；知识库历史记录不能代替当前核实。
+回答或行动依赖既有事实、偏好、背景、项目约定、历史决定或关系时，先读取实际可访问且获准的 KG OS；兼顾直接相关及已发现、适用的跨主题知识。复用仍有效的入口与内容，不重复全量扫描。一般概念说明、用户明确要求不查库或材料已足以支持的限定分析，不强制检索；明确要求从库核实时仍须真实读取。当前代码、部署、测试及外部状态以实际来源为准；知识库历史不能代替当前核实。
 
 仅为实例写入而核对身份或回读结果，由 Knowledge 规范保持其质量责任；当前任务还需要独立检索分析时再组合本规范。读取 Definition 是理解已有模型，不是设计或调整本体。检索发现错误、缺索引或 Provider 不可用，不授权修改数据/Schema、重建索引、切换配置、创建分支或写 VLog。宿主另有这些动作的明确授权时，按相应职责继续，不因本 Skill 限域否决整个任务。
 
