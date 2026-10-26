@@ -103,7 +103,7 @@ importers:
   packages/cli:
     dependencies:
       '@kgos/sdk':
-        specifier: workspace:0.3.4
+        specifier: workspace:0.3.5
         version: link:../sdk
       smol-toml:
         specifier: 1.9.1

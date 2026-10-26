@@ -859,7 +859,7 @@ test("agent installer has one installation flow and preserves official guidance"
     [guidance.match(block)[0]]
   );
   const rendered = renderInstaller(installer, {
-    tag: "v0.3.4",
+    tag: "v0.3.5",
     digestRef: `ghcr.io/byiyli/kgos@sha256:${"a".repeat(64)}`
   });
   assert.deepEqual(
