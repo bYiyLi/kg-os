@@ -12,7 +12,7 @@ graph.execute(request: GraphExecuteRequest): Promise<GraphExecuteResult>
 
 ## Constraints
 
-Cypher is passed through unchanged. Calling execute does not guarantee that a new Commit is created.
+Cypher is passed through unchanged. Execute does not guarantee a new Commit; when an authorized write creates one, use optional message per guides/evolution.md and verify its State.
 
 ## Input and return types
 

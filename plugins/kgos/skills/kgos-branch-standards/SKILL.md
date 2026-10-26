@@ -2,7 +2,7 @@
 name: kgos-branch-standards
 description: Guide the organization and evolution of KG OS knowledge worlds, including long-lived domain libraries and experimental branches. Use for choosing world boundaries, branch origins, version references, integration or retirement. Not for schema design or routine knowledge reads and edits.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # KG OS 知识世界与分支规范

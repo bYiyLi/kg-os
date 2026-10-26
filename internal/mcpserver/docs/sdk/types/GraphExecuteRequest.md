@@ -12,20 +12,20 @@ export interface GraphExecuteRequest {
   params?: JsonObject;
   /** Optional author text preserved as Commit metadata when a Commit is created. */
   author?: string;
-  /** Optional Commit message; do not assume every operation creates one. */
+  /** Optional Commit message: describe the post-change world and actual delta per guides/evolution.md; not every operation creates a Commit. */
   message?: string;
 }
 ```
 
 ## Fields
 
-| Name       | Type         | Notes                                                                                        |
-| ---------- | ------------ | -------------------------------------------------------------------------------------------- |
-| `branch`   | `string`     | Existing target Branch name; a plain Branch name, not branch/<name>.                         |
-| `cypher`   | `string`     | Single Lithograph Cypher 25 query passed unchanged; never SQL SELECT lithograph(...) syntax. |
-| `params?`  | `JsonObject` | Optional JSON-compatible named Cypher parameters, referenced as $name in the query.          |
-| `author?`  | `string`     | Optional author text preserved as Commit metadata when a Commit is created.                  |
-| `message?` | `string`     | Optional Commit message; do not assume every operation creates one.                          |
+| Name       | Type         | Notes                                                                                                                                   |
+| ---------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `branch`   | `string`     | Existing target Branch name; a plain Branch name, not branch/<name>.                                                                    |
+| `cypher`   | `string`     | Single Lithograph Cypher 25 query passed unchanged; never SQL SELECT lithograph(...) syntax.                                            |
+| `params?`  | `JsonObject` | Optional JSON-compatible named Cypher parameters, referenced as $name in the query.                                                     |
+| `author?`  | `string`     | Optional author text preserved as Commit metadata when a Commit is created.                                                             |
+| `message?` | `string`     | Optional Commit message: describe the post-change world and actual delta per guides/evolution.md; not every operation creates a Commit. |
 
 ## Related types
 

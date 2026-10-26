@@ -2,7 +2,7 @@
 name: kgos-ontology-standards
 description: Guide the design, review, modification and maintenance of KG OS ontology models. Use for choosing node, relationship and property definitions, clarifying model semantics, constraints and indexes, or assessing schema evolution. Not for ordinary instance edits, query-only tasks, branch administration or environment diagnosis.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # KG OS 本体建模规范

@@ -12,7 +12,7 @@ evolution.merge.finalize(request: MergeFinalizeRequest): Promise<MergeFinalizeRe
 
 ## Constraints
 
-Use the observed Merge Session revision. The Session may be stale after other changes.
+Use the observed Merge Session revision. The Session may be stale after other changes. An actual new merge Commit accepts optional message per guides/evolution.md; fast-forward/up-to-date cannot replace existing Commit messages.
 
 ## Input and return types
 

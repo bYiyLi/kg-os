@@ -285,7 +285,7 @@ export class KGOSClient {
       this.post<OntologyReadResult>("/api/v1/ontology/read", request, options),
     /**
      * Apply an Ontology-scoped Git Extended Diff to a Branch.
-     * @remarks Use the observed baseState and canonical editable Object text to construct the patch.
+     * @remarks Use the observed baseState and canonical editable Object text to construct the patch. Optional new Commit messages follow guides/evolution.md: describe the world's known purpose and actual change, then read back the returned State.
      * @example
      * ```js
      * const branch = "<authorized-target-branch>";
@@ -318,7 +318,7 @@ export class KGOSClient {
       this.post<ObjectTextReadResult>("/api/v1/object/read-text", request, options),
     /**
      * Atomically apply a Git Extended Diff spanning public Objects.
-     * @remarks Use the observed baseState and canonical editable Object text to construct the patch.
+     * @remarks Use the observed baseState and canonical editable Object text to construct the patch. Optional new Commit messages follow guides/evolution.md: describe the world's known purpose and actual change, then read back the returned State.
      * @example
      * ```js
      * const branch = "<authorized-target-branch>";
@@ -342,7 +342,7 @@ export class KGOSClient {
       this.post<GraphQueryResult>("/api/v1/graph/query", request, options),
     /**
      * Execute Cypher on a writable Branch; its effect depends on the statement.
-     * @remarks Cypher is passed through unchanged. Calling execute does not guarantee that a new Commit is created.
+     * @remarks Cypher is passed through unchanged. Execute does not guarantee a new Commit; when an authorized write creates one, use optional message per guides/evolution.md and verify its State.
      * @example
      * ```js
      * return await graph.execute({ branch: "<target-branch>", cypher: "MATCH (n) RETURN count(n) AS count" });
@@ -361,7 +361,7 @@ export class KGOSClient {
       this.stream("/api/v1/graph/query", request, options),
     /**
      * Stream Cypher execution on a writable Branch.
-     * @remarks Rows or columns alone do not confirm success; inspect the terminal summary or error.
+     * @remarks Rows or columns alone do not confirm success; inspect the terminal summary or error. For new Commit messages follow guides/evolution.md and read back the State.
      * @example
      * ```js
      * const events = []; for await (const event of graph.streamExecute({ branch: "<target-branch>", cypher: "MATCH (n) RETURN count(n)" })) events.push(event); return events;
@@ -422,7 +422,7 @@ export class KGOSClient {
     state: {
       /**
        * Create a new Commit/State on an existing Branch, even without graph changes.
-       * @remarks Creates a Commit even when the graph snapshot does not change.
+       * @remarks Creates a Commit even without graph changes. Use optional message per guides/evolution.md and read back via evolution.get; never make an empty Commit just to repair an old message.
        * @example
        * ```js
        * return await evolution.state.create({ branch: "<target-branch>", message: "Create a checkpoint" });
@@ -465,7 +465,7 @@ export class KGOSClient {
       list: (options?: RequestOptions) =>
         this.post<EvolutionRefListResult>("/api/v1/evolution/branch/list", {}, options),
       /**
-       * Create a Branch from a specified existing State.
+       * Create a Branch from a specified existing State. Name the world's actual purpose, respect valid user-chosen names and check collisions; see guides/evolution.md. This method does not create a Commit or accept message.
        * @example
        * ```js
        * return await evolution.branch.create({ name: "<new-branch>", from: "branch/main" });
@@ -570,7 +570,7 @@ export class KGOSClient {
         this.post<MergeSession>("/api/v1/evolution/merge/resolve", request, options),
       /**
        * Finalize a Merge Session using its current revision; may fast-forward or create a Commit.
-       * @remarks Use the observed Merge Session revision. The Session may be stale after other changes.
+       * @remarks Use the observed Merge Session revision. The Session may be stale after other changes. An actual new merge Commit accepts optional message per guides/evolution.md; fast-forward/up-to-date cannot replace existing Commit messages.
        * @example
        * ```js
        * const s = await evolution.merge.get({ session: "<session-id>" }); return await evolution.merge.finalize({ session: s.session, expectedRevision: s.revision });

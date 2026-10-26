@@ -53,7 +53,7 @@ func TestDoctorSkillResourceContract(t *testing.T) {
 	if err := decoder.Decode(&meta); err != nil {
 		t.Fatal(err)
 	}
-	if meta.Name != filepath.Base(root) || strings.TrimSpace(meta.Description) == "" || len(meta.Description) > 1024 || meta.Metadata["version"] != "1.0.0" {
+	if meta.Name != filepath.Base(root) || strings.TrimSpace(meta.Description) == "" || len(meta.Description) > 1024 || meta.Metadata["version"] != "1.1.0" {
 		t.Fatalf("invalid Skill metadata: %+v", meta)
 	}
 	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
@@ -97,7 +97,7 @@ func TestDoctorSkillResourceContract(t *testing.T) {
 		}
 		return nil
 	})
-	if err != nil || files != 5 {
+	if err != nil || files != 6 {
 		t.Fatalf("package resources: count=%d error=%v", files, err)
 	}
 	_ = doctorSkillProbe(t)
@@ -118,5 +118,22 @@ func TestDoctorGuidanceApprovedBaseline(t *testing.T) {
 	const approved = "c113b3e8c5ba068a27ee765d895ee70c5dcc67bf87a62a6a62c760e033413418"
 	if got := fmt.Sprintf("%x", sha256.Sum256([]byte(block))); got != approved {
 		t.Fatalf("approved v1 text changed: sha256=%s", got)
+	}
+}
+
+func TestDoctorGuidanceV2ApprovedBaseline(t *testing.T) {
+	body := strings.ReplaceAll(doctorSkillText(t, "assets/global-ai-guidance-v2.md"), "\r\n", "\n")
+	const begin, end = "[KGOS_GUIDANCE_BEGIN:v2]", "[KGOS_GUIDANCE_END:v2]"
+	if strings.Count(body, begin) != 1 || strings.Count(body, end) != 1 {
+		t.Fatal("official guidance v2 requires one matched marker pair")
+	}
+	start, finish := strings.Index(body, begin), strings.Index(body, end)
+	if finish <= start {
+		t.Fatal("guidance v2 markers are reversed")
+	}
+	block := body[start:finish+len(end)] + "\n"
+	const approved = "862a11f26cb18ae7b4b12cbf9bd1d6c6b49076d45caf991e0b3ce6439c19b640"
+	if got := fmt.Sprintf("%x", sha256.Sum256([]byte(block))); got != approved {
+		t.Fatalf("approved v2 text changed: sha256=%s", got)
 	}
 }

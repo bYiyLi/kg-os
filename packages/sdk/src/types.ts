@@ -188,7 +188,7 @@ export interface PatchRequest {
   patch: string;
   /** Optional author text preserved as Commit metadata when a Commit is created. */
   author?: string;
-  /** Optional Commit message; do not assume every operation creates one. */
+  /** Optional Commit message: describe the post-change world and actual delta per guides/evolution.md; not every operation creates a Commit. */
   message?: string;
 }
 
@@ -240,7 +240,7 @@ export interface GraphExecuteRequest {
   params?: JsonObject;
   /** Optional author text preserved as Commit metadata when a Commit is created. */
   author?: string;
-  /** Optional Commit message; do not assume every operation creates one. */
+  /** Optional Commit message: describe the post-change world and actual delta per guides/evolution.md; not every operation creates a Commit. */
   message?: string;
 }
 
@@ -313,7 +313,7 @@ export interface StateSummary {
   parents: ResolvedState[];
   /** Optional author text preserved as Commit metadata when a Commit is created. */
   author?: string;
-  /** Optional Commit message; do not assume every operation creates one. */
+  /** Optional Commit message: describe the post-change world and actual delta per guides/evolution.md; not every operation creates a Commit. */
   message?: string;
   /** Commit timestamp in UTC Unix epoch microseconds, not a Date string. */
   committedAt: number;
@@ -461,7 +461,7 @@ export interface StateCreateRequest {
   data?: JsonValue;
   /** Optional author text preserved as Commit metadata when a Commit is created. */
   author?: string;
-  /** Optional Commit message; do not assume every operation creates one. */
+  /** Optional Commit message: describe the post-change world and actual delta per guides/evolution.md; not every operation creates a Commit. */
   message?: string;
 }
 
@@ -700,7 +700,7 @@ export interface MergeFinalizeRequest {
   expectedRevision: number;
   /** Optional author text preserved as Commit metadata when a Commit is created. */
   author?: string;
-  /** Optional Commit message; do not assume every operation creates one. */
+  /** Optional Commit message: describe the post-change world and actual delta per guides/evolution.md; not every operation creates a Commit. */
   message?: string;
 }
 

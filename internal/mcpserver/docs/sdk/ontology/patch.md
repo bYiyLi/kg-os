@@ -12,7 +12,7 @@ ontology.patch(request: PatchRequest): Promise<PatchResult>
 
 ## Constraints
 
-Use the observed baseState and canonical editable Object text to construct the patch.
+Use the observed baseState and canonical editable Object text to construct the patch. Optional new Commit messages follow guides/evolution.md: describe the world's known purpose and actual change, then read back the returned State.
 
 ## Input and return types
 

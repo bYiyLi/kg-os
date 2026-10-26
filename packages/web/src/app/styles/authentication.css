@@ -4,8 +4,8 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: #0b1225;
-  color: #bcc8e3;
+  background: var(--color-page);
+  color: var(--color-muted);
   font-size: 14px;
 }
 
@@ -15,10 +15,10 @@
   bottom: 24px;
   z-index: 10;
   padding: 12px 18px;
-  border: 1px solid #b87272;
+  border: 1px solid var(--color-error);
   border-radius: 8px;
-  background: #283043;
-  color: #ffd4d4;
+  background: var(--color-control);
+  color: var(--color-error);
 }
 
 .authentication-dialog {
@@ -264,6 +264,72 @@
   color: #6f83a3;
   font-size: 13px;
   text-align: center;
+}
+
+/* The login is a body Portal. The document theme, not an independent login
+   preference, controls all of its surfaces and feedback. Keep dark unchanged. */
+.theme-light .authentication-dialog {
+  border-color: var(--color-border);
+  background:
+    radial-gradient(ellipse 85% 55% at 85% 40%, rgb(132 158 218 / 12%), transparent),
+    linear-gradient(140deg, #ffffff, #f0f5fd 79%);
+  box-shadow:
+    0 28px 80px rgb(32 56 104 / 17%),
+    inset 0 1px rgb(255 255 255 / 80%);
+  color: var(--color-text);
+  scrollbar-color: #b9c7dd transparent;
+}
+
+.theme-light .authentication-backdrop {
+  background: rgb(34 54 85 / 37%);
+}
+
+.theme-light .authentication-topline .language-switcher {
+  border-color: var(--color-border);
+  background: var(--color-control);
+  color: var(--color-muted);
+}
+
+.theme-light .authentication-topline .language-option[aria-pressed="true"] {
+  background: var(--color-selected);
+  color: var(--color-selected-text);
+}
+
+.theme-light .authentication-brand-description,
+.theme-light .authentication-introduction p,
+.theme-light .authentication-token-note,
+.theme-light .authentication-help-text p,
+.theme-light .authentication-footer {
+  color: var(--color-muted);
+}
+
+.theme-light .authentication-lock {
+  border-color: #cdd4f5;
+  background: linear-gradient(135deg, #f3f5ff, #e6ecfc);
+  box-shadow: 0 0 22px rgb(96 113 205 / 8%);
+  color: var(--color-primary);
+}
+
+.theme-light .authentication-introduction .authentication-reason {
+  color: #9a4a0a;
+}
+
+.theme-light .authentication-label .icon,
+.theme-light .authentication-help a {
+  color: var(--color-primary);
+}
+
+.theme-light .authentication-error {
+  color: var(--color-error);
+}
+
+.theme-light .authentication-help {
+  border-top-color: var(--color-border);
+}
+
+.theme-light .authentication-help-text code {
+  background: var(--color-control-hover);
+  color: var(--color-text);
 }
 
 .connection-disconnect {

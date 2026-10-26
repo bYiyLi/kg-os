@@ -2,7 +2,7 @@
 name: kgos-doctor
 description: Diagnose KG OS usage readiness on request, including global guidance, MCP access, available Skills, knowledge discoverability and maintenance evidence. Return read-only findings and next steps.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # KG OS 使用环境诊断
@@ -15,7 +15,7 @@ metadata:
 
 | 检查            | 判断目标                                                | 进入该检查前读取                                  |
 | --------------- | ------------------------------------------------------- | ------------------------------------------------- |
-| D1 全局引导     | 来源、完整正文、版本与实际行为分别核实                  | [宿主证据](references/host-checks.md)的 D1        |
+| D1 全局引导     | 来源、适用发布版本（v1/v2）、完整正文与实际行为分别核实 | [宿主证据](references/host-checks.md)的 D1        |
 | D2 MCP 与知识库 | 文档、实际授权读取、目标 State 一致性及 Ontology 可读性 | [知识库检查](references/knowledge-checks.md)的 D2 |
 | D3 官方 Skill   | 安装、可选用、加载、版本、兼容及使用证据分别核实        | [宿主证据](references/host-checks.md)的 D3        |
 | D4 知识就绪性   | 实例存在、发现入口、可读性与限定范围的规范问题          | [知识库检查](references/knowledge-checks.md)的 D4 |

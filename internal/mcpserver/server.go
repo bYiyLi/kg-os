@@ -298,7 +298,7 @@ func (s *Server) toolServer() *mcp.Server {
 		ReadOnly                 bool
 	}{
 		{"kgos_query", "Query KG OS with read-only JavaScript", "Execute read-only Ontology, Object, Graph and Evolution SDK methods with async JavaScript; not Cypher-only. First consult kgos_docs for method signatures and task guides. Return JSON-compatible data and pin one State for related reads. Writes are forbidden.", true},
-		{"kgos_mutate", "Read and mutate KG OS with JavaScript", "Execute read and write Ontology, Object, Graph and Evolution SDK methods with async JavaScript. Consult kgos_docs for method signatures and examples. Use only for authorized mutations; prefer kgos_query for reads. A script is not an atomic transaction; earlier writes may persist on failure or cancellation. Verify before retrying.", false},
+		{"kgos_mutate", "Read and mutate KG OS with JavaScript", "Execute read and write Ontology, Object, Graph and Evolution SDK methods with async JavaScript. Read kgos_docs guides/evolution.md and method signatures for Branch names, optional Commit messages, and readback; describe the world's purpose and actual changes for new Commits. Use only for authorized mutations; prefer kgos_query for reads. A script is not an atomic transaction; earlier writes may persist on failure or cancellation. Verify before retrying.", false},
 	} {
 		entry := item
 		serverName := entry.Name

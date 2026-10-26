@@ -2,7 +2,7 @@
 name: kgos-knowledge-standards
 description: Guide the accuracy of KG OS knowledge instance creation, review and updates under an existing ontology. Use when saving information, matching entities, asserting relationships, correcting facts or resolving conflicting updates. Covers instance content and evidence, not schema design, query-only answers, branch administration or scheduled whole-library maintenance.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # KG OS 知识实例质量规范

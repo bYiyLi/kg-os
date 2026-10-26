@@ -55,7 +55,7 @@ func TestKnowledgeSkillResourceContract(t *testing.T) {
 	if err := decoder.Decode(&meta); err != nil {
 		t.Fatal(err)
 	}
-	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 || meta.Metadata["version"] != "1.0.0" {
+	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 || meta.Metadata["version"] != "1.1.0" {
 		t.Fatalf("invalid declared metadata: %+v", meta)
 	}
 	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)

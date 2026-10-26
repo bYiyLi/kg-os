@@ -2,7 +2,7 @@
 
 **Write — kgos_mutate only**
 
-Create a Branch from a specified existing State.
+Create a Branch from a specified existing State. Name the world's actual purpose, respect valid user-chosen names and check collisions; see guides/evolution.md. This method does not create a Commit or accept message.
 
 ## Signature
 

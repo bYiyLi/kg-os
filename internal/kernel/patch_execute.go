@@ -173,7 +173,7 @@ func (service *Service) patchObjects(
 	if err := removeRenamedSourceProperties(ctx, transaction, plan); err != nil {
 		return PatchResult{}, err
 	}
-	if err := createChangedConstraints(ctx, transaction, baseConstraints, targetConstraints); err != nil {
+	if err := createChangedConstraints(ctx, transaction, baseConstraints, targetConstraints, baseGraphType != targetGraphType); err != nil {
 		return PatchResult{}, err
 	}
 	if err := createChangedIndexes(
@@ -183,6 +183,7 @@ func (service *Service) patchObjects(
 		targetIndexes,
 		service.fullTextAnalyzer,
 		service.semantic.IndexOptions(),
+		baseGraphType != targetGraphType,
 	); err != nil {
 		return PatchResult{}, err
 	}
@@ -291,7 +292,16 @@ func createChangedConstraints(
 	transaction *lithograph.Transaction,
 	base map[string]constraintSpec,
 	target map[string]constraintSpec,
+	graphTypeChanged bool,
 ) error {
+	var stagedNames map[string]bool
+	if graphTypeChanged {
+		var err error
+		stagedNames, err = stagedSchemaResourceNames(ctx, transaction, "SHOW CONSTRAINTS YIELD name RETURN name")
+		if err != nil {
+			return err
+		}
+	}
 	names := make([]string, 0, len(target))
 	for name := range target {
 		names = append(names, name)
@@ -299,7 +309,7 @@ func createChangedConstraints(
 	sort.Strings(names)
 	for _, name := range names {
 		baseConstraint, exists := base[name]
-		if exists && equalConstraintSpec(baseConstraint, target[name]) {
+		if exists && equalConstraintSpec(baseConstraint, target[name]) && (!graphTypeChanged || stagedNames[name]) {
 			continue
 		}
 		cypher, err := createConstraintCypher(target[name])
@@ -320,7 +330,16 @@ func createChangedIndexes(
 	target map[string]logicalIndex,
 	analyzer string,
 	semantic map[string]any,
+	graphTypeChanged bool,
 ) error {
+	var stagedNames map[string]bool
+	if graphTypeChanged {
+		var err error
+		stagedNames, err = stagedSchemaResourceNames(ctx, transaction, "SHOW ALL INDEXES YIELD name RETURN name")
+		if err != nil {
+			return err
+		}
+	}
 	names := make([]string, 0, len(target))
 	for name := range target {
 		names = append(names, name)
@@ -328,7 +347,7 @@ func createChangedIndexes(
 	sort.Strings(names)
 	for _, name := range names {
 		baseIndex, exists := base[name]
-		if exists && equalLogicalIndex(baseIndex, target[name], true) {
+		if exists && equalLogicalIndex(baseIndex, target[name], true) && (!graphTypeChanged || stagedNames[name]) {
 			continue
 		}
 		cypher, params, err := createIndexCypher(target[name], analyzer, semantic)
@@ -340,6 +359,28 @@ func createChangedIndexes(
 		}
 	}
 	return nil
+}
+
+// ALTER CURRENT GRAPH TYPE SET may drop standalone Schema resources even when
+// their logical declarations are unchanged. Restore only the missing resources.
+func stagedSchemaResourceNames(ctx context.Context, transaction *lithograph.Transaction, cypher string) (map[string]bool, error) {
+	result, err := transaction.Execute(ctx, cypher, nil, nil)
+	if err != nil {
+		return nil, AsPublicError(err)
+	}
+	rows, err := rowsByName(result)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[string]bool, len(rows))
+	for _, row := range rows {
+		name, err := rawString(row, "name")
+		if err != nil {
+			return nil, err
+		}
+		names[name] = true
+	}
+	return names, nil
 }
 
 func validateTargetIndexes(plan *plannedState, indexes map[string]logicalIndex) error {

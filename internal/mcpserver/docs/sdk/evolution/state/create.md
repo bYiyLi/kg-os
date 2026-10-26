@@ -12,7 +12,7 @@ evolution.state.create(request: StateCreateRequest): Promise<StateCreateResult>
 
 ## Constraints
 
-Creates a Commit even when the graph snapshot does not change.
+Creates a Commit even without graph changes. Use optional message per guides/evolution.md and read back via evolution.get; never make an empty Commit just to repair an old message.
 
 ## Input and return types
 

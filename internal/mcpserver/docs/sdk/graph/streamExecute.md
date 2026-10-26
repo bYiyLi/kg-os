@@ -12,7 +12,7 @@ graph.streamExecute(request: GraphExecuteRequest): AsyncGenerator<GraphStreamEve
 
 ## Constraints
 
-Rows or columns alone do not confirm success; inspect the terminal summary or error.
+Rows or columns alone do not confirm success; inspect the terminal summary or error. For new Commit messages follow guides/evolution.md and read back the State.
 
 ## Input and return types
 
