@@ -16,7 +16,7 @@
         "developerName": "KG OS",
         "category": "Productivity",
         "capabilities": ["Read", "Write"],
-        "defaultPrompt": "Inspect the current KG OS branches and ontology, then help me work with this knowledge graph."
+        "defaultPrompt": "Use the already selected KG OS instance and scope. Inspect all branches only when that scope permits it; otherwise read the known target State. Then help me with this knowledge graph."
       }
     }
   }

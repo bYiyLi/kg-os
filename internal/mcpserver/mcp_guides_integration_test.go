@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -136,5 +137,90 @@ return await object.read({at:s,refs:["node:Product","node:Note","relationship:HA
 				t.Fatalf("Relationship endpoints not retained through rename: %s", encoded)
 			}
 		}
+	}
+}
+
+// Execute the published reading example on distinct snapshots. A restricted
+// target must not silently fall back to the default Branch or change either.
+func TestDocumentedPinnedReadingBoundaries(t *testing.T) {
+	runtime := phase16Runtime(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	initial, err := runtime.Kernel.EvolutionOverview(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.Kernel.EvolutionBranchCreate(ctx, kernel.BranchCreateRequest{
+		Name: "allowed-read", From: initial.State,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.Kernel.PatchOntology(ctx, kernel.PatchRequest{
+		Branch: initial.DefaultBranch, BaseState: initial.State,
+		Patch: addMatrixPatch("new:node-definition:ReadFixture", "name: ReadFixture\nproperties:\n  - name: key\n    type: STRING\nconstraints: []\n"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defaultHead, err := runtime.Kernel.EvolutionOverview(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if defaultHead.State == initial.State {
+		t.Fatal("fixture did not separate snapshots")
+	}
+	before, err := runtime.Kernel.EvolutionBranchList(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := New(runtime.Kernel, Options{Token: "reading-example-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(svc.Handler())
+	defer server.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "reading-example", Version: "1"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{
+		Endpoint: server.URL + "/mcp", DisableStandaloneSSE: true,
+		HTTPClient: &http.Client{Transport: bearerRoundTripper{token: "reading-example-test", transport: http.DefaultTransport}},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	for _, target := range []struct{ name, state string }{
+		{initial.DefaultBranch, defaultHead.State}, {"allowed-read", initial.State},
+	} {
+		t.Run(target.name, func(t *testing.T) {
+			code := strings.ReplaceAll(documentedJavaScript(t, "reading", 0), "branch/main", "branch/"+target.name)
+			reply, err := session.CallTool(ctx, &mcp.CallToolParams{
+				Name: "kgos_query", Arguments: map[string]any{"code": code},
+			})
+			if err != nil || reply == nil || reply.IsError {
+				t.Fatalf("reading example failed: %v %#v", err, reply)
+			}
+			result := object(t, mcpText(t, reply)["result"])
+			models := object(t, result["ontology"])
+			if result["state"] != target.state || models["state"] != target.state {
+				t.Fatalf("reading example mixed target snapshots: %#v", result)
+			}
+			if object(t, result["consistency"])["status"] != "valid" {
+				t.Fatalf("reading example returned invalid State: %#v", result)
+			}
+		})
+	}
+	after, err := runtime.Kernel.EvolutionBranchList(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeJSON, err := json.Marshal(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterJSON, err := json.Marshal(after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(beforeJSON) != string(afterJSON) {
+		t.Fatal("reading example changed Branches")
 	}
 }

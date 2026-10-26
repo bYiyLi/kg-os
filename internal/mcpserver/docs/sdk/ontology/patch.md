@@ -20,6 +20,7 @@ Use the observed baseState and canonical editable Object text to construct the p
 - Return: `Promise<PatchResult>`
 
 - `sdk/types/PatchResult.md`
+  **Before writing:** Use explicit authorization and an observed target/revision. Know the applicable transaction and recovery contract in `guides/errors.md`; reuse it when already read for this version. A later failure, timeout or cancellation does not prove earlier mutations rolled back.
 
 ## Example for kgos_mutate
 
@@ -29,9 +30,8 @@ const { state } = await evolution.get({ state: `branch/${branch}` });
 return await ontology.patch({ branch, baseState: state, patch: "<git-extended-diff>" });
 ```
 
-**Write safety:** Use only with explicit authorization and observed target/revision. A later failure, timeout or cancellation does not prove earlier mutations rolled back.
-
 ## Related guides
 
-First read `guides/ontology.md` and `guides/errors.md` with `kgos_docs`.
+For task context not already established, read `guides/ontology.md` with `kgos_docs`; reuse current-version documents already read, without returning to an index.
+For a failure or uncertain result, consult `guides/errors.md`; non-streaming tasks need no streaming method pages.
 To read a type page, call the separate MCP Tool `kgos_docs` with `{"paths":["sdk/types/<Type>.md"]}`; do not put this in JavaScript.

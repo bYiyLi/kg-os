@@ -891,3 +891,20 @@ test("published installer snapshots retain their original guidance baseline", as
     assert.doesNotMatch(installer, /\[KGOS_GUIDANCE_BEGIN\]/);
   }
 });
+
+// The candidate guidance may evolve, but the v0.3.4 public installer is frozen.
+test("v0.3.4 installer retains its shipped guidance", async () => {
+  const installer = await readFile(
+    join(root, "distribution/site/src/content/service-installation/v0.3.4/INSTALL.md"),
+    "utf8"
+  );
+  const blocks = installer.match(/\[KGOS_GUIDANCE_BEGIN\][\s\S]*?\[KGOS_GUIDANCE_END\]/g);
+  assert.equal(blocks?.length, 1);
+  const { createHash } = await import("node:crypto");
+  assert.equal(
+    createHash("sha256")
+      .update(blocks[0] + "\n")
+      .digest("hex"),
+    "d4a594f52128ff6b11cbf8f7649f84c3b99aac0990e210d6895ab85d55c29876"
+  );
+});

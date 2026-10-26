@@ -32,5 +32,6 @@ return rows;
 
 ## Related guides
 
-First read `guides/graph.md` and `guides/errors.md` with `kgos_docs`.
+For task context not already established, read `guides/graph.md` with `kgos_docs`; reuse current-version documents already read, without returning to an index.
+Before consuming a stream, know the completion and cancellation contract in `guides/errors.md`.
 To read a type page, call the separate MCP Tool `kgos_docs` with `{"paths":["sdk/types/<Type>.md"]}`; do not put this in JavaScript.

@@ -275,6 +275,28 @@
         "不以工具调用数量或固定清单判完成",
         "没有有据缺口不制造维护动作"
       ]
+    },
+    {
+      "id": "restricted-read-no-skill-assumptions",
+      "prompt": "只查正式branch/work。连接包含禁止读取模型和简介的测试Branch；已知道目标，当前接口允许evolution.get与ontology.read。",
+      "criteria": [
+        "不先全分支预览后过滤",
+        "定向解析目标并固定State",
+        "不因不允许全预览中止可行读取"
+      ],
+      "mustInclude": ["kgos-retrieval-standards"],
+      "mustExclude": ["kgos-ontology-standards"]
+    },
+    {
+      "id": "reuse-current-method-docs",
+      "prompt": "同一连接与版本的reading指南和ontology.read签名已完整读过，当前只需继续同一固定State的下一页；没有写入或Streaming。",
+      "criteria": [
+        "复用有效文档",
+        "不重读目录/建模/写入/Streaming资料",
+        "继续实际分页而非提前结束"
+      ],
+      "mustInclude": ["kgos-retrieval-standards"],
+      "mustExclude": ["kgos-ontology-standards"]
     }
   ]
 }

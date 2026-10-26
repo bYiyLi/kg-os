@@ -71,7 +71,7 @@ P32-02/03 的文档与场景准备不依赖 P32-01 修复完成；涉及运行�
 
 包内资源引用可解析，七Skill清单保持；源模板与私人安装分别核验，未授权安装就保留该项未执行。
 
-最终正文第一部分与知识持续可用责任原则核对；第二至六部分沿用完整设计，不使用 800 字压缩稿。canonical INSTALL 的无版本标记完整区块与唯一资产一致，发布渲染后仍一致；旧版只从 Git Tag / 已归档发行包读取，已发行安装快照及发布目录不改写。
+最终正文六部分均与知识持续可用责任及权限/证据边界核对；授权等义精简不删除必要条件，安装执行者不得另造摘要版本。canonical INSTALL 的无版本标记完整区块与唯一资产一致，发布渲染后仍一致；旧版只从 Git Tag / 已归档发行包读取，已发行安装快照及发布目录不改写。
 
 对照日常职责与各 Skill 选择边界：持续管理授权内的明确决定及时记录；仅提问/未采纳建议不写成事实；本轮不查库、不保存或只读限制生效；已知单对象纠错不扩大为全库维护；疑似问题先确认、相关范围最小处置；系统结果记录区分源活动与保存结果；简单问候无需正文、适用跨主题偏好按需读取、Doctor 不逐次运行。覆盖缺权限/目标、指导缺失、连接失败及未知回执的局部暂停与独立继续，不以普通选择制造批准节点。
 
@@ -244,6 +244,48 @@ Review 修复了四类具体问题：Doctor 表格改动导致的四项 Markdown
 此项只完成当前源码及引用的整理，不代表当前文件已打 Tag、发布、推送、部署或在真实 ChatGPT 宿主生效；Phase 32 的其它跨连接、自然任务及最终 CI 验收仍独立存在。
 
 验证：`go test -tags sqlite_fts5 ./internal/mcpserver -run 'TestDoctorSkillResourceContract|TestDoctorGuidanceApprovedBaseline' -count=1` 通过；`node --test tests/render-kg-releases.node-test.mjs` **13/13 通过**，覆盖单一资产、当前 INSTALL 区块及历史发行快照原文；`pnpm check:markdown` **104 文件零问题**、`pnpm check:spelling` **347 文件零问题**，受影响文件 Prettier、Go 格式及 `git diff --check` 通过。上述为当前 Mac 工作树定向检查，不代替整个 Phase 的最终 CI 或真实客户端验收。
+
+## 提示词与 Skill 审阅优化（2026-10-26）
+
+用户批准先前八项审阅建议，本增量属于 P32-02/03/05；限于仓库规范、官方提示词/Skill、MCP 文档与相关验证，不包含提交、推送、发行、部署、私人 Plugin 或宿主配置修改。开始基线 `65849c417e63836f8b9f9506d1633fc1f309b18a`，工作树干净。具体合同由 [MCP owner](../../design/mcp.md#kgos-doctor-v1)、[全局引导](../../design/mcp.md#global-ai-guidance-and-daily-responsibility) 和 [AGENTS](../../../AGENTS.md)维护，本节不重置原阶段 Acceptance。
+
+本增量验收：Doctor 对可见局部差异和持久配置未知分别报告；空库/未启用选配能力不自动告警；普通工程选择不重复批准且明确审批保留；MCP-only 的受限读取入口在操作前可达；未知写入只暂停危险重复；已读有效文档不循环重读；安装前核对容量与定制；唯一官方正文、INSTALL 和生成文档同步，冻结发行材料不改。复核授权、部分失败、只读、相邻合法案例及资源可达性；文件/测试结果不冒充真实宿主行为。
+
+外部参考核验日期：2026-10-26。以下只支持编辑方法，不替代项目授权或证明模型效果：
+
+- [OpenAI model guidance](https://developers.openai.com/api/docs/guides/latest-model)：明确自治/批准边界，避免冲突规则；按同一任务评价改动。
+- [Agent Skills best practices](https://agentskills.io/skill-creation/best-practices)：按条件加载参考，核心限制在动作前可达，检查执行轨迹而非只看答案。
+- [Anthropic context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)：优先高信息密度与任务相关上下文，不把最短字数当正确性。
+- [ChatGPT Custom Instructions](https://help.openai.com/en/articles/8096356-chatgpt-custom-instructions)：容量与宿主入口有实际限制；安装时核对当前说明/UI及已有内容，不硬编码套餐能力或假设另一持久入口。
+
+### 本增量验证与 Review 结果
+
+本地源码优化已完成，未提交、推送、发行或部署，未改私人 Plugin、用户持久指令或业务知识库。以下证据来自本轮 Mac 工作树；不替代真实客户端行为、跨连接及远端 CI 验收。
+
+| 检查 | 本轮结果与范围 |
+| --- | --- |
+| 改动前基线 | `node scripts/generate-mcp-docs.mjs --check` 通过；`node --test tests/render-kg-releases.node-test.mjs` 13/13 通过 |
+| 最终 MCP 文档 | 同一 `--check` 验证 31 方法、75 类型、133 页；38 份变动内嵌页由生成器更新，不手改生成副本 |
+| Go 定向真实测试 | 下方定向命令：13 个主测试及 15 个子场景通过，无失败/跳过；使用现有 Lithograph v0.3.3 / Provider / Jieba 原生库与临时数据库 |
+| 文档读取示例 | 新增 `TestDocumentedPinnedReadingBoundaries`，通过真实 MCP 分别读取两个不同 Head 的默认/指定分支；返回目标 pinned State，读取前后 Branch 列表不变 |
+| Skill 资源与正文 | 七个资源合同通过；63 份包内 Markdown 全部可达；官方完整区块与 INSTALL 一致，当前批准正文的 SHA-256 受测试保护 |
+| 分发 | `node --test tests/render-kg-releases.node-test.mjs` 最终 14/14；新增 v0.3.4 冻结正文校验，已发布 v0.3.0–v0.3.4 材料未改 |
+| 静态质量 | MCP 包 `go vet`、`go tool staticcheck`（同上 tags）通过；生成器/分发测试 ESLint、所改文本 Prettier、Markdownlint（含 Plugin 和双语模板）、CSpell、`git diff --check` 通过 |
+| 引用与范围 | 所改 Markdown及 Skill 包共114份文件的本地目标/大小写检查通过；新增片段链接可定位。没有新增依赖、公共接口、业务模型、未跟踪产物或修改冻结 Release |
+
+定向测试命令：
+
+```bash
+go test -tags=sqlite_fts5,lithograph_smoke ./internal/mcpserver ./internal/kernel -run 'Test(.*SkillResourceContract|DoctorGuidanceApprovedBaseline|DoctorSkillReadProbe|DoctorSkillProbeKeepsReadFailureEvidence|DocsViaRealMCPProtocolNoSkill|Documented.*)$' -count=1 -v
+```
+
+场景集合新增12个输入（Doctor 8、Knowledge 2、Retrieval 2），当前8份场景文件合计301条定义；执行者输入与判据继续分离。新增场景和既有相邻合法情况完成**文本合同推演**：可见差异/隐藏其余配置、部分匹配/引用样本/合法定制、预期空库/手动维护/已有周期或记录要求缺失、未知写入/已确认拒绝后恢复、受限分支读取和有效文档复用。另复核仅评审不写、明确预先审批仍停、普通工程选择直接推进、Doctor 结束后宿主继续已有授权任务、安装容量未知不虚构替代入口。未执行独立模型批跑，不能将301条定义称为301次行为通过。
+
+Review 已修正：D1 的缺节/不配对判定邻接完整可见范围条件；D5 仅在明确不需要周期维护时判不适用，避免掩盖已约定但缺配置的任务；Object/Ontology/错误指南的循环前置及设计入口旧版本表述；精简稿保留已知目标、同实例用途范围、合理事实差异和授权边界。首轮新增 Go 夹具因零 Property 被正常拒绝，已补合法 Property 后重新通过，未放宽引擎合同。双语模板检查另修复既存表格对齐空格和英文表述，不改其部署语义。
+
+复核六部分含义、当前指令/案例及生成副本后，所审阅范围没有遗留影响本次优化完成的问题。全局指导成对区块 1,745→1,500 字符，AGENTS 5,449→4,778，设计索引 13,756→8,669；字符数不是 Token 或模型效果测量。实际可保存容量仍须扣除用户已有内容并核对宿主，不能据本文宣称账户配置已更新。
+
+原 A32-02/03/04 的真实跨连接/客户端验收及其它阶段缺项继续保留；本轮未运行完整 `pnpm validate`、Docker/远端 CI 或真实 ChatGPT 自动选用评测，不由本地文档增量关闭整个 Phase。
 
 ## Review 与完成条件
 

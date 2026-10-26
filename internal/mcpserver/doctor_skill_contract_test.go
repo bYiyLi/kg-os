@@ -115,7 +115,7 @@ func TestDoctorGuidanceApprovedBaseline(t *testing.T) {
 	}
 	// Freeze the sole approved source, not its surrounding documentation headings.
 	block := body[start:finish+len(end)] + "\n"
-	const approved = "d4a594f52128ff6b11cbf8f7649f84c3b99aac0990e210d6895ab85d55c29876"
+	const approved = "283bef6b053cd8fea99e845f9d829ab6936e285ae2a809056b20967e39c72251"
 	if got := fmt.Sprintf("%x", sha256.Sum256([]byte(block))); got != approved {
 		t.Fatalf("approved guidance text changed: sha256=%s", got)
 	}

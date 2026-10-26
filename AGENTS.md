@@ -5,10 +5,10 @@
 ## 当前来源与权限
 
 - 涉及本地事实时，直接检查当前工作区 `/Users/yi/Code/KGOS`；后续回合重新核对当前文件、Git 与命令结果。项目简介和历史聊天不能代替当前仓库事实。
-- 进入项目先读 [README](README.md) 和 [设计总入口](docs/design.md)。继续同一设计主题时，必须重新核对 `docs/design/` 中拥有该主题的职责文件；继续实现任务时，还要核对 [开发计划](docs/development/README.md)及当前阶段文件。来源不可读时说明未知，不用旧结论补齐。
+- 首次进入项目读 [README](README.md) 和 [设计入口](docs/design.md)，再按任务定位 owner；继续主题时核对该文件与当前版本，未变化的已读内容可复用。实现还须核对[开发计划](docs/development/README.md)的相关阶段与完成条件，不全量加载历史。来源不可读则说明未知，不用旧结论补齐。
 - `README.md` 负责产品定义；`docs/design.md` 负责设计导航与职责索引；`docs/design/*.md` 按 `docs/design.md` 的 ownership 表分别维护技术与数据设计唯一真源；`docs/development/README.md` 负责开发路线、状态和共同完成条件，`docs/development/phases/*.md` 负责单阶段范围、Feature、Acceptance、Review 与证据；`docs/guide/*.md` 负责可执行操作步骤，不维护阶段状态；本文件负责协作规则。背景、研究与 Noven 只作参考，不自动成为 KG OS 决定。
-- 讨论、评审默认只读。记录设计、修改文件、实现、提交、推送分别按用户授权执行；历史授权不自动覆盖本次动作。分别授权指每类动作都必须有明确依据，不要求分成多轮对话；同一本次请求可以明确授权多个动作。核对授权不等于再次索取授权。
-- 明确执行请求在已授权范围内推进到修改、必要验证和汇报，不把最小方案汇报设成额外批准节点。新设计仍先获得确认并记录到所属真源，再实现依赖它的代码；只阻塞依赖该决定的工作。Skill 结束后继续本次请求已经授权的剩余步骤。
+- 讨论、评审默认只读。记录设计、改文件、实现、提交、推送均须有适用于本次动作的明确授权；一次请求可授权多项。延续同一已授权任务不因换回合重新批准，历史授权不自动扩展到新任务；核对授权不等于再次索取。
+- 已授权工作持续到所需修改、验证和汇报，Skill 结束不等于任务结束。现有设计、标准及证据能裁决的工程取舍直接推进；只有无法裁决且改变产品合同的新设计才提交具体分歧与建议供用户确认，确认后先记入真源再实现依赖部分。明确要求事前审阅或即时批准时仍须遵守；只暂停依赖该批准的动作。
 
 ## 设计评审与下一步建议
 
@@ -23,9 +23,7 @@
 | 用户新决定与旧文档冲突 | 标出具体差异；获准写入时同步受影响规则，不静默改写无关决定 |
 | 只有外部产品有某能力 | 不据此认定 KG OS 缺失，先说明它解决的当前需求 |
 
-读取 `docs/design/implementation.md` 的“剩余依赖与工程合同”时，必须把它与对应职责设计文件的已确认 owner 章节一起判断。不得仅因该列表出现 `transport`、`serialization`、`wire`、`physical identifier`、底层 projection 或 `compiler mapping`，就推断该主题的产品语义、Object logical model 或 owner 边界未设计；只有对应 owner 章节本身明确保留 gap，或剩余选择会改变已确认产品合同，才提出新的设计问题。
-
-用户已授权完善设计时，属于 wire shape、字段命名、serialization、pagination、error mapping、internal persistence encoding、adapter mapping 或 compiler mapping 的工程合同，如果能从已确认产品语义、适用标准和当前底层公开合同确定，就直接选择满足当前需求的最简单方案、写入设计真源并验证，不逐项要求用户决定。只有不同可行答案会改变调用方可观察的产品语义、能力边界、数据 ownership、identity/lifecycle 或兼容承诺，并且现有真源与底层证据无法裁决时，才把具体分歧提交用户确认。
+判断工程缺口时，把 [Implementation](docs/design/implementation.md) 与对应 owner 一起读。logical state、ownership、identity/lifecycle 已确定的 transport、serialization、wire、pagination、error/adapter/compiler mapping 属于工程合同，不据缺少字段编码反推产品模型未设计。授权覆盖设计写入时按已有语义与底层公开合同选最小方案并验证；涉及产品语义、能力边界、数据归属、身份/生命周期或兼容承诺且现有依据无法裁决的分歧，按上面的新设计确认规则处理。
 
 评审图模型时，必须同时检查 Lithograph Schema 中的图结构、KG OS 上层语义和实际 Knowledge graph data，不能只检查 JSON/YAML 字段表。区分 Schema identifying name、数据库 element identity、业务唯一键与关系结构/约束；当前边界以 `docs/design/ontology.md` 的“使用模型”“公共可编辑格式”与持久化章节，以及 `docs/design/graph.md` 的“Knowledge 数据访问”为准。分别检查公共 aggregate 与底层存储：不得把“不持久化第二份 Schema”误读成“公共格式不能表达 type/required/unique/from/to”，也不得由底层 standalone ownership 推导必须提供独立 CRUD。
 
@@ -50,8 +48,7 @@
 
 - **Mac 工作树是源码真源，不是 Docker 测试机**：日常编码、Go/TypeScript/native 定向测试、`pnpm validate` 与 Review 在 Mac 进行；**不在 Mac 运行 Docker、Compose 或 Buildx**，也不要求 Mac 配置 Docker Engine/Context。Mac 缺少 Docker 不是开发阻塞项。
 - **OpenClaw 负责开发阶段 Docker 实测**：通过 `ssh openclaw` 访问现有 Linux amd64 主机，在 `/data/apps/KgosDev` 用现有受控入口执行镜像构建、隔离容器/临时 Volume 的完整 MCP/SDK/重启测试。长期 Dev Instance 不接受破坏性写入。Mac 可以远程触发 OpenClaw 的测试，但 Docker 命令实际在 OpenClaw 执行。
-- **公开仓库拥有完整 CI**：按照 [D108](docs/design/decisions.md#d108-private-source-public-releases)，当前 `kg-os` 是唯一私有源码与 `distribution/` 公开发布模板真源；推送 `main` 后，私有 `.github/workflows/sync-kg-releases.yml` 只生成并同步到 `kg-releases`，后者依据绑定的私有 SHA 运行两个 Linux amd64 Job：Ubuntu `pnpm validate` 验证 Go/TypeScript/Kernel/Web、安全、竞态及覆盖率；Docker Job 对同一 revision 构建并隔离验证初始化、Web/API/MCP、31/31 SDK、认证、持久化及非 root。取消六平台 native/npm matrix。**公开仓库没有独立编辑真源，任何公开工作流修改都必须在私有 `distribution/` 完成。**
-- **私有仓库只同步，公开仓库负责全部 CI/CD**：`kg-os` 的 GitHub Actions 仅保留 `sync-kg-releases.yml`，只验证同步目标的 SHA/Ref、生成与推送公开内容，不运行 `pnpm validate`、单测、Docker、正式 Release。私有 `v*` Tag 自动同步成公开 Tag，公开 Release 先完整 CI、再构建与 Smoke 精确镜像、验证 GHCR 平台/revision/digest 和匿名拉取并创建 GitHub Release；普通 `main` CI 不推送 GHCR。发布前须解决 AGPL/商业双授权的二进制源码许可问题，通过公开仓库变量 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 明确解锁。旧私有 CI/Release 已按用户要求停用并从当前源码移除，不能将尚未通过的公开 CI 误称为验收完成。
+- **私有源码、公开 CI/CD**：`kg-os` 与 `distribution/` 是唯一真源，公开 `kg-releases` 没有独立编辑源。私有 Actions 仅 `sync-kg-releases.yml`，同步精确 SHA/Ref，不运行质量门禁或发布；公开 Ubuntu Validate 与 Docker 两 Job 验证同一 revision。正式 Tag 经完整 CI、镜像 Smoke、平台/revision/digest 与匿名拉取核验后发布；普通 main 不推 GHCR，不恢复旧 native/npm matrix。发布许可门禁 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 仍须满足；具体流程见 [D108](docs/design/decisions.md#d108-private-source-public-releases) 和[分发维护](docs/guide/distribution-maintenance.md)，配置存在不等于 CI 通过。
 - **状态与权限分离**：OpenClaw Dev 部署、Git Commit、Push、Tag、GHCR 发布和生产部署是不同动作，各需相应授权；Phase 按自身要求的本地质量、OpenClaw Dev、**远程 Docker CI**、真实 ChatGPT 和 Review 判断，不能以在 Mac 上没有 Docker 为由跳过 Docker CI，也不能把旧 Phase 15 镜像证据充当 Phase 16。见 [D94](docs/design/decisions.md#d94-openclaw-docker-development-and-ci)、[Dev Runbook](docs/guide/dev-environment.md)。
 
 ## 写入与验证

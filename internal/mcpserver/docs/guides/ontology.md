@@ -1,6 +1,6 @@
 # 从空 Ontology 创建 Node、Relationship、Property、Constraint、Index
 
-**先读**：使用独立 `kgos_docs` 一次读取 `["guides/objects.md","sdk/ontology/patch.md","sdk/types/PatchRequest.md","sdk/ontology/read.md"]`。字段、约束与索引以 KG OS 的公共 Ontology 模型为准，不把 Cypher 的 Knowledge Node `CREATE` 当成 Definition 创建。
+执行下例前须掌握 Patch 格式、目标基线和失败边界：缺少本轮有效合同才用独立 `kgos_docs` 读取 `["guides/objects.md","guides/errors.md","sdk/ontology/patch.md","sdk/types/PatchRequest.md"]`；已读内容直接复用，不循环重读。仅查看已有模型时改读 `guides/reading.md` 与 `sdk/ontology/read.md`，不运行建模示例。字段、约束与索引以 KG OS 的公共 Ontology 模型为准，不把 Cypher 的 Knowledge Node `CREATE` 当成 Definition 创建。
 
 下例只适用于**用户明确授权的、尚无同名 Definition 的隔离测试 Branch**，**不在 `main` 或其它已有业务 Branch 上运行**。先选择一个未使用的测试 Branch 名称（下方 `kgos-guide-demo` 仅是示例，使用时换成唯一名称），从已观测的默认 Branch Commit **创建新 Branch**，再通过 `evolution.get({state:"branch/<name>"})` 取得这个新 Branch 的 immutable `baseState`；`evolution.overview()` 仅用于获得创建时的来源 Commit，绝不能把其 `defaultBranch` 当作测试写入目标。所有后续 `guides/objects.md` 示例必须使用**同一个测试 Branch 名称**。在 `kgos_mutate` 的 `code` 中执行；演示一个 Node 的必需 Property、KEY Constraint 和 Text Index，以及另一个 Node、具有类型化端点与 Property 的 Relationship。Property、Constraint、Index 都是各自 Definition 的内嵌结构，**不是独立 Object**。
 

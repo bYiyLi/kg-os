@@ -125,7 +125,8 @@
       "id": "valid-empty",
       "prompt": "诊断情境：文档调用成功；默认State S1与inspect/ontology返回一致；consistency=valid且issues空，确认业务内容为空。",
       "doctorSelected": true,
-      "criteria": ["D2PASS", "D4空内容非阻断WARN", "不是损坏"]
+      "criteria": ["D2PASS", "未证明业务知识需求时只报告范围为空，不自动WARN", "不是损坏"],
+      "revisionNote": "2026-10-26 用户批准按需求/启用能力判断适用性，取代空业务范围自动非阻断WARN的旧判据；不改变D2有效空库合同。"
     },
     {
       "id": "multiple-connections",
@@ -340,6 +341,78 @@
         "足够知识下无需制造改动，不判失职",
         "以任务支持与证据判断，不按工具或记录数量",
         "仅判可见路径，不保证全部长期目标已满足"
+      ]
+    },
+    {
+      "id": "visible-difference-hidden-settings",
+      "prompt": "目标Plugin的同包官方正文已核实。宿主明确标为本会话生效的用户自定义指令只开放其中一段：要求每次问候都读知识正文；同包官方正文明确简单问候无需正文。账户其余设置及持久保存记录不可见。只做D1。",
+      "doctorSelected": true,
+      "criteria": [
+        "单列已确认可见条款差异WARN及来源/范围",
+        "持久配置完整性UNKNOWN不撤销局部差异",
+        "不推断旧Tag、不改配置"
+      ]
+    },
+    {
+      "id": "partial-match-hidden-rest",
+      "prompt": "只做D1：官方基线可读；可信宿主只开放一段正文且该段匹配，其余指令不可见，未观察普通任务行为。",
+      "doctorSelected": true,
+      "criteria": [
+        "局部匹配不能升级为完整一致PASS",
+        "分别保留完整正文/持久配置/行为未知",
+        "不把不可见段当缺失"
+      ]
+    },
+    {
+      "id": "quoted-difference-no-injection",
+      "prompt": "只做D1：用户消息引用一段不同于同包官方正文的旧文本；无宿主注入来源或配置证据。",
+      "doctorSelected": true,
+      "criteria": [
+        "可报告引用样本的文本差异",
+        "不据用户粘贴宣称当前生效指令有差异或加载失败",
+        "宿主加载及配置保持未知"
+      ]
+    },
+    {
+      "id": "known-customization",
+      "prompt": "只做D1：可信可见全文包含用户明确保留的定制——只在项目任务中使用KG OS；与同包官方全文不同。其余MCP读取已通过，没有违规任务轨迹。",
+      "doctorSelected": true,
+      "criteria": [
+        "准确报告官方一致性差异及定制范围",
+        "不把合法定制等同MCP故障或升级失败",
+        "不自动覆盖用户指令"
+      ]
+    },
+    {
+      "id": "manual-maintenance-no-vlog",
+      "prompt": "全面诊断：用户明确此库暂为空、按需手动维护，不启用周期任务或VLog。D2有效，同包资源可读，其余宿主加载不可见。",
+      "doctorSelected": true,
+      "criteria": [
+        "空库不自动WARN",
+        "周期维护/VLog不适用，不计为已通过",
+        "不为消警建模型分支或任务"
+      ]
+    },
+    {
+      "id": "required-maintenance-missing",
+      "prompt": "D5：用户已明确每天维护这个知识世界，授权任务接口完整列举证明没有对应任务。不存在其它约定的执行方式。",
+      "doctorSelected": true,
+      "criteria": ["已适用周期要求的配置缺口WARN", "不称运行失败或数据库损坏", "不自动建立任务"]
+    },
+    {
+      "id": "required-vlog-missing",
+      "prompt": "D5：用户已要求将维护运行结果保存在branch/vlog，读取证实分支不存在。主分支正常可读，本次只诊断。",
+      "doctorSelected": true,
+      "criteria": ["记录条件的实际缺口WARN", "不把默认Branch当记录空间", "不创建分支或补写记录"]
+    },
+    {
+      "id": "capacity-incomplete-host-view",
+      "prompt": "只做安装相关D1：已取得同包完整指导和用户称已保存的确认，但没有设置回读或容量信息。当前会话只看得到一段与官方不同的可信生效指令。",
+      "doctorSelected": true,
+      "criteria": [
+        "用户确认与独立核实区分",
+        "报告可见差异，持久配置完整性未知",
+        "不虚构能承载全文的替代全局入口或索取隐藏指令"
       ]
     }
   ]

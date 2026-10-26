@@ -1,6 +1,6 @@
 # Object / Ontology — canonical Git Extended Diff
 
-**先读**：用独立 `kgos_docs` 批量读取 `["guides/ontology.md","sdk/object/readText.md","sdk/object/patch.md","sdk/types/PatchRequest.md"]`。下方 JavaScript **只作为 `kgos_query` / `kgos_mutate` 的 `code` 函数体**，文档读取不属于 JavaScript 全局方法。
+首次 Patch 且尚未掌握合同，用独立 `kgos_docs` 读取 `["sdk/object/readText.md","sdk/object/patch.md","sdk/types/PatchRequest.md","guides/errors.md"]`；已读且版本适用则复用。只有设计或创建模型时才读 `guides/ontology.md`，普通实例编辑不先执行建模示例。下方 JavaScript **只作为 `kgos_query` / `kgos_mutate` 的 `code` 函数体**，文档读取不属于 JavaScript 全局方法。
 
 唯一公共修改入口是 `ontology.patch`（Ontology 专用）或 `object.patch`（五类公共对象）。两者的 `patch` 都是严格匹配 canonical YAML 的 **Git Extended Diff**，不是 JSON Merge Patch。**先明确选择已授权的目标 Branch**（下面的 `kgos-guide-demo` 必须是通过 `guides/ontology.md` 创建并确认归自己所有的隔离测试 Branch，实际使用时替换成自己创建的唯一名称）；通过 `evolution.get({state:"branch/<name>"})` 读取**该 Branch** 的当前 immutable State，再对同一 State 调用 `object.readText({at:baseState,refs:[...]})`。不能用 `evolution.overview()` 的默认 Branch / State 来代替测试 Branch；`branch` 是不带前缀的名字，`baseState` 必须是已观测的 `commit/<64-hex>`。
 

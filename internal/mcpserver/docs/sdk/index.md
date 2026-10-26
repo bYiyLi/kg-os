@@ -2,7 +2,7 @@
 
 This is the exact 31-method JavaScript interface exposed by KG OS MCP. Use the separate `kgos_docs` Tool with `paths` to read references, then use `kgos_query` for reads or `kgos_mutate` for authorized writes. JavaScript code needs no import, new KGOSClient(), endpoint or token; return JSON-compatible results.
 
-Read `sdk/types/index.md` for all 75 public method-dependent types and follow each type's related links for nested values. Read `cypher/index.md` for Cypher 25.
+Follow the chosen method's request/return type links only as needed. `sdk/types/index.md` lists 75 public types; it is not a required read before each method. Read `cypher/index.md` only for Cypher tasks.
 
 | Access | Method                      | Document                           |
 | ------ | --------------------------- | ---------------------------------- |
