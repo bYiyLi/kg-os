@@ -1,5 +1,35 @@
 # Phase 27：KG OS 官方知识规范 Skill 体系
 
+<!-- cspell:words testdata SKOS CIDOC -->
+
+## 当前方案（D115/D116/D117，2026-10-28）
+
+**状态：`in_progress`**。原 Ontology/Branch 已合并为 `kgos-ontology-standards`；Knowledge/Retrieval/Maintenance 合并为唯一 `kgos-knowledge-standards`；VLog 保持独立。三个规范加 `kgos-doctor`，当前源码目标共 **四个官方 Skill**。已发行 v0.3.5 七 Skill、用户私人 Plugin 和当前部署不受本次本地修改影响。
+
+本阶段新增验收条件：统一 Ontology Skill 必须先进行本体语义与身份判断，明确能力问题、Ontology/Knowledge 分类边界及最小图结构；[KG OS 本体论方法论](../../../plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md)和[三个建模案例](../../../plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md)随 Skill 可独立读取。通过 [简版确认模板](../../../plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md) 向用户展示实际结构改动、关系图、语义与数据影响；**即使仅复用模型的建模任务，也须确认方案，普通 Knowledge 写入例外**。VLog 独立 `branch/vlog` 的内容归属不变。外部 `kgos-ontologies` 尚未创建时必须继续支持独立建模，不可强制依赖 GitHub 地址或额外 Skill。
+
+本次统一交付须通过：四目录源码与分发白名单一致、Ontology 包含入口与三份按需参考、Knowledge 运行时仅含 `SKILL.md`、所有链接可达；原 Ontology 及 Knowledge/Retrieval/Maintenance 历史教学案例仍作为隔离测试数据，现行案例还须由分发原文通过真实模型/查询验证。统一 Knowledge 的行为边界覆盖检索充分性、语义/身份/关系、更新冲突、维护和写后核实，不将读/写/维护强制串联，也不新增模型修改权限。此前冻结的分离 Skill 评测仅保留历史证据，统一 Ontology 使用 [建模评测](../../../tests/skills/ontology-unified-evaluation.json)，统一 Knowledge 使用 [知识评测](../../../tests/skills/knowledge-unified-evaluation.json)。实际客户端安装、版本发布及 CI 仍由 Phase 28 单独验收，不能标记 `done`。
+
+**D115 本地实现与验证（2026-10-27）**：四个运行时 Skill 目录已实际建立，Knowledge 仅保留 `SKILL.md`；原 Knowledge 四组实例、Retrieval 五组查询及 Maintenance 三组案例共十二份独立移到 `internal/kernel/testdata/knowledge/`，其中 39 个代码块与原版本一致。Go Skill 资源合同测试通过；真实本机 Lithograph v0.3.3/Jieba 下执行 Knowledge 实例、Retrieval 查询、Maintenance 证据以及既有 Ontology 测试回归全部通过。公开分发 Node 测试 **14/14**，Markdown 检查 **0 问题**、CSpell **0 问题**，Prettier/gofmt/`git diff --check` 通过，相关 **38 份 Markdown** 的链接检查 **0 失效**。新增 13 个合并 Knowledge 行为评测输入与判据，但**尚未运行独立 AI 行为评测、真实 ChatGPT Plugin 安装/选择、远端 CI、Commit、Push 或 Release**，不据本地检查关闭 Phase。
+
+### D116 · VLog 事件本体模型包与查询验证（2026-10-28）
+
+- **设计与交付**：VLog Skill 独立保留，入口负责记录准入、事件身份、证据与更新；`references/ontology.md` 集中维护可选的六 Node、七 Relationship KG OS Definition YAML；`references/cypher.md` 维护有业务目的的六条参数化查询。源码 `tests/seed.cypher` 与 `tests/expected.json` 提供隔离真实模型、实例及查询验证，公开 Plugin 包不携带 `tests/`。按 [D116](../../design/decisions.md#d116-vlog-event-ontology-package) 与 [MCP VLog 设计](../../design/mcp.md#vlog-standards-authoring) 执行。
+- **现有资料处理**：已存在的历史单 `VLogEntry` 模型与旧案例仍是可验证的历史参考，迁到 `internal/kernel/testdata/vlog/`，不作为当前可安装推荐模型；归并其它按需说明到 `SKILL.md` 与本体文档，不复制第二份完整 YAML。
+- **Acceptance**：由 Go 合同测试直接解析入口及 `references/` 两份 Markdown 的 YAML/查询围栏；真实 KG OS/Lithograph 的隔离测试必须使用文档原始模型与 Cypher，核验全部 Definition 可创建及回读、业务关系、七组查询预期、扩展 Concept 不改变 Definition、唯一键拒绝、旧模型/其它世界不变。历史 VLog 七项场景和旧单节点模型回归仍须通过。分发测试确保只有三份 Markdown 发布，`tests/` 不泄漏；完成链接/格式/拼写/最终 diff 检查。
+- **剩余门禁**：新 VLog 行为评测、真实 ChatGPT Skill 选用、完整 Phase/CI、Dev/Plugin 部署与正式发布，未获得实际证据前均标注未完成；没有本轮 Commit、Push 或发布授权。
+
+**本轮已取得的本地证据**：`TestVLogSkillEventOntology` 在实际 Lithograph v0.3.3/Jieba 隔离库中从 `references/ontology.md` 提取并成功创建、回读 **13 份 Definition（6 Node + 7 Relationship）**，直接执行 `references/cypher.md` 的 **6 类参数化查询 / 7 组预期**，包括新增 `Concept` 类别不改 `Event` Definition、真实图关系、执行成功但复测失败、物理地点/时间窗口、来源定位、重复业务键约束拒绝与来源 Branch 不变；执行结果为 PASS。原 `TestVLogSkillRecords` 七个测试分组、原单 `VLogEntry` 兼容测试与当前 Skill 资源合同测试同样 PASS。公开分发生成器测试 **14/14 PASS**，确认运行时只携带 `SKILL.md`、`references/ontology.md`、`references/cypher.md`，不打包 `tests/`；Markdown、CSpell、Prettier 与 Go 格式检查通过。**12 个 VLog 行为评测场景仅已编写，尚未运行模型试验；真实客户端、远端 CI、发布与部署均未执行。**
+
+### D117 · Ontology 本体工程方法论与当前 Skill 更名（2026-10-28）
+
+- **内容**：由 `kgos-modeling-standards` 更名为 `kgos-ontology-standards`，仍合并原 Ontology 与 Branch 选型职责；`SKILL.md` 强制先判断能力问题、稳定概念、分类/实例、业务身份、真实图关系，优先用 Knowledge 增加业务类别、只在必要结构缺口下改变 Definition。三份按需参考为 `references/model-confirmation-template.md`、`references/ontology-methodology.md`、`references/modeling-examples.md`。不恢复旧独立 Branch Skill，也不使 VLog 六 Node 成为其它领域的通用固定本体。
+- **外部依据**：方法论独立整理 Stanford Ontology Development 101、NeOn、W3C SKOS/PROV-O/OWL-Time、CIDOC CRM 和时间化参与设计模式；只提供可访问原始参考链接与 KG OS 原创归纳，不复制外部论文/教程。
+- **验收**：`TestOntologyStandardsResourceContract` 核查 Skill 元数据、行为入口、三份参考、链接与四文件运行时资源；`TestOntologyStandardsPublishedExamples` 必须直接读取公开参考中的三组 YAML/Cypher，在隔离真实 KG OS/Lithograph 中创建、回读模型、查询、拒绝重复业务键并检验数据库不保证的语义反例。旧八类本体隔离案例继续独立验证；发布生成器检查新 Skill 名与四项资源准确齐全。新的 [统一 Ontology 行为评测](../../../tests/skills/ontology-unified-evaluation.json) 还需要真实模型试验，不能以评测数据文件存在代替通过。
+- **交付边界**：当前改动是未提交本地工作树，不代表私人 Plugin 已安装、Dev/CI 已完成或发布版本已变化。详见 [D117](../../design/decisions.md#d117-ontology-methodology-and-skill-renaming)。
+
+## 历史开发记录（原六规范与七 Skill 基线）
+
 ## 目标与当前状态
 
 **状态：`in_progress`（2026-10-20）**。六项规范已有各自单项源码与验证记录；此前已创作 `kgos-maintenance-standards`，本轮按用户确认的设计完善 **`kgos-vlog-standards` 的一套可选 `VLogEntry` 推荐模型**，不创建统一官方 Ontology。Doctor 后续只按实际模型及可验证的运行证据判断。私人Plugin安装、ChatGPT原生触发、六规范整体验收与远端CI仍未完成；不将单Skill源码交付当作Phase `done`，不修改通用 `kgos` 或执行Phase 28退役。
@@ -111,7 +141,7 @@
 
 ### 交付内容与唯一职责
 
-[Maintenance Skill](../../../plugins/kgos/skills/kgos-maintenance-standards/SKILL.md) 版本 `1.0.0`，类型 `guidance`。运行时包为 **8 个 Markdown 文件**：入口、范围/覆盖、质量判断、处理选择、验证/连续性四份条件式专业参考和三组决策案例。三组 **21 个场景（I1–I6、C1–C7、S1–S8）** 及其相邻合法情况分别检验身份重复、来源证据、冲突/时效、缺边、范围、授权、并发及失败恢复；不是预置领域Model、固定评分或自动维护计划。
+原 `kgos-maintenance-standards`（已合并） 版本 `1.0.0`，类型 `guidance`。运行时包为 **8 个 Markdown 文件**：入口、范围/覆盖、质量判断、处理选择、验证/连续性四份条件式专业参考和三组决策案例。三组 **21 个场景（I1–I6、C1–C7、S1–S8）** 及其相邻合法情况分别检验身份重复、来源证据、冲突/时效、缺边、范围、授权、并发及失败恢复；不是预置领域Model、固定评分或自动维护计划。
 
 维护规范负责检查范围、候选确认、处理方向与维护效果，而不替代普通实例编辑（Knowledge）、模型/约束设计（Ontology）、具体查询策略（Retrieval）、长期知识世界版本管理（Branch）、维护事件正文（VLog）或用户环境只读诊断（Doctor）。未新增 Kernel API、系统字段、Scheduler、Agent、持久Issue队列或额外必填流程。
 
@@ -127,7 +157,7 @@
 
 ### 真实隔离 Kernel/Lithograph 测试
 
-[资源合同测试](../../../internal/kernel/maintenance_skill_contract_test.go) 使用真实YAML解析器核对姓名/Description/版本与包内八文件全部可达，避免悬空路由。[引擎集成测试](../../../internal/kernel/maintenance_skill_integration_test.go) 在 `t.TempDir()` 的隔离KG OS真实Runtime及Lithograph上运行 **九组**、与其它库完全独立的预设测试模型：
+原 `TestMaintenanceSkillResourceContract`（已退役；现由 [统一 Knowledge 合同测试](../../../internal/kernel/knowledge_skill_contract_test.go) 验证测试资料） 使用真实YAML解析器核对姓名/Description/版本与包内八文件全部可达，避免悬空路由。[引擎集成测试](../../../internal/kernel/maintenance_skill_integration_test.go) 在 `t.TempDir()` 的隔离KG OS真实Runtime及Lithograph上运行 **九组**、与其它库完全独立的预设测试模型：
 
 | 组 | 已验证的真实底层行为 |
 | --- | --- |
@@ -204,7 +234,7 @@ go test -race -tags=sqlite_fts5,lithograph_smoke -count=1 \
 
 ### P27-05 后续优化：VLog Skill v1.1.0 可选推荐模型（2026-10-21）
 
-**用户明确调整**：不为KG OS预置统一的VLog本体论，取消官方固定Model的前置条件；只在 `kgos-vlog-standards` 内提供**一套**按需引用的 [`VLogEntry` 建模参考](../../../plugins/kgos/skills/kgos-vlog-standards/references/model-examples.md)。这是Skill指导材料，不能当成目标知识库自动安装的Schema；实际 `branch/vlog` 模型足够时直接复用，缺模型时需先有建模授权。此决定和Doctor按实际Ontology/证据读取的职责，已同步 [MCP设计](../../design/mcp.md#vlog-standards-authoring)、[D104后续澄清](../../design/decisions.md#d104-kgos-doctor-v1-and-vlog) 与 [Phase25](25-kgos-doctor.md)；不新增 `plugins/kgos/ontologies/vlog.yaml`、`kgos_docs`公共Schema、Kernel、Scheduler或其它Skill。
+**用户明确调整**：不为KG OS预置统一的VLog本体论，取消官方固定Model的前置条件；只在 `kgos-vlog-standards` 内提供**一套**按需引用的 [`VLogEntry` 历史建模参考](../../../internal/kernel/testdata/vlog/legacy-vlogentry.md)。这是Skill指导材料，不能当成目标知识库自动安装的Schema；实际 `branch/vlog` 模型足够时直接复用，缺模型时需先有建模授权。此决定和Doctor按实际Ontology/证据读取的职责，已同步 [MCP设计](../../design/mcp.md#vlog-standards-authoring)、[D104后续澄清](../../design/decisions.md#d104-kgos-doctor-v1-and-vlog) 与 [Phase25](25-kgos-doctor.md)；不新增 `plugins/kgos/ontologies/vlog.yaml`、`kgos_docs`公共Schema、Kernel、Scheduler或其它Skill。
 
 **实际Skill**：版本从 `1.0.0` 调整为 `1.1.0`；新增一份可条件读取的 `model-examples.md`，运行时包变为**9份Markdown**。唯一推荐方案是一个Node Definition、18个Property、3个必填（`entryKey`、`kind`、`summary`），仅该示例内 `entryKey` 唯一；另外15项可选，0个Relationship Definition、无新增独立Index、无强制状态枚举。时间、任务/Run身份、执行与验证状态、证据及来源State的区分只在有实际依据时填写； `provenance` 为文本，不假装Doctor能对任意来源State进行结构化过滤。V1–V6正文及原有16例保留，之前的 `ExampleVLog` 测试案例仍是不同的教学前提，不冒充第二套推荐模型。
 
@@ -222,7 +252,7 @@ go test -race -tags=sqlite_fts5,lithograph_smoke -count=1 \
 
 ### 产物与职责收敛
 
-[Branch Skill](../../../plugins/kgos/skills/kgos-branch-standards/SKILL.md) 版本 `1.0.0`，guidance 类型。运行时 **9 个 Markdown 文件**：入口、世界边界/起点定位/版本记录/融合生命周期四份专业参考、四组决策案例。B1–B6 指导世界组织和演进，不预定小说/学习/VLog本体，不编辑普通事实，不部署Instance，不创建Branch元数据或新的版本API。Architecture/Evolution仅澄清多个长期知识世界的使用方式并指向[MCP职责真源](../../design/mcp.md#branch-standards-authoring)，底层接口未修改。
+原 `kgos-branch-standards`（历史独立 Skill）版本 `1.0.0`，guidance 类型。运行时 **9 个 Markdown 文件**：入口、世界边界/起点定位/版本记录/融合生命周期四份专业参考、四组决策案例。B1–B6 指导世界组织和演进，不预定小说/学习/VLog本体，不编辑普通事实，不部署Instance，不创建Branch元数据或新的版本API。Architecture/Evolution仅澄清多个长期知识世界的使用方式并指向[MCP职责真源](../../design/mcp.md#branch-standards-authoring)，底层接口未修改。
 
 四组案例共 **19 个情境及相邻合法选择**：W1–W4世界组织、O1–O4继承起点、F1–F5融合、L1–L6版本生命周期。名称与S0/S1为教学条件，不是待执行请求或预置Branch清单；独立模型、领域实例的内容仍由相应规范负责。包中没有脚本、模板数据、Skill自动路由前置或无用途资源。
 
@@ -238,7 +268,7 @@ go test -race -tags=sqlite_fts5,lithograph_smoke -count=1 \
 
 ### 实际Evolution/Kernel验证
 
-[资源测试](../../../internal/kernel/branch_skill_contract_test.go) 检查metadata、版本和全部九个资源的包内可达性；它不声称证明模型行为。[隔离集成测试](../../../internal/kernel/branch_skill_integration_test.go) 使用真实Kernel/Lithograph，在临时独立库验证七组行为，最终带 `-race` 全部通过：
+当时的 `branch_skill_contract_test.go` 检查 metadata、版本和全部九个资源的包内可达性（现在由 [Ontology 资源合同测试](../../../internal/kernel/ontology_standards_contract_test.go) 替代）；它不声称证明模型行为。[隔离集成测试](../../../internal/kernel/branch_skill_integration_test.go) 使用真实Kernel/Lithograph，在临时独立库验证七组行为，最终带 `-race` 全部通过：
 
 | 测试组 | 实际核对 |
 | --- | --- |
@@ -271,7 +301,7 @@ go test -race -tags=sqlite_fts5,lithograph_smoke -count=1 \
 
 ### 产物与独立职责
 
-[Retrieval Skill](../../../plugins/kgos/skills/kgos-retrieval-standards/SKILL.md) 版本 `1.0.0`，guidance 类型。包内 **10 个 Markdown 文件**：入口、策略/覆盖/State时间/证据交付四份按需参考、五组深入决策案例。R1–R6 指导任务内检索与证据使用，不设计模型或数据粒度，不负责知识修复、索引维护、分支策略、全库巡检或 VLog；没有运行脚本、额外依赖、独立 Agent 或强制输出报告。
+原 `kgos-retrieval-standards`（已合并） 版本 `1.0.0`，guidance 类型。包内 **10 个 Markdown 文件**：入口、策略/覆盖/State时间/证据交付四份按需参考、五组深入决策案例。R1–R6 指导任务内检索与证据使用，不设计模型或数据粒度，不负责知识修复、索引维护、分支策略、全库巡检或 VLog；没有运行脚本、额外依赖、独立 Agent 或强制输出报告。
 
 案例合计 **20 个情境及相邻合法条件**，并有 **17 条只读 Cypher 与明确预期列/行**。它们描述给定模型和合成数据，不是要在用户库创建的模板。代码及正文分别检查，数据库语法成功不替代语义合理性的审核。
 
@@ -295,7 +325,7 @@ go test -race -tags=sqlite_fts5,lithograph_smoke -count=1 \
 
 ### 真实查询与边界验证
 
-[资源合同测试](../../../internal/kernel/retrieval_skill_contract_test.go) 在普通Go测试中检查metadata、版本、10个资源可达性和17组查询/预期JSON的完整配对。[实际检索测试](../../../internal/kernel/retrieval_skill_integration_test.go) 直接读取这些已交付查询文本，在独立临时Kernel/Lithograph库执行，逐项比较返回State、columns、rows；**17条全部通过**，读取不移动测试Head。
+原 `TestRetrievalSkillResourceContract`（已退役；现由 [统一 Knowledge 合同测试](../../../internal/kernel/knowledge_skill_contract_test.go) 验证 17 条查询资料） 在普通Go测试中检查metadata、版本、10个资源可达性和17组查询/预期JSON的完整配对。[实际检索测试](../../../internal/kernel/retrieval_skill_integration_test.go) 直接读取这些已交付查询文本，在独立临时Kernel/Lithograph库执行，逐项比较返回State、columns、rows；**17条全部通过**，读取不移动测试Head。
 
 额外六组检查也通过：结构化/全文不调用embedding；缺索引返回错误而不是空成功；真实Provider路径收到可控HTTP失败后返回错误；只读查询拒绝写语句且不升级权限；消费者中断后没有成功summary；分支前进后旧State仍读旧值、明确新State读新值。另复跑既有Graph快照/分支回归和Provider等待取消回归，均通过。
 
@@ -368,8 +398,8 @@ Native 命令使用现行 `KGOS_LITHOGRAPH_LIBRARY`、`KGOS_LITHOGRAPH_PROVIDER_
 
 ### 实际产物与职责
 
-- [Skill 入口](../../../plugins/kgos/skills/kgos-ontology-standards/SKILL.md) 为 guidance 类型，版本 `1.0.0`；核心原则、选择条件、授权/停止边界和按需读取路径自包含。运行时包共 **13 个 Markdown 文件**：入口、质量/建模/演进/案例约定四份参考、八份案例；没有执行脚本、外部 Skill 前置或未引用资源。
-- [真实案例与演进测试](../../../internal/kernel/ontology_skill_examples_integration_test.go) 直接读取上述 Markdown 内的 YAML、Cypher 与预期 JSON，不维护第二套案例 fixture。每个测试使用临时独立库，不访问长期 Dev/用户数据。
+- 原 `kgos-ontology-standards/SKILL.md` 当时为 guidance 类型，版本 `1.0.0`；核心原则、选择条件、授权/停止边界和按需读取路径自包含。运行时包共 **13 个 Markdown 文件**：入口、质量/建模/演进/案例约定四份参考、八份案例；没有执行脚本、外部 Skill 前置或未引用资源。
+- [真实案例与演进测试](../../../internal/kernel/ontology_skill_examples_integration_test.go) 当时直接读取 Skill 教学案例中的 YAML、Cypher 与预期 JSON；现在从独立 `internal/kernel/testdata/ontology/` 读取同一案例，不再将案例作为 Skill 运行资源。每个测试使用临时独立库，不访问长期 Dev/用户数据。
 - [独立模型评测任务与预设判据](../../../tests/skills/ontology-standards-evaluation.json) 在执行前冻结，共 14 个场景。执行模型只收到原始用户任务与 Skill，不收到判据或作者结论；评测不打包进 Skill 的运行资源。
 
 ### 逐例审查及实际数据库结果

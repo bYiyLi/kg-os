@@ -9,13 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	host "github.com/bYiyLi/kg-os/internal/runtime"
-	"gopkg.in/yaml.v3"
 )
 
 type ontologySkillModel struct {
@@ -41,14 +39,14 @@ type ontologySkillCase struct {
 	semanticChecks []ontologySkillCheck
 }
 
-// Exercise the actual shipped examples rather than maintaining a second fixture copy.
-func TestOntologySkillExamples(t *testing.T) {
+// Exercise isolated modeling fixtures; they are not shipped in the Skill package.
+func TestOntologyFixtureCases(t *testing.T) {
 	for _, name := range []string{"KGOS_LITHOGRAPH_LIBRARY", "KGOS_LITHOGRAPH_PROVIDER_LIBRARY", "KGOS_JIEBA_LIBRARY"} {
 		if _, err := os.Stat(os.Getenv(name)); err != nil {
 			t.Fatalf("required real native fixture %s: %v", name, err)
 		}
 	}
-	paths, err := filepath.Glob("../../plugins/kgos/skills/kgos-ontology-standards/references/cases/*.md")
+	paths, err := filepath.Glob("testdata/ontology/cases/*.md")
 	if err != nil || len(paths) != 8 {
 		t.Fatalf("example coverage: paths=%v err=%v; want eight cases", paths, err)
 	}
@@ -233,12 +231,12 @@ func readOntologySkillCase(t *testing.T, path string) ontologySkillCase {
 					t.Fatal("duplicate seed")
 				}
 				result.seed = body
-			case section == "数据库反例":
+			case strings.HasPrefix(section, "数据库反例"):
 				if result.reject != "" {
 					t.Fatal("duplicate rejection")
 				}
 				result.reject = body
-			case section == "验证问题" || section == "语义检查":
+			case strings.HasPrefix(section, "验证问题") || strings.HasPrefix(section, "语义检查"):
 				if query != "" {
 					t.Fatal("query lacks expected result")
 				}
@@ -257,7 +255,7 @@ func readOntologySkillCase(t *testing.T, path string) ontologySkillCase {
 			if len(check.want.Columns) == 0 || check.want.Rows == nil {
 				t.Fatal("expected result must explicitly provide columns and rows")
 			}
-			if section == "语义检查" {
+			if strings.HasPrefix(section, "语义检查") {
 				if len(check.want.Rows) == 0 {
 					t.Fatal("semantic example must be detected, not vacuously pass")
 				}
@@ -276,9 +274,9 @@ func readOntologySkillCase(t *testing.T, path string) ontologySkillCase {
 	return result
 }
 
-// These checks guard model-changing operations taught by the skill on its own examples.
-func TestOntologySkillEvolution(t *testing.T) {
-	example := readOntologySkillCase(t, "../../plugins/kgos/skills/kgos-ontology-standards/references/cases/documents.md")
+// These checks verify model-changing behavior with isolated, synthetic fixtures.
+func TestOntologyFixtureEvolution(t *testing.T) {
+	example := readOntologySkillCase(t, "testdata/ontology/cases/documents.md")
 	runtime, _ := loadOntologySkillCase(t, example)
 	ctx := context.Background()
 	seeded, err := runtime.Kernel.ExecuteGraph(ctx, kernel.GraphExecuteRequest{Branch: "main", Cypher: example.seed})
@@ -353,79 +351,4 @@ func TestOntologySkillEvolution(t *testing.T) {
 	}
 	assertMainState(t, runtime, renamed.State)
 	checkOntologySkillQuery(t, runtime, renamed.State, current)
-}
-
-func TestOntologySkillResourceContract(t *testing.T) {
-	root, err := filepath.Abs("../../plugins/kgos/skills/kgos-ontology-standards")
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(filepath.Join(root, "SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	parts := strings.SplitN(string(data), "---\n", 3)
-	if len(parts) != 3 || parts[0] != "" {
-		t.Fatal("missing YAML metadata")
-	}
-	var meta struct {
-		Name        string            `yaml:"name"`
-		Description string            `yaml:"description"`
-		Metadata    map[string]string `yaml:"metadata"`
-	}
-	decoder := yaml.NewDecoder(strings.NewReader(parts[1]))
-	decoder.KnownFields(true)
-	if err := decoder.Decode(&meta); err != nil {
-		t.Fatal(err)
-	}
-	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 || meta.Metadata["version"] == "" {
-		t.Fatalf("invalid metadata: %+v", meta)
-	}
-	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
-	reached := map[string]bool{}
-	queue := []string{filepath.Join(root, "SKILL.md")}
-	for len(queue) > 0 {
-		path := queue[0]
-		queue = queue[1:]
-		if reached[path] {
-			continue
-		}
-		reached[path] = true
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, match := range links.FindAllStringSubmatch(string(raw), -1) {
-			target := match[1]
-			if strings.HasPrefix(target, "https://") {
-				continue
-			}
-			target = strings.SplitN(target, "#", 2)[0]
-			next := filepath.Clean(filepath.Join(filepath.Dir(path), target))
-			if !strings.HasPrefix(next, root+string(os.PathSeparator)) {
-				t.Fatalf("runtime reference escapes standalone package: %s", next)
-			}
-			queue = append(queue, next)
-		}
-	}
-	count := 0
-	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !entry.IsDir() {
-			count++
-			if !reached[path] {
-				return fmt.Errorf("unreachable runtime resource: %s", path)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != 13 {
-		t.Fatalf("want entrypoint plus 4 focused references plus 8 cases, got %d", count)
-	}
-	t.Logf("valid versioned metadata; %d reachable, package-local runtime files", count)
 }

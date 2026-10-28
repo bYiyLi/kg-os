@@ -1,0 +1,209 @@
+{
+  "purpose": "Review inputs and evaluator-only criteria for the current KG OS Ontology Skill: semantic-first modeling, stable definitions, graph identity and executable validation. Not evidence of live ChatGPT behavior.",
+  "cases": [
+    {
+      "id": "new-experience-existing-model",
+      "prompt": "把这篇提示词经验保存到已有知识库，相关模型完全能够表达它；不用新建模型。",
+      "expectedApplies": false,
+      "criteria": ["复用实际目标模型", "普通 Knowledge 写入不新增建模审批", "不新建主题 Branch"]
+    },
+    {
+      "id": "experience-no-topic-branch",
+      "prompt": "把这篇提示词设计经验保存到现有知识库。发现 main 没有专门的 PromptPractice 模型，用户没有要求独立的版本演进。",
+      "expectedApplies": true,
+      "criteria": [
+        "检查 main 的实际用途、相关模型和 Knowledge",
+        "缺少专用模型不意味着需要新 Branch",
+        "必要模型扩展先提交清晰变更方案供用户确认"
+      ]
+    },
+    {
+      "id": "model-selection-no-schema-change",
+      "prompt": "设计适合后续项目管理的 Ontology；如果现有结构已足够，就复用，先让我审核方案。",
+      "expectedApplies": true,
+      "criteria": [
+        "检查现有 Ontology 和 Knowledge",
+        "提交无结构改动的复用清单",
+        "用户确认后继续建模任务"
+      ]
+    },
+    {
+      "id": "new-relationship-confirmation",
+      "prompt": "需要增加项目与决策的关联。先设计确认单，不要写入。",
+      "expectedApplies": true,
+      "criteria": [
+        "只列实际新增的关系及端点含义",
+        "相关 Mermaid 图标明新关系",
+        "数据影响与用户确认",
+        "不执行写入"
+      ]
+    },
+    {
+      "id": "property-only-change",
+      "prompt": "已有 Definition 的一个字段需要从可选改成必填，帮我给出最小改动方案。",
+      "expectedApplies": true,
+      "criteria": [
+        "显示字段从可选到必填的明确变化",
+        "核对已有实例和迁移影响",
+        "关系图可以省略",
+        "确认前不修改"
+      ]
+    },
+    {
+      "id": "domain-is-not-branch",
+      "prompt": "现有知识世界里要新增两个业务领域，需要能直接连接领域间的相同实体。",
+      "expectedApplies": true,
+      "criteria": [
+        "优先同一图中的模型组织与共享身份",
+        "Domain 按需要组织 Definition",
+        "不按主题创建 Branch"
+      ]
+    },
+    {
+      "id": "vlog-existing-separate-world",
+      "prompt": "系统维护事件按 VLog 约定记录，用户知识和维护日志不可混淆。",
+      "expectedApplies": true,
+      "criteria": [
+        "保持 branch/vlog 独立归属",
+        "不得将系统记录强行转入普通业务图",
+        "现有模型足够时仅执行普通记录操作"
+      ]
+    },
+    {
+      "id": "legitimate-experiment-branch",
+      "prompt": "需要从当前知识世界某个已知 State 独立试验新的 Ontology，不影响原 Head。先给我审核。",
+      "expectedApplies": true,
+      "criteria": [
+        "说明独立演进原因及完整 State 继承",
+        "新 Branch 列入确认范围",
+        "确认前不得创建 Branch"
+      ]
+    },
+    {
+      "id": "unavailable-model-repository",
+      "prompt": "请完成一个新的模型设计，但 kgos-ontologies 仓库暂时无法访问。",
+      "expectedApplies": true,
+      "criteria": ["不编造官方模型", "按已确认的真实需求独立建模", "继续形成变更清单供审核"]
+    },
+    {
+      "id": "confirmation-scope-drift",
+      "prompt": "用户已经确认新增关系。实际执行时发现还要删除现有实体才能完成，该怎么办？",
+      "expectedApplies": true,
+      "criteria": [
+        "不得超出确认范围删除",
+        "更新受影响的变更清单和影响说明",
+        "仅新增影响部分重新确认"
+      ]
+    },
+    {
+      "id": "verification-not-success-receipt",
+      "prompt": "已批准模型更改，Patch 返回成功。如何判断任务真正完成？",
+      "expectedApplies": true,
+      "criteria": [
+        "读取实际目标 State 中的 Ontology",
+        "验证受影响 Knowledge、关系和代表性查询",
+        "工具成功不等于模型验收"
+      ]
+    },
+    {
+      "id": "category-is-knowledge",
+      "prompt": "以后项目里会有新的事件分类，如 Deployment、SecurityIncident。是不是应该现在为每一类都创建 Node Definition？",
+      "expectedApplies": true,
+      "criteria": [
+        "先确定共享事件语义和真实查询",
+        "业务类别优先通过已有 Concept Knowledge 或 Property 表达",
+        "出现真正不同的约束或结构语义才新增 Definition"
+      ]
+    },
+    {
+      "id": "overloaded-single-record",
+      "prompt": "新知识库想记录事件、人物、验证、证据。为了省事只创建一个 Entry 节点，把其它内容塞进 narrative、ids 字符串可行吗？",
+      "expectedApplies": true,
+      "criteria": [
+        "先识别可独立存在、关联和查询的概念",
+        "真实关系应按实际需求使用 Graph Relationship",
+        "不能机械拆所有词也不能压平已有身份和语义"
+      ]
+    },
+    {
+      "id": "role-and-period",
+      "prompt": "员工在同一公司任职两次，角色和时间不同，怎么本体建模？",
+      "expectedApplies": true,
+      "criteria": [
+        "Person 和 Organization 各自有业务身份",
+        "任职关系可保留角色与期间 Property",
+        "无独立任职生命周期需求时不提前造 Membership Node"
+      ]
+    },
+    {
+      "id": "no-time-nodes-everywhere",
+      "prompt": "日志事件只要求一个精确发生时刻，没有时间窗口共享或查询需要。每条 Event 都创建 Time 节点合适吗？",
+      "expectedApplies": true,
+      "criteria": [
+        "简单时点可以 Event Property 表达",
+        "不因为 Time 概念存在就强制独立 Node",
+        "发生时间与录入时间不混淆"
+      ]
+    },
+    {
+      "id": "source-capture-version",
+      "prompt": "同一网页链接两次获取到不同内容，如何在研究知识图里保留引用证据？",
+      "expectedApplies": true,
+      "criteria": [
+        "区分稳定源定位与实际捕获版本身份",
+        "引用具体来源快照与片段及使用意图",
+        "引用或链接不代表已经独立证实事实"
+      ]
+    },
+    {
+      "id": "explicit-ontology-not-reasoner",
+      "prompt": "模型定义了 Concept broader 关系，Cypher 查询能否假定底层自动提供 OWL 传递推理和子类继承？",
+      "expectedApplies": true,
+      "criteria": [
+        "区分明确存储的图边和推理语义",
+        "KG OS 不默认实现 OWL/分类词表 推理",
+        "根据实际索引、查询和应用规则证明结果"
+      ]
+    },
+    {
+      "id": "reasonable-extension",
+      "prompt": "我已经有 Event/Concept/HAS_TYPE，来了一个新业务类别但没有新属性或关系要求；该怎样扩展？",
+      "expectedApplies": true,
+      "criteria": [
+        "优先增加 Concept Knowledge 和实际 HAS_TYPE 关系",
+        "不因名称变化自动迁移 Schema",
+        "通过真实业务查询验证"
+      ]
+    },
+    {
+      "id": "concept-and-definition",
+      "prompt": "我们的本体需要同时管理事件类别和新事件实例。Concept 类别名称是不是一定等于 KG OS Node Definition？",
+      "expectedApplies": true,
+      "criteria": [
+        "区分分类概念 Knowledge、Node Definition、具体事件 Knowledge",
+        "不把分类层次、领域 Domain 和 Schema 定义混同",
+        "需要独立身份或语义时按实际模型表达"
+      ]
+    },
+    {
+      "id": "validation-negative",
+      "prompt": "模型创建成功了，能从库里查到两条记录。就可以确认本体设计正确了吗？",
+      "expectedApplies": true,
+      "criteria": [
+        "需要对应业务能力问题的 Cypher 与预期",
+        "检查同名异身份、重复键、时间与来源边界",
+        "验证合理分类扩展不需要反复改 Schema"
+      ]
+    },
+    {
+      "id": "avoid-universal-ontology",
+      "prompt": "我们未来可能研究科研、项目和日志。是否需要立即给每个领域预装统一 Event、Entity、Place、Source 以及大量通用关系？",
+      "expectedApplies": true,
+      "criteria": [
+        "不要把 VLog 六节点本体强制覆盖所有领域",
+        "复用已有适用模型，新增仅解决实际需求的语义",
+        "未来不确定需求不是预置额外 Schema 的理由"
+      ]
+    }
+  ]
+}

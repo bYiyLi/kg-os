@@ -10,9 +10,9 @@ import (
 	"github.com/bYiyLi/kg-os/internal/kernel"
 )
 
-// The agent-visible reference is a suggested model, not a Kernel-required schema.
-// This test verifies the literal shipped definition against real isolated KG OS/Lithograph.
-func TestVLogSkillRecommendedModel(t *testing.T) {
+// The historical VLogEntry fixture remains a compatible example, not the published graph ontology.
+// This test verifies the historical fixture definition against real isolated KG OS/Lithograph.
+func TestVLogLegacyModelFixture(t *testing.T) {
 	r, initial := newVLogSkillRuntime(t)
 	ctx := context.Background()
 	if _, err := r.Kernel.ReadObject(ctx, initial, "node:VLogEntry"); err == nil ||
@@ -24,7 +24,7 @@ func TestVLogSkillRecommendedModel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	model := vlogSkillRecommendedModel(t)
+	model := vlogLegacyModelFixture(t)
 	schema, err := r.Kernel.PatchOntology(ctx, kernel.PatchRequest{
 		Branch:    "vlog",
 		BaseState: initial,

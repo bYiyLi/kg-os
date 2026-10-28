@@ -10,7 +10,7 @@ KG OS 的当前目标是**一个 Go `kgosd` 进程、一个 HTTP listener**，�
 
 ## 1. 安装与初始化入口
 
-**唯一完整 AI 安装手册**位于 [KG OS INSTALL.md](../../plugins/kgos/INSTALL.md)，并由私有仓库自动生成到公开 [kg-releases/INSTALL.md](https://github.com/bYiyLi/kg-releases/blob/main/INSTALL.md)。安装 Docker、MCP OAuth、私人 Plugin、七个官方 Skill 与首次初始化，以该版本的手册和实际已发布镜像能力为准。这里不再维护另一套历史 Docker 命令、静态测试 TOML 或手工首次启动流程。
+**唯一完整 AI 安装手册**位于 [KG OS INSTALL.md](../../plugins/kgos/INSTALL.md)，并由私有仓库自动生成到公开 [kg-releases/INSTALL.md](https://github.com/bYiyLi/kg-releases/blob/main/INSTALL.md)。安装 Docker、MCP OAuth、私人 Plugin、随版本发布的官方 Skill 与首次初始化，以对应版本的手册和实际已发布镜像能力为准（v0.3.5 为七 Skill；待发布源码的当前目标为四 Skill）。这里不再维护另一套历史 Docker 命令、静态测试 TOML 或手工首次启动流程。
 
 历史版本需要先提供已有完整 `config.toml`、运行 `kgosd init`；支持 Web-first Setup 的镜像按其实际初始化流程处理。**Phase 26 Web-first Setup 仍在独立验收**，不能由设计草案推断任意旧镜像已经支持无配置自动初始化。不能从测试示例复制凭证、Provider 或持久化路径到真实 Instance。
 

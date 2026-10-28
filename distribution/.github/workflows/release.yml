@@ -197,7 +197,7 @@ jobs:
           test ! -e plugins/kgos/INSTALL.md
           test ! -e plugins/kgos/.app.json
           test ! -e plugins/kgos/skills/kgos
-          EXPECTED='kgos-branch-standards kgos-doctor kgos-knowledge-standards kgos-maintenance-standards kgos-ontology-standards kgos-retrieval-standards kgos-vlog-standards'
+          EXPECTED='kgos-doctor kgos-knowledge-standards kgos-ontology-standards kgos-vlog-standards'
           ACTUAL=$(find plugins/kgos/skills -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | tr '\n' ' ' | sed 's/ $//')
           test "$ACTUAL" = "$EXPECTED"
           for skill in $EXPECTED; do
@@ -219,7 +219,7 @@ jobs:
             exit 1
           fi
           test "$(unzip -Z -1 "$ARCHIVE" | grep -c -E '(^|/)INSTALL\.md$')" = 1
-          echo "Plugin archive root contains Manifest, one INSTALL.md and seven Skill resources"
+          echo "Plugin archive root contains Manifest, one INSTALL.md and four Skill resources"
 
       - name: Publish public GitHub Release
         env:
@@ -252,7 +252,7 @@ jobs:
               printf 'Linux amd64 Docker image: \`%s\`\n\n' "$IMAGE"
               printf 'Verified image digest: \`%s\`\n\n' "$DIGEST_REF"
               printf 'Private source commit SHA: \`%s\`\n\n' "$REVISION"
-              echo "Plugin archive: kgos-plugin-$TAG.zip (includes the sole INSTALL.md and seven Skills)"
+              echo "Plugin archive: kgos-plugin-$TAG.zip (includes the sole INSTALL.md and four Skills)"
               if [ "$STABLE_RELEASE" = true ]; then
                 printf '\nInstallation guides for `%s`: `kgos-install-zh-%s.md`, `kgos-install-en-%s.md`.\n' "$TAG" "$TAG" "$TAG"
                 printf 'AI Plugin guide: `kgos-INSTALL-%s.md` (also included as INSTALL.md in the Plugin archive).\n' "$TAG"

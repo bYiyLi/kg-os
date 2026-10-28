@@ -8,7 +8,7 @@ version: "0.3.5"
 
 This guide targets a **Linux amd64 host you choose**. We recommend **Docker Compose + Web setup**; Docker commands and configuration-file initialization are also available. If you already have a service, verify its identity and status and reuse its data instead of overwriting it with a new installation.
 
-Installation order: **deploy and initialize → public HTTPS → connect ChatGPT → create a private Plugin with AI → global guidance → check and use**. The basic MCP app works independently. Continue with the private Plugin for all seven official Skills and complete usage guidance.
+Installation order: **deploy and initialize → public HTTPS → connect ChatGPT → create a private Plugin with AI → global guidance → check and use**. The basic MCP app works independently. Continue with the private Plugin for all four official Skills and complete usage guidance.
 
 **Existing instance:** record its actual image version, persistent directory, launch configuration and public address, then use step 4’s read-only status query. If `ready`, keep the original paths and start at step 6 for verification; otherwise use step 11 for recovery. Skip new-directory, container-creation and initialization steps. Deployments with another layout must use their corresponding original commands.
 
@@ -472,7 +472,7 @@ Expect no difference: the default branch, immutable State, State data and admini
 
 ## 7. Connect ChatGPT and verify
 
-After service checks pass, use your chosen account or Workspace. First create a **basic MCP app**. ChatGPT displays it as a Plugin; it does not yet contain the seven official Skills. If a working app already targets the correct instance, reuse it and go directly to read-only checks.
+After service checks pass, use your chosen account or Workspace. First create a **basic MCP app**. ChatGPT displays it as a Plugin; it does not yet contain the four official Skills. If a working app already targets the correct instance, reuse it and go directly to read-only checks.
 
 ### Add the basic MCP app
 
@@ -521,24 +521,24 @@ Existing private Plugin: [name/version, or none]
 My needs and customizations to preserve: [describe]
 
 Reuse this app and connection; do not deploy or initialize the service again.
-Inspect the actual service, official release and any old Plugin/customizations. Present a specific plan for my confirmation, then create and install a new version-named private Plugin with all seven official Skills. Migrate my customizations without overwriting conflicts. Keep the old Plugin and shared connection until the new one passes checks; ask me to choose any cleanup not already authorized.
+Inspect the actual service, official release and any old Plugin/customizations. Present a specific plan for my confirmation, then create and install a new version-named private Plugin with all four official Skills. Migrate my customizations without overwriting conflicts. Keep the old Plugin and shared connection until the new one passes checks; ask me to choose any cleanup not already authorized.
 Provide the complete official global guidance and ChatGPT settings steps, then run installation checks. Do not request credentials in chat or repeat confirmations for already authorized steps.
 ```
 
 AI then follows the single [INSTALL.md](https://kgos.sites.y2l.top/install/v0.3.5/INSTALL.md) to help you:
 
 1. **Confirm a plan.** Check the service and matching official assets. For an old private Plugin, inspect its contents against the old official baseline and list customizations and conflicts. Before creation, also check the persistent instruction location’s capacity, existing content and scope. Report visibility limits instead of assuming another global location exists. You choose the target, migration, permissions, guidance storage and installation scope, then confirm the plan. Already authorized steps need no repeated confirmation.
-2. **Create and install a new version.** Always create a new private Plugin named with the official version; add a revision number when recreating the same version. Reuse the basic app’s real connection and retain all seven official Skills and resources. Keep the old Plugin, and let you decide conflicts rather than overwriting it.
+2. **Create and install a new version.** Always create a new private Plugin named with the official version; add a revision number when recreating the same version. Reuse the basic app’s real connection and retain all four official Skills and resources. Keep the old Plugin, and let you decide conflicts rather than overwriting it.
 3. **Configure global guidance.** AI supplies the complete official Global AI Guidance. Open **Settings → Personalization → Custom instructions**, following [ChatGPT personalization guidance](https://help.openai.com/en/articles/8096356-chatgpt-custom-instructions). Review existing instructions and choose how to append, merge or replace conflicts before saving. Do not silently overwrite them. Reuse the plan’s capacity check. If space is insufficient, use only a verified available storage option with its actual scope, or resolve existing-content conflicts. If full storage is unavailable, report guidance as not configured; do not locally abridge the official text or label project-only instructions or a one-time paste as global loading.
 4. **Check in a new conversation.** Install/enable the new Plugin, open a new conversation and select it with `@`. Pasting the guidance into that conversation is not proof that global settings took effect. Send:
 
 ```markdown
-Use the installed kgos-doctor Skill for installation checks D1–D3 only: global guidance, the selected KG OS MCP connection/knowledge base, and the seven official Skills. Reuse current evidence where applicable. Report official resources, visible instruction differences, persistent configuration evidence and ordinary-task behavior separately, alongside connection/Skill installation, real calls, versions and resources. Whole-configuration invisibility must not hide a confirmed local difference; list unverified parts separately. An empty knowledge base is valid. Do not write knowledge, create branches/commits, schedule maintenance or uninstall anything.
+Use the installed kgos-doctor Skill for installation checks D1–D3 only: global guidance, the selected KG OS MCP connection/knowledge base, and the four official Skills. Reuse current evidence where applicable. Report official resources, visible instruction differences, persistent configuration evidence and ordinary-task behavior separately, alongside connection/Skill installation, real calls, versions and resources. Whole-configuration invisibility must not hide a confirmed local difference; list unverified parts separately. An empty knowledge base is valid. Do not write knowledge, create branches/commits, schedule maintenance or uninstall anything.
 ```
 
-The report should identify the service/app, private Plugin version, all seven official Skills and referenced resources, guidance saving/observable behavior, and customization migration. The seven Skills cover Ontology, Knowledge, Retrieval, Branch, Maintenance and VLog standards, plus Doctor. Their actual resources come from the selected release.
+The report should identify the service/app, private Plugin version, all four official Skills and referenced resources, guidance saving/observable behavior, and customization migration. The four Skills cover Ontology, Knowledge, Retrieval, Branch, Maintenance and VLog standards, plus Doctor. Their actual resources come from the selected release.
 
-**Complete-install criteria:** real service and ChatGPT reads pass; the selected private Plugin is installed; all seven Skills and required resources are present and usable; complete guidance is saved; and relevant D1–D3 have no confirmed blocking omissions. Hidden host instruction provenance or automatic activation traces may remain unobservable rather than causing endless checks. Record “installed”, “usable” and “observed in use” separately. Knowledge quality, maintenance scheduling and writing business data are not installation requirements. If you explicitly choose the basic MCP app only, deliver that scope without claiming private Plugin installation.
+**Complete-install criteria:** real service and ChatGPT reads pass; the selected private Plugin is installed; all four Skills and required resources are present and usable; complete guidance is saved; and relevant D1–D3 have no confirmed blocking omissions. Hidden host instruction provenance or automatic activation traces may remain unobservable rather than causing endless checks. Record “installed”, “usable” and “observed in use” separately. Knowledge quality, maintenance scheduling and writing business data are not installation requirements. If you explicitly choose the basic MCP app only, deliver that scope without claiming private Plugin installation.
 
 After the new Plugin passes, you may choose to uninstall the old private Plugin. Keep any basic app or shared MCP connection still in use. If creation, installation or checks fail, preserve the old version and resume from the actual failed step.
 
@@ -679,7 +679,7 @@ diff -u acceptance-before-upgrade.json acceptance-upgrade.json
 
 Verify the actual image matches the chosen Tag/digest. Repeat step 6 for HTTPS, the original administrator Token, existing content, State and identity. Evaluate metadata changes explicitly allowed by the target release against its notes; do not treat every difference as success or reset data because of it. Repeat step 4’s same-network real Embedding check. It supports both Web and configuration-file initialization without adding business data for acceptance. Diagnose model/credential issues through the original initialization path rather than initializing again.
 
-A restart invalidates old OAuth Tokens. Reauthorize the existing ChatGPT connection and repeat step 7’s read-only checks. Refresh metadata if tools changed and check a new conversation. Once the service passes, switch to the **upgrade target version’s** KGHub manual and use its ChatGPT/private Plugin steps to inspect old customizations, confirm migration, and create/check a new version. The handoff prompt, `INSTALL.md`, seven Skills and Plugin resources must all match the target version. Do not keep copying this old manual’s version-pinned step 8 prompt. Then choose whether to uninstall the old version. Never replace the old Plugin in place or delete the shared connection.
+A restart invalidates old OAuth Tokens. Reauthorize the existing ChatGPT connection and repeat step 7’s read-only checks. Refresh metadata if tools changed and check a new conversation. Once the service passes, switch to the **upgrade target version’s** KGHub manual and use its ChatGPT/private Plugin steps to inspect old customizations, confirm migration, and create/check a new version. The handoff prompt, `INSTALL.md`, four Skills and Plugin resources must all match the target version. Do not keep copying this old manual’s version-pinned step 8 prompt. Then choose whether to uninstall the old version. Never replace the old Plugin in place or delete the shared connection.
 
 <a id="upgrade-recovery"></a>
 

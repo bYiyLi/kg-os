@@ -33,7 +33,48 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.ok(first.files.length > 50);
     assert.deepEqual(
       first.files.filter((path) => /^plugins\/kgos\/skills\/[^/]+\/SKILL\.md$/.test(path)).length,
-      7
+      4
+    );
+    assert.deepEqual(
+      first.files
+        .filter((path) => path.startsWith("plugins/kgos/skills/kgos-ontology-standards/"))
+        .sort(),
+      [
+        "plugins/kgos/skills/kgos-ontology-standards/SKILL.md",
+        "plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md",
+        "plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md",
+        "plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md"
+      ]
+    );
+    assert.deepEqual(
+      first.files.filter((path) =>
+        path.startsWith("plugins/kgos/skills/kgos-knowledge-standards/")
+      ),
+      ["plugins/kgos/skills/kgos-knowledge-standards/SKILL.md"]
+    );
+    assert.deepEqual(
+      first.files.filter((path) => path.startsWith("plugins/kgos/skills/kgos-doctor/")).sort(),
+      [
+        "plugins/kgos/skills/kgos-doctor/SKILL.md",
+        "plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md",
+        "plugins/kgos/skills/kgos-doctor/references/host-checks.md",
+        "plugins/kgos/skills/kgos-doctor/references/knowledge-checks.md",
+        "plugins/kgos/skills/kgos-doctor/references/maintenance-evidence.md",
+        "plugins/kgos/skills/kgos-doctor/references/report-template.md"
+      ]
+    );
+    assert.deepEqual(
+      first.files
+        .filter((path) => path.startsWith("plugins/kgos/skills/kgos-vlog-standards/"))
+        .sort(),
+      [
+        "plugins/kgos/skills/kgos-vlog-standards/SKILL.md",
+        "plugins/kgos/skills/kgos-vlog-standards/references/cypher.md",
+        "plugins/kgos/skills/kgos-vlog-standards/references/ontology.md"
+      ]
+    );
+    assert.ok(
+      !first.files.some((path) => path.startsWith("plugins/kgos/skills/kgos-vlog-standards/tests/"))
     );
     assert.deepEqual(
       first.files.filter(
@@ -104,12 +145,9 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.deepEqual(
       (await readdir(join(directory, "plugins/kgos/skills"))).sort(),
       [
-        "kgos-branch-standards",
         "kgos-doctor",
         "kgos-knowledge-standards",
-        "kgos-maintenance-standards",
         "kgos-ontology-standards",
-        "kgos-retrieval-standards",
         "kgos-vlog-standards"
       ].sort()
     );
@@ -122,7 +160,7 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.deepEqual(
       sourceSkillDirs,
       (await readdir(join(directory, "plugins/kgos/skills"))).sort(),
-      "Private source must contain exactly the seven official Skills; do not retain a legacy generic Skill"
+      "Private source must contain exactly the four official Skills; do not retain retired independent Skills"
     );
     assert.equal(
       await readFile(join(directory, "INSTALL.md"), "utf8"),

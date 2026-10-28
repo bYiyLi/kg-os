@@ -1,5 +1,29 @@
-# Phase 28：KG OS 官方七 Skill 清单收敛与通用 Skill 退役
+# Phase 28：官方 Skill 清单收敛与通用 Skill 退役
 
+## 当前目标与状态（D115/D117，2026-10-28）
+
+**状态：`in_progress`**。当前待发布源码目标为 **四个官方 Skill：Ontology、Knowledge、VLog 与 Doctor**。原 Ontology/Branch 统一职责现由 `kgos-ontology-standards` 承担，D114 的临时名称 Modeling 已于 D117 更名；原 Knowledge/Retrieval/Maintenance 合并为 Knowledge。不恢复旧通用 `kgos`。
+
+当前目标集合：
+
+- `kgos-ontology-standards`
+- `kgos-knowledge-standards`
+- `kgos-vlog-standards`
+- `kgos-doctor`
+
+### 当前 Acceptance
+
+- **A28-01 · 源码与公开打包清单**：这四个且仅四个 Skill 目录出现在当前源码、打包白名单、插件清单检查与 Doctor 发现目标；被合并的旧目录不作为新候选重复导出。
+- **A28-02 · Ontology 合同**：Skill 与 `references/` 中的方法论、三组完整建模示例和简版模型确认模板均可发现，概念/实例、分类/Definition、身份与图关系决策受实际问题驱动；模型与关系查询通过真实实例验证。未获确认不得修改 Ontology、迁移或创建 Branch。无改动模型选型仍需确认；普通 Knowledge 写入不被阻断。兼顾 VLog 独立归属及官方模型库不可用的回退。
+- **A28-02a · VLog 自包含模型**：Plugin 中 VLog Skill 的 `SKILL.md`、`references/ontology.md`、`references/cypher.md` 三项均可读取并对应同版源码，包含完整 Definition YAML 与可验证业务查询；源码的 `tests/` 只用于隔离测试，不进入公开包。用户库已有合适模型时不强制安装或覆盖参考本体。
+- **A28-03 · 旧版本与迁移**：已发布 v0.3.5 保留原七 Skill 和对应安装资料；用户私人 Plugin 不自动更新，须按其已获授权的独立安装/迁移流程操作，保留用户定制和原有连接。
+- **A28-04 · 真实客户端与发行**：最终还需新四 Skill 的实际安装/发现、MCP-only 可用性、只读与经授权知识写入/模型修改行为、修订后的发布物/安装手册及发布 CI 证据；未执行则不得标记完成。
+
+本轮只处理源码与必要的设计、测试同步，不提交、推送、发布或修改现有私人 Plugin。先前七 Skill 的验证和阶段记录仍保留为历史证据。
+
+## 2026-10-21 七 Skill 原始计划与实施证据（历史）
+
+以下保留 D107 时期的七 Skill 计划、验收与执行记录作为历史依据；当前目标以上文 D115 为准。
 <!-- cspell:words mcpserver -->
 
 ## 目标与当前状态

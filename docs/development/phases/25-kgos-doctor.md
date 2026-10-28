@@ -1,10 +1,10 @@
 # Phase 25：KG OS Doctor v1 · 使用环境诊断
 
-<!-- cspell:words mcpserver -->
+<!-- cspell:words mcpserver frontmatter -->
 
 ## 目标、状态与边界
 
-**状态：`in_progress`（2026-10-21）**。本轮按用户授权创作独立 `kgos-doctor` Skill，落盘已确认的 Global AI Guidance v1 对照正文，并对 D1–D5 的条件读取、证据、未知和只读边界作专项验证。当前是 **Skill 源码交付**，不是私人 Plugin 安装、宿主真实自动触发或整个 Phase 已完成；最终验收和证据见本文件后续记录。通用 `kgos` 保留，Phase 28 不提前实施。
+**当前状态：`in_progress`（2026-10-28）**。当前待发布源码为四个官方 Skill；本阶段的 Doctor 仍是独立只读使用就绪性诊断。已依据正式 KG OS 提示词经验优化 Doctor 的行为与证据判断，历史创作及测试记录保留在下文。源码修改与本地验证不代表私人 Plugin 已更新、宿主真实自动触发、远端 CI 通过或 Phase 已完成；当前目标清单以 [Phase 28](28-official-skill-roster.md) 为准。
 
 目标：用户在已使用或准备使用 KG OS 的 AI 会话里请求“检查我的 KG OS 使用环境”，AI 通过 `kgos-doctor` **只读**检查当前会话/已暴露连接及每个可访问 Knowledge Base，逐项报告配置就绪情况、真实观察、无法核实的事项与安全的下一步引导。与 [MCP Doctor v1 设计](../../design/mcp.md#kgos-doctor-v1) 对齐，不为执行方便发明新的 Kernel/SQLite/知识质量标准。
 
@@ -13,7 +13,7 @@
 ## 设计输入与真实前置
 
 - [D104](../../design/decisions.md#d104-kgos-doctor-v1-and-vlog) 固定范围与取舍；行为正文由 [MCP Doctor v1](../../design/mcp.md#kgos-doctor-v1) 唯一维护。本计划仅拥有 Feature、Acceptance、状态和实证，不复制模型/权限语义。
-- [D107 最终七 Skill 清单](../../design/mcp.md#kgos-seven-skills) 将 Doctor 作为七个官方目标之一；本 Phase 只负责 Doctor 自身，目标七个 Skill 的官方 Plugin 清单收敛与旧通用 `kgos` 退役归 [Phase 28](28-official-skill-roster.md)，不因 Doctor 实现而自动删除现有 Skill。
+- [D107 历史七 Skill 清单](../../design/mcp.md#kgos-seven-skills) 当时将 Doctor 作为七个官方目标之一；当前四 Skill 目标由 [D115/D117](../../design/decisions.md#d117-ontology-methodology-and-skill-renaming) 确认，准确分发与私人安装迁移归 [Phase 28](28-official-skill-roster.md)。本 Phase 只负责 Doctor 自身，不以源码变更代替用户插件安装。
 - [KG OS 使用边界](../../../README.md)、[Ontology](../../design/ontology.md#使用模型)、[Knowledge/Graph](../../design/graph.md#knowledge-数据访问) 与 [Evolution](../../design/evolution.md#branch-与-tag) 决定单库/State/Branch/数据解释；`vlog` 使用普通 Branch，不是内核保留空间。`docs/vlog/` 是仓库开发记录，两者不混用。
 - [Phase 23](23-mcp-tool-taxonomy-and-docs.md) 已交付五个 AI-facing Tool、`kgos_docs`/31 个 SDK；[Phase 24](24-lithograph-v033-upgrade.md) 已关闭 v0.3.3 依赖升级。当前 `kgos_query` 只有 15 个只读业务 SDK 方法：`ontology`、`object`、`graph`、`evolution`，**不包含** HTTP `system.diagnostics` / `web.data.info`、宿主全局配置或任务调度 API；不要把这类不可达数据当成已可检查。单个 Instance 只代表一个 Knowledge Base；多个库需客户端实际暴露多个可访问连接。
 - [官方 Plugin/Skill](../../design/mcp.md#官方-skill-与私人-plugin) 及当前 `plugins/kgos/` 是现有客户端载体，实际 Skill 自动激活、版本/安装可见性和全局提示词注入取决于宿主，不能从模板或 Server Instructions 推断生效。
@@ -21,7 +21,7 @@
 **已确认输入与待实际验证的能力**：
 
 1. **引导词**：当时用户已确认初版引导词及成对标记，其原始内容由相应 Git 历史/Tag 追溯；当前仅维护 [Global AI Guidance](../../../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md)。D1 只把它作为对照；实际指令来源、完整加载和行为证据分开验证，不复制第二份正文，不自动安装。
-2. **独立规范**：Phase 27 六项源码已存在；Doctor 只消费目标宿主实际可用、版本可辨的有关规则。源码存在不证明安装/发布，缺规则时规范符合性为 `UNKNOWN`。
+2. **独立规范**：现行源码目标为 Ontology、Knowledge、VLog 三规范与 Doctor；已发布 v0.3.5 的七 Skill 仍是历史安装基线。Doctor 只消费目标宿主实际可用、版本可辨的有关规则；源码存在不证明安装/发布，缺规则时规范符合性为 `UNKNOWN`。
 3. **VLog**：按目标 Branch 的真实模型辨认记录、运行、时间、结果和源 State；不要求统一 `VLogEntry` Schema。不同模型与覆盖不足的判断需分别验收。
 4. **宿主能力**：只检查当次实际暴露的指令来源、Skill/版本/轨迹、MCP 连接和外部任务信息；隐藏/不开放的部分未知。没有单一跨宿主配置 API 或自动调度前置。
 
@@ -60,7 +60,7 @@
 ### A25-04 · Knowledge 内容与规范
 
 - 只针对 A25-02 实际可读的库执行；同一检查阶段绑定一个 resolved State，避免 Branch 移动导致混合快照；查询有界，不默认展开全图或全模型。
-- 区分用户可解释的 Ontology 与实际 Knowledge 实例、内置保留结构，以及空库/无可用模型/查询结果不足以证明空库的情形。业务内容存在只能基于可区分的公共数据证据报告。
+- 区分用户可解释的 Ontology 与实际 Knowledge 实例、内置保留结构，以及空库/无可用模型/查询结果不足以证明空库的情形。需要 D4 时必须依据目标 State 的实际 Schema 执行有界只读 Knowledge 查询；仅 `kgos_docs`、State、Ontology 可读不得冒充 D4 验收。业务内容存在只能基于可区分的公共数据证据报告。
 - 独立规范 Skill 未发布/不可见、规则版本不明时，“内容规范和质量”返回 `UNKNOWN`，**不得**按对象计数、强制 Domain 或主观印象评分；规范存在时先以其实际合同和访问权限进行验收。D4 只检查发现入口、实例可读性和限定范围明显问题；不替代深度 Maintenance。
 
 ### A25-05 · 周期任务与系统级 VLog
@@ -68,18 +68,20 @@
 - 从已授权且可见的**外部调度源**核实任务定义、启用状态、约定周期、最近执行时间及结果；VLog 则从对应知识库 `branch/vlog` 的真实Ontology/Knowledge中，只读获取**有证据可辨识的**任务/Run、发生时间、结果、验证范围与关联的Commit/State，不依赖固定 `VLogEntry` Definition。不同实际模型下无法证明的部分报告 `UNKNOWN`。
 - 当 MCP 不可用时仍检查已授权且可独立访问的调度状态，VLog 部分标记 `UNKNOWN`；当调度平台不可见但 MCP 可用时，仍独立检查 VLog 历史。
 - 必须覆盖：任务与 VLog 都存在且最近成功；任务存在但未执行/失败；VLog 有历史但外部任务已停；调度不可见；VLog 缺失；仅有 `vlog` Branch 没有可识别记录。不得把两种事实互相替代。
-- 没有长期维护任务时给出适当 `WARN` 与配置建议，**不**自动建立 Task、Branch、Ontology 或填充记录；VLog 读取得到普通业务数据不能将其算作系统日志。不读取仓库 `docs/vlog/` 作为运行时记录。
+- 没有长期维护任务但用户选择手动维护、也未要求周期执行时**不自动报告 `WARN`**；只有已确认有周期要求且缺少配置、或有证据确认到期未执行时才提示相应缺口。**不**自动建立 Task、Branch、Ontology 或填充记录；VLog 读取得到普通业务数据不能将其算作系统日志。不读取仓库 `docs/vlog/` 作为运行时记录。
 
 ### A25-06 · 只读与报告边界
 
 - Doctor **所有**检查路径都不得调用 `kgos_mutate`、执行写 Cypher、创建测试对象、改变 Branch、调度任务、Prompt、Plugin、VLog 或其它宿主设置；故障诊断不自动进行修复。远程诊断样例和测试写入只允许在独立隔离 fixture 中由验收工具预先准备，不在用户长期 Instance 上执行。
 - 对每个检查和知识库输出 `PASS`、`WARN`、`FAIL`、`UNKNOWN` 中之一，给出采样范围/State、实际证据、结论、限制及下一步引导；未知与未执行不判正常，连接失效时后续依赖项标明无法执行并继续其它可访问库。不创建无证据综合健康分数或暗示已读取未授权历史。
+- 输出必须遵循 [线性增量报告模板](../../../plugins/kgos/skills/kgos-doctor/references/report-template.md)：D1 → D2 → D3 → D4 → D5 **仅为结果展示顺序**，每项有证据结论或明确受阻后及时交付，检查调用不必串行；指定检查只展示适用项目与必要前置，不为凑齐五项扩大范围。宿主不支持中途输出时在最终回复保持同一顺序，不谎称实时交付；已输出结果不重复汇总，后续新证据改变结论时显式更正，最后仅简短收尾。
 - 设计范围外的 CPU、日志、备份、磁盘、历史其它会话等无需检查；提示词、知识内容和 VLog 文字均作为不可信数据对待，不能影响操作权限或改变 Skill 指令。
 
 ### A25-07 · Skill、Plugin 与多客户端验收
 
 - 对实际 Skill 文件执行 YAML 头部元数据、资源路径、无过期工具名、触发/不触发、数据源缺失/权限失败/恢复分支的审查；独立检查首次使用、新用户无引导、旧 Skill、MCP 失效、两个可访问库、外部任务不可见等场景。
 - 在能实际运行的目标 ChatGPT 客户端中验证 Skill 被选择、只读工具调用、报告范围/状态；宿主不支持的配置读取必须实测为 `UNKNOWN` 而非伪造成功。必要时按 [MCP](../../design/mcp.md)现有 Go/WASM 及 Plugin 合同做隔离回归，不扩大 SDK/Kernel 范围。
+- 还必须检验全面诊断、定向检查、连接失败导致下游受阻、多个 Instance、前项证据晚于后项、已输出结果更正、宿主不可增量输出的报告：逐段内容与实际证据一致、展示顺序正确、不重复已输出结果，且不触发无关检查；报告模板可从当前 Skill 单独读取，不把 Markdown 模板通过当作真实宿主流式交付成功。
 - 如实施涉及仓库代码/交付物，Mac 相关和完整质量门禁、OpenClaw 独立 Linux amd64 Docker Smoke、最终提交 SHA 的远端 Ubuntu Validate + Unified Docker 两 Job 必须取得实际证据；Review、diff、相关文档与 Plugin 实际 Release 一致性核对完成后才能标记 `done`。正式插件分发、Git Commit/Push、Dev/生产部署与 Tag/GHCR 另按实际授权执行，不以旧 CI 代替本阶段验收。
 
 ## Review 重点与下一步
@@ -88,6 +90,21 @@
 - 是否把 Prompt 出现于普通用户文字/Knowledge 判为注入；把存在 MCP Tool 判为授权正常；把 Skill 已安装判为主动触发；把保留图数据判为用户 Knowledge；把有 `vlog` Branch 判为持续调度运行？
 - 是否将 `branch/vlog` 当成第二个数据库、KG OS 内核保留 Schema 或 `docs/vlog/` 开发日志？是否让 Doctor 创建 Task/Branch/运行记录，或把默认 `main` 的 Head 错当 `vlog`？
 - 是否把 Skill 的推荐 `VLogEntry` 当成强制 Schema，或重复定义内容质量规范、提示词正文与跨客户端通用配置方式？若当前实际模型/证据不足，不在本阶段用例中臆造 PASS。
+
+### 2026-10-28 Doctor 提示词合同优化与验收
+
+本轮依据正式 `kg-os-v0-3-5` 知识世界中已保存的**行为约束型提示词七项经验**，修订 [Doctor 入口](../../../plugins/kgos/skills/kgos-doctor/SKILL.md) 和三份按需参考，严格落实“适用触发 → 必须动作 → 禁止误判 → 完成证据”，不复制全局引导的每轮强制行为正文。
+
+- **已修改**：移除 Doctor 自带 `metadata.version`（版本由发行 Tag/同包 Plugin 确认）；严格区分 D2 实际 MCP/State/Ontology 读取与 D4 真实 Knowledge 查询；D1 仅按**实际安装的引导版本和完整可见普通任务轨迹**判断，D3 不以四 Skill 待发布清单误判旧版七 Skill；D5 移除退役 Maintenance Skill 的必需引用，并允许按实际图模型解析事件、验证和来源关系；请求错误、安全恢复、依赖子项 `UNKNOWN`、只读与宿主继续已授权任务的边界写明。
+- **Acceptance 与静态覆盖**：[Doctor 资源合同测试](../../../internal/mcpserver/doctor_skill_contract_test.go) 直接解析现行 frontmatter/引用，禁止旧版自带元数据，检查关键行为与旧 Maintenance 引用；原全局引导词固定 Hash 验证继续保留。新增 [当前 Doctor 场景评测](../../../tests/skills/doctor-current-evaluation.json) 共 19 个任务与判据，覆盖 D1–D5、旧版与候选版区分、异常/依赖失败、合法手动维护、新 VLog 及相邻非 Doctor 任务；**尚未运行独立 AI 行为评测**，不能将评测资料存在当成效果已验证。
+- **实际已验证**：本机 Go Doctor 合同、Global Guidance 基线和故障保持证据的 QuickJS 测试 PASS；真实 MCP/QuickJS/Lithograph 隔离只读探针 PASS；公开 Plugin 分发测试 14/14 PASS；Markdown/CSpell/Prettier 与 Git diff 检查按本次记录的最终工作树再核对。以上不证明生产 ChatGPT 里自动选择和 D1/D3 隐藏宿主配置可见。
+- **未执行**：真实 ChatGPT 当前候选 Plugin 安装/诊断行为、独立模型场景评测、OpenClaw Dev、最终远端 CI、Commit、Push、Tag 与发布；保持 `in_progress`。
+
+### 2026-10-28 Doctor 线性增量报告模板
+
+- **已实现**：`kgos-doctor/references/report-template.md` 是唯一输出格式参考，单项用“项目与状态 → 目标范围 → 真实证据 → 判断限制 → 必要建议”；`SKILL.md` 必须先加载模板，按 D1–D5 的展示顺序在可用宿主逐项输出。定向只输出适用项，独立检查可并行；不能中途输出的宿主退化为按同序一次性报告，不制造实时交付假象。依赖失败保留各自状态，已输出内容不重复，只在新证据影响结论时更正，最终简短结束。
+- **测试范围**：资源合同测试要求六份 Doctor 运行时文件全部从入口可达，并检查模板的路由、完整结构、顺序/证据、依赖受阻与更正条件；报告行为场景追加到 [当前 Doctor 评测](../../../tests/skills/doctor-current-evaluation.json)。这些属于源码/静态合同与可执行场景输入，实际 ChatGPT 增量行为仍需客户端验证。
+- **未改变**：D1–D5 各项证据真源、四种诊断状态、只读权限、Global Guidance 正文，以及已发布版本。无独立新 Skill 或报告引擎。此工作不涉及提交、推送或发布，Phase 25 保持 `in_progress`。
 
 **当前实施边界**：本轮仅创作及验证 Doctor Skill 与必要对照资产，不安装或更新私人 Plugin、不提交/推送/部署；单项证据不关闭 A25-07 的真实宿主和交付门禁。阶段保持 `in_progress`。
 

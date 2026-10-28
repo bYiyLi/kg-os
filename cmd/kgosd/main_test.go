@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/bYiyLi/kg-os/internal/buildinfo"
 )
 
 func TestRunMetadataModes(t *testing.T) {
@@ -17,7 +19,7 @@ func TestRunMetadataModes(t *testing.T) {
 		wantStderr string
 	}{
 		{name: "help", args: []string{"--help"}, wantStdout: "KG OS daemon"},
-		{name: "version", args: []string{"--version"}, wantStdout: "0.3.5"},
+		{name: "version", args: []string{"--version"}, wantStdout: buildinfo.Version},
 		{name: "unsupported", args: []string{"--phase0-shell"}, wantCode: 2, wantStderr: "unknown option"},
 		{name: "missing root", wantCode: 2, wantStderr: "--root"},
 	}

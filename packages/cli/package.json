@@ -1,6 +1,6 @@
 {
   "name": "@kgos/cli",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "KG OS command-line client",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -25,7 +25,7 @@
     "node": ">=24.15.0"
   },
   "dependencies": {
-    "@kgos/sdk": "workspace:0.3.5",
+    "@kgos/sdk": "workspace:0.3.6",
     "smol-toml": "1.9.1"
   },
   "scripts": {

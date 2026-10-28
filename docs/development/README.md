@@ -86,7 +86,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 13 Init Wizard UX & Embedding Credential Boundary 当前为 `done`，并已随后作为 v0.2.1 正式发布。** D84 已实现：credential env-value 从 init / 普通 CLI / `kgosd` startup 前置条件移到实际 Semantic Provider operation，doctor 改为 current-CLI-process non-blocking 诊断，TTY wizard 改为清晰 defaults、custom-extension 语义与字段级 retry。主工作树完整 `pnpm validate`、独立 fresh-source `setup && validate`、packed no-key smoke 与 macOS arm64 中英文 repo-out TTY first-run 均通过；实现提交 `01f0c99f650dd672f35bbe430e8c7b2f6b03ffe8` 与 CI Run `36505717058` 已闭环。后续独立 release revision `cd8307fb015f697d4db2958a2040b3cd5d32d2b8` 的 CI Run `36509929726` 全绿，Recovery Release Run `36514243605` 完成八包 `0.2.1` / `latest`、六平台 public-registry smoke 与 GitHub Release。详见[Phase 13](phases/13-init-wizard-credential-boundary.md)。
 
-**Phase 14 Web 当前为 `in_progress`（2026-10-25：知识世界、版本导航与五分类设置增量，其余业务链继续暂缓）。** 保留单一 Web Phase 与原 P14-01–11 业务范围；已有 Shell、认证/Session、国际化、初始化与真实只读版本导航作为前置基础。[V6 平铺展开方案](phases/14-web.md#平铺世界与设置入口收敛2026-10-25)已完成知识世界导航、满高滚动历史与仅设置底栏，保留跨世界高级筛选及真实版本关系图；完整本地 `pnpm validate` exit 0，455 项前端测试、56 项浏览器用例通过，本轮修改未提交、未推送。最终证据由[平铺导航验收](phases/14-web.md#平铺导航实施与验收证据)维护；[五分类设置的本地实现与验收](phases/14-web.md#五分类设置增量2026-10-25)保持已完成。查询、知识/本体编辑与 Web 持久化未完成，不把本轮导航验收当作整个阶段完成。不作为 MCP 前置依赖，详见[Phase 14](phases/14-web.md)与[Web owner](../design/web.md#版本区域)。
+**Phase 14 Web 当前为 `in_progress`（2026-10-28：领域树与 Branch 历史弹窗增量，其余业务链继续暂缓）。** 保留单一 Web Phase 与原 P14-01–11 范围；已有 Shell、认证/Session、国际化、初始化与只读版本导航作为前置基础。[V6 平铺导航](phases/14-web.md#平铺世界与设置入口收敛2026-10-25)和[五分类设置](phases/14-web.md#五分类设置增量2026-10-25)保留其本地实现/验收记录；用户已批准以 Branch → 领域树替换日常提交列表，并从 Branch 行末图标打开居中历史弹窗，本轮按[领域树增量](phases/14-web.md#领域树与-branch-历史弹窗2026-10-28)更新设计、计划、代码与验收。V6 的 455 项前端测试、56 项浏览器及完整门禁为历史证据，不替代新工作树验证；本轮尚无实现通过结论。右侧画布、本体图/查询编辑与 Web 持久化仍未完成，不以导航增量关闭整个阶段；不作为 MCP 前置依赖。详见[Phase 14](phases/14-web.md)与[Web owner](../design/web.md#版本区域)。
 
 **Phase 15 MCP & Private Plugin 已为 `done`。** 按 D91/D92 已实现独立 TypeScript MCP、四个 Tool、QuickJS/Worker 受控 SDK、Linux amd64 Docker-only、官方 Skill 源文件与 MCP-only 私人 Plugin 模板；Linux Dev 31/31 SDK 方法、持久化重启、真实 ChatGPT OAuth/四 Tool 已验收，提交 [`ea37ddf`](https://github.com/bYiyLi/kg-os/commit/ea37ddfca8c69bc701de0bb41d10d465f92c6b64) 的 [CI Run #65](https://github.com/bYiyLi/kg-os/actions/runs/38261156640) 为 **Ubuntu Validate + 六平台 Runtime 7/7 success**。Phase 15 的旧 MCP 验收保留为历史；新 `kgosd` 单进程 Go MCP 与私人 Skill 的真实客户端验收已作为 [Phase 16](phases/16-kgosd-unified-mcp.md) `done` 独立关闭。按 [D94](../design/decisions.md#d94-openclaw-docker-development-and-ci)，Mac 不跑 Docker，OpenClaw 开发测试，GitHub Actions CI 必须构建并测试 Docker。旧 Phase 关闭不受影响；GHCR 正式发布和生产部署另行授权。
 
@@ -110,9 +110,9 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 26 Web-first Token-first 初始化与 Runtime Bootstrap 当前为 `in_progress`（2026-10-25）。** 本地未提交工作树已实现受限 Web、完整 TOML 自动初始化、先于鉴权的业务门禁、四步 Token-first Web/认证/私有 Key 与真实数据库 Bootstrap/receipt，并取消已认证向量测试的目的 IP 类型限制。D110 Mac 完整 `pnpm validate` 已通过：Web 定向 Vitest **345/345**、完整 Playwright **56/56**、Go 全包/Race/覆盖率（≥90%）及其余本地质量门禁；后续一次小范围 Session 恢复导航修正按定向验证单独记录。历史 Linux Docker 31/31 SDK 与先前工作树相关，**未对 D110 最终代码重新执行 Docker/Dev 验收**。Commit、Push 与最终 pushed SHA 的公开 CI 两 Job 尚未执行，**不能标记 `done`**。见 [D110](../design/decisions.md#d110-token-first-setup)、[Runtime](../design/runtime.md#web-first-run-bootstrap) 和 [Phase 26 D110 验收](phases/26-web-first-run-bootstrap.md#d110-实施与-mac-验收记录2026-10-25)。
 
-**Phase 27 KG OS Knowledge Standards Skills 当前为 `in_progress`（2026-10-21）。** 六项规范均已分别创作，本轮将 `kgos-vlog-standards` 升至 `v1.1.0`，补充单一可选 `VLogEntry` 推荐本体模型并通过定向真实引擎验证，符合调用方按实际Ontology定义模型的方向，**不建立官方固定VLog Schema**。本轮证据见 [VLog可选模型](phases/27-knowledge-standards-skills.md#p27-05-vlog-model-v11)，此前Maintenance的单项证据见 [P27-06](phases/27-knowledge-standards-skills.md#p27-06-maintenance-evidence)。Doctor的实际多模型只读识别、私人Plugin六规范安装及真实客户端整体验收仍未完成；单项源码不关闭阶段，不影响Phase25/26。
+**Phase 27 当前为 `in_progress`（D115/D116/D117，2026-10-28）**。Ontology 统一本体建模与知识世界选择，包含 KG OS 方法论、三组实测案例和确认模板；Knowledge 统一检索写入维护，VLog Skill 提供可选事件中心图本体与 Cypher。当前本地实施与验收材料见 [Phase 27](phases/27-knowledge-standards-skills.md)、[D117](../design/decisions.md#d117-ontology-methodology-and-skill-renaming)；真实客户端、最终远端 CI 仍待验收，历史测试记录保留。
 
-**Phase 28 官方七 Skill 清单收敛与旧通用 Skill 退役当前为 `in_progress`（2026-10-21）。** [D107](../design/decisions.md#d107-final-seven-official-skills) 将最终官方 Skill 固定为 Phase 27 的六规范 + Phase 25 的 `kgos-doctor`，合计七个。用户明确授权后，源码中旧 `skills/kgos/SKILL.md` 已删除，旧操作说明映射到 `kgos_docs` 并补齐少量 Guide 缺口，官方源码与公开候选包均只有七个。**私人 Plugin 未自动更新，七 Skill 的真实客户端选用/读写及完整阶段验收仍未完成**；不能因源码清理就标记 `done`。详见 [Phase 28](phases/28-official-skill-roster.md)。
+**Phase 28 当前为 `in_progress`（D115，2026-10-27）**。待发布源码目标四 Skill（三规范 + Doctor），已发布的 v0.3.5 七 Skill 私人 Plugin/安装手册保持不变；新候选的真实客户端、发布验收未完成。见 [Phase 28](phases/28-official-skill-roster.md)。
 
 ## 5. 路线总览
 
@@ -145,8 +145,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [24 Lithograph v0.3.3 Upgrade](phases/24-lithograph-v033-upgrade.md) | `done` | v0.3.3 制品/手册、真实旧库兼容、Mac 完整质量、OpenClaw 隔离镜像 31/31 SDK 与重启/清理，以及最终实施 SHA [CI 2/2](https://github.com/bYiyLi/kg-os/actions/runs/39149281181) 均通过；未部署/发布 | [D103](../design/decisions.md#d103-lithograph-v033-upgrade)、[Graph](../design/graph.md#graph)、[Runtime](../design/runtime.md#lithograph-调用入口) |
 | [25 KG OS Doctor v1](phases/25-kgos-doctor.md) | `in_progress` | Doctor v1.0.0 与引导词对照资产已创作，单项审核/本地验证；真实宿主安装、激活与完整阶段验收待完成 | [D104](../design/decisions.md#d104-kgos-doctor-v1-and-vlog)、[MCP Doctor v1](../design/mcp.md#kgos-doctor-v1) |
 | [26 Web-first Setup & Runtime Bootstrap](phases/26-web-first-run-bootstrap.md) | `in_progress` | 当前 Token-first Setup 增量实施中；原有受限 Runtime/认证门禁与数据库 Bootstrap 已实现；Mac 完整 validate、Playwright 33/33、Go 90.1% 覆盖率、最新隔离 Docker 31/31 SDK 通过；最终 pushed SHA CI 待验收 | [D105](../design/decisions.md#d105-web-first-run-and-runtime-bootstrap)、[Runtime](../design/runtime.md#web-first-run-bootstrap)、[Web](../design/web.md#web-first-run-setup)、[Setup 错误](../design/contracts.md#初始化门禁与-setup-错误) |
-| [27 KG OS Knowledge Standards Skills](phases/27-knowledge-standards-skills.md) | `in_progress` | 六规范源码已创作，VLog补充单一可选建模参考；Doctor衔接、六规范整包安装及真实客户端验收未完成，无固定官方VLog模型要求 | [D106](../design/decisions.md#d106-six-kgos-standards-skills)、[MCP规范体系](../design/mcp.md#kgos-standards-skill-suite) |
-| [28 Official Seven Skills & Legacy kgos Retirement](phases/28-official-skill-roster.md) | `in_progress` | 源码已收敛七个、旧通用 Skill 已清理、MCP 指南已补缺；私人 Plugin 更新、真实客户端选用/写入和最终阶段验收待完成 | [D107](../design/decisions.md#d107-final-seven-official-skills)、[最终七 Skill](../design/mcp.md#kgos-seven-skills) |
+| [27 KG OS Knowledge Standards Skills](phases/27-knowledge-standards-skills.md) | `in_progress` | 现三规范（Ontology、Knowledge、VLog）；Ontology 方法论与完整案例、VLog 事件本体与隔离测试；客户端验收待完成 | [D117](../design/decisions.md#d117-ontology-methodology-and-skill-renaming)、[MCP规范体系](../design/mcp.md#kgos-standards-skill-suite) |
+| [28 Official Skills & Legacy kgos Retirement](phases/28-official-skill-roster.md) | `in_progress` | 当前四 Skill，真实 Plugin 安装、客户端验收与发布待完成 | [D115](../design/decisions.md#d115-unified-knowledge-lifecycle-skill)、[四 Skill 清单](../design/mcp.md#kgos-official-skills) |
 | [29 Web shadcn/ui Migration](phases/29-web-shadcn-ui.md) | `in_progress` | 组件迁移已实现，39 项 Web E2E 与本地视觉验收通过；整仓质量门禁及已有开发依赖审计问题见 Phase 29，未执行提交或部署 | [Web UI 体系](../design/web.md#通用-ui-组件体系) |
 | [32 知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md) | `in_progress` | 既有模型修复、Skill/MCP 引导与 Web 定向证据保留；六部分 Global AI Guidance 当前唯一正文按知识持续可用责任优化，状态情境与本地检查见阶段记录；跨连接客户端、恢复全矩阵及最终 CI 仍待完整验收 | [D111](../design/decisions.md#d111-task-scoped-knowledge-loading)、[D112](../design/decisions.md#d112-global-ai-guidance-and-daily-responsibility)、[MCP 日常职责](../design/mcp.md#global-ai-guidance-and-daily-responsibility)、既有 Ontology/Graph/Evolution 合同 |
 
@@ -212,12 +212,12 @@ Go Engineering Foundation
        Phase 26: Web-first Token-first Setup & Runtime Bootstrap [in_progress; D110]
          (limited HTTP before config → init-first auth gate → Instance Token/Web wizard →
           shared Kernel bootstrap/receipt → real Docker/browser/API/MCP acceptance)
-       Phase 27: KG OS Knowledge Standards Skills [in_progress; D106; six guidance Skills authored, final acceptance pending]
-         (six independent guidance roles → separate rule design → Skill packages →
+       Phase 27: KG OS Knowledge Standards Skills [in_progress; D115; three standards, final acceptance pending]
+         (three standards including Modeling and unified Knowledge → Skill packages →
           client selection/compatibility → Doctor standards consumption)
-       Phase 28: Official Seven Skills & Legacy kgos Retirement [planned; D107]
+       Phase 28: Official Four Skills & Legacy kgos Retirement [in_progress; D115]
          (MCP docs coverage → Phase 25/27 real Skill acceptance →
-          exact-seven Plugin packaging → generic Skill retirement → client validation)
+          four-Skill Plugin packaging → generic Skill retirement → client validation)
        Phase 30: Private Source & Generated Public kg-releases [done; D108]
          (private source → allowlisted public generation/sync → source-pinned public CI →
           public Docker Release → remote verification → retire legacy private CI)
@@ -269,7 +269,7 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 25：KG OS Doctor v1 使用环境诊断](phases/25-kgos-doctor.md)
 - [Phase 26：Web-first Token-first 初始化与 Runtime Bootstrap](phases/26-web-first-run-bootstrap.md)
 - [Phase 27：官方知识规范 Skill 体系](phases/27-knowledge-standards-skills.md)
-- [Phase 28：官方七 Skill 清单收敛与通用 Skill 退役](phases/28-official-skill-roster.md)
+- [Phase 28：官方 Skill 清单收敛与通用 Skill 退役](phases/28-official-skill-roster.md)
 - [Phase 30：私有代码真源与自动生成的公开 kg-releases](phases/30-private-source-public-releases.md)
 - [Phase 31：KG OS 公开产品官网与 GitHub Pages](phases/31-public-product-website.md)
 - [Phase 32：知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md)

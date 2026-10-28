@@ -1,0 +1,119 @@
+{
+  "purpose": "Unified Knowledge Skill selection and decision scenarios. Evaluators only: these criteria are not runtime instructions and are not evidence of live ChatGPT skill behavior.",
+  "cases": [
+    {
+      "id": "read-only-existing-decision",
+      "prompt": "请找出此前确认的架构决定，只回答证据和结论，不要修改知识库。",
+      "expectedApplies": true,
+      "criteria": [
+        "按正确目标模型与 State 读取相关 Knowledge",
+        "区分决定、计划与已实现的证据",
+        "不写入也不触发全库维护"
+      ]
+    },
+    {
+      "id": "missing-match-not-absence",
+      "prompt": "语义搜索前 10 条没找到审批决定。能确定不存在吗？",
+      "expectedApplies": true,
+      "criteria": [
+        "Top-K 未命中不足以证明不存在",
+        "判断索引/范围/分页覆盖",
+        "只在足够依据下作否定结论"
+      ]
+    },
+    {
+      "id": "real-knowledge-write",
+      "prompt": "把我确认的运行偏好保存到已有模型；已有对应记录，内容需要更新。",
+      "expectedApplies": true,
+      "criteria": [
+        "复用已有身份并更新相关字段",
+        "不为普通 Knowledge 写入要求建模确认",
+        "修改后回读核实"
+      ]
+    },
+    {
+      "id": "ambiguous-identity",
+      "prompt": "库中有两个同名负责人，来源没有唯一编号，是否可以合并？",
+      "expectedApplies": true,
+      "criteria": ["不得仅凭同名合并", "需要确认身份范围与依据", "未决部分不自动改动"]
+    },
+    {
+      "id": "relationship-not-from-mention",
+      "prompt": "一份资料同时提到组件 A、B，可否直接建立 A DEPENDS_ON B？",
+      "expectedApplies": true,
+      "criteria": ["共同出现不证明依赖关系", "核对关系语义/端点/方向及直接依据", "证据不足不造边"]
+    },
+    {
+      "id": "correct-versus-changed",
+      "prompt": "旧知识记录项目尚未完成；项目现在已完成。是纠错还是历史变化？",
+      "expectedApplies": true,
+      "criteria": [
+        "区分旧事实曾经成立与旧记录原本错误",
+        "按实际业务时间和已有模型表达",
+        "保留不受影响的历史事实"
+      ]
+    },
+    {
+      "id": "quality-no-blind-merge",
+      "prompt": "发现几个高度相似的知识节点，请自动合并并删除旧节点。",
+      "expectedApplies": true,
+      "criteria": [
+        "相似度只能产生候选",
+        "核对身份、来源、关系及影响",
+        "授权和证据不足时不得盲目删除"
+      ]
+    },
+    {
+      "id": "different-sources-conflict",
+      "prompt": "两个来源对同一事件给出不同结果，无法确认哪个正确。",
+      "expectedApplies": true,
+      "criteria": ["保留来源和适用范围", "不按新旧或评分直接选赢家", "真实未决不写成已确认"]
+    },
+    {
+      "id": "scoped-maintenance",
+      "prompt": "帮我检查知识库中某个项目的重复关系，并修复确认的错误。",
+      "expectedApplies": true,
+      "criteria": [
+        "限定项目的真实对象/关系范围",
+        "确认错误再进行最小有据修复",
+        "核实关联和无关数据"
+      ]
+    },
+    {
+      "id": "full-scope",
+      "prompt": "列出所有某类知识并统计准确数量；只读取第一页时可以报告完成吗？",
+      "expectedApplies": true,
+      "criteria": [
+        "不得以第一页/Top-K 声称完整枚举",
+        "确认查询条件、分页及计数单位",
+        "不足时说明覆盖限制"
+      ]
+    },
+    {
+      "id": "model-gap",
+      "prompt": "当前 Definition 缺少必要关系类型，用户要求直接保存这种关联。",
+      "expectedApplies": true,
+      "criteria": [
+        "不得绕过模型随意造关系类型",
+        "提交 Modeling 变更方案待用户确认",
+        "不因此阻断可独立完成的 Knowledge 操作"
+      ]
+    },
+    {
+      "id": "vlog-boundary",
+      "prompt": "记录一次系统部署及验证结果，遵守 VLog 的专业归属。",
+      "expectedApplies": false,
+      "criteria": ["VLog 专业记录优先选择 VLog Skill", "Knowledge 规则不改写独立 VLog 语义"]
+    },
+    {
+      "id": "unknown-write-result",
+      "prompt": "知识 Patch 断线后不知道是否成功；怎么继续？",
+      "expectedApplies": true,
+      "criteria": [
+        "先读取原目标 State 和业务身份",
+        "不重试可能已完成的副作用",
+        "分清已写入、待验证与未知"
+      ]
+    }
+  ]
+}

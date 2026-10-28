@@ -16,7 +16,7 @@ const knowledgeSkillRoot = "../../plugins/kgos/skills/kgos-knowledge-standards"
 
 func knowledgeSkillExamples(t *testing.T, filename string) []kernel.ObjectValue {
 	t.Helper()
-	body, err := os.ReadFile(filepath.Join(knowledgeSkillRoot, "references", "cases", filename))
+	body, err := os.ReadFile(filepath.Join("testdata", "knowledge", "instance-cases", filename))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func knowledgeSkillExamples(t *testing.T, filename string) []kernel.ObjectValue 
 	for _, block := range blocks {
 		value, err := kernel.ParseObjectJSON(kernel.KindKnowledgeNode, block[1])
 		if err != nil {
-			t.Fatalf("invalid shipped instance in %s: %v", filename, err)
+			t.Fatalf("invalid isolated Knowledge fixture in %s: %v", filename, err)
 		}
 		values = append(values, value)
 	}
@@ -46,39 +46,20 @@ func TestKnowledgeSkillResourceContract(t *testing.T) {
 		t.Fatal("missing metadata")
 	}
 	var meta struct {
-		Name        string            `yaml:"name"`
-		Description string            `yaml:"description"`
-		Metadata    map[string]string `yaml:"metadata"`
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
 	}
 	decoder := yaml.NewDecoder(strings.NewReader(parts[1]))
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&meta); err != nil {
 		t.Fatal(err)
 	}
-	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 || meta.Metadata["version"] != "1.2.0" {
+	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 {
 		t.Fatalf("invalid declared metadata: %+v", meta)
 	}
-	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
-	queue := []string{filepath.Join(root, "SKILL.md")}
-	seen := map[string]bool{}
-	for len(queue) > 0 {
-		path := queue[0]
-		queue = queue[1:]
-		if seen[path] {
-			continue
-		}
-		seen[path] = true
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, link := range links.FindAllStringSubmatch(string(raw), -1) {
-			target := strings.SplitN(link[1], "#", 2)[0]
-			next := filepath.Clean(filepath.Join(filepath.Dir(path), target))
-			if !strings.HasPrefix(next, root+string(os.PathSeparator)) {
-				t.Fatalf("reference requires resources outside the standalone Skill: %s", target)
-			}
-			queue = append(queue, next)
+	for _, expected := range []string{"## 2. 检索与理解", "## 3. 创建与更新 Knowledge", "## 4. 维护知识质量", "## 5. 执行与核实", "kgos-ontology-standards", "kgos_docs"} {
+		if !strings.Contains(string(body), expected) {
+			t.Fatalf("unified Knowledge Skill lacks %q", expected)
 		}
 	}
 	count := 0
@@ -88,14 +69,14 @@ func TestKnowledgeSkillResourceContract(t *testing.T) {
 		}
 		if !entry.IsDir() {
 			count++
-			if !seen[path] {
-				return fmt.Errorf("runtime resource is not reachable: %s", path)
+			if path != filepath.Join(root, "SKILL.md") {
+				return fmt.Errorf("unexpected runtime Knowledge resource: %s", path)
 			}
 		}
 		return nil
 	})
-	if err != nil || count != 9 {
-		t.Fatalf("resource graph: files=%d err=%v; want entrypoint, four rules and four cases", count, err)
+	if err != nil || count != 1 {
+		t.Fatalf("resource graph: files=%d err=%v; want only SKILL.md", count, err)
 	}
 	for file, expected := range map[string]int{
 		"evidence-decisions.md": 2, "identity-decisions.md": 1,
@@ -103,6 +84,14 @@ func TestKnowledgeSkillResourceContract(t *testing.T) {
 	} {
 		if got := len(knowledgeSkillExamples(t, file)); got != expected {
 			t.Fatalf("%s: %d valid JSON examples; want %d", file, got, expected)
+		}
+	}
+	if examples := readRetrievalSkillExamples(t); len(examples) != 17 {
+		t.Fatalf("retrieval fixtures=%d, want 17", len(examples))
+	}
+	for _, name := range []string{"duplicates-identity.md", "conflicts-freshness.md", "scope-recovery.md"} {
+		if data, err := os.ReadFile(filepath.Join("testdata", "knowledge", "maintenance-cases", name)); err != nil || len(data) == 0 {
+			t.Fatalf("maintenance case %s: %v", name, err)
 		}
 	}
 }

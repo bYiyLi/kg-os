@@ -16,7 +16,7 @@ const RUNTIME = {
   name: "kgos-local-runtime-darwin-arm64",
   root: "/runtime",
   daemon: "/runtime/kgosd",
-  version: "0.3.5",
+  version: "0.3.6",
   extensions: []
 };
 

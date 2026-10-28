@@ -14,10 +14,10 @@ import (
 
 const vlogSkillRoot = "../../plugins/kgos/skills/kgos-vlog-standards"
 
-// Read the shipped instance examples, not a second expected-fixture copy.
+// Read original synthetic VLog instance regression fixtures, not published Skill resources.
 func vlogSkillExamples(t *testing.T) map[string]kernel.ObjectValue {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(vlogSkillRoot, "references/cases/execution.md"))
+	raw, err := os.ReadFile(filepath.Join("testdata/vlog/cases/execution.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,16 +59,15 @@ func TestVLogSkillResourceContract(t *testing.T) {
 		t.Fatal("missing YAML metadata")
 	}
 	var meta struct {
-		Name        string            `yaml:"name"`
-		Description string            `yaml:"description"`
-		Metadata    map[string]string `yaml:"metadata"`
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
 	}
 	decoder := yaml.NewDecoder(strings.NewReader(parts[1]))
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&meta); err != nil {
 		t.Fatal(err)
 	}
-	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 || meta.Metadata["version"] != "1.2.0" {
+	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 {
 		t.Fatalf("invalid metadata: %+v", meta)
 	}
 	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
@@ -97,6 +96,9 @@ func TestVLogSkillResourceContract(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		if entry.IsDir() && path == filepath.Join(root, "tests") {
+			return filepath.SkipDir
+		}
 		if !entry.IsDir() {
 			count++
 			if !seen[path] {
@@ -105,27 +107,30 @@ func TestVLogSkillResourceContract(t *testing.T) {
 		}
 		return nil
 	})
-	if err != nil || count != 9 {
-		t.Fatalf("files=%d err=%v; want entry, five references and three case groups", count, err)
+	if err != nil || count != 3 || len(seen) != 3 {
+		t.Fatalf("runtime files=%d reachable=%d err=%v; want SKILL.md, ontology.md and cypher.md", count, len(seen), err)
 	}
 	vlogSkillExamples(t)
-	vlogSkillRecommendedModel(t)
+	vlogLegacyModelFixture(t)
+	vlogGraphModels(t)
+	vlogCypherQueries(t)
+	vlogQueryCases(t)
 }
 
-// Parse the one model shipped to the agent, not a second copy kept in the test.
-func vlogSkillRecommendedModel(t *testing.T) kernel.ObjectValue {
+// Keep the historical single-node example tested without publishing it as the new ontology.
+func vlogLegacyModelFixture(t *testing.T) kernel.ObjectValue {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(vlogSkillRoot, "references/model-examples.md"))
+	raw, err := os.ReadFile(filepath.Join("testdata/vlog/legacy-vlogentry.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	matches := regexp.MustCompile("(?s)```yaml\\n(.*?)\\n```").FindAllSubmatch(raw, -1)
 	if len(matches) != 1 {
-		t.Fatalf("expected exactly one recommended YAML Node Definition, found %d", len(matches))
+		t.Fatalf("expected one legacy VLogEntry Node Definition, found %d", len(matches))
 	}
 	model, err := kernel.ParseObjectYAML(kernel.KindNodeDefinition, matches[0][1])
 	if err != nil {
-		t.Fatalf("invalid shipped VLog Ontology: %v", err)
+		t.Fatalf("invalid historical VLog Ontology: %v", err)
 	}
 	if model.Definition == nil || model.Definition.Name != "VLogEntry" ||
 		len(model.Definition.Properties) != 18 || len(model.Definition.Constraints) != 0 || len(model.Definition.Indexes) != 0 {

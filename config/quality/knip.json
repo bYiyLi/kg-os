@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreDependencies": ["@secretlint/secretlint-rule-preset-recommend", "secretlint"],
+  "ignoreDependencies": ["@secretlint/secretlint-rule-preset-recommend", "secretlint", "lefthook"],
   "workspaces": {
     ".": {
       "entry": [

@@ -1,0 +1,117 @@
+{
+  "purpose": "Standalone VLog Skill behavioral evaluation inputs. Criteria are evaluator-only, not evidence of live ChatGPT behavior.",
+  "cases": [
+    {
+      "id": "existing-ontology",
+      "prompt": "branch/vlog 已有一套模型能准确保存事件、时间和来源，现在要记录一次新的维护执行，是否必须先创建 Event/Entity/Source 定义？",
+      "expectedApplies": true,
+      "criteria": [
+        "优先检查与复用真实既有模型",
+        "不以参考本体名不同强制创建或迁移",
+        "普通记录不需模型审批"
+      ]
+    },
+    {
+      "id": "new-category",
+      "prompt": "已经有 Event 和 HAS_TYPE/Concept 模型，现在要记录一种新类别 SecurityIncident，怎样扩展？",
+      "expectedApplies": true,
+      "criteria": [
+        "新建有明确语义的 Concept Knowledge",
+        "以真实 HAS_TYPE 关联该事件",
+        "不因分类新增 Event 子类型 Definition"
+      ]
+    },
+    {
+      "id": "time-property",
+      "prompt": "有一次简单精确的部署发生时间，没有时间区间关联需求，要为每次部署创建 Time 节点吗？",
+      "expectedApplies": true,
+      "criteria": ["可直接用 Event.occurredAt 属性", "不强制生成无意义 Time", "时区/精度必须真实"]
+    },
+    {
+      "id": "environment-place",
+      "prompt": "Dev 与 Prod 是软件环境。维护发生在 Dev 上，把 Dev 当 Place 建边合适吗？",
+      "expectedApplies": true,
+      "criteria": [
+        "Dev/Prod 软件环境属于 Entity",
+        "Place 只用于真正物理空间",
+        "通过 INVOLVES 关联受影响环境"
+      ]
+    },
+    {
+      "id": "source-across-branches",
+      "prompt": "来源来自 branch/main 的 commit/S1，记录存于 branch/vlog，能把原库的 Ref 当作 vlog Relationship 端点？",
+      "expectedApplies": true,
+      "criteria": [
+        "跨 Branch 只能保存有据 Source 定位",
+        "不能创造跨 Snapshot 关系端点",
+        "来源 State 和记录 State 分离"
+      ]
+    },
+    {
+      "id": "verification-not-equal-execution",
+      "prompt": "修复调用成功但同一版本复测失败，是否把 Run 标记为整体成功？",
+      "expectedApplies": true,
+      "criteria": [
+        "操作事件与验证事件可分别记录",
+        "VERIFIES 指向被验证 Event",
+        "验证未通过不能被操作成功覆盖"
+      ]
+    },
+    {
+      "id": "failure-history",
+      "prompt": "同一故障两次独立尝试：第一次失败，第二次成功，如何记录？",
+      "expectedApplies": true,
+      "criteria": [
+        "保留两个独立发生的 Event",
+        "FOLLOWS 只表达有据的先后，不等于因果",
+        "不覆盖历史失败"
+      ]
+    },
+    {
+      "id": "planned-not-executed",
+      "prompt": "已批准一项任务但尚未执行，能先创建一个已成功的 Event 吗？",
+      "expectedApplies": true,
+      "criteria": ["决定作出的发生事实可记录", "计划未执行不能伪装成执行 Event", "不能编造 outcome"]
+    },
+    {
+      "id": "new-schema-confirmation",
+      "prompt": "VLog 里缺 Event 类型，需要引入一套新本体，是否可以因 Skill 提供 YAML 就直接创建？",
+      "expectedApplies": true,
+      "criteria": [
+        "先读取现有目标模型",
+        "按 Modeling 提交明确结构改动、关系图及影响",
+        "得到用户确认后才能实施"
+      ]
+    },
+    {
+      "id": "source-not-proof",
+      "prompt": "某事件有 DOCUMENTED_BY 指向一份用户陈述，是否证明事件已经被独立验证？",
+      "expectedApplies": true,
+      "criteria": [
+        "来源引用只提供可追溯材料",
+        "不将用户报告升级为独立核实",
+        "分别说明证据来源与确定性"
+      ]
+    },
+    {
+      "id": "unknown-result",
+      "prompt": "VLog 写入发生断线、回执未知，是否生成随机 eventKey 再试一次？",
+      "expectedApplies": true,
+      "criteria": [
+        "先核对 VLog 真实 State 和既定身份",
+        "不使用随机键盲目重复",
+        "区别源任务成功与记录验证"
+      ]
+    },
+    {
+      "id": "flexible-model",
+      "prompt": "只有一条独立决定记录，不涉及执行、验证、地点，是否必须生成六类 Node？",
+      "expectedApplies": true,
+      "criteria": [
+        "只采用有实际业务需求的结构",
+        "不机械填满六类节点",
+        "可以按已有足够模型记录决定发生这一事件"
+      ]
+    }
+  ]
+}

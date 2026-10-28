@@ -25,9 +25,6 @@ const generatedFiles = [
 const officialSkills = [
   "kgos-ontology-standards",
   "kgos-knowledge-standards",
-  "kgos-retrieval-standards",
-  "kgos-branch-standards",
-  "kgos-maintenance-standards",
   "kgos-vlog-standards",
   "kgos-doctor"
 ];
@@ -136,7 +133,10 @@ async function publicFiles() {
   const paths = [...generatedFiles];
   for (const skill of officialSkills) {
     const directory = `plugins/kgos/skills/${skill}`;
-    const files = await collectFiles(sourceRoot, directory);
+    // The author's model tests are not assistant-facing Skill resources.
+    const files = (await collectFiles(sourceRoot, directory)).filter(
+      (file) => !file.startsWith(`${directory}/tests/`)
+    );
     if (!files.includes(`${directory}/SKILL.md`)) {
       throw new Error(`Missing official Skill entrypoint: ${directory}`);
     }
