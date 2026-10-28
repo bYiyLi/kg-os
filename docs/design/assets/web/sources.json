@@ -269,6 +269,39 @@
       "width": 1504,
       "height": 1046,
       "sha256": "407e217c7abd05ecec88452f8a31c854a8d342a8e27941b361dc0324959f2646"
+    },
+    {
+      "board": "V7",
+      "role": "core",
+      "file": "V7-domain-tree-sidebar.png",
+      "source": "image_gen",
+      "sourceFilename": "exec-d0d2d0f1-167b-4de3-883c-8c0ccf69a557.png",
+      "bytes": 1306351,
+      "width": 1505,
+      "height": 1045,
+      "sha256": "0ac8bfeeec0ef30412816987b57766254de0a7da05c5649cdbbe8b732fea3e7f"
+    },
+    {
+      "board": "V7",
+      "role": "core",
+      "file": "V7-branch-history-dialog.png",
+      "source": "image_gen",
+      "sourceFilename": "exec-1b09e7f9-d6ad-40ba-b908-8e0a761ba0cf.png",
+      "bytes": 1518713,
+      "width": 1505,
+      "height": 1045,
+      "sha256": "3f8465e9a0957bc799b849154745e07dbddfb7c22d3957651c7329fe388ee5ac"
+    },
+    {
+      "board": "Q3",
+      "role": "core",
+      "file": "Q3-linkurious-canvas-search.png",
+      "source": "image_gen",
+      "sourceFilename": "exec-adfd86c0-513a-4405-b1ba-cd19e913e7d0.png",
+      "bytes": 1188151,
+      "width": 1506,
+      "height": 1045,
+      "sha256": "7bc95dfb559f5f17341cac58089555303a5e077ae9d23d79c07de466685c6733"
     }
   ],
   "documents": [

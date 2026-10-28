@@ -45,6 +45,8 @@ pnpm test:e2e
 
 先执行 `pnpm --filter @kgos/web check`，再执行 `pnpm test:e2e`，后者会重建包含 Web 的真实 daemon。验证 Browser 与内嵌入口时均检查 body Portal 中的深浅色、语言、键盘和焦点；仅在 Vite 开发页看到正常不足以证明生产 CSS 正常。MCP 自包含资源的协议 Host 测试位于 `tests/e2e/ui-migration.spec.ts`，不等同真实 ChatGPT 客户端验收。
 
+并行验收占用默认的 4173 端口时，可用 `KGOS_E2E_PORT=4175 pnpm test:e2e` 或 `KGOS_E2E_PORT=4175 pnpm validate` 指定本轮测试端口。接受 `1..65535` 的整数，测试页面地址与 Runtime 同时使用所选端口。
+
 `pnpm build` 会清理和重建本机 `artifacts/`；不要与依赖这些原生制品的 Go race/coverage 并行运行。完整门禁优先使用 `pnpm validate` 的串行顺序，避免测试过程中真实扩展文件被构建清理。
 
 ## 代码质量与正确性

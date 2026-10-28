@@ -5,11 +5,16 @@ import type {
   EvolutionGetRequest,
   EvolutionGetResult,
   EvolutionRefListResult,
-  RequestOptions
+  RequestOptions,
+  OntologyReadResult,
+  ObjectReadResult,
+  GraphQueryResult
 } from "@kgos/sdk";
 
 import { McpReadError, readMcpResult } from "../../core/client/mcp-read.js";
+import type { DomainReader } from "../domain/domain-data.js";
 import type { VersionReader } from "./version-data.js";
+import type { GraphReader } from "../graph/graph-search.js";
 
 const revokedCodes = new Set([
   "AUTHENTICATION_FAILED",
@@ -25,7 +30,7 @@ const revokedCodes = new Set([
 export function createMcpVersionReader(
   app: Pick<McpApp, "callServerTool">,
   onTransportFailure: () => void
-): VersionReader {
+): VersionReader & DomainReader & { graph: GraphReader } {
   async function read<T>(code: string, options?: RequestOptions): Promise<T> {
     options?.signal?.throwIfAborted();
     let result: unknown;
@@ -55,6 +60,18 @@ export function createMcpVersionReader(
   }
 
   return {
+    graph: {
+      query: (request, options) =>
+        read<GraphQueryResult>(`return await graph.query(${JSON.stringify(request)})`, options)
+    },
+    ontology: {
+      read: (request, options) =>
+        read<OntologyReadResult>(`return await ontology.read(${JSON.stringify(request)})`, options)
+    },
+    object: {
+      read: (request, options) =>
+        read<ObjectReadResult>(`return await object.read(${JSON.stringify(request)})`, options)
+    },
     branch: {
       list: (options) =>
         read<EvolutionRefListResult>("return await evolution.branch.list()", options)

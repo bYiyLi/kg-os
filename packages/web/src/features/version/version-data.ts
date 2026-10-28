@@ -198,17 +198,12 @@ export async function loadVersions(
   signal: AbortSignal
 ): Promise<VersionSnapshot> {
   const { branches, tags } = await readVersionRefs(reader, signal);
-  const pages = await batches(branches, signal, async (branch) =>
-    page(reader, stateRef(branch.state), undefined, signal)
+  return loadMissingVersions(
+    reader,
+    { branches, tags, pages: Object.create(null) as VersionSnapshot["pages"] },
+    new Set(branches.map((branch) => branch.name)),
+    signal
   );
-  // Branch names are data (including "__proto__"), never object prototype keys.
-  const indexed = Object.create(null) as Record<string, VersionPage>;
-  for (const [index, branch] of branches.entries()) {
-    const result = pages[index];
-    if (result === undefined) throw new Error("Missing Evolution ancestry page");
-    indexed[branch.name] = result;
-  }
-  return { branches, tags, pages: indexed };
 }
 
 export function hasMore(snapshot: VersionSnapshot, selected: ReadonlySet<string>): boolean {
@@ -255,6 +250,27 @@ export async function loadMoreVersions(
   for (const [index, name] of pending.entries()) {
     const result = next[index];
     if (result !== undefined) pages[name] = result;
+  }
+  return { ...snapshot, pages };
+}
+
+export async function loadMissingVersions(
+  reader: VersionReader,
+  snapshot: VersionSnapshot,
+  selected: ReadonlySet<string>,
+  signal: AbortSignal
+): Promise<VersionSnapshot> {
+  const pending = snapshot.branches.filter(
+    (branch) => selected.has(branch.name) && snapshot.pages[branch.name] === undefined
+  );
+  const next = await batches(pending, signal, async (branch) =>
+    page(reader, stateRef(branch.state), undefined, signal)
+  );
+  const pages = Object.assign(Object.create(null) as VersionSnapshot["pages"], snapshot.pages);
+  for (const [index, branch] of pending.entries()) {
+    const result = next[index];
+    if (result === undefined) throw new Error("Missing Evolution ancestry page");
+    pages[branch.name] = result;
   }
   return { ...snapshot, pages };
 }

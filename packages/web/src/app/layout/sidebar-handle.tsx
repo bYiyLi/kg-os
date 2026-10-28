@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import type { KeyboardEvent, PointerEvent } from "react";
+import type { KeyboardEvent, PointerEvent, Ref, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Icon } from "../../shared/ui/icon.js";
@@ -53,14 +53,34 @@ function SidebarHandleContour() {
   );
 }
 
+function finishSidebarDrag(
+  event: PointerEvent<HTMLButtonElement>,
+  drag: RefObject<Drag | null>,
+  suppressClick: RefObject<boolean>,
+  onDraggingChange: (dragging: boolean) => void
+) {
+  const current = drag.current;
+  if (current?.pointerId !== event.pointerId) return;
+  suppressClick.current = current.moved && event.type !== "pointercancel";
+  drag.current = null;
+  onDraggingChange(false);
+  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+}
+
 export function SidebarHandle({
+  ref,
   collapsed,
+  drawerOpen,
   width,
   onToggle,
   onResize,
   onDraggingChange
 }: {
+  ref?: Ref<HTMLButtonElement>;
   collapsed: boolean;
+  drawerOpen?: boolean | undefined;
   width: number;
   onToggle: () => void;
   onResize: (width: number) => void;
@@ -69,28 +89,26 @@ export function SidebarHandle({
   const { t } = useTranslation();
   const drag = useRef<Drag | null>(null);
   const suppressClick = useRef(false);
+  const isDrawer = drawerOpen !== undefined;
+  const contracted = isDrawer || collapsed;
+  const sidebarLabel = t(collapsed ? "versions.expandSidebar" : "versions.collapseSidebar");
+  const label = isDrawer ? t("versions.navigation") : sidebarLabel;
 
-  function finishDrag(event: PointerEvent<HTMLButtonElement>, canceled = false) {
-    const current = drag.current;
-    if (current?.pointerId !== event.pointerId) {
-      return;
-    }
-    suppressClick.current = current.moved && !canceled;
-    drag.current = null;
-    onDraggingChange(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
+  function finishDrag(event: PointerEvent<HTMLButtonElement>) {
+    finishSidebarDrag(event, drag, suppressClick, onDraggingChange);
   }
 
   return (
     <button
+      ref={ref}
       className="sidebar-handle"
       type="button"
-      aria-controls="kgos-version-sidebar"
-      aria-expanded={!collapsed}
-      aria-label={t(collapsed ? "versions.expandSidebar" : "versions.collapseSidebar")}
-      title={t(collapsed ? "versions.expandSidebar" : "versions.collapseHint")}
+      data-collapsed={contracted}
+      aria-controls={isDrawer ? "kgos-version-drawer" : "kgos-version-sidebar"}
+      aria-expanded={isDrawer ? drawerOpen : !collapsed}
+      aria-haspopup={isDrawer ? "dialog" : undefined}
+      aria-label={label}
+      title={isDrawer || collapsed ? label : t("versions.collapseHint")}
       onClick={() => {
         if (suppressClick.current) {
           suppressClick.current = false;
@@ -99,11 +117,11 @@ export function SidebarHandle({
         onToggle();
       }}
       onKeyDown={(event) => {
-        resizeFromKeyboard(event, collapsed, width, onResize);
+        resizeFromKeyboard(event, contracted, width, onResize);
       }}
       onPointerDown={(event) => {
         suppressClick.current = false;
-        if (collapsed || event.button !== 0) {
+        if (contracted || event.button !== 0) {
           return;
         }
         drag.current = {
@@ -116,7 +134,7 @@ export function SidebarHandle({
       }}
       onPointerMove={(event) => {
         const current = drag.current;
-        if (current?.pointerId !== event.pointerId) {
+        if (contracted || current?.pointerId !== event.pointerId) {
           return;
         }
         const delta = event.clientX - current.startX;
@@ -130,9 +148,7 @@ export function SidebarHandle({
         onResize(clampWidth(current.startWidth + delta));
       }}
       onPointerUp={finishDrag}
-      onPointerCancel={(event) => {
-        finishDrag(event, true);
-      }}
+      onPointerCancel={finishDrag}
       onLostPointerCapture={() => {
         if (drag.current !== null) {
           drag.current = null;
@@ -141,7 +157,7 @@ export function SidebarHandle({
       }}
     >
       <SidebarHandleContour />
-      <Icon name={collapsed ? "chevronRight" : "chevronLeft"} />
+      <Icon name={contracted ? "chevronRight" : "chevronLeft"} />
     </button>
   );
 }

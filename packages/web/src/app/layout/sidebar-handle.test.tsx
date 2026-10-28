@@ -36,12 +36,13 @@ afterEach(() => {
   host.remove();
 });
 
-function renderHandle(collapsed = false, width = 272): HTMLButtonElement {
+function renderHandle(collapsed = false, width = 272, drawerOpen?: boolean): HTMLButtonElement {
   act(() => {
     root.render(
       <TranslationProvider>
         <SidebarHandle
           collapsed={collapsed}
+          drawerOpen={drawerOpen}
           width={width}
           onToggle={onToggle}
           onResize={onResize}
@@ -111,6 +112,28 @@ it("toggles normally and only resizes an expanded handle by supported keys", () 
     collapsed.click();
   });
   expect(onToggle).toHaveBeenCalledTimes(2);
+});
+
+it("opens the narrow drawer with the same contour without resizing", () => {
+  const button = renderHandle(false, 280, false);
+  expect(button.getAttribute("aria-label")).toBe("Version navigation");
+  expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+  expect(button.getAttribute("aria-controls")).toBe("kgos-version-drawer");
+  expect(button.getAttribute("aria-expanded")).toBe("false");
+  expect(button.getAttribute("data-collapsed")).toBe("true");
+  expect(button.querySelector(".icon.lucide-chevron-right")).not.toBeNull();
+  key(button, "ArrowRight");
+  key(button, "ArrowLeft");
+  pointer(button, "pointerdown", [1, 100]);
+  pointer(button, "pointermove", [1, 200]);
+  pointer(button, "pointerup", [1, 200]);
+  expect(onResize).not.toHaveBeenCalled();
+  expect(capturePointer).not.toHaveBeenCalled();
+  act(() => {
+    button.click();
+  });
+  expect(onToggle).toHaveBeenCalledOnce();
+  expect(renderHandle(false, 280, true).getAttribute("aria-expanded")).toBe("true");
 });
 
 it("resizes on a threshold-crossing drag, releases capture, and suppresses its click", () => {

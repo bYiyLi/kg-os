@@ -4,19 +4,16 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { EvolutionGetResult } from "@kgos/sdk";
 
 import { i18n } from "../i18n/index.js";
 import { stateRef, type VersionReader } from "../../features/version/version-data.js";
 import {
   main,
   develop,
-  experiment,
   common,
   genesis,
   at,
   ONTOLOGY_COMMIT,
-  WORLD_ACTIONS,
   WORLD_REFRESH,
   CROSS_WORLD_FILTER,
   PRESSED_ATTRIBUTE,
@@ -30,6 +27,7 @@ import {
   rows,
   namedRow,
   worldButton,
+  worldToggle,
   inputValue,
   resolved,
   flush,
@@ -41,11 +39,10 @@ import {
 const HEAD_MESSAGE = "Merge experiment";
 const FIX_MESSAGE = "Fix properties";
 const LOAD_EARLIER = "Load earlier versions";
-const FEATURE_WORLD = "feature/search";
 const WORLD_SEARCH = "Search knowledge worlds...";
-const BACK_TO_WORLDS = "Back to world navigation";
 const CURRENT_ATTRIBUTE = "aria-current";
 const EXPANDED_ATTRIBUTE = "aria-expanded";
+const WORLD_SECTION = ".world-section";
 let host: HTMLDivElement;
 let root: Root;
 
@@ -62,9 +59,10 @@ afterEach(() => {
   });
   host.remove();
 });
+
 async function render(
   reader: VersionReader | null,
-  options: { defaultBranch?: string; initialState?: string } = {}
+  options: { defaultBranch?: string | null; initialState?: string } = {}
 ) {
   await act(async () => {
     root.render(<VersionBrowserHarness reader={reader} {...options} />);
@@ -72,45 +70,42 @@ async function render(
   });
 }
 
-it("shows peer worlds and opens the actual default world without a merged history", async () => {
+it("shows peer worlds and the actual default world's domains without fetching history", async () => {
   const api = mockReader();
   await render(api, { defaultBranch: "develop", initialState: develop });
-  expect(host.querySelectorAll(".world-section")).toHaveLength(4);
+  expect(host.querySelectorAll(WORLD_SECTION)).toHaveLength(4);
   expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
-  expect(rows()).toHaveLength(2);
-  expect(host.textContent).not.toContain(HEAD_MESSAGE);
-  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
-  expect(namedRow(ONTOLOGY_COMMIT).textContent).toContain("Latest");
-  expect(host.querySelector(".world-picker-trigger")).toBeNull();
-  expect(api.tag.list).toHaveBeenCalledOnce();
+  expect(worldToggle("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(host.querySelector('[aria-label="Domains: develop"]')?.textContent).toContain("Knowledge");
+  expect(host.querySelectorAll(".commit-item")).toHaveLength(0);
+  expect(api.ancestry).not.toHaveBeenCalled();
+  expect(vi.mocked(api.object.read).mock.calls[0]?.[0]).toEqual({
+    at: stateRef(develop),
+    refs: ["domain:Knowledge", "domain:Topics"]
+  });
+  expect(vi.mocked(api.object.read).mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
 });
 
-it("expands or collapses one peer world without selecting a version or issuing get", async () => {
+it("expands or collapses a peer independently from selecting its name", async () => {
   const api = mockReader();
   await render(api);
-  act(() => {
-    worldButton("develop").click();
-  });
+  click("Expand knowledge world: develop");
+  await flush();
   expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(worldButton("main").getAttribute(EXPANDED_ATTRIBUTE)).toBe("false");
-  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
-  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  expect(worldToggle("main").getAttribute(EXPANDED_ATTRIBUTE)).toBe("false");
+  expect(worldToggle("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
   expect(api.get).not.toHaveBeenCalled();
-  const region = document.getElementById(
-    worldButton("develop").getAttribute("aria-controls") ?? ""
-  );
-  expect(region?.getAttribute("role")).toBe("region");
-  expect(region?.getAttribute("aria-label")).toBe("Version history: develop");
-  act(() => {
-    worldButton("develop").click();
-  });
-  expect(rows()).toHaveLength(0);
-  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("false");
-  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  click("Expand knowledge world: develop");
+  expect(host.querySelectorAll(".world-domain-region")).toHaveLength(0);
+  await chooseWorld("develop");
+  expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(worldToggle("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(vi.mocked(api.get).mock.calls[0]?.[0]).toEqual({ state: stateRef(develop) });
+  expect(vi.mocked(api.get).mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  expect(api.ancestry).not.toHaveBeenCalled();
 });
 
-it("does not highlight another world that happens to share the selected head", async () => {
+it("does not highlight another world that shares the same immutable head", async () => {
   const api = mockReader();
   vi.mocked(api.branch.list).mockResolvedValue({
     items: [
@@ -119,37 +114,48 @@ it("does not highlight another world that happens to share the selected head", a
     ]
   });
   await render(api, { defaultBranch: "novel" });
-  act(() => {
-    worldButton("main").click();
-  });
+  click("Expand knowledge world: main");
+  await flush();
   expect(worldButton("novel").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(namedRow(HEAD_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBeNull();
   await chooseWorld("main");
   expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(namedRow(HEAD_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(worldButton("novel").getAttribute(CURRENT_ATTRIBUTE)).toBeNull();
 });
 
-it("searches loaded world names without searching versions or silently changing the browse context", async () => {
+it("filters world names without selecting them or reading their history", async () => {
   const api = mockReader();
   await render(api);
   inputValue(WORLD_SEARCH, "FEATURE/");
-  expect(host.querySelectorAll(".world-section")).toHaveLength(1);
-  expect(worldButton(FEATURE_WORLD).textContent).toContain(FEATURE_WORLD);
-  act(() => {
-    worldButton(FEATURE_WORLD).click();
-  });
-  expect(namedRow("Hybrid search").getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  expect(host.querySelectorAll(WORLD_SECTION)).toHaveLength(1);
+  expect(worldButton("feature/search").textContent).toContain("feature/search");
   expect(api.get).not.toHaveBeenCalled();
-  await chooseWorld(FEATURE_WORLD);
-  expect(worldButton(FEATURE_WORLD).getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(api.ancestry).not.toHaveBeenCalled();
   inputValue(WORLD_SEARCH, "no-such-world");
   expect(host.textContent).toContain("No matching knowledge worlds.");
-  expect(rows()).toHaveLength(0);
+  inputValue(WORLD_SEARCH, "");
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
 });
 
-it("keeps latest distinct from the historical selection and returns only by explicit action", async () => {
+it("opens an unexpanded world's history without changing navigation and restores trigger focus", async () => {
   const api = mockReader();
   await render(api);
+  await openRelationships("develop");
+  expect(document.body.querySelector(".version-dag-world")?.textContent).toBe("develop");
+  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(worldToggle("main").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(api.get).not.toHaveBeenCalled();
+  click("Close version relationships");
+  await flush();
+  expect(document.body.querySelector(".version-dag-dialog")).toBeNull();
+  expect(document.activeElement).toBe(findButton("View history: develop"));
+});
+
+it("selects a historical version and reads the matching domain snapshot before returning latest", async () => {
+  const api = mockReader();
+  await render(api);
+  await openRelationships();
   act(() => {
     namedRow(FIX_MESSAGE).click();
   });
@@ -157,20 +163,23 @@ it("keeps latest distinct from the historical selection and returns only by expl
   expect(namedRow(FIX_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
   expect(namedRow(HEAD_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
   expect(namedRow(HEAD_MESSAGE).textContent).toContain("Latest");
-  expect(host.textContent).toContain("Viewing a historical version");
+  expect(document.body.textContent).toContain("Viewing a historical version");
+  expect(vi.mocked(api.ontology.read).mock.calls.at(-1)?.[0].at).toBe(stateRef("e".repeat(64)));
+  click("Close version relationships");
+  await flush();
   click("Back to latest");
   await flush();
-  expect(namedRow(HEAD_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
-  expect(vi.mocked(api.get).mock.calls.at(-1)?.[0]).toEqual({ state: "commit/" + main });
+  expect(vi.mocked(api.get).mock.calls.at(-1)?.[0]).toEqual({ state: stateRef(main) });
 });
 
-it("retains browsing context and expansion while filtering the loaded cross-world union", async () => {
+it("keeps the domain sidebar and browsing identity while filtering cross-world history", async () => {
   await render(mockReader());
   await showAcrossWorlds();
   expect(rows()).toHaveLength(6);
   expect(rows().filter((item) => item.textContent.includes(SHARED_MESSAGE))).toHaveLength(1);
+  expect(host.querySelectorAll(".commit-item")).toHaveLength(0);
   click(CROSS_WORLD_FILTER);
-  for (const name of ["develop", "experiment", FEATURE_WORLD])
+  for (const name of ["develop", "experiment", "feature/search"])
     act(() => {
       checkbox(name).click();
     });
@@ -184,60 +193,25 @@ it("retains browsing context and expansion while filtering the loaded cross-worl
   inputValue("Search loaded versions...", "ONTOLOGY");
   expect(rows()).toHaveLength(1);
   expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
-  inputValue("Search loaded versions...", "");
-  click(CROSS_WORLD_FILTER);
-  click("Clear all");
-  click(CROSS_WORLD_FILTER);
-  click(BACK_TO_WORLDS);
-  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(worldButton("main").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
-  expect(rows()).toHaveLength(2);
-  expect(host.textContent).not.toContain("Select a knowledge world to show versions.");
-});
-
-it("continues the expanded world's immutable root through the version relationships view", async () => {
-  const api = mockReader();
-  await render(api);
-  await openRelationships();
-  click(LOAD_EARLIER);
+  click("Close version relationships");
   await flush();
-  expect(rows()).toHaveLength(3);
-  expect(vi.mocked(api.ancestry).mock.calls.at(-1)?.[0]).toEqual({
-    root: "commit/" + main,
-    limit: 20,
-    cursor: "next-main"
-  });
-  expect(vi.mocked(api.ancestry).mock.calls.at(-1)?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(worldToggle("main").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
 });
 
-it("does not fake world rows when disconnected and disables refresh", async () => {
+it("does not fake worlds while disconnected and renders a genuinely empty directory", async () => {
   await render(null);
-  expect(rows()).toHaveLength(0);
-  expect(host.querySelectorAll(".world-section")).toHaveLength(0);
-  expect(host.textContent).toContain("Connect to view version history.");
+  expect(host.querySelectorAll(WORLD_SECTION)).toHaveLength(0);
+  expect(host.textContent).toContain("Connect to view knowledge worlds.");
   expect(findButton(WORLD_REFRESH)).toHaveProperty("disabled", true);
-});
-
-it("reports a genuinely empty directory without inventing world contents", async () => {
   const api = mockReader();
   vi.mocked(api.branch.list).mockResolvedValueOnce({ items: [] });
-  await render(api);
-  expect(rows()).toHaveLength(0);
+  await render(api, { defaultBranch: null });
   expect(host.textContent).toContain("No knowledge worlds are available.");
   expect(api.ancestry).not.toHaveBeenCalled();
 });
 
-it("renders a real commit with no message or parent without inventing a description", async () => {
-  const api = mockReader();
-  vi.mocked(api.ancestry).mockResolvedValueOnce({
-    root: stateRef(main),
-    items: [{ state: main, committedAt: at, parents: null }] as never
-  });
-  await render(api);
-  expect(rows().some((item) => item.textContent.includes("No version description"))).toBe(true);
-});
-
-it("uses meaningful immutable message content while preserving its full original text", async () => {
+it("shows immutable message summaries in the dialog and retains full source text", async () => {
   const api = mockReader();
   const message = "## 简介\n\n小说创作经验与叙事原则。\n\n## 改动\n\n补充人物动机。";
   vi.mocked(api.ancestry).mockResolvedValueOnce({
@@ -245,165 +219,55 @@ it("uses meaningful immutable message content while preserving its full original
     items: [row(main, message, 0, [])]
   });
   await render(api);
+  await openRelationships();
   const item = namedRow("小说创作经验与叙事原则。");
   expect(item.textContent).not.toContain("## 简介");
-  expect(item.querySelector(".commit-title")?.getAttribute("title")).toBe(message);
+  expect(item.title).toBe(message);
 });
 
-it("retries a failed initial directory load and retains the old list on refresh failure", async () => {
+it("renders missing commit descriptions honestly and keeps invalid selection from replacing context", async () => {
   const api = mockReader();
-  vi.mocked(api.branch.list).mockRejectedValueOnce(new Error("offline"));
-  await render(api);
-  expect(host.querySelectorAll(".world-section")).toHaveLength(0);
-  expect(findButton(WORLD_REFRESH)).toHaveProperty("disabled", false);
-  click(WORLD_REFRESH);
-  await flush();
-  expect(rows()).toHaveLength(2);
-  vi.mocked(api.branch.list).mockRejectedValueOnce(new Error("offline again"));
-  click(WORLD_REFRESH);
-  await flush();
-  expect(host.textContent).toContain("Could not load version history.");
-  expect(rows()).toHaveLength(2);
-  click(WORLD_REFRESH);
-  await flush();
-  expect(host.textContent).not.toContain("Could not load version history.");
-});
-
-it("keeps a failed page available for explicit retry without changing its cursor", async () => {
-  const api = mockReader();
+  vi.mocked(api.ancestry).mockResolvedValueOnce({
+    root: stateRef(main),
+    items: [{ state: main, committedAt: at, parents: null }] as never
+  });
   await render(api);
   await openRelationships();
-  vi.mocked(api.ancestry).mockRejectedValueOnce(new Error("page timed out"));
-  click(LOAD_EARLIER);
+  expect(rows().some((item) => item.textContent.includes("No version description"))).toBe(true);
+  click("Close version relationships");
   await flush();
-  expect(rows()).toHaveLength(2);
-  click(LOAD_EARLIER);
-  await flush();
-  expect(rows()).toHaveLength(3);
-  expect(vi.mocked(api.ancestry).mock.calls.at(-1)?.[0].cursor).toBe("next-main");
-});
-
-it("keeps the selected context when version get fails or resolves to a different immutable state", async () => {
-  const api = mockReader();
-  await render(api);
-  const selected = namedRow(FIX_MESSAGE);
+  await openRelationships("develop");
   vi.mocked(api.get).mockRejectedValueOnce(new Error("offline"));
   act(() => {
-    selected.click();
+    namedRow(ONTOLOGY_COMMIT).click();
   });
   await flush();
-  expect(selected.getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
-  expect(host.textContent).toContain("Could not open this version.");
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(document.body.textContent).toContain("Could not open this version.");
   vi.mocked(api.get).mockResolvedValueOnce(resolved(common));
   act(() => {
-    selected.click();
+    namedRow(ONTOLOGY_COMMIT).click();
   });
   await flush();
-  expect(selected.getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
-  act(() => {
-    selected.click();
-  });
-  await flush();
-  expect(selected.getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
 });
 
-it("does not change browsing world until a clicked version is verified", async () => {
+it("keeps a pending failed world selection from changing current identity", async () => {
   const api = mockReader();
   await render(api);
-  vi.mocked(api.get).mockRejectedValueOnce(new Error("world unavailable"));
+  vi.mocked(api.get).mockRejectedValueOnce(new Error("unavailable"));
   await chooseWorld("develop");
   expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
-  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  expect(worldToggle("main").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(host.textContent).toContain("Could not open this version.");
   await chooseWorld("develop");
   expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
 });
 
-it("does not reopen a world when its pending version resolves after another world was expanded", async () => {
-  const api = mockReader();
-  let finishSlow: ((data: EvolutionGetResult) => void) | undefined;
-  await render(api);
-  vi.mocked(api.get).mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finishSlow = resolve;
-      })
-  );
-  await chooseWorld("experiment");
-  act(() => {
-    worldButton("develop").click();
-  });
-  await act(async () => {
-    finishSlow?.(resolved(experiment));
-    await Promise.resolve();
-  });
-  expect(worldButton("experiment").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(worldButton("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
-  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
-});
-
-it("ignores a late world version response after a newer choice has succeeded", async () => {
-  const api = mockReader();
-  let finishSlow: ((data: EvolutionGetResult) => void) | undefined;
-  await render(api);
-  vi.mocked(api.get).mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finishSlow = resolve;
-      })
-  );
-  await chooseWorld("experiment");
-  await chooseWorld("develop");
-  await act(async () => {
-    finishSlow?.(resolved(experiment));
-    await Promise.resolve();
-  });
-  expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
-});
-
-it("opens the expanded world's DAG without selecting that world or changing its root", async () => {
-  const api = mockReader();
-  await render(api);
-  act(() => {
-    worldButton("develop").click();
-  });
-  await openRelationships();
-  expect(document.body.querySelector(".version-dag-world")?.textContent).toBe("develop");
-  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(api.get).not.toHaveBeenCalled();
-});
-
-it("does not reopen an old DAG after disconnect and reconnect", async () => {
+it("retains the selected old version and original cursor when the branch advances or disappears", async () => {
   const api = mockReader();
   await render(api);
   await openRelationships();
-  expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
-  await render(null);
-  await render(api);
-  expect(document.body.querySelector('[role="dialog"]')).toBeNull();
-});
-
-it("keeps advanced filters after their popover closes on Escape", async () => {
-  await render(mockReader());
-  await showAcrossWorlds();
-  const trigger = click(CROSS_WORLD_FILTER);
-  act(() => {
-    checkbox("develop").click();
-  });
-  act(() => {
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  });
-  await flush();
-  expect(trigger.getAttribute(EXPANDED_ATTRIBUTE)).toBe("false");
-  click(CROSS_WORLD_FILTER);
-  expect(checkbox("develop").getAttribute("aria-checked")).toBe("false");
-});
-
-it("observes head movement without following it or rewriting the old paging root", async () => {
-  const api = mockReader();
-  await render(api);
   act(() => {
     namedRow(FIX_MESSAGE).click();
   });
@@ -416,22 +280,15 @@ it("observes head movement without following it or rewriting the old paging root
     window.dispatchEvent(new Event("focus"));
   });
   await flush();
-  expect(host.textContent).toMatch(/new version/i);
+  expect(document.body.textContent).toMatch(/new version/i);
   expect(namedRow(FIX_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
   expect(api.ancestry).toHaveBeenCalledTimes(calls);
-  await openRelationships();
   click(LOAD_EARLIER);
   await flush();
-  expect(vi.mocked(api.ancestry).mock.calls.at(-1)?.[0].root).toBe("commit/" + main);
-});
-
-it("retains a removed world's name and readable pinned history without falling back", async () => {
-  const api = mockReader();
-  await render(api);
-  act(() => {
-    namedRow(FIX_MESSAGE).click();
+  expect(vi.mocked(api.ancestry).mock.calls.at(-1)?.[0]).toMatchObject({
+    root: stateRef(main),
+    cursor: "next-main"
   });
-  await flush();
   vi.mocked(api.branch.list).mockResolvedValue({
     items: [{ name: "develop", state: stateRef(develop) }]
   });
@@ -440,13 +297,11 @@ it("retains a removed world's name and readable pinned history without falling b
   });
   await flush();
   expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(host.textContent).toMatch(/no longer exists/i);
+  expect(document.body.textContent).toMatch(/no longer exists/i);
   expect(namedRow(FIX_MESSAGE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
-  click(WORLD_ACTIONS);
-  expect(findButton("View version relationships").getAttribute("aria-disabled")).not.toBe("true");
 });
 
-it("does not replace a new connection with a late old directory response", async () => {
+it("ignores a late directory from an older disconnected reader", async () => {
   const old = mockReader();
   let finish:
     | ((response: { items: { name: string; state: ReturnType<typeof stateRef> }[] }) => void)
@@ -466,5 +321,49 @@ it("does not replace a new connection with a late old directory response", async
     await Promise.resolve();
   });
   expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
-  expect(namedRow(ONTOLOGY_COMMIT).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(host.querySelectorAll(".commit-item")).toHaveLength(0);
+});
+
+it("does not reopen a requested world after the user expands another while verification is pending", async () => {
+  const api = mockReader();
+  await render(api);
+  let finish: ((value: ReturnType<typeof resolved>) => void) | undefined;
+  vi.mocked(api.get).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  act(() => {
+    worldButton("develop").click();
+  });
+  click("Expand knowledge world: experiment");
+  await flush();
+  expect(worldToggle("experiment").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  await act(async () => {
+    finish?.(resolved(develop));
+    await Promise.resolve();
+  });
+  expect(worldButton("develop").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(worldToggle("experiment").getAttribute(EXPANDED_ATTRIBUTE)).toBe("true");
+  expect(worldToggle("develop").getAttribute(EXPANDED_ATTRIBUTE)).toBe("false");
+});
+
+it("shows a failed directory read and retries without replacing a later confirmed directory", async () => {
+  const api = mockReader();
+  vi.mocked(api.branch.list).mockRejectedValueOnce(new Error("offline"));
+  await render(api);
+  expect(host.querySelectorAll(WORLD_SECTION)).toHaveLength(0);
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  expect(findButton(WORLD_REFRESH)).toHaveProperty("disabled", false);
+  click(WORLD_REFRESH);
+  await flush();
+  expect(host.querySelectorAll(WORLD_SECTION)).toHaveLength(4);
+  vi.mocked(api.branch.list).mockRejectedValueOnce(new Error("offline again"));
+  click(WORLD_REFRESH);
+  await flush();
+  expect(host.querySelectorAll(WORLD_SECTION)).toHaveLength(4);
+  expect(worldButton("main").getAttribute(CURRENT_ATTRIBUTE)).toBe("page");
+  expect(host.textContent).toContain("World references may be out of date.");
+  expect(findButton("Check again")).toHaveProperty("disabled", false);
 });

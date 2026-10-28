@@ -18,6 +18,7 @@ interface HistoryMode {
 interface ExpandedWorld {
   reader: VersionReader;
   name: string | null;
+  root?: string;
 }
 
 export interface VersionHistory {
@@ -55,7 +56,10 @@ export interface VersionHistory {
   checkingRefs: boolean;
   setBranches: (names: string[]) => void;
   selectCommit: (state: string) => void;
-  selectWorld: (name: string) => void;
+  selectWorld: (name: string, onSelected?: () => void) => void;
+  selectWorldSnapshot: (name: string, state: string, onSelected?: () => void) => void;
+  openHistory: (name: string) => void;
+  retryHistory: () => void;
   toggleWorld: (name: string) => void;
   selectWorldCommit: (name: string, state: string) => void;
   setMode: (mode: "world" | "all") => void;
@@ -116,27 +120,22 @@ function useHistoryScope(
 function useWorldActions(
   snapshot: VersionSnapshot | null,
   selection: ReturnType<typeof useVersionSelection>,
-  openWorld: ReturnType<typeof useVersionPages>["openWorld"],
+  syncHistory: (name: string, root: string) => void,
   setMode: VersionHistory["setMode"]
 ) {
   const branches = snapshot?.branches;
   const selectWorld = useCallback(
-    (name: string) => {
+    (name: string, onSelected?: () => void) => {
       const branch = branches?.find((item) => item.name === name);
       if (branch === undefined) return;
       const root = stateRef(branch.state);
-      selection.select(
-        root,
-        name,
-        async (signal) => {
-          await openWorld(name, root, signal);
-        },
-        () => {
-          setMode("world");
-        }
-      );
+      selection.select(root, name, undefined, () => {
+        setMode("world");
+        syncHistory(name, root);
+        onSelected?.();
+      });
     },
-    [branches, selection.select, openWorld, setMode]
+    [branches, selection.select, syncHistory, setMode]
   );
   const returnToLatest = useCallback(() => {
     if (
@@ -153,72 +152,126 @@ function useWorldActions(
     },
     [snapshot, selection.select]
   );
-  return { selectWorld, returnToLatest, selectWorldCommit };
+  const selectWorldSnapshot = useCallback(
+    (name: string, state: string, onSelected?: () => void) => {
+      if (branches?.some((branch) => branch.name === name) !== true && selection.world !== name)
+        return;
+      selection.select(state, name, undefined, onSelected);
+    },
+    [branches, selection.select, selection.world]
+  );
+  return { selectWorld, returnToLatest, selectWorldCommit, selectWorldSnapshot };
 }
 
-function useExpandedWorld(
-  reader: VersionReader | null,
-  initialWorld: string | null,
-  pages: ReturnType<typeof useVersionPages>
-) {
+function useExpandedWorld(reader: VersionReader | null, pages: ReturnType<typeof useVersionPages>) {
   const [expanded, setExpanded] = useState<ExpandedWorld | null>(null);
   const [pending, setPending] = useState<ExpandedWorld | null>(null);
   const [failure, setFailure] = useState<ExpandedWorld | null>(null);
   const opened = useRef<ExpandedWorld | null>(null);
-  const generation = useRef(0);
-  const active = useRef<AbortController | null>(null);
-  const { snapshot, openWorld, cancelPaging } = pages;
+  const expected = useRef(new Map<string, string>());
+  const latest = useRef(pages.snapshot);
+  latest.current = pages.snapshot;
+  const { openWorld, cancelPaging, loading, directoryRevision } = pages;
+  const name = reader !== null && expanded?.reader === reader ? expanded.name : null;
   useEffect(() => {
     setExpanded(null);
-    setPending(null);
-    setFailure(null);
     opened.current = null;
-    return () => {
-      active.current?.abort();
-      generation.current++;
-    };
+    expected.current.clear();
   }, [reader]);
-  let name = reader === null ? null : initialWorld;
-  if (reader !== null && expanded?.reader === reader) name = expanded.name;
+  const open = useCallback(
+    (world: string | null, root?: string) => {
+      const snapshot = latest.current;
+      const requested = root ?? (world === null ? undefined : expected.current.get(world));
+      if (
+        reader === null ||
+        (world !== null &&
+          snapshot?.branches.some((branch) => branch.name === world) !== true &&
+          snapshot?.pages[world] === undefined &&
+          requested === undefined)
+      )
+        return;
+      cancelPaging();
+      if (world !== null && root !== undefined) expected.current.set(world, root);
+      const next = { reader, name: world, ...(requested === undefined ? {} : { root: requested }) };
+      opened.current = next;
+      setExpanded(next);
+    },
+    [reader, cancelPaging]
+  );
   const toggle = useCallback(
     (world: string) => {
-      const branch = snapshot?.branches.find((item) => item.name === world);
-      const cached = snapshot?.pages[world];
-      if (reader === null || (branch === undefined && cached === undefined)) return;
-      const previous = opened.current?.reader === reader ? opened.current.name : initialWorld;
-      const next = previous === world ? null : world;
-      cancelPaging();
-      const current = ++generation.current;
-      active.current?.abort();
-      opened.current = { reader, name: next };
-      setExpanded(opened.current);
-      setPending(null);
-      setFailure(null);
-      if (next === null || cached !== undefined || branch === undefined) return;
-      const controller = new AbortController();
-      active.current = controller;
-      setPending({ reader, name: world });
-      void openWorld(world, stateRef(branch.state), controller.signal, false).then(
-        () => {
-          if (generation.current === current && !controller.signal.aborted) setPending(null);
-        },
-        () => {
-          if (generation.current !== current || controller.signal.aborted) return;
-          controller.abort();
-          setPending(null);
-          setFailure({ reader, name: world });
-        }
-      );
+      open(opened.current?.name === world ? null : world);
     },
-    [reader, initialWorld, snapshot, openWorld, cancelPaging]
+    [open]
   );
-  const missingPage = name !== null && snapshot?.pages[name] === undefined;
+  const sync = useCallback(
+    (world: string, root: string) => {
+      if (latest.current?.pages[world] !== undefined) expected.current.set(world, root);
+      if (opened.current?.reader === reader && opened.current.name === world) open(world, root);
+    },
+    [reader, open]
+  );
+  useEffect(() => {
+    setPending(null);
+    setFailure(null);
+    if (reader === null || name === null || loading) return;
+    const cached = latest.current?.pages[name];
+    const root = expanded?.root;
+    if (cached !== undefined && (root === undefined || cached.root === root)) return;
+    const branch = latest.current?.branches.find((item) => item.name === name);
+    const requested = root ?? branch?.state;
+    if (requested === undefined) return;
+    const controller = new AbortController();
+    setPending({ reader, name });
+    void openWorld(name, stateRef(requested), controller.signal, root !== undefined).then(
+      () => {
+        if (!controller.signal.aborted) setPending(null);
+      },
+      () => {
+        if (controller.signal.aborted) return;
+        setPending(null);
+        setFailure({ reader, name });
+      }
+    );
+    return () => {
+      controller.abort();
+    };
+  }, [reader, name, expanded, loading, directoryRevision, openWorld]);
+  const cached = name === null ? undefined : pages.snapshot?.pages[name];
+  const incomplete =
+    cached === undefined || (expanded?.root !== undefined && cached.root !== expanded.root);
   return {
     name,
+    open,
     toggle,
-    pending: missingPage && pending?.reader === reader && pending.name === name ? name : null,
-    error: missingPage && failure?.reader === reader && failure.name === name
+    sync,
+    pending: pending?.reader === reader && pending.name === name ? name : null,
+    error: incomplete && failure?.reader === reader && failure.name === name
   };
+}
+
+function useAllWorldPages(
+  pages: ReturnType<typeof useVersionPages>,
+  mode: HistoryMode["value"],
+  selected: ReadonlySet<string>
+) {
+  const attempted = useRef<string | null>(null);
+  const { loading, directoryRevision, ensurePages, snapshot } = pages;
+  useEffect(() => {
+    if (mode !== "all") {
+      attempted.current = null;
+      return;
+    }
+    if (loading || snapshot === null) return;
+    const key = JSON.stringify([
+      directoryRevision,
+      [...selected].sort(),
+      snapshot.branches.map((branch) => [branch.name, branch.state])
+    ]);
+    if (attempted.current === key) return;
+    attempted.current = key;
+    ensurePages(selected);
+  }, [mode, loading, directoryRevision, ensurePages, snapshot, selected]);
 }
 
 function worldStatus(snapshot: VersionSnapshot | null, name: string | null) {
@@ -243,6 +296,102 @@ function retainedWorldNames(snapshot: VersionSnapshot | null, names: readonly (s
   );
 }
 
+function useHistoryNavigation({
+  pages,
+  scope,
+  expanded,
+  selection,
+  shownBranches,
+  worldNames
+}: {
+  pages: ReturnType<typeof useVersionPages>;
+  scope: ReturnType<typeof useHistoryScope>;
+  expanded: ReturnType<typeof useExpandedWorld>;
+  selection: ReturnType<typeof useVersionSelection>;
+  shownBranches: ReadonlySet<string>;
+  worldNames: ReadonlySet<string>;
+}) {
+  const { setMode, mode, selected: selectedBranches } = scope;
+  const openHistory = useCallback(
+    (name: string) => {
+      setMode("world");
+      const missing = pages.snapshot?.branches.some((branch) => branch.name === name) !== true;
+      const cached = pages.snapshot?.pages[name];
+      const fallback =
+        missing && cached === undefined && selection.world === name
+          ? (selection.selected ?? undefined)
+          : undefined;
+      expanded.open(name, fallback);
+    },
+    [setMode, expanded.open, pages.snapshot, selection.world, selection.selected]
+  );
+  const changeMode = useCallback(
+    (value: HistoryMode["value"]) => {
+      setMode(value);
+      if (value === "all" && mode === "all") pages.ensurePages(selectedBranches);
+    },
+    [setMode, mode, pages.ensurePages, selectedBranches]
+  );
+  const loadMore = useCallback(() => {
+    pages.loadMore(shownBranches);
+  }, [pages.loadMore, shownBranches]);
+  const loadMoreWorld = useCallback(() => {
+    pages.loadMore(worldNames);
+  }, [pages.loadMore, worldNames]);
+  const retryHistory = useCallback(() => {
+    if (pages.pagingError) pages.retryPaging();
+    else if (pages.directoryError) pages.refresh();
+    else if (pages.refsError) void pages.checkRefs();
+    else if (mode === "all") pages.ensurePages(selectedBranches);
+    else if (expanded.name !== null) openHistory(expanded.name);
+    else pages.refresh();
+  }, [pages, mode, selectedBranches, expanded.name, openHistory]);
+  return { openHistory, changeMode, loadMore, loadMoreWorld, retryHistory };
+}
+
+function useHistoryCommits(
+  snapshot: VersionSnapshot | null,
+  shownBranches: ReadonlySet<string>,
+  world: string | null
+) {
+  const commits = useMemo(
+    () => (snapshot === null ? [] : flattenCommits(snapshot, shownBranches)),
+    [snapshot, shownBranches]
+  );
+  const topologyCommits = useMemo(
+    () => (snapshot === null || world === null ? [] : worldTopology(snapshot, world)),
+    [snapshot, world]
+  );
+  return { commits, topologyCommits };
+}
+
+function useBrowsingHead(
+  reader: VersionReader | null,
+  selection: ReturnType<typeof useVersionSelection>,
+  head: string | null
+) {
+  const baseline = useRef<{
+    reader: VersionReader | null;
+    world: string | null;
+    revision: number;
+    head: string | null;
+  } | null>(null);
+  const previous = baseline.current;
+  if (
+    previous?.reader !== reader ||
+    previous.world !== selection.world ||
+    previous.revision !== selection.revision
+  ) {
+    baseline.current = {
+      reader,
+      world: selection.world,
+      revision: selection.revision,
+      head: selection.revision === 0 ? selection.selected : head
+    };
+  }
+  return head !== null && baseline.current?.head !== null && head !== baseline.current?.head;
+}
+
 // A single owner shares world, history and browsing selection across both hosts.
 export function useVersionHistory(
   reader: VersionReader | null,
@@ -256,32 +405,30 @@ export function useVersionHistory(
   const { mode, setBranches, setMode } = scope;
   const selectedBranches = scope.selected;
   const currentWorld = selection.world;
-  const expanded = useExpandedWorld(reader, defaultVersionBranch, pages);
+  const expanded = useExpandedWorld(reader, pages);
+  useAllWorldPages(pages, mode, selectedBranches);
   const browsingStatus = worldStatus(pages.snapshot, currentWorld);
+  const hasNewVersion = useBrowsingHead(reader, selection, browsingStatus.head);
   const expandedStatus = worldStatus(pages.snapshot, expanded.name);
   const worldNames = useMemo(
     () => new Set(expanded.name === null ? [] : [expanded.name]),
     [expanded.name]
   );
   const shownBranches = mode === "all" ? selectedBranches : worldNames;
-  const commits = useMemo(
-    () => (pages.snapshot === null ? [] : flattenCommits(pages.snapshot, shownBranches)),
-    [pages.snapshot, shownBranches]
+  const { commits, topologyCommits } = useHistoryCommits(
+    pages.snapshot,
+    shownBranches,
+    expanded.name
   );
-  const topologyCommits = useMemo(
-    () =>
-      pages.snapshot === null || expanded.name === null
-        ? []
-        : worldTopology(pages.snapshot, expanded.name),
-    [pages.snapshot, expanded.name]
-  );
-  const actions = useWorldActions(pages.snapshot, selection, pages.openWorld, setMode);
-  const loadMore = useCallback(() => {
-    pages.loadMore(shownBranches);
-  }, [pages.loadMore, shownBranches]);
-  const loadMoreWorld = useCallback(() => {
-    pages.loadMore(worldNames);
-  }, [pages.loadMore, worldNames]);
+  const actions = useWorldActions(pages.snapshot, selection, expanded.sync, setMode);
+  const navigation = useHistoryNavigation({
+    pages,
+    scope,
+    expanded,
+    selection,
+    shownBranches,
+    worldNames
+  });
 
   return {
     branches,
@@ -293,7 +440,7 @@ export function useVersionHistory(
     loading: reader !== null && (pages.loading || (pages.snapshot === null && !pages.error)),
     ready: pages.snapshot !== null,
     loadingMore: pages.paging,
-    error: reader !== null && (pages.error || expanded.error),
+    error: reader !== null && (pages.error || (mode === "world" && expanded.error)),
     selectionError: selection.error,
     canLoadMore: pages.snapshot !== null && hasMore(pages.snapshot, shownBranches),
     available: reader !== null,
@@ -310,7 +457,7 @@ export function useVersionHistory(
     worldMissing: browsingStatus.missing,
     switchingWorld: selection.pendingWorld,
     mode,
-    hasNewVersion: browsingStatus.changed,
+    hasNewVersion,
     topologyCommits,
     topologyHasMore: pages.snapshot !== null && hasMore(pages.snapshot, worldNames),
     refsCheckedAt: pages.refsCheckedAt,
@@ -319,13 +466,16 @@ export function useVersionHistory(
     setBranches,
     selectCommit: selection.select,
     selectWorld: actions.selectWorld,
+    selectWorldSnapshot: actions.selectWorldSnapshot,
+    openHistory: navigation.openHistory,
+    retryHistory: navigation.retryHistory,
     toggleWorld: expanded.toggle,
     selectWorldCommit: actions.selectWorldCommit,
-    setMode,
+    setMode: navigation.changeMode,
     returnToLatest: actions.returnToLatest,
-    loadMore,
-    loadMoreWorld,
-    loadMoreExpandedWorld: loadMoreWorld,
+    loadMore: navigation.loadMore,
+    loadMoreWorld: navigation.loadMoreWorld,
+    loadMoreExpandedWorld: navigation.loadMoreWorld,
     refresh: pages.refresh,
     checkRefs: () => void pages.checkRefs()
   };

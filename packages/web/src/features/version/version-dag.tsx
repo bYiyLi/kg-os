@@ -2,6 +2,11 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
+import { CrossWorldFilter } from "./world-picker.js";
+import { CommitHistory } from "./world-directory.js";
+import { VersionBrowsingStatus } from "./version-browsing-status.js";
+import { VersionSwitchAction } from "./version-switch-action.js";
+import { Input } from "../../shared/ui/input.js";
 import { Button } from "../../shared/ui/button.js";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../shared/ui/dialog.js";
 import { Icon } from "../../shared/ui/icon.js";
@@ -38,24 +43,38 @@ function TopologyRow({
   history: VersionHistory;
   graphWidth: number;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const selected =
     history.currentWorld === history.expandedWorld && history.selectedCommit === node.state;
+  const pending =
+    history.switchingWorld === history.expandedWorld && history.selectingCommit === node.state;
   const content = (
     <>
-      <span className="version-dag-row-title">
-        {node.commit === null
-          ? t("versions.unloadedParent")
-          : commitTitle(node.commit.message, t("versions.noMessage"))}
-      </span>
-      <span className="version-dag-row-meta">
-        <code title={node.state}>{node.state.slice(7, 14)}</code>
-        {node.commit !== null && node.state === history.expandedHead && (
-          <span className="version-dag-badge">{t("versions.latest")}</span>
-        )}
-        {node.commit !== null && selected && (
-          <span className="version-dag-badge">{t("versions.currentBrowsing")}</span>
-        )}
+      <span className="version-dag-row-content">
+        <span className="version-dag-row-title">
+          {node.commit === null
+            ? t("versions.unloadedParent")
+            : commitTitle(node.commit.message, t("versions.noMessage"))}
+        </span>
+        <span className="version-dag-row-meta">
+          <code title={node.state}>{node.state.slice(7, 14)}</code>
+          {node.commit !== null && node.state === history.expandedHead && (
+            <span className="version-dag-badge">{t("versions.latest")}</span>
+          )}
+          {node.commit !== null && (
+            <span className="version-dag-row-time">
+              {new Intl.DateTimeFormat(i18n.resolvedLanguage ?? "en", {
+                dateStyle: "medium",
+                timeStyle: "short"
+              }).format(node.commit.committedAt / 1000)}
+            </span>
+          )}
+          {node.commit?.refs.map((ref) => (
+            <span className="version-dag-badge" key={ref.kind + ref.name}>
+              {ref.name}
+            </span>
+          ))}
+        </span>
       </span>
       {node.commit !== null && node.commit.parents.length > 0 && (
         <span className="sr-only">
@@ -83,17 +102,16 @@ function TopologyRow({
           style={{ paddingLeft: graphWidth }}
           type="button"
           aria-pressed={selected}
-          aria-busy={
-            history.switchingWorld === history.expandedWorld &&
-            history.selectingCommit === node.state
-          }
+          aria-busy={pending}
           title={node.commit.message ?? node.state}
           onClick={() => {
+            if (pending || (selected && history.selectingCommit === null)) return;
             if (history.expandedWorld !== null)
               history.selectWorldCommit(history.expandedWorld, node.state);
           }}
         >
           {content}
+          <VersionSwitchAction pending={pending} selected={selected} />
         </Button>
       )}
     </div>
@@ -204,7 +222,10 @@ function TopologyViewport({
     )
       return;
     const height = element.clientHeight || 360;
-    element.scrollTop = Math.max(0, selected.row * ROW_HEIGHT - (height - ROW_HEIGHT) / 2);
+    const top = selected.row * ROW_HEIGHT;
+    const bottom = top + ROW_HEIGHT;
+    if (top < element.scrollTop) element.scrollTop = top;
+    else if (bottom > element.scrollTop + height) element.scrollTop = bottom - height;
     located.current = { state: selected.state, world: history.expandedWorld };
     setViewport({ top: element.scrollTop, height });
   }, [history.currentWorld, history.expandedWorld, history.selectedCommit, topology.nodes]);
@@ -226,7 +247,7 @@ function TopologyViewport({
         aria-label={t("versions.history")}
         style={{
           height: topology.nodes.length * ROW_HEIGHT,
-          minWidth: graphWidth + 260
+          minWidth: graphWidth + 180
         }}
       >
         <TopologyLines
@@ -244,6 +265,110 @@ function TopologyViewport({
   );
 }
 
+function HistoryBody({ history }: { history: VersionHistory }) {
+  const { t } = useTranslation();
+  const [query, setQuery] = useState("");
+  const topology = useMemo(() => {
+    if (history.expandedWorld === null) return null;
+    try {
+      return layoutVersionTopology(history.topologyCommits);
+    } catch {
+      return null;
+    }
+  }, [history.expandedWorld, history.topologyCommits]);
+  if (history.mode === "all")
+    return (
+      <>
+        <div className="version-dag-filters">
+          <CrossWorldFilter history={history} />
+          <Input
+            type="search"
+            aria-label={t("versions.searchCommits")}
+            placeholder={t("versions.searchCommits")}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.currentTarget.value);
+            }}
+          />
+          <span className="version-loaded-note">{t("versions.loadedAcrossWorlds")}</span>
+        </div>
+        <div className="version-dag-viewport version-cross-history">
+          {history.loadingMore && (
+            <p className="version-list-status" role="status">
+              {t("versions.loading")}
+            </p>
+          )}
+          <CommitHistory history={history} query={query} />
+        </div>
+      </>
+    );
+  return (
+    <>
+      <p className="version-dag-legend">{t("versions.parentLegend")}</p>
+      {history.expandedWorldMissing && (
+        <p className="version-dag-message" role="status">
+          {t("versions.worldMissing")}
+        </p>
+      )}
+      {topology === null || topology.nodes.length === 0 ? (
+        <p className="version-dag-message" role="status">
+          {history.loading || history.expandingWorld !== null
+            ? t("versions.loading")
+            : t("versions.relationsUnavailable")}
+        </p>
+      ) : (
+        <TopologyViewport topology={topology} history={history} />
+      )}
+    </>
+  );
+}
+
+function HistoryFooter({ history }: { history: VersionHistory }) {
+  const { t } = useTranslation();
+  const all = history.mode === "all";
+  const count = all ? history.commits.length : history.topologyCommits.length;
+  const more = all ? history.canLoadMore : history.topologyHasMore;
+  return (
+    <>
+      <footer className="version-dag-footer">
+        <span>{t("versions.loadedVersions", { count })}</span>
+        {more && (
+          <Button
+            variant="ghost"
+            type="button"
+            disabled={history.loadingMore || history.loading}
+            onClick={all ? history.loadMore : history.loadMoreWorld}
+          >
+            {history.loadingMore ? t("versions.loading") : t("versions.loadMore")}
+          </Button>
+        )}
+        {!more && !history.loading && !history.error && count > 0 && (
+          <span>{t("domains.oldest")}</span>
+        )}
+      </footer>
+      {(history.error || (history.selectionError && history.selectedCommit === null)) && (
+        <div className="version-dag-message">
+          <p role="alert">
+            {history.selectionError && history.selectedCommit === null
+              ? t("versions.selectFailed")
+              : t("versions.loadFailed")}
+          </p>
+          {history.error && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                history.retryHistory();
+              }}
+            >
+              {t("versions.retry")}
+            </Button>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 export function VersionDag({
   open,
   onOpenChange,
@@ -257,18 +382,10 @@ export function VersionDag({
 }) {
   const { t } = useTranslation();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const topology = useMemo(() => {
-    if (history.expandedWorld === null) return null;
-    try {
-      return layoutVersionTopology(history.topologyCommits);
-    } catch {
-      return null;
-    }
-  }, [history.expandedWorld, history.topologyCommits]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="version-dag-dialog translate-x-0 translate-y-0"
+        className="version-dag-dialog"
         overlayClassName="version-dag-backdrop"
         initialFocus={closeRef}
         finalFocus={returnFocus}
@@ -277,7 +394,7 @@ export function VersionDag({
           <div>
             <DialogTitle className="version-dag-title">{t("versions.relationsTitle")}</DialogTitle>
             <p className="version-dag-world" title={history.expandedWorld ?? undefined}>
-              {history.expandedWorld}
+              {history.mode === "all" ? t("versions.crossWorldHistory") : history.expandedWorld}
             </p>
           </div>
           <Button
@@ -296,37 +413,9 @@ export function VersionDag({
         <DialogDescription className="version-dag-description">
           {t("versions.relationsDescription")}
         </DialogDescription>
-        <p className="version-dag-legend">{t("versions.parentLegend")}</p>
-        {history.expandedWorldMissing && (
-          <p className="version-dag-message" role="status">
-            {t("versions.worldMissing")}
-          </p>
-        )}
-        {topology === null || topology.nodes.length === 0 ? (
-          <p className="version-dag-message" role="status">
-            {history.loading ? t("versions.loading") : t("versions.relationsUnavailable")}
-          </p>
-        ) : (
-          <TopologyViewport topology={topology} history={history} />
-        )}
-        <footer className="version-dag-footer">
-          <span>{t("versions.loadedVersions", { count: history.topologyCommits.length })}</span>
-          {history.topologyHasMore && (
-            <Button
-              variant="ghost"
-              type="button"
-              disabled={history.loadingMore || history.loading}
-              onClick={history.loadMoreWorld}
-            >
-              {history.loadingMore ? t("versions.loading") : t("versions.loadMore")}
-            </Button>
-          )}
-        </footer>
-        {(history.error || history.selectionError) && (
-          <p className="version-dag-message" role="alert">
-            {history.selectionError ? t("versions.selectFailed") : t("versions.loadFailed")}
-          </p>
-        )}
+        <VersionBrowsingStatus history={history} />
+        <HistoryBody history={history} />
+        <HistoryFooter history={history} />
       </DialogContent>
     </Dialog>
   );

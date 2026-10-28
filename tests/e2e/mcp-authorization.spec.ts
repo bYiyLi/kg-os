@@ -68,7 +68,7 @@ async function mockWebConnection(page: Page, loggedIn: boolean, validDetails = t
     const request = route.request();
     expect(request.headers()["authorization"]).toBe("Bearer " + webToken);
     expect(request.headers()["x-kgos-expected-daemon-boot"]).toBe(bootID);
-    expect(request.headers()["origin"]).toBe("http://127.0.0.1:4173");
+    expect(request.headers()["origin"]).toBe(new URL(request.url()).origin);
     const body = JSON.parse(request.postData() ?? "{}") as {
       request_id: string;
       decision: "approve" | "deny";
@@ -147,7 +147,7 @@ test("explicit refusal returns access_denied to the verified OAuth client", asyn
   expect(calls.decisions()).toBe(1);
 });
 
-test("an expired request can be dismissed without issuing any grant", async ({ page }) => {
+test("an expired request can be dismissed without issuing any grant", async ({ page, baseURL }) => {
   const calls = await mockWebConnection(page, true, false);
   await page.goto("/?mcp_authorization=" + requestID);
   const dialog = page.getByRole("dialog", { name: "Authorize Connection" });
@@ -155,7 +155,7 @@ test("an expired request can be dismissed without issuing any grant", async ({ p
   await expect(dialog.getByRole("button", { name: "Authorize Connection" })).toBeDisabled();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page).toHaveURL("http://127.0.0.1:4173/");
+  await expect(page).toHaveURL(new URL("/", baseURL).href);
   expect(calls.decisions()).toBe(0);
 });
 

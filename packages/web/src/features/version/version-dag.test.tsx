@@ -1,127 +1,28 @@
 // @vitest-environment jsdom
 
-import { act, useRef, useState } from "react";
+import { act } from "react";
 import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-import { TranslationProvider } from "../../../test/translation-provider.js";
-import { UiProvider } from "../../shared/ui/ui-provider.js";
 import { stateRef } from "./version-data.js";
-import type { VersionCommit } from "./version-data.js";
 import type { VersionHistory } from "./use-version-history.js";
-import { VersionDag } from "./version-dag.js";
+import {
+  HEAD,
+  LEFT,
+  RIGHT,
+  PARENT,
+  OPEN_LABEL,
+  fixture,
+  version,
+  Harness
+} from "../../../test/version-dag-fixture.js";
 
-const HEAD = stateRef("a".repeat(64));
-const LEFT = stateRef("b".repeat(64));
-const RIGHT = stateRef("c".repeat(64));
-const PARENT = stateRef("d".repeat(64));
-const OPEN_LABEL = "Open relationships";
 const EDGE_SELECTOR = "path[data-child]";
-
-function version(state: string, parents: string[] = [], message?: string): VersionCommit {
-  return {
-    state: stateRef(state),
-    parents: parents.map(stateRef),
-    committedAt: 1000,
-    reachableFrom: ["knowledge"],
-    refs: [],
-    merge: parents.length > 1,
-    ...(message === undefined ? {} : { message })
-  };
-}
-
-function fixture(overrides: Partial<VersionHistory> = {}): VersionHistory {
-  const commits = [
-    version(HEAD, [LEFT, RIGHT], "Merge knowledge"),
-    version(LEFT, [PARENT], "Left history"),
-    version(RIGHT, [PARENT], "Right history")
-  ];
-  return {
-    branches: [],
-    retainedWorlds: [],
-    commits,
-    topologyCommits: commits,
-    selectedBranches: new Set(["knowledge"]),
-    selectedCommit: LEFT,
-    selectingCommit: null,
-    loading: false,
-    ready: true,
-    loadingMore: false,
-    error: false,
-    selectionError: false,
-    canLoadMore: true,
-    available: true,
-    defaultBranch: "knowledge",
-    currentWorld: "knowledge",
-    expandedWorld: "knowledge",
-    expandedHead: HEAD,
-    expandedWorldMissing: false,
-    expandedHasNewVersion: false,
-    expandedPageKey: "knowledge-history",
-    expandingWorld: null,
-    expansionError: false,
-    worldHead: HEAD,
-    worldMissing: false,
-    switchingWorld: null,
-    mode: "world",
-    hasNewVersion: false,
-    topologyHasMore: true,
-    refsCheckedAt: null,
-    refsError: false,
-    checkingRefs: false,
-    setBranches: vi.fn(),
-    selectCommit: vi.fn(),
-    selectWorld: vi.fn(),
-    toggleWorld: vi.fn(),
-    selectWorldCommit: vi.fn(),
-    setMode: vi.fn(),
-    returnToLatest: vi.fn(),
-    loadMore: vi.fn(),
-    loadMoreWorld: vi.fn(),
-    loadMoreExpandedWorld: vi.fn(),
-    refresh: vi.fn(),
-    checkRefs: vi.fn(),
-    ...overrides
-  };
-}
-
-function Harness({
-  history,
-  initiallyOpen,
-  onOpenChange
-}: {
-  history: VersionHistory;
-  initiallyOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const [open, setOpen] = useState(initiallyOpen);
-  const returnFocus = useRef<HTMLButtonElement>(null);
-  return (
-    <TranslationProvider>
-      <UiProvider>
-        <button
-          type="button"
-          ref={returnFocus}
-          onClick={() => {
-            setOpen(true);
-          }}
-        >
-          {OPEN_LABEL}
-        </button>
-        <VersionDag
-          open={open}
-          onOpenChange={(value) => {
-            setOpen(value);
-            onOpenChange(value);
-          }}
-          history={history}
-          returnFocus={returnFocus}
-        />
-      </UiProvider>
-    </TranslationProvider>
-  );
-}
+const PRESSED_ATTRIBUTE = "aria-pressed";
+const IDENTITY_SELECTOR = ".version-browsing-identity";
+const FEEDBACK_SELECTOR = ".version-browsing-feedback";
+const STATUS_SELECTOR = ".version-browsing-status";
 
 let host: HTMLDivElement;
 let root: Root;
@@ -177,22 +78,75 @@ it("draws actual merge-parent edges and keeps unread endpoints unselectable", as
   expect(node(PARENT)?.textContent).toContain("Parent version not loaded");
   expect(node(PARENT)?.querySelector("button")).toBeNull();
   expect(node(HEAD)?.textContent).toContain("Latest");
-  expect(node(LEFT)?.querySelector("button")?.getAttribute("aria-pressed")).toBe("true");
+  expect(node(LEFT)?.querySelector("button")?.getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
   expect(node(LEFT)?.textContent).toContain("Current view");
   expect(history.selectCommit).not.toHaveBeenCalled();
   expect(history.selectWorldCommit).not.toHaveBeenCalled();
 });
 
 it("selects the expanded world and full state without assigning an unread parent", async () => {
-  const history = fixture({ selectingCommit: RIGHT, switchingWorld: "knowledge" });
+  const history = fixture();
   await render(history);
   const row = node(RIGHT)?.querySelector<HTMLButtonElement>("button");
+  expect(row?.textContent).toContain("Switch to version");
+  act(() => row?.click());
+  expect(history.selectWorldCommit).toHaveBeenCalledExactlyOnceWith("knowledge", RIGHT);
+  await render({ ...history, selectingCommit: RIGHT, switchingWorld: "knowledge" });
   expect(row?.getAttribute("aria-busy")).toBe("true");
+  expect(row?.textContent).toContain("Switching...");
   act(() => row?.click());
   expect(history.selectWorldCommit).toHaveBeenCalledExactlyOnceWith("knowledge", RIGHT);
   expect(history.selectCommit).not.toHaveBeenCalled();
   expect(history.selectWorld).not.toHaveBeenCalled();
   expect(history.returnToLatest).not.toHaveBeenCalled();
+});
+
+it("keeps the confirmed context visible until a pending switch succeeds", async () => {
+  const history = fixture();
+  await render(history);
+  const status = document.body.querySelector(STATUS_SELECTOR);
+  await render({ ...history, selectingCommit: RIGHT, switchingWorld: "knowledge" });
+  expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).toContain("bbbbbbb");
+  expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).not.toContain("ccccccc");
+  expect(document.body.querySelector(FEEDBACK_SELECTOR)?.textContent).toContain("ccccccc");
+  expect(node(LEFT)?.querySelector("button")?.getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(node(RIGHT)?.querySelector("button")?.getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+  await render({ ...history, selectedCommit: RIGHT });
+  expect(document.body.querySelector(STATUS_SELECTOR)).toBe(status);
+  expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).toContain("ccccccc");
+  expect(node(RIGHT)?.textContent).toContain("Current view");
+  expect(node(RIGHT)?.querySelector("button")?.getAttribute("aria-busy")).toBe("false");
+  expect(node(LEFT)?.querySelector("button")?.getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+});
+
+it("ignores the current row unless it replaces a different pending choice", async () => {
+  const history = fixture();
+  await render(history);
+  act(() => node(LEFT)?.querySelector<HTMLButtonElement>("button")?.click());
+  expect(history.selectWorldCommit).not.toHaveBeenCalled();
+  await render({ ...history, selectingCommit: RIGHT, switchingWorld: "knowledge" });
+  act(() => node(LEFT)?.querySelector<HTMLButtonElement>("button")?.click());
+  expect(history.selectWorldCommit).toHaveBeenCalledExactlyOnceWith("knowledge", LEFT);
+});
+
+it("keeps a latest-version identity after returning from historical browsing", async () => {
+  const history = fixture();
+  await render(history);
+  const status = document.body.querySelector(STATUS_SELECTOR);
+  act(() => {
+    button("Back to latest").click();
+  });
+  expect(history.returnToLatest).toHaveBeenCalledOnce();
+  await render({ ...history, selectingCommit: HEAD, switchingWorld: "knowledge" });
+  expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).toContain("bbbbbbb");
+  await render({ ...history, selectedCommit: HEAD });
+  expect(document.body.querySelector(STATUS_SELECTOR)).toBe(status);
+  expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).toContain("aaaaaaa");
+  expect(status?.textContent).toContain("Latest version");
+  expect(document.body.querySelector(FEEDBACK_SELECTOR)?.textContent).toContain(
+    "You are viewing the latest version."
+  );
+  expect(node(HEAD)?.querySelector("button")?.getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
 });
 
 it("opens and closes without changing selection and returns focus to its stable trigger", async () => {
@@ -237,9 +191,11 @@ it("uses the expanded world's title and head without highlighting another world'
   });
   await render(history);
   expect(document.body.querySelector(".version-dag-world")?.textContent).toBe("world-b");
+  expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).toContain("world-a");
+  expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).not.toContain("world-b");
   expect(node(LEFT)?.textContent).not.toContain("Latest");
   expect(node(LEFT)?.textContent).not.toContain("Current view");
-  expect(node(LEFT)?.querySelector("button")?.getAttribute("aria-pressed")).toBe("false");
+  expect(node(LEFT)?.querySelector("button")?.getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
   expect(node(LEFT)?.querySelector("button")?.getAttribute("aria-busy")).toBe("false");
   expect(document.body.querySelectorAll(".version-dag-node.is-selected")).toHaveLength(0);
   expect(node(HEAD)?.textContent).toContain("Latest");
@@ -280,16 +236,21 @@ it("shows loading, unavailable and read failures without retaining a fake graph"
 });
 
 it("reports a failed selection while keeping its previous pinned graph visible", async () => {
-  await render(fixture({ error: true, selectionError: true }));
+  const history = fixture();
+  await render({ ...history, selectingCommit: RIGHT, switchingWorld: "knowledge" });
+  await render({ ...history, error: true, selectionError: true });
   expect(document.body.querySelector('[role="alert"]')?.textContent).toBe(
     "Could not open this version. Your previous selection is unchanged."
   );
-  expect(node(LEFT)?.querySelector("button")?.getAttribute("aria-pressed")).toBe("true");
+  expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).toContain("bbbbbbb");
+  expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).not.toContain("ccccccc");
+  expect(node(LEFT)?.querySelector("button")?.getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(node(RIGHT)?.querySelector("button")?.getAttribute("aria-busy")).toBe("false");
 });
 
 it("fails closed for invalid ancestry and gives an honest label for a version without a message", async () => {
   await render(fixture({ topologyCommits: [version(HEAD, [HEAD])] }));
-  expect(document.body.querySelector('[role="status"]')?.textContent).toContain(
+  expect(document.body.querySelector('.version-dag-message[role="status"]')?.textContent).toContain(
     "Version relationships are unavailable"
   );
   expect(document.body.querySelectorAll(EDGE_SELECTOR)).toHaveLength(0);
@@ -300,7 +261,7 @@ it("fails closed for invalid ancestry and gives an honest label for a version wi
 
 it("does not draw residual ancestry when no knowledge world is expanded", async () => {
   await render(fixture({ expandedWorld: null }));
-  expect(document.body.querySelector('[role="status"]')?.textContent).toContain(
+  expect(document.body.querySelector('.version-dag-message[role="status"]')?.textContent).toContain(
     "Version relationships are unavailable"
   );
   expect(document.body.querySelectorAll(EDGE_SELECTOR)).toHaveLength(0);
@@ -340,6 +301,22 @@ it("renders a visible window of long history and reveals the selected version", 
   expect(nextSelected === null ? null : node(nextSelected)).not.toBeNull();
   expect(history.selectCommit).not.toHaveBeenCalled();
   expect(history.selectWorldCommit).not.toHaveBeenCalled();
+});
+
+it("keeps visible selections still and scrolls only enough to reveal a clipped row", async () => {
+  const commits = longHistory();
+  const history = fixture({ topologyCommits: commits, selectedCommit: commits[0]?.state ?? null });
+  await render(history);
+  const viewport = document.body.querySelector<HTMLElement>(".version-dag-viewport");
+  if (viewport === null) throw new Error("Missing version viewport");
+  for (const [index, top] of [
+    [4, 0],
+    [5, 72],
+    [4, 72]
+  ] as const) {
+    await render({ ...history, selectedCommit: commits[index]?.state ?? null });
+    expect(viewport.scrollTop).toBe(top);
+  }
 });
 
 it("preserves the expanded world's scroll through browsing and ref changes or pagination", async () => {
@@ -384,3 +361,73 @@ it("preserves the expanded world's scroll through browsing and ref changes or pa
   expect(node(commits[0]?.state ?? "")).not.toBeNull();
   expect(history.selectWorldCommit).not.toHaveBeenCalled();
 });
+
+it("marks exhausted history honestly without leaving a load-more action", async () => {
+  await render(fixture({ topologyHasMore: false }));
+  expect(document.body.querySelector(".version-dag-footer")?.textContent).toContain(
+    "Earliest version reached"
+  );
+  expect(document.body.querySelector(".version-dag-footer button")).toBeNull();
+});
+
+it("keeps cross-world history in the dialog without presenting it as a single-root graph", async () => {
+  await render(
+    fixture({ mode: "all", branches: [{ name: "knowledge", state: HEAD, color: "violet" }] })
+  );
+  expect(document.body.querySelectorAll(EDGE_SELECTOR)).toHaveLength(0);
+  expect(document.body.querySelectorAll(".commit-row")).toHaveLength(3);
+  expect(document.body.querySelector(".version-dag-world")?.textContent).toBe(
+    "View history across worlds"
+  );
+  expect(
+    document.body.querySelector('input[aria-label="Search loaded versions..."]')
+  ).not.toBeNull();
+  expect(document.body.textContent).toContain("Search and colors cover loaded versions");
+});
+
+it.each([null, "knowledge"] as const)(
+  "distinguishes a pending snapshot from a named-world choice (%s)",
+  async (switchingWorld) => {
+    const history = fixture({
+      mode: "all",
+      branches: [{ name: "knowledge", state: HEAD, color: "violet" }],
+      selectingCommit: RIGHT,
+      switchingWorld
+    });
+    await render(history);
+    expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).toContain("knowledge");
+    expect(document.body.querySelector(IDENTITY_SELECTOR)?.textContent).toContain("bbbbbbb");
+    expect(document.body.querySelector(FEEDBACK_SELECTOR)?.textContent).toContain("ccccccc");
+    const snapshot = [...document.body.querySelectorAll<HTMLButtonElement>(".commit-row")].find(
+      (row) => row.textContent.includes("Right history")
+    );
+    expect(snapshot?.getAttribute("aria-busy")).toBe(String(switchingWorld === null));
+    expect(snapshot?.getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
+    expect(snapshot?.textContent).toContain(
+      switchingWorld === null ? "Switching..." : "Switch to version"
+    );
+    act(() => snapshot?.click());
+    if (switchingWorld === null) expect(history.selectCommit).not.toHaveBeenCalled();
+    else expect(history.selectCommit).toHaveBeenCalledExactlyOnceWith(RIGHT);
+    expect(history.selectWorldCommit).not.toHaveBeenCalled();
+  }
+);
+
+it.each(["world", "all"] as const)(
+  "delegates a %s history failure to the retry owner without replacing its cursor or selection",
+  async (mode) => {
+    const history = fixture({ error: true, currentWorld: "another-world", mode });
+    await render(history);
+    act(() => {
+      button("Retry history").click();
+    });
+    expect(history.retryHistory).toHaveBeenCalledExactlyOnceWith();
+    expect(history.openHistory).not.toHaveBeenCalled();
+    expect(history.setMode).not.toHaveBeenCalled();
+    expect(history.loadMore).not.toHaveBeenCalled();
+    expect(history.loadMoreWorld).not.toHaveBeenCalled();
+    expect(history.selectWorld).not.toHaveBeenCalled();
+    expect(history.selectWorldCommit).not.toHaveBeenCalled();
+    expect(history.selectCommit).not.toHaveBeenCalled();
+  }
+);

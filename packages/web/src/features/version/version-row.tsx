@@ -4,6 +4,7 @@ import { Button } from "../../shared/ui/button.js";
 import type { VersionCommit } from "./version-data.js";
 import type { VersionHistory } from "./use-version-history.js";
 import { commitTitle } from "./version-presentation.js";
+import { VersionSwitchAction } from "./version-switch-action.js";
 
 const timeUnits: readonly [unit: Intl.RelativeTimeFormatUnit, duration: number][] = [
   ["year", 31536000],
@@ -41,6 +42,8 @@ export function VersionRow({
     history.selectedCommit === commit.state &&
     (worldName === undefined || history.currentWorld === worldName);
   const latest = worldName !== undefined && history.expandedHead === commit.state;
+  const pending =
+    history.selectingCommit === commit.state && history.switchingWorld === (worldName ?? null);
   const refs = commit.refs.filter((ref) => history.mode === "all" || ref.kind === "tag");
   return (
     <li className="commit-item">
@@ -49,11 +52,9 @@ export function VersionRow({
         className="commit-row"
         type="button"
         aria-pressed={selected}
-        aria-busy={
-          history.selectingCommit === commit.state &&
-          (worldName === undefined || history.switchingWorld === worldName)
-        }
+        aria-busy={pending}
         onClick={() => {
+          if (pending || (selected && history.selectingCommit === null)) return;
           if (worldName === undefined) history.selectCommit(commit.state);
           else history.selectWorldCommit(worldName, commit.state);
         }}
@@ -75,21 +76,13 @@ export function VersionRow({
               {commitTitle(commit.message, t("versions.noMessage"))}
             </span>
             {latest && <span className="commit-latest">{t("versions.latest")}</span>}
-            {selected && !latest && worldName !== undefined && (
-              <span className="commit-ref is-current">{t("versions.currentBrowsing")}</span>
-            )}
           </span>
           <span className="commit-meta">
             <code title={commit.state}>{commit.state.replace(/^commit\//, "").slice(0, 7)}</code>
             <span>{relativeCommitTime(commit.committedAt, locale)}</span>
           </span>
-          {(commit.merge ||
-            refs.length > 0 ||
-            (selected && !latest && worldName === undefined)) && (
+          {(commit.merge || refs.length > 0) && (
             <span className="commit-refs">
-              {selected && !latest && worldName === undefined && (
-                <span className="commit-ref is-current">{t("versions.currentBrowsing")}</span>
-              )}
               {commit.merge && <span className="commit-ref is-merge">{t("versions.merge")}</span>}
               {refs.map((ref) => (
                 <span
@@ -106,6 +99,7 @@ export function VersionRow({
             {t("versions.reachableFrom", { names: commit.reachableFrom.join(", ") })}
           </span>
         </span>
+        <VersionSwitchAction pending={pending} selected={selected} />
       </Button>
     </li>
   );

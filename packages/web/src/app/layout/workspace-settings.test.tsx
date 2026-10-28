@@ -3,7 +3,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { TranslationProvider } from "../../../test/translation-provider.js";
 import { UiProvider } from "../../shared/ui/ui-provider.js";
@@ -30,6 +30,7 @@ afterEach(() => {
   });
   host.remove();
   localStorage.clear();
+  vi.unstubAllGlobals();
 });
 
 async function renderShell(authenticationRequired = false) {
@@ -59,6 +60,17 @@ async function click(target: HTMLButtonElement) {
     target.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
+}
+
+function mockLayout(matches: boolean) {
+  const media = Object.assign(new EventTarget(), { matches });
+  vi.stubGlobal("matchMedia", () => media);
+  return (next: boolean) => {
+    act(() => {
+      media.matches = next;
+      media.dispatchEvent(new Event("change"));
+    });
+  };
 }
 
 it("keeps only Settings in the footer and applies real appearance and language preferences there", async () => {
@@ -97,6 +109,7 @@ it("closes settings on authentication loss and does not reopen it after reconnec
 });
 
 it("opens settings from the mobile drawer and restores focus to stable navigation after closing", async () => {
+  mockLayout(true);
   await renderShell();
   const navigation = button("Version navigation", host);
   await click(navigation);
@@ -109,4 +122,31 @@ it("opens settings from the mobile drawer and restores focus to stable navigatio
   await click(button("Close settings"));
   expect(document.querySelector(SETTINGS_DIALOG)).toBeNull();
   expect(document.activeElement).toBe(navigation);
+});
+
+it("closes the drawer across the breakpoint and preserves desktop sidebar state", async () => {
+  const setNarrow = mockLayout(false);
+  await renderShell();
+  const handle = button("Collapse sidebar");
+  act(() => {
+    handle.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+  });
+  await click(handle);
+  setNarrow(true);
+  expect(button("Version navigation")).toBe(handle);
+  act(() => {
+    handle.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+  });
+  await click(handle);
+  expect(document.querySelector(".version-drawer[data-open]")).not.toBeNull();
+  setNarrow(false);
+  expect(document.querySelector(".version-drawer[data-open]")).toBeNull();
+  expect(button("Expand sidebar")).toBe(handle);
+  expect(handle.getAttribute("aria-controls")).toBe("kgos-version-sidebar");
+  expect(host.querySelector(".app-shell")?.classList.contains("is-sidebar-collapsed")).toBe(true);
+  expect(host.querySelector(".app-shell")?.getAttribute("style")).toContain(
+    "--sidebar-width: 296px"
+  );
+  setNarrow(true);
+  expect(document.querySelector(".version-drawer[data-open]")).toBeNull();
 });

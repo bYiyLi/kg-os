@@ -57,7 +57,7 @@
 }
 
 .app-shell.is-auth-required .version-tree,
-.app-shell.is-auth-required .canvas-toolbar {
+.app-shell.is-auth-required .knowledge-canvas {
   visibility: hidden;
 }
 

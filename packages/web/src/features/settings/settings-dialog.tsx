@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Activity, Boxes, Cable, Database, Info, Monitor, Settings2, X } from "lucide-react";
 
@@ -26,6 +26,7 @@ export interface SettingsDialogProps {
   onSelectTheme: (value: ThemePreference) => void;
   languageControl: ReactNode;
   onDisconnect?: (() => void) | undefined;
+  returnFocus?: RefObject<HTMLElement | null> | undefined;
 }
 
 const categories = [
@@ -313,7 +314,11 @@ export function SettingsDialog(props: SettingsDialogProps) {
         }
       }}
     >
-      <DialogContent className="settings-dialog" overlayClassName="settings-backdrop">
+      <DialogContent
+        className="settings-dialog"
+        overlayClassName="settings-backdrop"
+        finalFocus={props.returnFocus}
+      >
         <SettingsHeader
           busy={data.busy}
           onClose={() => {

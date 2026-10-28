@@ -13,6 +13,7 @@ import {
   EyeOff,
   GitBranch,
   Globe2,
+  History,
   KeyRound,
   LockKeyhole,
   Map,
@@ -31,6 +32,7 @@ import {
 const icons = {
   branch: GitBranch,
   globe: Globe2,
+  history: History,
   check: Check,
   clock: Clock3,
   arrowDown: ArrowDown,

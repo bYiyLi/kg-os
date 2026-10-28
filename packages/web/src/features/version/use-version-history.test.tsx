@@ -35,6 +35,12 @@ it("uses the actual default world even when another world shares its head", asyn
   await render(api, "novel");
   expect(history().currentWorld).toBe("novel");
   expect(history().defaultBranch).toBe("novel");
+  expect(history().expandedWorld).toBeNull();
+  expect(history().commits).toEqual([]);
+  expect(api.ancestry).not.toHaveBeenCalled();
+  await update(() => {
+    history().openHistory("novel");
+  });
   expect(history().commits).toHaveLength(2);
   expect(history().commits[0]?.reachableFrom).toEqual(["novel"]);
   expect(history().mode).toBe("world");
@@ -81,13 +87,16 @@ it("does not let a delayed world switch replace a later commit selection", async
     history().selectCommit(older);
   });
   await update(() => finish?.({ state: other }));
-  expect(history().currentWorld).toBe("main");
+  expect(history().currentWorld).toBeNull();
   expect(history().selectedCommit).toBe(older);
 });
 
 it("observes a new head without replacing the old cursor or browsing state", async () => {
   const api = reader();
   await render(api);
+  await update(() => {
+    history().openHistory("main");
+  });
   const initialRequests = vi.mocked(api.ancestry).mock.calls.length;
   vi.mocked(api.branch.list).mockResolvedValue({
     items: [
@@ -118,6 +127,9 @@ it("observes a new head without replacing the old cursor or browsing state", asy
 it("keeps deleted-world history and its pinned continuation readable after refresh", async () => {
   const api = reader();
   await render(api);
+  await update(() => {
+    history().openHistory("main");
+  });
   vi.mocked(api.branch.list).mockResolvedValue({ items: [{ name: "learning", state: other }] });
   await update(() => {
     history().checkRefs();
@@ -145,6 +157,9 @@ it("keeps deleted-world history and its pinned continuation readable after refre
 it("does not overlap reference observation with an in-flight full refresh", async () => {
   const api = reader();
   await render(api);
+  await update(() => {
+    history().openHistory("main");
+  });
   let finish: ((value: { items: { name: string; state: typeof head }[] }) => void) | undefined;
   vi.mocked(api.branch.list).mockImplementationOnce(
     () =>
@@ -235,7 +250,7 @@ it("backs off failed reference observations while retaining the last known head"
 it("keeps world expansion separate from browsing and cross-world filtering", async () => {
   const api = reader();
   await render(api);
-  expect(history().expandedWorld).toBe("main");
+  expect(history().expandedWorld).toBeNull();
   await update(() => {
     history().toggleWorld("learning");
   });
@@ -261,6 +276,9 @@ it("keeps world expansion separate from browsing and cross-world filtering", asy
 it("confirms a world's version without reopening a later expanded world", async () => {
   const api = reader();
   await render(api);
+  await update(() => {
+    history().openHistory("main");
+  });
   await update(() => {
     history().toggleWorld("learning");
   });
@@ -300,6 +318,12 @@ it("uses the clicked world identity for shared commits and rejects unrelated loa
     ]
   });
   await render(api);
+  await update(() => {
+    history().openHistory("novel");
+  });
+  await update(() => {
+    history().openHistory("main");
+  });
   await update(() => {
     history().selectWorldCommit("main", other);
   });

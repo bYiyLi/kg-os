@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import type { RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../shared/ui/button.js";
@@ -19,17 +18,16 @@ function observationTime(timestamp: number, locale: string): string {
 
 export function VersionControls({
   history,
-  onOpenRelations,
-  onRefresh,
-  menuRef
+  onOpenAllHistory,
+  onRefresh
 }: {
   history: VersionHistory;
-  onOpenRelations: () => void;
+  onOpenAllHistory: (trigger: HTMLButtonElement) => void;
   onRefresh: () => void;
-  menuRef: RefObject<HTMLButtonElement | null>;
 }) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLButtonElement>(null);
   const disabled = !history.available || history.loading || history.loadingMore;
   useEffect(() => {
     if (!history.available) setOpen(false);
@@ -78,26 +76,13 @@ export function VersionControls({
               variant="ghost"
               role="menuitem"
               data-version-option
-              disabled={history.expandedWorld === null || history.topologyCommits.length === 0}
               onClick={() => {
-                setOpen(false);
-                onOpenRelations();
-              }}
-            >
-              <Icon name="branch" />
-              {t("versions.viewRelations")}
-            </Button>
-            <Button
-              variant="ghost"
-              role="menuitem"
-              data-version-option
-              onClick={() => {
-                history.setMode(history.mode === "all" ? "world" : "all");
+                if (menuRef.current !== null) onOpenAllHistory(menuRef.current);
                 setOpen(false);
               }}
             >
               <Icon name="globe" />
-              {t(history.mode === "all" ? "versions.backToWorld" : "versions.crossWorldHistory")}
+              {t("versions.crossWorldHistory")}
             </Button>
           </PopoverContent>
         </Popover>
@@ -109,20 +94,22 @@ export function VersionControls({
 export function VersionContextNotice({ history }: { history: VersionHistory }) {
   const { t } = useTranslation();
   const historical =
-    history.expandedWorld !== null &&
-    history.expandedWorld === history.currentWorld &&
+    history.currentWorld !== null &&
     history.selectedCommit !== null &&
-    history.selectedCommit !== history.expandedHead;
-  const pending =
-    history.switchingWorld !== null && history.switchingWorld === history.expandedWorld;
+    history.selectedCommit !== history.worldHead;
+  const pending = history.selectingCommit !== null;
   if (!history.available || !history.ready) return null;
   if (pending)
     return (
       <p className="version-context-status" role="status">
-        {t("versions.switchingWorld", { name: history.switchingWorld })}
+        {t("versions.switchingVersion", {
+          version: [history.switchingWorld, history.selectingCommit?.slice(7, 14)]
+            .filter(Boolean)
+            .join(" · ")
+        })}
       </p>
     );
-  if (history.expandedWorldMissing)
+  if (history.worldMissing)
     return (
       <p className="version-context-status" role="status">
         {t("versions.worldMissing")}
@@ -137,21 +124,24 @@ export function VersionContextNotice({ history }: { history: VersionHistory }) {
         </Button>
       </p>
     );
-  if (!historical && !history.expandedHasNewVersion) return null;
+  if (!historical && !history.hasNewVersion) return null;
   return (
     <div className="version-history-notice" role="status">
-      <Icon name={history.expandedHasNewVersion ? "refresh" : "clock"} />
+      <Icon name={history.hasNewVersion ? "refresh" : "clock"} />
       <span>
-        {t(history.expandedHasNewVersion ? "versions.newVersion" : "versions.viewingHistory")}
+        <span>{t(history.hasNewVersion ? "versions.newVersion" : "versions.viewingHistory")}</span>
+        <code className="version-context-hash" title={history.selectedCommit ?? undefined}>
+          {history.selectedCommit?.slice(7, 14)}
+        </code>
       </span>
       <Button
         variant="ghost"
         onClick={() => {
-          if (history.expandedWorld !== null) history.selectWorld(history.expandedWorld);
+          history.returnToLatest();
         }}
         disabled={history.selectingCommit !== null}
       >
-        {t(history.expandedHasNewVersion ? "versions.viewLatest" : "versions.backToLatest")}
+        {t(history.hasNewVersion ? "versions.viewLatest" : "versions.backToLatest")}
       </Button>
     </div>
   );

@@ -16,8 +16,13 @@ const branchTwo = vi.hoisted(() => "commit/" + "b".repeat(64));
 const shared = vi.hoisted(() => "commit/" + "c".repeat(64));
 const textType = vi.hoisted(() => "text");
 const alertSelector = '[role="alert"]';
-const sidebarCommitSelector = ".version-sidebar .commit-row";
+const sidebarDomainSelector = ".version-sidebar .domain-name";
+const historyRowSelector = ".version-dag-row";
+const MAIN_DOMAIN = "Main domain";
+const EXPERIMENT_DOMAIN = "Experiment domain";
+const WORLD_REFRESH = "Refresh knowledge worlds";
 const EXPERIMENT_UPDATE = "Experiment update";
+const SHARED_HISTORY = "Shared history";
 
 function reply(value: unknown): {
   content: { type: string; text: string }[];
@@ -26,7 +31,46 @@ function reply(value: unknown): {
   return { content: [{ type: textType, text: JSON.stringify({ result: value }) }] };
 }
 
+function domainReply(code: string) {
+  const request = JSON.parse(code.slice(code.indexOf("(") + 1, -1)) as {
+    at: string;
+    refs?: string[];
+  };
+  const archived = request.at === shared;
+  const names = archived ? ["Archive"] : ["Work", "Projects"];
+  const title = request.at === commitOne ? MAIN_DOMAIN : EXPERIMENT_DOMAIN;
+  if (code.startsWith("return await ontology.read("))
+    return reply({
+      state: request.at,
+      results: [
+        {
+          kind: "overview",
+          items: names.map((name) => ({ kind: "domain", ref: "domain:" + name, name })),
+          total: names.length,
+          markdown: ""
+        }
+      ]
+    });
+  return reply({
+    state: request.at,
+    results: (request.refs ?? []).map((ref) => ({
+      kind: "domain",
+      ref,
+      value: {
+        name: ref.slice(7),
+        title: ref === "domain:Work" ? title : ref.slice(7),
+        includes: ref === "domain:Work" ? ["domain:Projects"] : []
+      }
+    }))
+  });
+}
+
 function versionReply(code: string) {
+  if (
+    code.startsWith("return await ontology.read(") ||
+    code.startsWith("return await object.read(")
+  )
+    return domainReply(code);
   if (code === "return await evolution.branch.list()") {
     return reply({
       items: [
@@ -54,7 +98,7 @@ function versionReply(code: string) {
           state: shared,
           parents: null,
           committedAt: Date.now() * 1000 - 1000,
-          message: "Shared history"
+          message: SHARED_HISTORY
         }
       ]
     });
@@ -129,8 +173,8 @@ async function renderEmbedded() {
   });
 }
 
-function button(name: string) {
-  const element = Array.from(document.body.querySelectorAll("button")).find(
+function button(name: string, container: ParentNode = document.body) {
+  const element = Array.from(container.querySelectorAll("button")).find(
     (item) => item.textContent === name || item.getAttribute("aria-label") === name
   );
   if (element === undefined) throw new Error("Missing button: " + name);
@@ -143,72 +187,108 @@ function overviewCalls() {
   ).length;
 }
 
-it("loads the existing read-only tool through the bridge with no Web login", async () => {
+async function click(name: string, container: ParentNode = document.body) {
+  await act(async () => {
+    button(name, container).click();
+    await Promise.resolve();
+  });
+}
+
+function dialog() {
+  const element = document.body.querySelector<HTMLElement>('[role="dialog"]');
+  if (element === null) throw new Error("Missing history dialog");
+  return element;
+}
+
+function historyRow(message: string) {
+  const row = [...dialog().querySelectorAll<HTMLButtonElement>(historyRowSelector)].find(
+    (element) => element.textContent.includes(message)
+  );
+  if (row === undefined) throw new Error("Missing history version");
+  return row;
+}
+
+async function openHistory(name = "main") {
+  await click("View history: " + name);
+  return dialog();
+}
+
+it("loads real Domain navigation through fixed read-only MCP methods without Web login or eager history", async () => {
   await renderEmbedded();
   expect(document.body.textContent).toContain(commitOne);
-  expect(document.body.textContent).toContain("main");
   expect(document.body.querySelector('[data-theme="light"]')).not.toBeNull();
   expect(document.body.querySelector(".authentication-dialog")).toBeNull();
   expect(document.body.querySelector('input[type="password"]')).toBeNull();
   expect(bridge.connect).toHaveBeenCalledTimes(1);
+  expect(overviewCalls()).toBe(1);
+  expect(button("main").getAttribute("aria-current")).toBe("page");
+  expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(1);
+  expect(document.body.querySelector(".version-sidebar")?.textContent).toContain(MAIN_DOMAIN);
+  expect(document.body.textContent).not.toContain(SHARED_HISTORY);
+  expect(
+    bridge.callServerTool.mock.calls.some(([request]) =>
+      request.arguments.code.includes("evolution.ancestry")
+    )
+  ).toBe(false);
   expect(bridge.callServerTool).toHaveBeenCalledWith({
     name: "kgos_query",
     arguments: { code: "return await evolution.overview()" }
   });
-  expect(overviewCalls()).toBe(1);
-  expect(button("main").getAttribute("aria-current")).toBe("page");
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
-  expect(document.body.querySelector(".version-sidebar")?.textContent).not.toContain(
-    EXPERIMENT_UPDATE
-  );
-  expect(document.body.textContent).toContain("Shared history");
+  expect(
+    bridge.callServerTool.mock.calls.some(
+      ([request]) =>
+        request.arguments.code === `return await ontology.read({"at":"${commitOne}","limit":100})`
+    )
+  ).toBe(true);
+  expect(
+    bridge.callServerTool.mock.calls.some(
+      ([request]) =>
+        request.arguments.code.startsWith("return await object.read(") &&
+        request.arguments.code.includes(commitOne)
+    )
+  ).toBe(true);
+  await click("Expand domain: " + MAIN_DOMAIN);
+  expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(2);
+  expect(document.body.querySelector(".version-sidebar")?.textContent).toContain("Projects");
   expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_query")).toBe(
     true
   );
   expect(bridge.addEventListener).toHaveBeenCalledWith("hostcontextchanged", expect.any(Function));
 });
 
-it("filters embedded history across worlds and reads the selected version through MCP", async () => {
+it("filters history inside its dialog while preserving the sidebar Domain tree", async () => {
   await renderEmbedded();
-  act(() => {
-    button("Knowledge world actions").click();
-  });
-  act(() => {
-    button("View history across worlds").click();
-  });
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(3);
-  act(() => {
-    button("Filter knowledge worlds").click();
-  });
-  const main = Array.from(
-    document.body.querySelectorAll<HTMLElement>('.version-branch-option [role="checkbox"]')
-  ).find((input) => input.getAttribute("aria-label") === "main");
+  await click("Knowledge world actions");
+  await click("View history across worlds");
+  expect(dialog().querySelectorAll(".commit-row")).toHaveLength(3);
+  expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(1);
+  await click("Filter knowledge worlds", dialog());
+  const main = [
+    ...document.body.querySelectorAll<HTMLElement>('.version-branch-option [role="checkbox"]')
+  ].find((input) => input.getAttribute("aria-label") === "main");
   if (main === undefined) throw new Error("Missing main branch");
   await act(async () => {
     main.click();
     await Promise.resolve();
   });
   expect(document.body.querySelector(".version-branch-count")?.textContent).toBe("1/2");
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
-  act(() => {
-    button("Filter knowledge worlds").click();
-  });
-  const row = Array.from(
-    document.body.querySelectorAll<HTMLButtonElement>(sidebarCommitSelector)
-  ).find((candidate) => candidate.textContent.includes(EXPERIMENT_UPDATE));
-  if (row === undefined) throw new Error("Missing experiment Commit");
+  expect(dialog().querySelectorAll(".commit-row")).toHaveLength(2);
+  await click("Filter knowledge worlds", dialog());
+  const row = [...dialog().querySelectorAll<HTMLButtonElement>(".commit-row")].find((candidate) =>
+    candidate.textContent.includes(EXPERIMENT_UPDATE)
+  );
+  if (row === undefined) throw new Error("Missing experiment version");
   await act(async () => {
     row.click();
     await Promise.resolve();
   });
   expect(row.getAttribute("aria-pressed")).toBe("true");
-  act(() => {
-    button("Back to world navigation").click();
-  });
-  expect(button("main").getAttribute("aria-current")).toBe("page");
+  await click("Close version relationships", dialog());
+  expect(document.body.querySelector('.world-section-trigger[aria-current="page"]')).toBeNull();
+  expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(1);
   expect(
     bridge.callServerTool.mock.calls.some(([request]) =>
-      request.arguments.code.startsWith("const item = await evolution.get(")
+      request.arguments.code.includes("evolution.get")
     )
   ).toBe(true);
   expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_query")).toBe(
@@ -216,100 +296,90 @@ it("filters embedded history across worlds and reads the selected version throug
   );
 });
 
-it("expands worlds without get and selects a world version through the read-only bridge", async () => {
+it("expands a world without get, selects its Domain and reads historical Domains at the selected State", async () => {
   await renderEmbedded();
-  const before = bridge.callServerTool.mock.calls.filter(([request]) =>
-    request.arguments.code.includes("evolution.get")
-  ).length;
-  act(() => {
-    button("experiment").click();
-  });
+  await click("Expand knowledge world: experiment");
   expect(button("main").getAttribute("aria-current")).toBe("page");
-  expect(button("experiment").getAttribute("aria-expanded")).toBe("true");
+  expect(button("Expand knowledge world: experiment").getAttribute("aria-expanded")).toBe("true");
   expect(
-    bridge.callServerTool.mock.calls.filter(([request]) =>
+    bridge.callServerTool.mock.calls.some(([request]) =>
       request.arguments.code.includes("evolution.get")
     )
-  ).toHaveLength(before);
-  const head = [...document.body.querySelectorAll<HTMLButtonElement>(sidebarCommitSelector)].find(
-    (candidate) => candidate.textContent.includes(EXPERIMENT_UPDATE)
-  );
-  if (head === undefined) throw new Error("Missing experiment world head");
-  await act(async () => {
-    head.click();
-    await Promise.resolve();
-  });
+  ).toBe(false);
+  await click(EXPERIMENT_DOMAIN);
   expect(button("experiment").getAttribute("aria-current")).toBe("page");
-  const row = [...document.body.querySelectorAll<HTMLButtonElement>(sidebarCommitSelector)].find(
-    (candidate) => candidate.textContent.includes("Shared history")
-  );
-  if (row === undefined) throw new Error("Missing shared historical version");
-  await act(async () => {
-    row.click();
-    await Promise.resolve();
-  });
-  expect(row.getAttribute("aria-pressed")).toBe("true");
-  expect(document.body.textContent).toContain("Viewing a historical version");
-  await act(async () => {
-    button("Back to latest").click();
-    await Promise.resolve();
-  });
+  expect(button(EXPERIMENT_DOMAIN).getAttribute("aria-pressed")).toBe("true");
   expect(
-    document.body.querySelector(`${sidebarCommitSelector}[aria-pressed="true"]`)?.textContent
-  ).toContain(EXPERIMENT_UPDATE);
+    bridge.callServerTool.mock.calls.some(([request]) =>
+      request.arguments.code.includes("evolution.ancestry")
+    )
+  ).toBe(false);
+  await openHistory("experiment");
+  const historical = historyRow(SHARED_HISTORY);
+  await act(async () => {
+    historical.click();
+    await Promise.resolve();
+  });
+  expect(historical.getAttribute("aria-pressed")).toBe("true");
+  expect(dialog().textContent).toContain("Viewing a historical version");
+  expect(document.body.querySelector(".version-sidebar")?.textContent).toContain("Archive");
   expect(
     bridge.callServerTool.mock.calls.some(
       ([request]) =>
-        request.arguments.code.startsWith("const item = await evolution.get(") &&
+        request.arguments.code.startsWith("return await ontology.read(") &&
         request.arguments.code.includes(shared)
     )
   ).toBe(true);
-  expect(bridge.callServerTool.mock.calls.every(([request]) => request.name === "kgos_query")).toBe(
-    true
-  );
+  await click("Back to latest", dialog());
+  expect(historyRow(EXPERIMENT_UPDATE).getAttribute("aria-pressed")).toBe("true");
+  expect(document.body.querySelector(".version-sidebar")?.textContent).toContain(EXPERIMENT_DOMAIN);
   expect(document.body.querySelector(".authentication-dialog")).toBeNull();
 });
 
-it("keeps MCP tool errors local to the version list without losing overview", async () => {
+it("keeps MCP resource errors local while preserving confirmed Domain navigation and overview", async () => {
   await renderEmbedded();
   bridge.callServerTool.mockResolvedValueOnce({
     isError: true,
     content: [{ type: textType, text: '{"code":"RESOURCE_ERROR","message":"quota"}' }]
   });
-  await act(async () => {
-    button("Refresh knowledge worlds").click();
-    await Promise.resolve();
-  });
+  await click(WORLD_REFRESH);
   expect(document.body.textContent).toContain(commitOne);
-  expect(document.body.textContent).toContain("Could not load version history.");
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
+  expect(document.body.textContent).toContain("World references may be out of date");
+  expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(1);
+  expect(document.body.querySelector(".embedded-connection [role='alert']")).toBeNull();
 });
 
-it("clears stale embedded versions when MCP reports authentication failure", async () => {
+it("clears old Domains and an open history dialog after MCP authentication failure", async () => {
   await renderEmbedded();
+  await openHistory();
+  expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(1);
   bridge.callServerTool.mockResolvedValueOnce({
     isError: true,
     content: [{ type: textType, text: '{"code":"AUTHENTICATION_FAILED"}' }]
   });
   await act(async () => {
-    button("Refresh knowledge worlds").click();
+    historyRow(SHARED_HISTORY).click();
     await Promise.resolve();
   });
   expect(document.body.querySelector(".embedded-connection [role='alert']")).not.toBeNull();
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
+  expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(0);
+  expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.body.textContent).not.toContain(SHARED_HISTORY);
 });
 
-it("invalidates the embedded connection and stale commits if the host revokes MCP access", async () => {
+it("invalidates Domain navigation and loaded ancestry when the host revokes MCP access", async () => {
   await renderEmbedded();
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(2);
+  await openHistory();
+  expect(historyRow(SHARED_HISTORY)).toBeDefined();
   bridge.callServerTool.mockRejectedValueOnce(new Error("OAuth authorization revoked"));
   await act(async () => {
-    button("Refresh knowledge worlds").click();
+    historyRow(SHARED_HISTORY).click();
     await Promise.resolve();
   });
   expect(document.body.querySelector(".embedded-connection [role='alert']")).not.toBeNull();
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
-  expect(document.body.textContent).not.toContain("Shared history");
+  expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(0);
+  expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.body.textContent).not.toContain(SHARED_HISTORY);
   expect(document.body.querySelector(".authentication-dialog")).toBeNull();
 });
 
@@ -372,7 +442,7 @@ it("fails safely when MCP overview returns a malformed resolved State", async ()
   );
   await renderEmbedded();
   expect(document.body.querySelector(alertSelector)).not.toBeNull();
-  expect(document.body.querySelectorAll(sidebarCommitSelector)).toHaveLength(0);
+  expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(0);
 });
 
 it("handles rejected host connections without querying", async () => {

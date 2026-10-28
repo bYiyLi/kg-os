@@ -176,3 +176,67 @@ it("invalidates the host when the Bridge rejects an active request", async () =>
   await expect(reader.branch.list()).rejects.toThrow("OAuth authorization revoked");
   expect(onTransportFailure).toHaveBeenCalledExactlyOnceWith();
 });
+
+it("uses fixed read-only Ontology and Object scripts with safely encoded Domain inputs", async () => {
+  const { reader, callServerTool, onTransportFailure } = fixture();
+  const controller = new AbortController();
+  const cursor = '"); throw new Error("unexpected"); //\n';
+  const overview = { at: main, limit: 100, cursor };
+  const objects = { at: main, refs: ['domain:People"); throw new Error("unexpected"); //'] };
+  callServerTool.mockResolvedValueOnce(success({ state: main, results: [] }));
+  await reader.ontology.read(overview, { signal: controller.signal });
+  expect(callServerTool).toHaveBeenLastCalledWith(
+    {
+      name: "kgos_query",
+      arguments: { code: `return await ontology.read(${JSON.stringify(overview)})` }
+    },
+    { signal: controller.signal }
+  );
+  callServerTool.mockResolvedValueOnce(success({ state: main, results: [] }));
+  await reader.object.read(objects, { signal: controller.signal });
+  expect(callServerTool).toHaveBeenLastCalledWith(
+    {
+      name: "kgos_query",
+      arguments: { code: `return await object.read(${JSON.stringify(objects)})` }
+    },
+    { signal: controller.signal }
+  );
+  expect(onTransportFailure).not.toHaveBeenCalled();
+});
+
+it.each(["ontology", "object"] as const)(
+  "invalidates the host when Domain %s access is revoked",
+  async (method) => {
+    const { reader, callServerTool, onTransportFailure } = fixture();
+    callServerTool.mockResolvedValueOnce({
+      isError: true,
+      content: [
+        { type: "text", text: JSON.stringify({ code: "PERMISSION_DENIED", message: "revoked" }) }
+      ]
+    });
+    const pending =
+      method === "ontology"
+        ? reader.ontology.read({ at: main })
+        : reader.object.read({ at: main, refs: ["domain:People"] });
+    await expect(pending).rejects.toThrow("MCP read failed");
+    expect(onTransportFailure).toHaveBeenCalledExactlyOnceWith();
+  }
+);
+
+it("preserves Domain resource failures locally and does not call the Bridge after cancellation", async () => {
+  const { reader, callServerTool, onTransportFailure } = fixture();
+  callServerTool.mockResolvedValueOnce({
+    isError: true,
+    content: [
+      { type: "text", text: JSON.stringify({ code: "RESOURCE_ERROR", message: "too large" }) }
+    ]
+  });
+  await expect(reader.object.read({ at: main, refs: ["domain:People"] })).rejects.toThrow(
+    "MCP read failed"
+  );
+  expect(onTransportFailure).not.toHaveBeenCalled();
+  const controller = new AbortController();
+  controller.abort();
+  await expect(reader.ontology.read({ at: main }, { signal: controller.signal })).rejects.toThrow();
+  expect(callServerTool).toHaveBeenCalledTimes(1);
+});

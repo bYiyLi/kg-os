@@ -5,42 +5,49 @@ import { authenticate, mockInstance, secondBootID } from "./web-shell-fixture.js
 
 test.use({ colorScheme: "dark" });
 
-test("renders API-backed versions with a blank graph canvas", async ({ page }) => {
+test("renders API-backed world navigation with a blank graph canvas", async ({ page }) => {
   await authenticate(page);
 
   await expect(page).toHaveTitle("KG OS");
   await expect(page.getByRole("heading", { name: "KG OS" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Version navigation" })).toBeVisible();
-  await expect(page.locator(".version-sidebar .commit-item")).toHaveCount(6);
+  await expect(page.locator(".version-sidebar .commit-item")).toHaveCount(0);
   const sidebar = page.locator(".version-sidebar");
   await expect(
     sidebar.getByRole("heading", { name: "Knowledge worlds", exact: true })
   ).toBeVisible();
-  await expect(sidebar.locator(".world-section-trigger")).toHaveCount(4);
+  await expect(sidebar.locator(".world-section")).toHaveCount(4);
   await expect(sidebar.getByRole("button", { name: "main", exact: true })).toHaveAttribute(
-    "aria-expanded",
-    "true"
+    "aria-current",
+    "page"
   );
-  await expect(sidebar.getByRole("region", { name: "Version history: main" })).toBeVisible();
+  await expect(
+    sidebar.getByRole("button", { name: "View history: main", exact: true })
+  ).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "Work", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Graph canvas" })).toBeVisible();
   await expect(page.locator(".workspace-controls")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
   await expect(page.locator(".sidebar-collapse-button")).toHaveCount(0);
   await expect(sidebar.locator(".sidebar-settings-button")).toHaveText("Settings");
   await expect(sidebar.locator(".sidebar-bottom button")).toHaveCount(1);
-  await expect(page.locator(".canvas-toolbar button:disabled")).toHaveCount(5);
+  await expect(page.locator(".graph-canvas-controls button:disabled")).toHaveCount(5);
+  const graph = page.getByRole("region", { name: "Graph canvas" });
+  await expect(graph.getByRole("group", { name: "Graph canvas", exact: true })).toBeVisible();
+  await expect(graph.locator(".graph-node, .graph-relationship")).toHaveCount(0);
 
   const metrics = await page.evaluate(() => {
     const shell = document.querySelector(".app-shell");
     const sidebar = document.querySelector(".version-sidebar");
     const canvas = document.querySelector(".canvas-stage");
-    const selected = document.querySelector('.version-sidebar .commit-row[aria-pressed="true"]');
+    const selected = document.querySelector('.version-sidebar button[aria-current="page"]');
     return {
       theme: shell?.getAttribute("data-theme"),
       sidebarWidth: sidebar?.getBoundingClientRect().width ?? 0,
       sidebarBorder: sidebar === null ? "" : getComputedStyle(sidebar).borderTopWidth,
       sidebarBackground: sidebar === null ? "" : getComputedStyle(sidebar).backgroundColor,
-      selectedBackground: selected === null ? "" : getComputedStyle(selected).backgroundColor,
+      selectedColor: selected === null ? "" : getComputedStyle(selected).color,
+      sidebarColor: sidebar === null ? "" : getComputedStyle(sidebar).color,
       canvasBorder: canvas === null ? "" : getComputedStyle(canvas).borderTopWidth,
       canvasTop: canvas?.getBoundingClientRect().top ?? 0,
       horizontalOverflow:
@@ -52,13 +59,16 @@ test("renders API-backed versions with a blank graph canvas", async ({ page }) =
   expect(metrics.sidebarWidth).toBeLessThanOrEqual(320);
   expect(metrics.sidebarBorder).toBe("0px");
   expect(metrics.sidebarBackground).toBe("rgba(0, 0, 0, 0)");
-  expect(metrics.selectedBackground).not.toBe("rgba(0, 0, 0, 0)");
+  expect(metrics.selectedColor).not.toBe(metrics.sidebarColor);
   expect(metrics.canvasBorder).toBe("1px");
   expect(metrics.canvasTop).toBeLessThan(30);
   expect(metrics.horizontalOverflow).toBe(false);
   await expect(page.locator(".global-header")).toHaveCount(0);
   await expect(page.locator(".version-sidebar input[type=search]")).toHaveCount(1);
-  await expect(page.locator(".canvas-stage input")).toHaveCount(0);
+  const search = graph.getByRole("searchbox", { name: "Search knowledge", exact: true });
+  await expect(search).toBeVisible();
+  await expect(search).toBeEnabled();
+  await expect(search).toHaveValue("");
   await expect(page.getByText("Connected")).toHaveCount(0);
 });
 
@@ -214,44 +224,53 @@ test("keeps version navigation available at 320 CSS px without horizontal overfl
   await authenticate(page);
 
   await expect(page.getByRole("region", { name: "Graph canvas" })).toBeVisible();
-  await expect(page.locator(".sidebar-handle")).toBeHidden();
+  await expect(page.locator(".sidebar-handle")).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Version navigation" })).toBeHidden();
-  const navigation = page.getByRole("button", { name: "Version navigation" });
+  const navigation = page.locator(".sidebar-handle");
+  await expect(page.locator(".mobile-versions-button")).toHaveCount(0);
+  await expect(navigation).toHaveClass("sidebar-handle");
+  await expect(navigation).toHaveAttribute("aria-controls", "kgos-version-drawer");
+  await expect(navigation).toHaveAttribute("aria-expanded", "false");
   await expect(navigation).toHaveAttribute("title", "Version navigation");
   await expect(navigation).toHaveText("");
-  await expect(navigation.locator("svg")).toHaveCount(1);
+  await expect(navigation.locator(".sidebar-handle-contour")).toHaveCount(1);
   const bounds = await navigation.boundingBox();
   expect(bounds?.width).toBe(44);
-  expect(bounds?.height).toBe(44);
+  expect(bounds?.height).toBe(112);
   await navigation.click();
   await expect(page.getByRole("dialog", { name: "Mobile version navigation" })).toBeVisible();
-  await expect(page.locator(".version-drawer .commit-item")).toHaveCount(6);
+  await expect(navigation).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".version-drawer .commit-item")).toHaveCount(0);
   const drawer = page.getByRole("dialog", { name: "Mobile version navigation" });
   const featureWorld = drawer.getByRole("button", { name: "feature/search", exact: true });
   await expect(featureWorld).toBeVisible();
   await featureWorld.click();
-  await expect(featureWorld).toHaveAttribute("aria-expanded", "true");
-  await expect(drawer.getByRole("button", { name: "main", exact: true })).toHaveAttribute(
-    "aria-expanded",
-    "false"
+  await expect(featureWorld).toHaveAttribute("aria-current", "page");
+  await expect(drawer.getByRole("button", { name: "main", exact: true })).not.toHaveAttribute(
+    "aria-current",
+    "page"
   );
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth
     )
   ).toBe(false);
-  const featureHistory = drawer.getByRole("region", { name: "Version history: feature/search" });
-  await expect(featureHistory.locator(".commit-item")).toHaveCount(4);
-  await expect(featureHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(0);
-  await featureHistory.locator(".commit-row").first().click();
-  await expect(featureHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(1);
-  await drawer.getByRole("button", { name: "Knowledge world actions" }).click();
-  await page.getByRole("menuitem", { name: "View version relationships" }).click();
+  const historyTrigger = drawer.getByRole("button", {
+    name: "View history: feature/search",
+    exact: true
+  });
+  await historyTrigger.click();
   const relationships = page.getByRole("dialog", { name: "Version relationships", exact: true });
   await expect(relationships).toBeVisible();
+  await expect(relationships.locator(".version-dag-world")).toHaveText("feature/search");
+  await expect(relationships.getByRole("button", { name: /Add hybrid search/ })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
   await page.keyboard.press("Escape");
   await expect(relationships).toBeHidden();
   await expect(drawer).toBeVisible();
+  await expect(historyTrigger).toBeFocused();
   const drawerBounds = await page.locator(".version-drawer").boundingBox();
   expect(drawerBounds?.x).toBe(0);
   expect(drawerBounds?.y).toBe(0);

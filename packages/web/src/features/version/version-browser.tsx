@@ -1,177 +1,109 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../shared/ui/button.js";
 import { Icon } from "../../shared/ui/icon.js";
 import { Input } from "../../shared/ui/input.js";
-import { useHistoryFill } from "./use-history-fill.js";
+import { DomainTreeView } from "../domain/domain-tree.js";
+import type { WorldNavigation } from "../domain/use-world-navigation.js";
 import type { VersionHistory } from "./use-version-history.js";
-import { VersionControls } from "./version-controls.js";
-import { VersionDag } from "./version-dag.js";
-import { CommitHistory, HistoryMore, WorldDirectory } from "./world-directory.js";
-import { CrossWorldFilter } from "./world-picker.js";
+import { VersionControls, VersionContextNotice } from "./version-controls.js";
+import { WorldSection } from "./world-section.js";
 
-function directoryNames(history: VersionHistory, query: string): string[] {
-  if (!history.ready) return [];
-  const known = [...history.branches.map((branch) => branch.name), ...history.retainedWorlds];
-  const search = query.trim().toLocaleLowerCase();
-  return [...new Set(known)].filter((name) => name.toLocaleLowerCase().includes(search));
-}
-
-function VersionFeedback({ history }: { history: VersionHistory }) {
-  const { t } = useTranslation();
-  return (
-    <>
-      {!history.available && (
-        <p className="version-list-status" role="status">
-          {t("versions.unavailable")}
-        </p>
-      )}
-      {history.loading && (
-        <p className="version-list-status" role="status">
-          {t("versions.loading")}
-        </p>
-      )}
-      {history.error && (
-        <p className="version-list-status" role="alert">
-          {t("versions.loadFailed")}
-        </p>
-      )}
-      {history.selectionError && (
-        <p className="version-list-status" role="alert">
-          {t("versions.selectFailed")}
-        </p>
-      )}
-    </>
-  );
-}
-
-function DirectorySearch({
-  history,
-  query,
-  onQueryChange
-}: {
+export interface WorldDirectoryProps {
   history: VersionHistory;
-  query: string;
-  onQueryChange: (query: string) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      {history.mode === "all" && (
-        <section className="version-cross-world" aria-label={t("versions.crossWorldHistory")}>
-          <Button
-            variant="ghost"
-            className="version-back-to-world"
-            onClick={() => {
-              history.setMode("world");
-            }}
-          >
-            <Icon name="chevronLeft" />
-            {t("versions.backToWorld")}
-          </Button>
-          <CrossWorldFilter history={history} />
-        </section>
-      )}
-      <label
-        className={history.mode === "all" ? "version-commit-search" : "world-directory-search"}
-      >
-        <Icon name="search" />
-        <Input
-          type="search"
-          aria-label={t(
-            history.mode === "all" ? "versions.searchCommits" : "versions.searchWorlds"
-          )}
-          placeholder={t(
-            history.mode === "all" ? "versions.searchCommits" : "versions.searchWorlds"
-          )}
-          value={query}
-          onChange={(event) => {
-            onQueryChange(event.currentTarget.value);
-          }}
-        />
-      </label>
-    </>
-  );
+  navigation: WorldNavigation;
+  onOpenHistory: (name: string, trigger: HTMLButtonElement) => void;
+  onOpenAllHistory: (trigger: HTMLButtonElement) => void;
 }
 
-export function VersionTree({ history }: { history: VersionHistory }) {
+export function VersionTree({
+  history,
+  navigation,
+  onOpenHistory,
+  onOpenAllHistory
+}: WorldDirectoryProps) {
   const { t } = useTranslation();
-  const [worldQuery, setWorldQuery] = useState("");
-  const [versionQuery, setVersionQuery] = useState("");
-  const [relationsOpen, setRelationsOpen] = useState(false);
-  const menuRef = useRef<HTMLButtonElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
-  const moreRef = useRef<HTMLButtonElement | null>(null);
-  const names = directoryNames(history, worldQuery);
-  const fill = useHistoryFill({
-    history,
-    scrollRef,
-    contentRef,
-    moreRef,
-    enabled:
-      history.mode === "world" &&
-      history.expandedWorld !== null &&
-      names.includes(history.expandedWorld)
-  });
-  useEffect(() => {
-    if (!history.available) {
-      setRelationsOpen(false);
-      setWorldQuery("");
-      setVersionQuery("");
-    }
-  }, [history.available]);
+  const [query, setQuery] = useState("");
+  const names = history.ready
+    ? [
+        ...new Set([
+          ...history.branches.map((branch) => branch.name),
+          ...history.retainedWorlds,
+          ...[navigation.world, history.currentWorld].filter(
+            (name): name is string => name !== null
+          )
+        ])
+      ].filter((name) => name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+    : [];
   return (
     <div className="version-tree" aria-label={t("versions.tree")}>
       <div className="world-directory-header">
         <VersionControls
           history={history}
-          menuRef={menuRef}
           onRefresh={() => {
-            fill.reset();
             history.refresh();
+            navigation.retry();
           }}
-          onOpenRelations={() => {
-            setRelationsOpen(true);
-          }}
+          onOpenAllHistory={onOpenAllHistory}
         />
-        <DirectorySearch
-          history={history}
-          query={history.mode === "all" ? versionQuery : worldQuery}
-          onQueryChange={history.mode === "all" ? setVersionQuery : setWorldQuery}
-        />
+        <label className="world-directory-search">
+          <Icon name="search" />
+          <Input
+            type="search"
+            aria-label={t("versions.searchWorlds")}
+            placeholder={t("versions.searchWorlds")}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.currentTarget.value);
+            }}
+          />
+        </label>
       </div>
-      <div className="world-directory-scroll" ref={scrollRef}>
-        <div className="world-directory-content" ref={contentRef}>
-          <VersionFeedback history={history} />
-          {history.mode === "world" ? (
-            <WorldDirectory
+      <div className="world-directory-scroll">
+        {!history.available && (
+          <p className="version-list-status" role="status">
+            {t("domains.unavailable")}
+          </p>
+        )}
+        {history.loading && (
+          <p className="version-list-status" role="status">
+            {t("domains.loadingWorlds")}
+          </p>
+        )}
+        {history.selectionError && (
+          <p className="version-list-status" role="alert">
+            {t("versions.selectFailed")}
+          </p>
+        )}
+        {history.error && !history.ready && (
+          <p className="version-list-status" role="alert">
+            {t("versions.loadFailed")}{" "}
+            <Button variant="ghost" onClick={history.refresh}>
+              {t("versions.retry")}
+            </Button>
+          </p>
+        )}
+        <VersionContextNotice history={history} />
+        <ol className="world-directory-list" aria-label={t("versions.world")}>
+          {names.map((name) => (
+            <WorldSection
+              key={name}
+              name={name}
               history={history}
-              names={names}
-              moreRef={moreRef}
-              overflowing={fill.overflowing}
-              stalled={fill.stalled}
-            />
-          ) : (
-            <>
-              {history.available && history.ready && (
-                <CommitHistory history={history} query={versionQuery} />
-              )}
-              <HistoryMore history={history} moreRef={moreRef} show />
-              {history.available && history.branches.length > 0 && (
-                <span className="version-loaded-note">{t("versions.loadedAcrossWorlds")}</span>
-              )}
-            </>
-          )}
-        </div>
+              navigation={navigation}
+              onOpenHistory={onOpenHistory}
+            >
+              <DomainTreeView navigation={navigation} />
+            </WorldSection>
+          ))}
+        </ol>
+        {history.ready && names.length === 0 && (
+          <p className="version-commit-empty">
+            {t(history.branches.length === 0 ? "versions.noBranches" : "versions.noWorldsMatch")}
+          </p>
+        )}
       </div>
-      <VersionDag
-        open={relationsOpen && history.available}
-        onOpenChange={setRelationsOpen}
-        history={history}
-        returnFocus={menuRef}
-      />
     </div>
   );
 }

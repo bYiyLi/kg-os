@@ -55,6 +55,7 @@ export function CrossWorldFilter({ history }: { history: VersionHistory }) {
         <PopoverContent
           align="start"
           className="version-branch-menu"
+          positionerClassName="version-branch-positioner"
           role="group"
           aria-label={t("versions.filterBranches")}
         >

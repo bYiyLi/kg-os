@@ -7,6 +7,7 @@ interface SelectedCommit {
   reader: VersionReader;
   state: string;
   world: string | null;
+  revision: number;
 }
 
 interface PendingSelection {
@@ -40,7 +41,7 @@ export function useVersionSelection(
   const select = useCallback(
     (
       state: string,
-      nextWorld?: string,
+      nextWorld: string | null = null,
       prepare?: (signal: AbortSignal) => Promise<void>,
       onSelected?: () => void
     ) => {
@@ -59,7 +60,7 @@ export function useVersionSelection(
           if (stateRef(result.state) !== requested) throw new Error("Version resolution changed");
           await prepare?.(controller.signal);
           if (current !== generation.current || controller.signal.aborted) return;
-          setChosen({ reader, state: requested, world: nextWorld ?? world });
+          setChosen({ reader, state: requested, world: nextWorld, revision: current });
           onSelected?.();
           setPending(null);
         } catch {
@@ -69,7 +70,7 @@ export function useVersionSelection(
         }
       })();
     },
-    [reader, world]
+    [reader]
   );
 
   let active: PendingSelection | null = null;
@@ -81,6 +82,7 @@ export function useVersionSelection(
   }
   return {
     selected,
+    revision: chosen?.reader === reader ? chosen.revision : 0,
     world: reader === null ? null : world,
     pending: active?.state ?? null,
     pendingWorld: active?.world ?? null,

@@ -8,6 +8,19 @@ interface FixtureCommit {
   parents: string[];
 }
 
+export interface FixtureDomain {
+  name: string;
+  title?: string;
+  includes: string[];
+}
+
+export interface DomainReadCall {
+  operation: "overview" | "objects";
+  at: string;
+  refs?: string[];
+  cursor?: string;
+}
+
 function sha(prefix: string): string {
   return prefix.padEnd(64, "0");
 }
@@ -22,6 +35,108 @@ export const states = {
   index: sha("6e2d4f"),
   genesis: sha("3b7f9c")
 };
+
+const currentDomains: FixtureDomain[] = [
+  { name: "Work", title: "Work", includes: ["domain:People", "domain:Projects"] },
+  { name: "People", title: "People and organizations", includes: ["domain:Shared"] },
+  { name: "Projects", title: "Projects and decisions", includes: ["domain:Shared"] },
+  { name: "Shared", title: "Shared references", includes: [] },
+  { name: "CycleA", title: "Cycle A", includes: ["domain:CycleB"] },
+  { name: "CycleB", title: "Cycle B", includes: ["domain:CycleA"] },
+  { name: "Technology", title: "Technology and tools", includes: [] }
+];
+
+function domainsAt(state: string): FixtureDomain[] {
+  const resolved = state.replace(/^commit\//, "");
+  if (resolved === states.main || resolved === states.search) return currentDomains;
+  if (resolved === states.develop) return [];
+  return [{ name: "Archive", title: "Historical archive", includes: [] }];
+}
+
+function domainOverview(state: string, records = domainsAt(state)) {
+  return {
+    state: state.startsWith("commit/") ? state : "commit/" + state,
+    results: [
+      {
+        kind: "overview",
+        items: records
+          .map((domain) => ({
+            kind: "domain",
+            ref: "domain:" + domain.name,
+            name: domain.name,
+            ...(domain.title === undefined ? {} : { title: domain.title })
+          }))
+          .sort((left, right) => left.ref.localeCompare(right.ref)),
+        total: records.length,
+        markdown: ""
+      }
+    ]
+  };
+}
+
+function domainObjects(state: string, refs: string[], records = domainsAt(state)) {
+  return {
+    state: state.startsWith("commit/") ? state : "commit/" + state,
+    results: refs.map((ref) => {
+      const value = records.find((domain) => "domain:" + domain.name === ref);
+      if (value === undefined) throw new Error("Missing fixture Domain " + ref);
+      return { kind: "domain", ref, value };
+    })
+  };
+}
+
+export async function mockDomainRoutes(
+  page: Page,
+  options: {
+    records?: FixtureDomain[];
+    pageSize?: number;
+    behavior?: "repeat" | "failure";
+  } = {}
+) {
+  const calls: DomainReadCall[] = [];
+  await page.route("**/api/v1/ontology/read", async (route) => {
+    const input = route.request().postDataJSON() as {
+      at: string;
+      cursor?: string;
+    };
+    calls.push({ operation: "overview", ...input });
+    if (input.cursor !== undefined && options.behavior === "failure") {
+      await route.fulfill({
+        status: 503,
+        json: { code: "IO_ERROR", message: "Domain overview unavailable" }
+      });
+      return;
+    }
+    const result = domainOverview(input.at, options.records);
+    const item = result.results[0];
+    if (item === undefined) throw new Error("Missing fixture overview");
+    const offset = Number(input.cursor?.slice("offset:".length) ?? 0);
+    const pageSize = options.pageSize ?? item.total;
+    const repeated = input.cursor !== undefined && options.behavior === "repeat";
+    const next = (repeated ? 0 : offset) + pageSize;
+    let cursor: string | undefined;
+    if (repeated) cursor = input.cursor;
+    else if (next < item.total) cursor = `offset:${String(next)}`;
+    await route.fulfill({
+      json: {
+        ...result,
+        results: [
+          {
+            ...item,
+            items: item.items.slice(repeated ? 0 : offset, next),
+            ...(cursor === undefined ? {} : { cursor })
+          }
+        ]
+      }
+    });
+  });
+  await page.route("**/api/v1/object/read", async (route) => {
+    const input = route.request().postDataJSON() as { at: string; refs: string[] };
+    calls.push({ operation: "objects", ...input });
+    await route.fulfill({ json: domainObjects(input.at, input.refs, options.records) });
+  });
+  return calls;
+}
 
 const branches = [
   { name: "main", state: states.main },
@@ -68,6 +183,7 @@ async function respond(route: Route, body: object) {
 // Read-only HTTP fixture for browser acceptance. The UI must still use the SDK
 // and issue the real Evolution routes with their actual request shapes.
 export async function mockVersionRoutes(page: Page) {
+  await mockDomainRoutes(page);
   await page.route("**/api/v1/evolution/branch/list", async (route) =>
     respond(route, { items: branches })
   );

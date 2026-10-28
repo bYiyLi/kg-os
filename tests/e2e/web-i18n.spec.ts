@@ -13,7 +13,12 @@ async function mockConnectedInstance(page: Page) {
   let requestCount = 0;
   page.on("request", (request) => {
     const path = new URL(request.url()).pathname;
-    if (path.startsWith("/api/v1/evolution/") && !path.endsWith("/overview")) requestCount++;
+    if (
+      (path.startsWith("/api/v1/evolution/") && !path.endsWith("/overview")) ||
+      path === "/api/v1/ontology/read" ||
+      path === "/api/v1/object/read"
+    )
+      requestCount++;
   });
   await page.route("**/api/v1/web/auth/login", async (route) => {
     await route.fulfill({
@@ -162,7 +167,11 @@ test("supports switching inside the mobile drawer at narrow widths", async ({ pa
   await page.getByRole("button", { name: "Version navigation" }).click();
   const drawer = page.getByRole("dialog", { name: "Mobile version navigation" });
   await expect(drawer).toBeVisible();
-  await expect(drawer.locator(".commit-item")).toHaveCount(6);
+  await expect(drawer.locator(".commit-item")).toHaveCount(0);
+  await expect(
+    drawer.getByRole("button", { name: "View history: main", exact: true })
+  ).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Work", exact: true })).toBeVisible();
   const before = getRequestCount();
   const settings = await openPreferenceSettings(page);
   await expect(drawer).toBeHidden();
@@ -175,10 +184,13 @@ test("supports switching inside the mobile drawer at narrow widths", async ({ pa
   await expect(chineseDrawer).toBeVisible();
   await expect(chineseDrawer.getByRole("heading", { name: "知识世界", exact: true })).toBeVisible();
   await expect(chineseDrawer.getByRole("button", { name: "main", exact: true })).toHaveAttribute(
-    "aria-expanded",
-    "true"
+    "aria-current",
+    "page"
   );
-  await expect(chineseDrawer.locator(".world-section-trigger")).toHaveCount(4);
+  await expect(chineseDrawer.locator(".world-section")).toHaveCount(4);
+  await expect(
+    chineseDrawer.getByRole("button", { name: "查看历史：main", exact: true })
+  ).toBeVisible();
   expect(getRequestCount()).toBe(before);
   expect(
     await page.evaluate(

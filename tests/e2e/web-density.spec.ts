@@ -61,7 +61,7 @@ test("compact layout fits a mobile viewport without shrinking the tap target", a
   const dimensions = await page.evaluate(() => {
     const dialog = document.querySelector<HTMLDialogElement>(".authentication-dialog");
     const action = document.querySelector<HTMLElement>(".authentication-connect");
-    const navigation = document.querySelector<HTMLElement>(".mobile-versions-button");
+    const navigation = document.querySelector<HTMLElement>(".sidebar-handle");
     if (dialog === null || action === null || navigation === null) {
       throw new Error("Missing mobile controls");
     }
@@ -85,6 +85,6 @@ test("compact layout fits a mobile viewport without shrinking the tap target", a
   expect(dimensions.dialogBottom).toBeLessThanOrEqual(844);
   expect(dimensions.controlHeight).toBeGreaterThanOrEqual(44);
   expect(dimensions.mobileNavHeight).toBeGreaterThanOrEqual(44);
-  expect(dimensions.mobileNavDisplay).toBe("flex");
+  expect(dimensions.mobileNavDisplay).not.toBe("none");
   expect(dimensions.horizontalOverflow).toBe(false);
 });

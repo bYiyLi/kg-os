@@ -4,7 +4,7 @@ import type { ResolvedState } from "@kgos/sdk";
 
 import {
   loadMoreVersions,
-  loadVersions,
+  loadMissingVersions,
   loadWorldVersions,
   readVersionRefs
 } from "./version-data.js";
@@ -130,47 +130,8 @@ function useVersionObservation({ reader, generation, setLoaded, snapshot, loadin
   return { checkedAt, error, checking, check, abort, didLoad };
 }
 
-function useVersionPaging(store: PageStore, loading: boolean) {
-  const { reader, snapshot, generation, setLoaded, loadedRef } = store;
-  const [paging, setPaging] = useState(false);
-  const [error, setError] = useState(false);
-  const active = useRef<AbortController | null>(null);
-  const abort = useCallback(() => {
-    active.current?.abort();
-    active.current = null;
-    setPaging(false);
-    setError(false);
-  }, []);
-  const loadMore = useCallback(
-    (selected: ReadonlySet<string>) => {
-      if (reader === null || snapshot === null || paging || loading) return;
-      const controller = new AbortController();
-      const current = generation.current;
-      active.current?.abort();
-      active.current = controller;
-      setPaging(true);
-      setError(false);
-      void loadMoreVersions(reader, snapshot, selected, controller.signal).then(
-        (data) => {
-          if (generation.current !== current || controller.signal.aborted) return;
-          setLoaded((previous) =>
-            previous?.reader === reader
-              ? { reader, data: continuedPages(previous.data, snapshot, data, selected) }
-              : previous
-          );
-          setPaging(false);
-        },
-        () => {
-          if (generation.current !== current || controller.signal.aborted) return;
-          controller.abort();
-          setError(true);
-          setPaging(false);
-        }
-      );
-    },
-    [reader, snapshot, paging, loading, generation, setLoaded]
-  );
-  const openWorld = useCallback(
+function useWorldPage({ reader, generation, loadedRef, setLoaded }: PageStore) {
+  return useCallback(
     async (name: string, root: ResolvedState, signal: AbortSignal, replace = true) => {
       if (reader === null) throw new Error("No version connection");
       const current = generation.current;
@@ -189,7 +150,85 @@ function useVersionPaging(store: PageStore, loading: boolean) {
     },
     [reader, generation, loadedRef, setLoaded]
   );
-  return { paging, error, abort, loadMore, openWorld };
+}
+
+interface FailedPageRequest {
+  reader: VersionReader;
+  snapshot: VersionSnapshot;
+  selected: ReadonlySet<string>;
+  missing: boolean;
+}
+
+function useVersionPaging(store: PageStore, loading: boolean) {
+  const { reader, snapshot, generation, setLoaded } = store;
+  const [paging, setPaging] = useState(false);
+  const [error, setError] = useState(false);
+  const active = useRef<AbortController | null>(null);
+  const failed = useRef<FailedPageRequest | null>(null);
+  const abort = useCallback(() => {
+    active.current?.abort();
+    active.current = null;
+    failed.current = null;
+    setPaging(false);
+    setError(false);
+  }, []);
+  const load = useCallback(
+    (selected: ReadonlySet<string>, missing: boolean, retrySnapshot?: VersionSnapshot) => {
+      const source = retrySnapshot ?? snapshot;
+      if (reader === null || source === null || paging || loading) return;
+      const pending = missing
+        ? source.branches.some(
+            (branch) => selected.has(branch.name) && source.pages[branch.name] === undefined
+          )
+        : [...selected].some((name) => source.pages[name]?.cursor !== undefined);
+      if (!pending) return;
+      const controller = new AbortController();
+      const current = generation.current;
+      active.current?.abort();
+      active.current = controller;
+      setPaging(true);
+      setError(false);
+      failed.current = null;
+      const readPages = missing ? loadMissingVersions : loadMoreVersions;
+      void readPages(reader, source, selected, controller.signal).then(
+        (data) => {
+          if (generation.current !== current || controller.signal.aborted) return;
+          setLoaded((previous) =>
+            previous?.reader === reader
+              ? { reader, data: continuedPages(previous.data, source, data, selected) }
+              : previous
+          );
+          setPaging(false);
+        },
+        () => {
+          if (generation.current !== current || controller.signal.aborted) return;
+          controller.abort();
+          failed.current = { reader, snapshot: source, selected: new Set(selected), missing };
+          setError(true);
+          setPaging(false);
+        }
+      );
+    },
+    [reader, snapshot, paging, loading, generation, setLoaded]
+  );
+  const openWorld = useWorldPage(store);
+  const loadMore = useCallback(
+    (selected: ReadonlySet<string>) => {
+      load(selected, false);
+    },
+    [load]
+  );
+  const ensurePages = useCallback(
+    (selected: ReadonlySet<string>) => {
+      load(selected, true);
+    },
+    [load]
+  );
+  const retry = useCallback(() => {
+    const request = failed.current;
+    if (request?.reader === reader) load(request.selected, request.missing, request.snapshot);
+  }, [reader, load]);
+  return { paging, error, abort, loadMore, ensurePages, openWorld, retry };
 }
 
 export function useVersionPages(reader: VersionReader | null) {
@@ -197,6 +236,7 @@ export function useVersionPages(reader: VersionReader | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [refreshID, setRefreshID] = useState(0);
+  const [directoryRevision, setDirectoryRevision] = useState(0);
   const generation = useRef(0);
   const loadedRef = useRef<Loaded | null>(null);
   const loadingRef = useRef(false);
@@ -218,8 +258,9 @@ export function useVersionPages(reader: VersionReader | null) {
     if (reader === null) {
       setLoaded(null);
     } else {
-      void loadVersions(reader, controller.signal).then(
-        (data) => {
+      void readVersionRefs(reader, controller.signal).then(
+        (refs) => {
+          const data = { ...refs, pages: Object.create(null) as VersionSnapshot["pages"] };
           if (generation.current !== current || controller.signal.aborted) return;
           setLoaded((previous) => {
             if (previous?.reader !== reader) return { reader, data };
@@ -231,6 +272,7 @@ export function useVersionPages(reader: VersionReader | null) {
             return { reader, data: { ...data, pages } };
           });
           didLoad(true);
+          setDirectoryRevision((value) => value + 1);
           loadingRef.current = false;
           setLoading(false);
         },
@@ -258,10 +300,15 @@ export function useVersionPages(reader: VersionReader | null) {
   return {
     snapshot,
     loading,
+    directoryRevision,
     paging: paging.paging,
     error: error || paging.error,
+    directoryError: error,
+    pagingError: paging.error,
+    retryPaging: paging.retry,
     refresh,
     loadMore: paging.loadMore,
+    ensurePages: paging.ensurePages,
     cancelPaging: paging.abort,
     openWorld: paging.openWorld,
     checkRefs: observation.check,

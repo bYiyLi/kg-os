@@ -1,8 +1,10 @@
 # Phase 14：Web
 
+<!-- cspell:words Linkurious -->
+
 ## 目标与状态
 
-`in_progress`（2026-10-25 用户批准知识世界与版本导航增量；其余完整业务链继续暂缓）。本阶段把已确认的 [Web 设计](../../design/web.md)接入现有 Runtime、SDK 与业务 API，交付可以真实浏览、查询、编辑和管理版本的内置 Web 工作区。2026-10-13 已另行提前实现静态页面外壳；2026-10-14 先行实现强制 Token 认证弹窗、`web.data.info`、daemon boot guard 与 Web 连接失效 / 显式重连，通过 SDK 对受保护业务 API 发起请求；已增加服务器持久 Web Session、Cookie 无感刷新恢复及退出撤销，不依赖后续 Web UI store。2026-10-14 **P14-00 Web 国际化基础已实现并通过定向测试**；2026-10-15 **先行实现紧凑版本导航的真实 Evolution SDK 读取**。本轮范围见下文增量，Web 数据存储、查询、编辑及完整 A14-08/整体 Phase 验收仍未完成，原 P14-01–11 的 Acceptance 不因局部先行开发而改变。
+`in_progress`（2026-10-28 领域树与 Branch 历史弹窗已有本地增量证据；用户另批准 Q3 单画布搜索与真实图谱浏览增量，其余完整业务链继续暂缓）。本阶段把已确认的 [Web 设计](../../design/web.md)接入现有 Runtime、SDK 与业务 API，交付可以真实浏览、查询、编辑和管理版本的内置 Web 工作区。2026-10-13 已另行提前实现静态页面外壳；2026-10-14 先行实现强制 Token 认证弹窗、`web.data.info`、daemon boot guard 与 Web 连接失效 / 显式重连，通过 SDK 对受保护业务 API 发起请求；已增加服务器持久 Web Session、Cookie 无感刷新恢复及退出撤销，不依赖后续 Web UI store。2026-10-14 **P14-00 Web 国际化基础已实现并通过定向测试**；2026-10-15 **先行实现紧凑版本导航的真实 Evolution SDK 读取**。本轮范围见下文增量，Web 数据存储、查询、编辑及完整 A14-08/整体 Phase 验收仍未完成，P14-04/05 的主页面呈现按本轮用户认可的 Q3 单画布方向替代旧帧布局；其余原 Acceptance 与协议、数据、安全和完整交付门禁不因局部增量降低。
 
 **职责补充（2026-10-14）**：[Phase 18](18-chatgpt-embedded-web.md) 负责 ChatGPT MCP Apps 的双入口、同一 React Shell 复用及宿主通信验收；本阶段仍独占真实 Web 查询、图谱、Ontology/Knowledge 编辑、版本/草稿等业务 Feature。Phase 18 的入口联通不替代本阶段 A14 业务验收，后续每个已实现 Feature 再按需复用到内嵌 UI。
 
@@ -11,7 +13,7 @@
 ```text
 打开当前 Instance 的 daemon endpoint，显式连接
   → 选择并固定浏览 State
-  → 查询并阅读独立结果帧 / 本体图谱
+  → 搜索知识起点，在单一画布点选、查看详情并展开关系
   → 显式编辑，预览并确认一次高层 Patch
   → 查看真实回执，按需刷新当前分支
   → 刷新 / 重开后优先恢复有效 Web Session（失效时重新输入根 Token），之后恢复已保存输入和工作位置
@@ -21,9 +23,9 @@
 
 ## 设计输入
 
-- [Web owner](../../design/web.md)：交互、帧生命周期、草稿、持久化与连接工程合同；实现核对以[当前能力与工程待办](../../design/web.md#当前能力与工程待办)及[动态验收边界](../../design/web.md#设计自查与后续动态验收边界)为入口。
+- [Web owner](../../design/web.md)：单画布搜索/探索、请求生命周期、草稿、持久化与连接工程合同；实现核对以[当前能力与工程待办](../../design/web.md#当前能力与工程待办)及[动态验收边界](../../design/web.md#设计自查与后续动态验收边界)为入口。
 - [Web 国际化与语言偏好](../../design/web.md#国际化与语言偏好)：双语言、语言解析/保存、页面与认证展示、不可翻译数据范围以及前端模块边界。CLI 的环境变量 locale 合同只由 [CLI owner](../../design/cli.md#国际化)负责。
-- [统一功能材料与覆盖矩阵](../../design/web-materials.md)：Q1/Q2、E1/E2/E3、O1/O2、V1–V4、R1/R2 与 A1；状态表是条件成立时的组件表现，不是新页面。认可的白蓝风格和首版简化范围以 Web owner 为准。
+- [统一功能材料与覆盖矩阵](../../design/web-materials.md)：当前右侧以 Q3 单画布/搜索为准，V7 负责领域树与历史弹窗；Q1/Q2 为已替换的帧布局历史材料，E1/E2/E3、O1/O2、V1–V4、R1/R2 与 A1 按各自仍有效的规则适用。状态表不是新页面，视觉认可不等于真实功能已实现。
 - [一致评审样例](../../design/web-examples.md)：作为真实测试 fixture 的输入参考；通过正式 API 建立所需模型、数据和版本，符号 State、短 hash、示意 JSON 与计数不作为 wire 或固定返回值。
 - [Object 公共调用合同](../../design/object.md#object-公共调用合同)：同 State batch read、canonical YAML、Git Extended Diff、strict base、alias 与 transition；[Ontology](../../design/ontology.md#公共可编辑格式)、[共享资源](../../design/ontology.md#共享资源与聚合编辑)和 [Domain](../../design/ontology.md#domain业务组织)约束模型聚合编辑。
 - [Knowledge 数据访问](../../design/graph.md#knowledge-数据访问)及 [Graph 调用合同](../../design/graph.md#graph-公共调用合同)：真实 Property Graph、typed values、query/execute 与底层事务边界。
@@ -59,8 +61,8 @@
 | 1. 连接与 `.kgos/web` 持久基础 | P14-01 Daemon Web 数据 | Runtime Paths、独立普通 SQLite UI store、缓存、受控 API、共享错误映射与认证后的 boot guard；落在 Runtime/daemon adapter，隔离现有 Kernel | 当前 Runtime 基线；[Web 工作区数据](../../design/web.md#web-工作区数据)、[连接](../../design/web.md#连接认证与恢复) | [A14-01](#a14-01-daemon-存储与接口) |
 | 1. 连接与 `.kgos/web` 持久基础 | P14-02 SDK 与连接适配 | SDK `web.data / web.cache` 和 Blob 下载；Web fetch 注入 guard、有界 JSON/NDJSON 接收、每请求取消；简短显式连接与 pinned 上下文 | P14-01；[SDK](../../design/client.md#kgossdk)、[响应预算](../../design/web.md#接收与显示预算)、[当前上下文](../../design/web.md#信息架构与当前上下文) | [A14-02](#a14-02-sdk连接与上下文) |
 | 1. 连接与 `.kgos/web` 持久基础 | P14-03 记录保存与恢复基础 | workspace/editor/frame/query/draft 记录接入、自动保存、按记录 CAS、原位置恢复；收藏查询仅填入编辑器，维护能力不新增日常管理页 | P14-01/02；[记录生命周期](../../design/web.md#持久记录与可丢弃缓存)、[库绑定与恢复](../../design/web.md#库绑定格式与恢复)、[多窗口保存](../../design/web.md#受控-api-与多窗口保存) | [A14-03](#a14-03-自动保存与恢复) |
-| 2. 查询与结果帧 | P14-04 查询生命周期 | 顶部编辑器、逐帧请求快照、查询/高级执行、重跑/折叠/关闭/全屏/取消、排队与预算；落在 Web 并复用 SDK parser | P14-02/03；[帧流](../../design/web.md#编辑器与结果帧流)、[State](../../design/web.md#state-固定与重跑)、[反馈](../../design/web.md#查询状态与反馈) | [A14-04](#a14-04-独立帧与执行) |
-| 2. 查询与结果帧 | P14-05 图投影与检查器 | 真实 typed 图值投影、Graph/JSON、帧内检查器、有界邻居展开、局部布局和按需缓存恢复 | P14-04；[图投影](../../design/web.md#图投影与帧内检查器)、[高级执行](../../design/web.md#高级执行与无图写入结果) | [A14-05](#a14-05-图阅读与预算) |
+| 2. 搜索与图谱探索 | P14-04 搜索与画布读取生命周期 | 顶部搜索、固定 State、参数化真实检索、操作快照/取消/迟到保护、空/失败/受限反馈及预算；复用 SDK parser，后续高级执行保持显式写入边界 | 当前只读增量复用既有连接/导航，可先于 UI store；持久读取记录后接 P14-03；[单画布合同](../../design/web.md#知识图谱画布与搜索)、[协议反馈](../../design/web.md#查询状态与反馈) | [A14-04](#a14-04-独立帧与执行) |
+| 2. 搜索与图谱探索 | P14-05 图投影与按需详情 | 单画布真实 typed Node/Relationship/Path 投影、选择/详情、有界邻居展开、局部布局、平移/缩放/适配；后续按需缓存恢复 | P14-04；[单画布合同](../../design/web.md#知识图谱画布与搜索)、[图投影语义](../../design/web.md#图投影与帧内检查器) | [A14-05](#a14-05-图阅读与预算) |
 | 3. Knowledge / 本体编辑 | P14-06 Knowledge 草稿与 Patch | 显式新建/编辑/删除、canonical base、无损表单与按需 YAML/Patch、预览确认、可靠保存后一次提交及真实回执 | P14-03/05；[显式编辑](../../design/web.md#显式编辑工作流)、[删除](../../design/web.md#节点关系与删除影响)、[保存与提交](../../design/web.md#保存与知识提交) | [A14-06](#a14-06-knowledge-草稿与提交) |
 | 3. Knowledge / 本体编辑 | P14-07 Ontology 图与聚合编辑 | 全局/Domain/Definition 图、同 State 详情与分页、字段/约束/索引聚合编辑；复用 P14-06 的 Patch/提交路径，支持同请求 Ontology + Knowledge | P14-03/06；[本体图谱](../../design/web.md#本体图谱)及 Ontology/Object owner | [A14-07](#a14-07-本体图与模型变化) |
 | 4. 版本演化 | P14-08 知识世界、版本列表与覆盖 DAG | 当前世界单选、版本历史/最新与浏览区分、跨世界筛选、可见范围渲染、分页/局部搜索、真实 parent DAG 与 ref 变化提示；本轮允许复用现有连接/只读 SDK 先行 | P14-02/03 的持久化与旧帧部分后续联验；[版本区域](../../design/web.md#版本区域) | [A14-08](#a14-08-历史与覆盖-dag)及本轮增量 |
@@ -84,13 +86,13 @@
 1. P14-01 daemon store/API/boot guard
       → P14-02 SDK + Web fetch/connection/pinned context
       → P14-03 record autosave/CAS/restore
-2. P14-04 frame lifecycle → P14-05 graph/inspector
+2. P14-04 search/canvas lifecycle → P14-05 graph/details/neighbor exploration
 3. P14-06 Knowledge draft/Patch → P14-07 Ontology aggregate
 4. P14-08 list/DAG → P14-09 State/History/Diff/ref → P14-10 Merge
 5. P14-11 real E2E/packaged/platform gates/final review
 ```
 
-这是默认推进顺序，Feature 表给出实际依赖。**P14-00 可独立于暂缓的业务链先行实施**；2026-10-25 两项已批准增量使 Phase 为 `in_progress`，其余业务链仍暂缓；所有后来新增的 Web 可见文案直接使用这套资源，不再硬编码。P14-02 先提供基础 State 解析/切换与显式目标 Branch，保证查询和编辑不等待完整历史 UI；P14-08 再复用该上下文补齐版本列表/DAG。P14-03 提供各记录/subtype 的保存基础，帧、Object、State Data、Merge 各 Feature 再接入自己的恢复校验。UI 库只存操作数据，不能用记录保存替代真正 Kernel 提交。
+这是完整业务链的默认推进顺序，Feature 表给出实际依赖。2026-10-28 已批准的只读单画布增量复用既有认证、SDK 与导航上下文，先完成真实检索/图浏览，不等待尚未实施的 UI store；持久恢复、高级执行、编辑与后续阶段门禁仍单独验收。**P14-00 可独立于暂缓的业务链先行实施**；2026-10-25 两项已批准增量使 Phase 为 `in_progress`，其余业务链仍暂缓；所有后来新增的 Web 可见文案直接使用这套资源，不再硬编码。P14-02 先提供基础 State 解析/切换与显式目标 Branch，保证查询和编辑不等待完整历史 UI；P14-08 再复用该上下文补齐版本列表/DAG。P14-03 提供各记录/subtype 的保存基础，帧、Object、State Data、Merge 各 Feature 再接入自己的恢复校验。UI 库只存操作数据，不能用记录保存替代真正 Kernel 提交。
 
 各 Feature 取得针对性验收与局部 Review 后再接依赖它的功能；需要上下游的场景在两者具备时联验，并在 P14-11 取得完整阶段证据。组件的键盘、窄屏、错误反馈与预算随功能落实，最终阶段测量和回归。设计覆盖按材料 ID → Feature → Acceptance 追踪，不能按画板数量机械拆分交付单位。
 
@@ -126,7 +128,7 @@
 
 ## 平铺世界与设置入口收敛（2026-10-25）
 
-用户批准 [V6 高保真](../../design/assets/web/V6-flat-world-sidebar.png)并授权先同步设计/计划，再实现与验收；本增量替换上方 V5 的世界下拉入口，沿用 P14-08 与现有五分类设置，不另建 Phase。新规则由 [Web 版本区域](../../design/web.md#版本区域)拥有。
+本节保留当时的实施与验收；侧栏内容、选择行为与历史入口已由下方 [2026-10-28 增量](#领域树与-branch-历史弹窗2026-10-28)替换。用户当时批准 [V6 高保真](../../design/assets/web/V6-flat-world-sidebar.png)并授权先同步设计/计划，再实现与验收；本增量替换上方 V5 的世界下拉入口，沿用 P14-08 与现有五分类设置，不另建 Phase。新规则由 [Web 版本区域](../../design/web.md#版本区域)拥有。
 
 | 工作 | 验收目标 | 状态 |
 | --- | --- | --- |
@@ -149,6 +151,137 @@
 - **浏览器**：正式构建上的 Playwright **56/56 通过（27.0 秒）**，包含 5 项满高/分页场景、桌面/320px/375px、双语/主题、键盘/焦点、真实 Runtime 及内嵌 Host fixture。真实 Runtime 使用临时独立库、正常认证和真实 Evolution API，创建三个世界与共享 Head，验证历史选择/返回最新/父边，未 mock 版本路由、未移动原默认 Head。现有 `http://127.0.0.1:5173/` 实页也已核对展开/收起、历史选择/返回最新及设置中的主题、语言、退出入口；开发库只有 main 与两个真实版本，按耗尽规则自然留白，未为截图伪造数据。实页截图为 `.cache/flat-world-sidebar/final-dev-sidebar.png`。
 - **失败修正与 Review**：前期覆盖率不足通过补充真实交互/失败路径回归解决，未放宽阈值；首次完整门禁停在格式检查，格式修正后重新跑完整流程通过。复核中先复现并修正 A 世界分页错误/忙碌污染 B、旧模式闭包取消新分页，以及模式往返把主动取消误判为无进度；最终相关三文件 **38/38 定向通过**，独立只读 Review 确认无剩余必改。旧 V5 与设置专项证据不替代这轮实际结果。
 - **交付边界**：本轮不新增后端 API、依赖、世界元数据或持久 UI store；保留原有设置业务文件。未 Commit/Push、OpenClaw Docker、公开 CI、发布或真实 ChatGPT 宿主验收。查询、知识/本体编辑和 Web 持久化仍未完成，不以本地导航增量关闭整个阶段。
+
+## 领域树与 Branch 历史弹窗（2026-10-28）
+
+`done`（本地增量；整个 Phase 14 仍为 `in_progress`）。用户已批准 [V7 领域树](../../design/assets/web/V7-domain-tree-sidebar.png)和 [V7 历史弹窗](../../design/assets/web/V7-branch-history-dialog.png)，并明确要求先更新设计与开发计划，再修改代码和验证。本增量沿用 P14-08，并接入 P14-07 的只读领域导航部分，不另建 Phase；唯一交互规则由 [Web 版本区域](../../design/web.md#版本区域)维护，Domain / State 合同沿用现有 owner。
+
+本次只交付左侧真实领域树、Branch / State / Domain 选中上下文与历史浏览，右侧仍为现有占位画布。保留当前深浅主题、字体、弧形控制柄、侧栏调宽、固定设置和普通浏览器/内嵌双入口。不实现本体图、Knowledge 查询/编辑、领域或 Branch CRUD、Web 持久化，不包含 Commit/Push、远端部署或正式发布。
+
+| 实施顺序 / 工作 | 验收目标 | 状态 |
+| --- | --- | --- |
+| 1. 设计与材料 | owner 替换 Branch 下 Commit 列表和靠左 DAG 抽屉的有效规则，归档 V7 与来源，计划保留旧验收并明确替换关系 | `done`（文档/材料） |
+| 2. 同 State 领域组织读取 | 全局分页枚举 Domain，过滤未归类 Definition；每批最多 100 个 `object.read` 读取公共 `includes`；拓扑完整后派生树根和无领域状态，保留多父/cycle 可发现入口 | `done`（本地） |
+| 3. Branch / 领域树 | 名称选择、箭头展开和行末历史独立；真实嵌套、共享路径、循环引用停止、无领域仅 Branch；选中绑定世界+State+Domain，失败/乱序/重连不覆盖既有上下文 | `done`（本地） |
+| 4. 居中历史弹窗 | 未展开 Branch 也可按图标打开；对象/root 与领域展开分离；复用真实父边、分页/选中/返回最新；跨世界高级历史迁入独立弹窗模式，不替换领域侧栏 | `done`（本地） |
+| 5. 验证与 Review | 定向逻辑/组件与负路径、真实隔离 Runtime、内嵌 fixture、浅深主题/中英文/键盘/桌面与 320/375px；完整本地 `pnpm validate`、最终 diff 与独立 Review | `done`（本地） |
+
+验收同时覆盖：无领域、多根、多层、共享子领域、自引用/循环、完整分页、资源超限、长名称、深层窄屏；Branch 共享 Head、前进/删除、历史版本的领域变化、快速切换和迟到响应；历史打开/关闭不切版本或改画布几何、Merge 多父/未加载端点、加载更早与耗尽提示、焦点恢复。只在隔离临时实例创建验收领域和版本，现有本地 Instance 仅只读核对，不写演示数据。
+
+普通浏览器使用现有 HTTP SDK；内嵌入口补固定 `kgos_query` 的 `ontology.read / object.read` 只读调用，沿用当前认证、取消、错误和权限失效行为，不新增公共 API、依赖或通用脚本代理。领域读取失败保留原导航并重试，部分结果不能成为完整/空树；Domain 选择只维护导航状态，不宣称已接入右侧模型视图。
+
+### 领域树增量实施与验收证据
+
+**本轮设计、代码、完整本地门禁与最终 Review 已完成。** 该结论只覆盖本节左侧导航与历史弹窗增量，整个 Phase 14 仍为 `in_progress`；右侧模型图、查询/编辑和持久化等原范围不因局部交付改变。
+
+- **来源与输入一致性**：Mac 主工作区基于 `main@2c96c3a0f2ff7f8030f67f9c8750e24da01a7919` 的 dirty 工作树，含既有其他未提交工作，不虚构本次 Commit。最终完整门禁前后 **891 项源码输入指纹完全一致**，`changed_inputs=[]`。输入、日志与结果分别在 `.cache/domain-tree-navigation/validation-inputs.json`、`validate.log`、`validate-result.json`；门禁后只补本节与开发路线的验收文字，再做文档检查，不修改已验收代码。
+- **实现与读取**：默认侧栏使用真实 Branch / Domain 树，世界名选择、展开箭头和行末历史操作独立；同 State 完整 Overview 分页后通过最多 100 Ref 的 Object batch 读取公共 `includes`，处理多根、共享、循环与真实 Go 空集合编码。缓存、取消与迟到响应按 reader / State 隔离；普通 Web 使用现有 SDK，内嵌使用固定 `kgos_query` 的两个只读方法，无新增公共 API、依赖或 Knowledge 写入路径。历史对象与领域展开独立，跨世界筛选/搜索留在弹窗内；旧版本领域、返回最新与共享 Head 身份保持真实。
+- **真实 Runtime 与本地页面**：隔离临时 Instance 通过真实 Object Patch 建立 `Writing → Characters`，验证当前/历史领域、共享 Head、真实 ancestry 父边与重启；没有 mock 认证/版本/领域协议响应，也没有改动原默认 Head。独立串行 Runtime 流程 **3/3 通过（11.6 秒）**，并再次进入最终完整 E2E。最终 Runtime 截图为 `.cache/domain-tree-navigation/runtime-domain-tree.png` 和 `runtime-history-dialog.png`。现有 `.kgos-dev` 仅只读验证中文页面，其真实数据没有领域，因此只展示 `main` 与历史入口；只读截图为 `local-sidebar-zh.png` 和 `local-history-zh.png`，已在最终门禁后只读复核并刷新截图。未为效果图向现有 Instance 写演示数据。
+- **深层与窄屏实测**：12 层领域树在 **320 / 375 / 1280px** 三视口下，最深名称按钮宽 **136px**、文字区域宽 **99px**，导航自身可横向滚动，页面无横向溢出；结果在 `.cache/domain-tree-navigation/deep-navigation-result.json`。此前最深按钮被压至 12px、文字宽度为 0 的问题已通过导航容器内部滚动和树行最小可读宽度修复，并纳入后续最终完整门禁。
+- **完整本地门禁**：最终 **`pnpm validate` exit 0，540.87 秒**。Vitest **57 文件 / 506 项通过**；TS Statements **94.23%**、Branches **90.08%**、Functions **96.41%**、Lines **96.76%**；Go statement coverage **90.3%**，类型覆盖率 **99.76%**，重复代码 **0**。Playwright **58/58 通过（38.3 秒）**，覆盖深浅主题、双语、桌面/320/375px、键盘与焦点、真实隔离 Runtime 和内嵌 Host fixture；普通与 MCP Web 构建、Go 常规/race/security、许可证与 diff 等既有门禁均通过。生产 npm 依赖无已知漏洞，开发依赖仍有 **3 low / 6 moderate**，按原 high 门槛通过，不称零漏洞。
+- **失败记录与修复闭环**：首轮完整门禁 **exit 1，36.66 秒**，停在新 App 测试的 6 项 ESLint 规范错误；抽取真实 fixture/辅助断言并修正类型处理后，App **13/13** 及对应规范检查通过，没有禁用规则。第二轮完整门禁 **exit 1，547.84 秒**，Playwright **57/58**；历史筛选 Popover 的父 Positioner 仍处于 z-index 50，只提高 Popup 无效，随后给该 Positioner 使用专用层级并复验正常点击。两轮记录保留在 `validate-attempt-1.log` / `validate-attempt-1-result.json` 与 `validate-attempt-2.log` / `validate-attempt-2-result.json`，不把失败轮次当成功证据；最终以修复后固定输入重新完整运行，关闭这些失败。
+- **Review 与文档检查**：独立只读 Review 检查领域数据/双入口、取消与选中、历史 root/cursor、弹窗和窄屏。已修复迟到名称选择覆盖后续展开、首次引用目录失败缺少反馈、历史后页重试未重发原 cursor，以及在另一历史对象打开时选择新 Head 后重开旧缓存根的问题；另修复筛选浮层层级与深层行收缩，相关回归和最终完整门禁通过。前置文档/材料曾核对 39 个新增/修改本地链接与锚点，两张 V7 PNG 的原字节、SHA-256、尺寸与 chunk CRC 匹配；验收文字补写后另做 Prettier、Markdownlint、本地链接及 diff 检查，不重复运行无代码变化的完整门禁。
+- **交付边界**：未由本轮执行 Commit/Push、OpenClaw Docker、远程 CI、部署、正式发布或真实 ChatGPT 宿主验收。内嵌 Host fixture 只证明受控协议/资源与业务路径，不代替真实客户端证据；本增量 `done`（本地）不能据此关闭整个 Phase 14。
+
+### 历史切换体验优化（2026-10-28）
+
+`done`（本地增量；整个 Phase 14 仍为 `in_progress`）。用户反馈历史版本切换不明显，要求在现有风格下优化易用性与流畅性。本轮沿用同一 P14-08 的历史弹窗，不新增 Phase、后端 API、依赖或右侧业务视图；上方已完成的领域树增量及其证据保留，不能代替本轮变更后的验收。交互真源见 [Branch 历史弹窗与纵向 Git DAG](../../design/web.md#branch-历史弹窗与纵向-git-dag)。
+
+| 工作 | 验收目标 | 状态 |
+| --- | --- | --- |
+| 设计与计划 | 明确当前/请求中/成功/失败反馈与阅读连续性，保留直接切换和现有样式 | `done`（文档） |
+| 切换反馈 | 行末常显操作、当前勾选、目标忙碌；顶部持续显示真实世界和 Hash，侧栏历史提示保留 Hash；返回最新不让摘要消失 | `done`（本地实现） |
+| 流畅性与状态安全 | 可见行不强制居中，离屏行按最近边缘定位；无其他待切换目标时当前行不重复请求，同一在途目标不重发，当前行可替换其他在途目标；快速切换只接受最后一次有效结果，失败保留已确认上下文 | `done`（本地实现） |
+| 验证与 Review | 定向组件/并发负路径、普通与内嵌入口、桌面及 320/375px、双语/双主题、键盘/焦点/减少动态效果；完整本地 `pnpm validate` 与最终 diff/独立 Review | `done`（本地） |
+
+完成条件包括：慢请求能看见目标与忙碌状态；成功/返回最新后能辨认实际版本且弹窗保持打开；失败不预切上下文；共享 Head 或查看其他 Branch 历史不混淆当前世界；没有其他待切换目标时重复点击当前行、重复点击同一在途目标均不重发，点击当前行可替换其他待完成目标，反序响应不能覆盖最后一次选择；已经可见的行与分页阅读锚点不跳动，窄屏仍能看到明确动作。仅记录实际通过的本轮证据；本轮不执行 Commit/Push、远程 CI、部署或真实 ChatGPT 宿主验收。
+
+本轮实现、Review 与完整本地门禁已完成，证据如下；只关闭本节历史切换体验增量，不据此关闭整个 Phase 14：
+
+- **实现与定向回归**：DAG、状态摘要与侧栏定向 **34 项通过**；新增 `version-graph-integration` **3/3 通过**，使用真实 `WorkspaceShell` 与导航 hooks 连接当前 Q3 `GraphCanvas`。另有 `graph-feedback` **13/13 通过**，仅是同一工作区的图谱状态反馈接合 QA，不归为本轮实现 Graph。Review 发现的跨世界同 State 去重身份问题已修复并有回归覆盖，当前世界行可替换其他在途目标。
+- **当前构建浏览器验收**：在主工作区 `/Users/yi/Code/KGOS` 当前 Q3 图谱与版本切换组合构建上，`knowledge-world-navigation` 与 `web-shell` **23/23 E2E 通过（22.9 秒）**，命令进程 exit 0、25.24 秒。原 4173 端口被其他发布验收占用，本轮未干预其进程；ignored Playwright 配置只调整到 4175 端口及独立报告目录，源码与执行仍在主仓库。结果和日志为 `.cache/version-switch-ux/e2e-main-result.json` 与 `e2e-main.log`。
+- **现有本地页面观感**：999px 浅色/深色及 375/320px 浅色下，历史选择前后 viewport bounds 稳定、操作可见且页面无横向溢出；返回最新后的摘要持续显示由上述 E2E 验证，本轮观感脚本未测量返回最新后的 bounds。结果为 `.cache/version-switch-ux/local-visual-final-result.json`，截图为同目录的 `history-999-light-final.png`、`latest-999-light-final.png`、`history-999-dark-final.png`、`latest-999-dark-final.png`、`history-375-light-final.png`、`latest-375-light-final.png`、`history-320-light-final.png`、`latest-320-light-final.png` 和 `pending-final.png`。
+- **最终完整本地门禁**：在主工作区 `/Users/yi/Code/KGOS` 的 dirty 组合工作树执行 **`KGOS_E2E_PORT=4175 pnpm validate`，exit 0，675.25 秒**；当时 HEAD 为 `0a963a0e2b26a254e2025f579952e295e4bee30a`，只标识验证基线，不是本轮创建的提交。**922 项输入前后无变化，`changed_inputs=[]`**；结果与日志为 `.cache/version-switch-ux/validate-result.json`、`validate.log`。最终 **68 文件 / 661 项测试通过、62/62 E2E 通过（34.4 秒）**；Go statement coverage **90.3%**，TS Statements **94.97%**、Branches **91.09%**、Functions **96.86%**、Lines **97.26%**，类型覆盖率 **99.74%**，重复代码 **0**。Browser/MCP 构建、类型、lint、文档、Go 常规/竞态/安全、依赖与许可证、diff 等原门槛均通过；生产 npm 依赖无已知漏洞，开发依赖仍有 **3 low / 6 moderate**，按原 high 门槛通过，不称零漏洞。
+- **早期失败与收尾边界**：早期一轮 **636/636 测试通过但 Branch coverage 88.56% 未达 90%** 的结果保留在 `coverage-main.log`；两轮完整尝试分别 **exit 1，48.36/77.16 秒**，日志与结果保留在同目录的 `validate-attempt-1*`、`validate-attempt-2*`。第一轮停于新词汇拼写，第二轮在并行源码变化期间停于 ESLint；修正词汇并冻结源码写入后重新完整运行，最终固定输入结果已通过，旧失败不再代表当前状态，也不计为通过轮次。本轮实现与验证均在主仓库进行，未使用独立工作空间；未执行本轮提交、推送、部署、远程 CI、正式发布或真实 ChatGPT 宿主验收，其他任务造成的 HEAD 变化不归为本轮提交。
+
+## 单画布搜索与图谱浏览增量（2026-10-28）
+
+用户已认可 [Q3 Linkurious 风格](../../design/assets/web/Q3-linkurious-canvas-search.png)，并明确授权先更新设计/开发计划，再实现当前本地页面；随后确认本轮一起接入真实知识搜索与图谱浏览。本增量归 P14-04/05，不新建 Phase；当前 owner 为 [单画布合同](../../design/web.md#知识图谱画布与搜索)，替代旧 Q1/Q2 的顶部多行编辑器和可见结果帧流。左侧 V7 导航、历史弹窗与设置保持既有合同。
+
+本轮范围为连续画布、顶部搜索输入/清空/快捷键、真实只读检索、typed 图投影、节点/关系点选与属性详情、有界邻居展开、局部布局、缩放/平移/适配，以及选择版本/换连接的请求隔离。图中演示数据不复制进产品或现有 Instance；实际验收数据仅在隔离临时 Runtime 创建。当前页面只读浏览，不新增搜索语言、后端 API、图库依赖、任意执行/写入入口或 UI 持久存储。
+
+| 项目 | 工作与验收 | 当前状态 |
+| --- | --- | --- |
+| owner 与视觉材料 | 归档原始 Q3 PNG、来源及 Hash；同步单画布主结构与旧帧历史边界 | 已写入；文档检查与局部独立 Review 通过 |
+| 三路混合检索 | 关键词匹配普通 Knowledge 节点 STRING 属性；全文 `FULLTEXT`/向量托管 `SEMANTIC` 节点索引；同 State、取消/预算、两层 RRF k=60 去重融合，每路完成即展示真实进度；界面呈现路级状态/数量 | 已完成本地实现与验收 |
+| 画布与搜索外观 | 干净无点阵的连续画布、顶部居中单行搜索框、输入/清空/Cmd/Ctrl+K、右下局部控件；深浅主题、双语与 320px | 已完成本地实现与验收 |
+| 真实图谱浏览 | 复用 SDK 固定节点/一跳关系查询，按真实 typed identity 投影；选择/详情/邻居、平行边/自环、局部布局与视口，不开放任意 Path 结果导入 | 已完成本地实现与验收 |
+| 上下文与失败保护 | 同一 pinned State、连接/版本切换取消及 generation、零结果与失败/受限区分；取消清空本次状态与图，不写用户数据 | 已完成本地实现与验收 |
+| 本地检查与 Review | 定向数据/组件回归、Web check、正式 Browser/MCP 双构建、隔离真实 Runtime E2E、桌面/窄屏视觉与 diff Review；完整仓库门禁按实际结果报告 | 本轮完整本地门禁、62 项 E2E 与 Review 通过 |
+
+验收重点：搜索结果来自当前版本真实 Knowledge；不把普通业务 Map 或内部保留图伪装成 Knowledge；缺名称的节点仍可定位，类型与属性保持保真；关系方向/端点、自环和平行边准确；邻居范围和显示上限明确。新搜索、快速点选、展开、切版本、断连与重连的旧响应不能覆盖新选择；失败不写成空库，未知/部分响应不写成完成。属性读取与展开保留已有可用内容，控件不写知识库；历史弹窗开关、侧栏拖动和主题/语言切换不重跑查询或随意重置图相机。
+
+本轮替代的旧验收是“每次查询必须另建可见帧、帧流中折叠/全屏与顶层 Graph/JSON”。原 P14-04/05 的固定 State、取消、完整/部分结果、typed 值、资源预算、真实集成与失败路径仍保留并用于当前画布；高级执行与可靠持久恢复继续在后续范围；本次只读增量完成不等于完整 P14-04/05 或整个 Phase 完成。
+
+### 单画布增量本地实施与验收证据
+
+**本次只读画布/搜索增量已完成本地实现与验收。** 结论只覆盖本节 Q3 范围，P14-04/05 的高级执行、通用 streaming/任意结果导入、可靠持久恢复等完整 Feature 尚未完成，整个 Phase 14 仍为 `in_progress`。
+
+- **最终源码与完整门禁**：在主源码目录 `/Users/yi/Code/KGOS` 的 dirty 组合工作树执行 `KGOS_E2E_PORT=4175 pnpm validate`，exit 0，用时 **675.25 秒**。当时 HEAD 为 `0a963a0e2b26a254e2025f579952e295e4bee30a`，只标识验证基线，不是本轮创建的提交；本轮改动仍未提交。门禁记录 **922 项输入、changed_inputs=[]**，主任务另核对本轮 **184 项 Web 源码/测试/配置指纹，0 变化**。实际结果为 `.cache/version-switch-ux/validate-result.json`，完整日志为同目录 `validate.log`，不能用更早的导航/设置门禁替代。
+- **构建、类型与质量检查**：类型、Lint、Markdown/拼写、secret、Browser/MCP/native 构建、Go 常规/竞态/安全、前端覆盖率、依赖边界、许可证、安全审计和 diff 均按原门槛通过。Go statement coverage **90.3%**；前端 **68 文件 / 661 项测试通过**，Statements **94.97%**、Branches **91.09%**、Functions **96.86%**、Lines **97.26%**；类型覆盖率 **99.74%（29491/29566）**，重复代码 **0 clones**，unused 检查通过。安全检查按现有门槛通过，不写为零漏洞；正式构建保留既有 >500 KiB chunk 警告。
+- **完整浏览器回归**：最终 **62/62 E2E 通过（34.4 秒）**。另有最终专项 **7/7 通过（4190 端口，15.1 秒）**，覆盖真实鼠标点选关系、375/1100px 自包含 MCP UI，以及只关闭最上层历史弹窗后保留外层抽屉和焦点。该协议/浏览器 fixture 不等于真实 ChatGPT 宿主验收。
+- **真实只读知识流程**：两项 Graph Runtime 用独立临时 Instance 与本地测试 Embeddings Provider 贯通三路真实查询、语义特有命中、融合去重、typed 属性、邻居平行边/自环和历史 State 隔离；不以现有 Instance 或生产模型承担写入验收，效果稿节点未写入本地用户知识库。搜索进度到达即可阅读，融合期间展开/隐藏有 UI 与 Hook 双层保护，完成后启用；取消清空、迟到响应和只读边界有定向回归。
+- **Review 与先前失败闭环**：已修正鼠标点边的 pointer capture、拖动后键盘选择和移动端单次 Escape 同时关闭两层的问题；scene/layout 定向 **26/26** 通过，最终浏览器回归确认。早期 4173 端口占用、fixture 400 及一轮 61/62（375px 抽屉 Escape）属于修正前过程，已由最终真实流程和 62/62 结果闭环，不再是当前阻塞。
+- **交付边界**：本轮已修改、已验证；未执行本轮 Git Commit/Push、远端 Docker/CI、部署、正式发布或真实 ChatGPT 宿主验收。其它任务带来的 HEAD 变化不归为本轮提交，本增量不关闭完整 P14-04/05 或整个 Phase。
+
+设计/计划准备验证（2026-10-28 当前未提交工作树）：本轮路径的 Prettier check 与 `git diff --check` 通过；Markdownlint 实际检查 104 份 Markdown，0 问题；五份修改 Markdown 的 CSpell 0 问题；553 处本地路径及本轮新增/变化的 14 处路径/锚点核对通过，Q3 PNG 的原字节、尺寸、长度与来源 SHA-256 一致。局部独立 Review 已修正旧帧术语在当前草稿、键盘、连接和入口材料中的残留，再审未发现本轮必须修正的文档矛盾。这些只证明文档与材料准备，不计为搜索/图谱功能验收。
+
+## 图谱直接操作体验增量（2026-10-28）
+
+状态为 `done`（本地增量；整个 Phase 14 仍为 `in_progress`）。用户反馈现有图谱缺少 Neo4j 式双击/拖动体验，并要求优化直接操作；本轮沿用 Phase 14 的 Q3 单画布，不新建 Phase。[Web 直接操作 owner](../../design/web.md#图谱直接操作与自动布局)记录工程映射，不能写成用户逐项指定的手势、布局公式或新数据模型。首轮 Q3 的 661 项前端测试、62 项 E2E 与完整门禁保留为当时证据；本轮直接操作以以下新增实现、当前构建与实际交互结果独立验收。
+
+| 项目 | 实施与验收目标 | 当前状态 |
+| --- | --- | --- |
+| 直接指针/触屏/键盘操作 | 节点/边单击详情，双击展开/再双击收起、Shift+Enter 与可访问替代入口；节点拖动固定、边或背景起点平移、光标锚点普通滚轮/捏合/双指、显式 fit/缩放与图内快捷键 | `done`（本地实现与实际交互验收） |
+| 搜索种子自动连边 | 三路融合结束后，同 State 参数化读取两端均为最多 50 个命中种子的已有关系，最多 400 条边并识别受限；失败保留节点并单独重试，不引入外部邻居 | `done`（固定查询/预算回归与真实 Runtime） |
+| 展开与局部操作生命周期 | 每节点在途去重、多节点并发独立、选择不取消其它展开、反序结果保护；收起保留种子、共享依赖及在途展开的真实发起节点；清空/搜索/切版本/卸载统一取消，隐藏可撤销最后一次 | `done`（并发、取消、隐藏/撤销负路径） |
+| 跟手布局与相机 | 自动节点在图结构变化后短时有界松弛，新增邻居就近出现、人工固定保留、可解除固定与整理布局；避让节点/标题，fit 计入标题与曲线/自环；减少动态效果不动画，不无限调度，不因展开重置相机 | `done`（布局回归与真实浏览器） |
+| 提示与回归 | 小浮层提示、双主题、桌面/窄屏、原有顶部单搜索布局；新定向测试、隔离真实 Runtime 与浏览器验收，已有本地 22 节点/36 关系演示图仅只读观察效果 | `done`（本轮门禁与独立 Review） |
+
+验收需要真实鼠标双击、节点拖动、从关系起点平移、普通滚轮光标锚点、触屏双指，以及图焦点/可编辑输入/模态隔离；逐一核对 A/B 连续并发展开反序返回、同节点请求去重、收起仍保留搜索种子与共享依赖、隐藏后撤销、搜索种子自动真实连边及补读失败重试。搜索融合 busy 期间可阅读但不修改子图；两次节点点击不得误触发背景 fit，短移动不能丢失 edge click，拖动后的键盘选择仍使用实际位置。
+
+本轮本地实现与验收完成，证据绑定 `/Users/yi/Code/KGOS` 当前未提交工作树（HEAD `0a963a0e2b26a254e2025f579952e295e4bee30a`）；仓库外保留本轮 187 项初始输入基线，最终源码与测试另有 943 项输入指纹记录。最后的状态/证据追加只涉及本节及 Web owner、开发路线三份文档。
+
+- **构建与质量检查**：最终 `pnpm build` exit 0，普通浏览器与 MCP Apps 构建通过；三个 TypeScript 配置的 `pnpm typecheck`、全仓 `pnpm lint` 及随后变更路径的专项 ESLint/Prettier/CSpell 通过。依赖方向检查 0 问题，类型覆盖率 **99.76%**，重复代码 **0**，unused 检查 exit 0（仍有既有 `lefthook` 配置提示）。本轮未重跑完整 `pnpm validate` 或 Go race/coverage/security，不把此前完整门禁当成本轮结果。
+- **测试与覆盖率**：最终 `pnpm test:coverage --maxWorkers=4` **76 文件 / 793 项通过，exit 0**；Statements **95.34%**、Branches **91.06%**、Functions **97.29%**、Lines **97.66%**，原 90% 阈值与用例超时保持。新增回归覆盖同 State 种子连边、节点/边身份与预算、并发展开反序返回、在途节点保留、隐藏/撤销、旧响应失效、菜单/快捷键/焦点、碰撞与自环适配、人工固定及减少动态效果。
+- **当前构建浏览器验收**：`KGOS_E2E_PORT=4190` 下完整 Playwright **69/69 通过，52.0 秒，exit 0**，使用 4 workers 且未配置重试；其中图谱真实 Runtime 专项 **9/9 通过**。隔离临时 Instance 提供真实三路搜索、种子内关系、平行边/自环与固定 State，验证真实鼠标双击、节点拖动、关系起点平移、普通滚轮锚点、双指触屏、右键/键盘菜单、隐藏/撤销和实际 HTTP 反序响应；临时测试 Provider 不替代用户的外部向量服务验收。
+- **实际预览与 Review**：本地演示搜索自动呈现 **22 节点 / 36 关系**；实际鼠标将“林澄”从 **1/0** 双击展开为 **4/4**，再双击收回 **1/0**。节点拖动 **60×40px** 后准确跟随并固定；普通滚轮从 **200%→134%** 时锚点误差小于 1px。键盘菜单首项聚焦、点击搜索关闭菜单并转移焦点已实际复核；深浅主题及 320/375px 无横向溢出，fit 后自环与标题不被搜索框遮挡。独立 Review 检查并修复了在途展开节点消失、修饰键误操作、菜单焦点/外部点击及适配边界，已检查范围内无剩余任务阻塞发现。
+
+首次拼写、旧断言、菜单/触屏交互及末帧读取问题的失败日志和 trace 保留在 `.cache/graph-ux/`；已按实际交互修复后重建并复验。与 E2E 并行的早期覆盖率运行曾出现一个历史用例 5 秒超时，原断言独跑通过后，最终以 `--maxWorkers=4` 与全套浏览器顺序验收；拖动断言改为等待实际最终坐标，保留原 2px 精度及边跟随/固定/整理断言。最终日志为 `build-accepted.log`、`coverage-bounded.log`、`e2e-all-accepted.log`，早期失败不记为通过。
+
+本轮数据与权限边界不变：补读、展开、固定/松弛布局和隐藏/撤销全部只读；现有本地 22/36 演示数据不改写，写入测试数据仅在隔离临时 Instance。演示环境的向量索引仍未配置，本轮不计为外部真实向量服务接入。尚未提交、推送、部署、执行远端 Docker/CI 或真实 ChatGPT 宿主验收；本节完成不关闭完整 P14-04/05 或整个 Phase 14。
+
+## 画布背景还原（2026-10-28）
+
+状态为 `done`（本地增量；整个 Phase 14 仍为 `in_progress`）。按用户批准的还原方案，恢复开发图谱卡片前的画布底色、蓝紫渐变与 20×20px 点阵，沿用原透明度、位置和尺寸；用户随后要求移除画布额外出现的整圈蓝色描边，因此仅取消画布本身聚焦时的整圈 outline，保留原 1px 卡片边框、圆角及节点/按钮焦点提示。当前搜索框、节点/连线和图谱直接操作保持。设计真源见 [单一画布与顶部搜索](../../design/web.md#单一画布与顶部搜索)。上方首轮 Q3 的无点阵外观及验收保留为当时记录，当前背景以本节对应的新决定为准。
+
+验收覆盖浅色 `#F8FBFF`、深色 `#0C1530`，桌面与窄屏的视觉、文字/搜索框可读性，点击画布后、拖动后及键盘聚焦时均无整圈描边而节点及按钮焦点仍可见，拖动、缩放与右键操作，以及修改文件的格式、链接和 diff 检查。仅本地修改与验证，不新增公共 API 或数据结构，不包含提交、推送或部署；整个 Phase 14 仍为 `in_progress`。
+
+本轮证据：恢复后的画布背景声明与改版前版本逐项一致；实际页面在 1280px 桌面、375px 与 320px 窄屏的深浅两种主题下，底色、三层背景、20×20px 点阵和原 1px 卡片边框均正确，无横向溢出。键盘聚焦画布后 outline 为 `none`，节点及按钮仍有焦点提示；真实演示仍为 22 节点 / 36 关系，节点拖动 45×25px 准确跟随并固定，滚轮缩放锚点误差小于 1px，右键菜单及 Escape 返回焦点正常。实际截图在仓库外保存，验证记录位于 `.cache/graph-background-restore/20261028T072719Z/`。
+
+修改文件的 Prettier、文档 CSpell、Markdownlint（104 份）和包含未跟踪文件的 diff 检查通过。本轮为 CSS 与设计/计划修正，未新增测试或重跑完整 `pnpm validate`；上方图谱交互增量的 793/69 项记录保留为当时验收，不计作本轮重跑。
+
+## 左边框导航入口统一（2026-10-28）
+
+状态为 `done`（本地增量；整个 Phase 14 仍为 `in_progress`）。本轮移除画布左上角版本菜单及窄屏搜索框为其保留的空间，按 [Web App Shell 合同](../../design/web.md#前端代码架构)复用左边框弧形控制柄。桌面保持点击收放、240–420px 拖动及 16px 键盘调宽；窄屏保留覆盖式抽屉，统一由边框打开。保留已有工作树、历史验收及 Phase 14 的整体状态；不包含提交、推送或部署。
+
+验收覆盖 320/375/867px、900/901px 断点两侧、桌面收放与调宽、抽屉/设置焦点恢复、历史弹窗逐层关闭、跨断点状态保留，以及中英文、深浅主题和普通浏览器/MCP 内嵌入口。运行 Web `check`、当前源码构建后的完整浏览器测试及文档/diff 检查；本节记录本轮结果，不以旧增量测试替代。
+
+### 本轮实施与验收
+
+- **实现与 Review**：Shell 按现有 900px 断点复用同一个边框柄；窄屏不调宽，ARIA 控制实际抽屉，抽屉与设置显式恢复到稳定入口。窗口变宽时关闭抽屉，保留桌面宽度/折叠及浏览上下文。复核当前改动及既有工作树，保留并行背景还原；未改变公共 API、依赖或知识数据。
+- **Web 与浏览器**：Web `check` 的类型、ESLint、格式与 **692/692 Vitest（59 文件）**通过；当前源码重新构建后，`KGOS_E2E_PORT=4191 pnpm test:e2e --workers=4` 最终 **73/73 通过，43.0 秒，exit 0**，未配置重试。深浅主题下的 320/375/867/900px 边框连接、44×112px 命中区、搜索居中、键盘/触屏/遮罩均有实际浏览器断言；900/901px 切换保留状态。真实隔离 Runtime 验证导航开关不重查图谱或重置选择/相机；MCP 内嵌使用协议 Host fixture，不代表真实 ChatGPT 宿主验收。
+- **失败闭环与证据**：首轮 69/73 中三项是模态打开后用角色定位背景入口的测试错误，改用稳定 DOM 定位；另一项平移提前读取倒数一帧，改为等待原精度的最终位移。后续深色边框的样式过渡也改为等待真实 CSS 状态，未削弱坐标或颜色断言。最终构建与验收期间 178 份前端输入指纹未变化；日志与基线保留在 `.cache/border-navigation/`。本次修改文件的拼写/格式、两份文档 158 个本地目标及新增章节锚点、diff 已检查。仅完成本地增量，未提交、推送、部署或执行远端 CI。
 
 ## 五分类设置增量（2026-10-25）
 
@@ -198,7 +331,7 @@
 1. 新 namespace 复用 SDK 共享错误/协议解析，导出为 Web Platform Blob，无 Node-only 依赖。Web adapter 在 SDK 解码前按 owner 限制 JSON/NDJSON bytes/chunks，保留同一个 AbortSignal；下载流不进 JSON decoder。
 2. 显式连接先取得 boot/store 诊断，再带 guard 访问业务 API。401 清除失效内存凭证；boot 变化停止旧连接所有服务器动作并保留输入；重启/复制目录复用端口与 token 的场景不误发操作。正常恢复须显式重新连接。
 3. 根 Token 不进 URL、Cookie、browser storage、记录、导出或日志；服务端只保存 Session 摘要及根 Token 指纹，浏览器只保存受保护的 HttpOnly Session Cookie。刷新自动恢复有效 Session 并取得临时 Web Bearer，失效时才重新输入根 Token；主动退出须服务端撤销。UI store 不可用时仍可浏览 Kernel 数据，但依赖可靠草稿保存的提交不可绕过。
-4. StateRef 成功解析后才切新上下文；失败保留可用旧视图，解析期间禁止依赖新上下文的执行。顶部、本体、帧和对象选择的迟到响应只能更新对应 generation；A→B 后 A 的详情不覆盖 B。
+4. StateRef 成功解析后才切新上下文；失败保留可用旧视图，解析期间禁止依赖新上下文的执行。当前上下文、画布读取和对象选择的迟到响应只能更新对应 generation；A→B 后 A 的详情不覆盖 B。
 5. 通过现有 ref 接口观察跨 Web/CLI 指针变化，只提示手动刷新；Tag/Branch 移动或本页写入不静默切当前 commit，不修改旧帧。所选 ref 被删除时标明引用不存在，原 commit可读则保留只读上下文，不自动回 main；目标 Branch不存在时保留草稿并禁止提交。
 
 ### A14-03 自动保存与恢复
@@ -209,24 +342,29 @@
 4. 恢复不自动执行查询/写入，不把别的窗口的运行中记录改成终态。缓存 miss 保留帧 metadata，按原 State 另建帧须用户触发；原 State 不存在仍保留输入，不转成当前 State。
 5. Object、Merge、State Data 恢复分别在 P14-06/10/09 重读其权威数据后启用动作；UI revision 不替代 Knowledge baseState、Session revision 或不存在的 sidecar CAS。
 
-### A14-04 独立帧与执行
+<a id="a14-04-独立帧与执行"></a>
 
-1. 每次运行/重跑冻结语句、params、模式、commit/Branch，另建独立帧；编辑器后续变化不改旧记录。主重跑按原 State，按当前 State 新跑有明确入口；折叠/关闭/全屏/Graph/JSON 不改变其他帧 ownership。
-2. 新只读帧在请求前固定 commit，传给 query `at`；流中 rows 不等待 summary 才决定其 State。唯一 summary 与正常 EOF 后才标完成并核对 State；summary 后数据、terminal error、缺 summary/EOF、零行和断流分别验证，异常不伪装完整结果。
-3. 折叠继续运行；取消使用原请求 signal；运行中关闭同时失效执行/详情/邻居 generation。已缓冲 row/summary 与晚到保存/缓存回调不会复活、完成或覆盖已取消/关闭帧。
-4. 活跃流、队列、每帧/整页接收预算真实触发，等待任务可取消且上下文冻结。接收触顶主动 abort 并标部分；图显示受限与接收不完整可区分。
-5. 高级执行显式 Branch、重新观察 head、无 strict base 或自动重试；scalar/无 rows 显示实际 JSON/summary/counters，不造新 State 或 affected IDs。取消/断连标写入待核对，不能承诺回滚；继续探索先在实际返回 State 新建只读帧。
+### A14-04 搜索与画布读取
+
+2026-10-28 用户认可 Q3 并以单画布探索替代旧帧流；以下验收保留原协议与失败保护，更新可观察的主页面交互。原始帧方案保留于 [Web 历史参考](../../design/web.md#历史查询帧与执行参考)。
+
+1. 顶部只有一个简单搜索框，输入/清空/快捷键/焦点反馈真实可用；模态、认证、其它输入及 IME 不被误触发。关键词、全文、向量三路按 owner 落实；不假定统一 `name/title`，不把当前屏幕过滤称为全库检索。
+2. 三路搜索冻结同一输入与当前 immutable State：关键词仅按普通 Knowledge 节点的 STRING 属性做不区分大小写包含匹配，全文/向量发现真实可用索引后检索，按 State + identity 去重并以排名融合合并，不能直接相加不同量纲原始分数。无索引标未配置，一路失败保留其它真实已完成结果并明确部分检索。每次搜索通过现有只读 SDK 查询；新搜索、切版本、换连接使旧操作 generation 失效并使用同一 AbortSignal 取消。旧响应不会混入新画布或改写新搜索状态；失败保留仍有效的上下文与内容。
+3. 当前固定 JSON 查询在核对列、rows、typed 值与返回 State 后才可用，区分零匹配、读取失败、未配置、在途及达到预算；每路完成即更新真实结果，不等待全部。取消真实 abort 并清空本次检索/图，不承诺保留逐路 cancelled 状态。后续流式接入仍需唯一 summary 与正常 EOF 后才标完整，分别验证缺 summary/EOF、terminal error 与断流；本轮没有据此宣称通用流式查询已接入。
+4. 检验 owner 的当前工程初值：每路/融合最多 50 候选、全文/语义各最多 16 个真实节点索引、单次搜索查询并发 4、单请求 15 秒、浏览器 HTTP JSON 解码前 16 MiB、累计 rows 编码 32 MiB、一跳 25 条关系与画布 200 Node / 400 Relationship、属性深度 64/100,000 值。受限与失败如实反馈，不把累计读取量说成 heap/RSS 保证，不补造节点/属性/边或全库数量；全部操作只读。
+5. 后续高级执行仍须显式 Branch、无 strict base 或自动重试；scalar/无 rows 使用真实 JSON/summary/counters，不造新 State 或 affected IDs。取消/断连的写入结果先核对，不能承诺回滚。此能力不从本轮只读搜索框顺带开放，需取得独立实现证据。
 
 ### A14-05 图阅读与预算
 
-1. 用真实 typed Node/Relationship/Path 及混合嵌套值验证 identity + 帧 State 去重、方向、自环/平行边、0 Label、缺端点详情与不一致 payload；普通业务 Map 不被猜成图实体。
-2. 帧内概览只统计当前显示子图，完整 Ref/Labels/Type/端点/typed Property 可查；大整数、null/absence、Temporal/Point/Vector 等原编码不因 JSON/显示或表单入口丢失。高层不支持的原始值仍可阅读，编辑明确受 Object profile 限制。
-3. 邻居用参数化有界 Cypher和同帧 State，计数/范围与原查询分开；迟到详情、展开失败、超限只影响本次操作。局部布局不自动 fit，不绕过帧/页面预算，原查询的完成记录和完整缓存不混入部分展开。
-4. 测量大结果的有界投影、按片段 JSON、可见范围渲染与堆内存/交互性能；释放 rows 保留执行 metadata 和输入，重开按需读缓存，miss 不自动补跑。静态图和预算数字不能替代实际压力证据。
+1. 用当前固定查询真实返回的 typed Node/Relationship 验证 State + element identity 去重、方向、自环/平行边、0 Label、缺失/不一致端点与 payload；普通业务 Map 不猜成图实体，内部保留图不冒充公共 Knowledge。本轮没有任意 Path 结果导入入口，不以单元投影工具能力替代该产品集成。
+2. 当前画布只统计已显示子图；选择后按需查看完整 Ref/Labels/Type/端点/typed Property，大整数、null/absence、Temporal/Point/Vector 等编码不因显示或表单入口丢失。A→B 选择后 A 的迟到详情不能覆盖 B；高层不支持的原始值仍可阅读，编辑保持 Object profile 边界。
+3. 邻居使用参数化有界 Cypher和同一画布 State，显示本次范围/上限；迟到详情、展开失败、超限只影响对应操作。保留已有位置与选择，新元素局部布局，不自动 fit，不绕过画布接收/显示预算。
+4. 平移、节点拖动、缩放、回到选中与适配只改变视图，不写 Knowledge；侧栏/历史弹窗/主题语言等非图操作保持相机与选择，窄屏下搜索和控件不溢出，图与详情都有键盘入口。
+5. 测量真实大结果的有界投影、按片段属性/JSON、可见范围渲染与堆内存/交互性能；后续持久缓存仍须完整记录、State 绑定及明确恢复，缓存 miss 不自动补跑。静态图和预算初值不能替代压力或可靠持久化证据。
 
 ### A14-06 Knowledge 草稿与提交
 
-1. 只有显式编辑/新建/删除进入草稿；历史/Tag/明确 commit 阅读只读，用户另选/建 Branch 并取符合 head 的 base 才可编辑。原帧始终保留原 State。
+1. 只有显式编辑/新建/删除进入草稿；历史/Tag/明确 commit 阅读只读，用户另选/建 Branch 并取符合 head 的 base 才可编辑。原 base 与读取记录始终绑定原 State。
 2. canonical base 来自同 State `readText`，Git Extended Diff 精确针对该正文；支持保留未编辑 typed value、无损编辑/null/absence、多个 target 和新节点/关系 alias。Node 0..N Labels、Relationship 单 Type与真实端点遵守 owner，无损能力不足的字段只读。
 3. 验证改 Type/端点的直接 transition、新 alias 返回 Ref、显式删除关系、Node incident edge reject 及同 Patch 明确处理依赖；不得从局部图猜全库影响、自动 detach 或臆造派生 replacement mapping。
 4. 预览是局部检查与已知影响，须确认具体变化/Branch/base；冻结内容和待核对标记可靠保存确认后，才发送一次同版 Patch。期间重复动作/修改受控；前置保存失败不发送，后置回执失败显示知识成功而 Web 记录未保存。
@@ -245,8 +383,8 @@
 
 1. 大历史、多泳道、fork/merge与未加载 parent 通过真实 ancestry验证：reverse-topological 顺序、完整已知 parent、继续加载标识、完整 State 键与去重均正确，不把轨道推断成 Branch 独占历史。
 2. 列表/DAG只渲染可见范围及缓冲；首次请求使用解析后的 commit，翻页保留原 root 参数与 cursor，加载新 head 开新分页。覆盖直接用 Branch root 的接口回归：下一页不能改 root 为返回 commit仍沿用旧 cursor。文本搜索标明已加载范围；无匹配、跨过滤连接和直接 StateRef 定位不冒充全史搜索或造 parent。
-3. 抽屉覆盖而不加宽列表/挤压画布；实际测量开关前后底层尺寸、图相机及选择不变，不自动 fit。运行中背景数据返回不引发缩放；关闭恢复列表锚点，选择连续且减少动态效果可用。
-4. ancestry topology 与业务 history 分开；immutable 提交时间/摘要与 mutable ref/State Data 来源分开。切版本只影响新视图，旧帧仍按自身 State 查属性/邻居/模型。
+3. 居中历史弹窗覆盖而不加宽导航/挤压画布；实际测量开关前后底层尺寸、图相机及选择不变，不自动 fit。运行中背景数据返回不引发缩放；关闭恢复列表锚点，选择连续且减少动态效果可用。
+4. ancestry topology 与业务 history 分开；immutable 提交时间/摘要与 mutable ref/State Data 来源分开。切版本后画布读取使用新的 pinned State，旧请求/选择不混入；保留的历史读取记录仍绑定其原 State。
 
 ### A14-09 State、差异与 ref
 
@@ -264,7 +402,7 @@
 
 ### A14-11 端到端与交付
 
-1. 扩展现有 Playwright 真实 Runtime fixture，使用 fresh Workspace、真实 Lithograph 和已认证业务 API 构建数据/版本。至少贯通：连接→选 State→多帧查询→属性/邻居→Knowledge/模型编辑→预览确认→一次提交→保留旧帧→显式刷新→重新认证恢复；另贯通真实 Diff和有冲突 Merge。
+1. 扩展现有 Playwright 真实 Runtime fixture，使用 fresh Workspace、真实 Lithograph 和已认证业务 API 构建数据/版本。至少贯通：连接→选 State→真实搜索与单画布阅读→属性/邻居→Knowledge/模型编辑→预览确认→一次提交→显式刷新并隔离旧 State 响应→重新认证恢复；另贯通真实 Diff和有冲突 Merge。
 2. 真实 daemon 验证 401、重启/换端口、store 故障、quota、stale、CAS竞争、cache miss和知识成功但 Web 回执失败；连接/协议故障可在 transport 边界注入，保留实际 Kernel 执行与结果核对。关键业务成功不能以 mock rows或截图替代。
 3. 材料矩阵的 Q/E/O/V/R 功能与状态映射均取得对应证据；A1 随组件验收并最终联验。实际浏览器以 English / 简体中文覆盖关键业务流程、错误与提示、键盘主流程、图对象导航、focus trap/返回、Escape、减少动态效果、长文本、200% zoom与320 CSS px，测量对比与点击区，不以静态画板宣称达标。
 4. 从构建后的同源内嵌产物和仓库外 packed Runtime 打开 Web 并做已认证操作；SDK新接口与现有 CLI/业务路径无回归，两个 Workspace独立 daemon/存储互不串用。源码 dev server成功不能替代打包交付。

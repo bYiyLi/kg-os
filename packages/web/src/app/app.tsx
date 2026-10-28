@@ -107,6 +107,7 @@ function BrowserApp() {
       connection={connection}
       authenticationRequired={connection === null}
       versionReader={connection?.client.evolution ?? null}
+      domainReader={connection?.client ?? null}
       initialVersionState={connection?.state ?? null}
       defaultVersionBranch={connection?.defaultBranch ?? null}
       onDisconnect={

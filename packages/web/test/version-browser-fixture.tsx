@@ -1,19 +1,19 @@
 import { act } from "react";
-import type { EvolutionGetResult } from "@kgos/sdk";
-
+import type { EvolutionGetResult, ResolvedState } from "@kgos/sdk";
 import { I18nextProvider } from "react-i18next";
 import { vi } from "vitest";
 
 import { i18n } from "../src/app/i18n/index.js";
-import { VersionTree as VersionBrowser } from "../src/features/version/version-browser.js";
+import { WorkspaceShell } from "../src/app/layout/workspace-shell.js";
+import type { DomainReader } from "../src/features/domain/domain-data.js";
 import { stateRef, type VersionReader } from "../src/features/version/version-data.js";
-import { useVersionHistory } from "../src/features/version/use-version-history.js";
+import { UiProvider } from "../src/shared/ui/ui-provider.js";
 
 export const main = "a".repeat(64);
 export const develop = "b".repeat(64);
-export const experiment = "c".repeat(64);
+const experiment = "c".repeat(64);
 const feature = "d".repeat(64);
-export const first = "e".repeat(64);
+const first = "e".repeat(64);
 export const common = "f".repeat(64);
 export const genesis = "0".repeat(64);
 export const at = Date.now() * 1000;
@@ -21,8 +21,8 @@ export const ONTOLOGY_COMMIT = "Update ontology";
 export const WORLD_ACTIONS = "Knowledge world actions";
 export const WORLD_REFRESH = "Refresh knowledge worlds";
 export const CROSS_WORLD_FILTER = "Filter knowledge worlds";
-export const PRESSED_ATTRIBUTE = "aria-pressed";
 export const SHARED_MESSAGE = "Shared commit";
+export const PRESSED_ATTRIBUTE = "aria-pressed";
 
 export function row(state: string, message: string, offset: number, parents: string[]) {
   return {
@@ -33,8 +33,41 @@ export function row(state: string, message: string, offset: number, parents: str
   };
 }
 
-export function mockReader(): VersionReader {
+export function mockReader(): VersionReader & DomainReader {
   return {
+    ontology: {
+      read: vi.fn().mockImplementation((request: { at: ResolvedState }) =>
+        Promise.resolve({
+          state: request.at,
+          results: [
+            {
+              kind: "overview",
+              total: 2,
+              markdown: "",
+              items: [
+                { kind: "domain", ref: "domain:Knowledge", name: "Knowledge" },
+                { kind: "domain", ref: "domain:Topics", name: "Topics" }
+              ]
+            }
+          ]
+        })
+      )
+    },
+    object: {
+      read: vi.fn().mockImplementation((request: { at: ResolvedState; refs: string[] }) =>
+        Promise.resolve({
+          state: request.at,
+          results: request.refs.map((ref) => ({
+            kind: "domain",
+            ref,
+            value: {
+              name: ref.slice(7),
+              includes: ref === "domain:Knowledge" ? ["domain:Topics"] : []
+            }
+          }))
+        })
+      )
+    },
     branch: {
       list: vi.fn().mockResolvedValue({
         items: [
@@ -47,7 +80,7 @@ export function mockReader(): VersionReader {
     },
     tag: { list: vi.fn().mockResolvedValue({ items: [{ name: "v1", state: common }] }) },
     ancestry: vi.fn().mockImplementation((request: { root: string; cursor?: string }) => {
-      if (request.root === "commit/" + main) {
+      if (request.root === "commit/" + main)
         return Promise.resolve(
           request.cursor === undefined
             ? {
@@ -60,34 +93,24 @@ export function mockReader(): VersionReader {
               }
             : { root: main, items: [row(genesis, "Initial knowledge", -4000, [])] }
         );
-      }
-      if (request.root === "commit/" + develop) {
+      if (request.root === "commit/" + develop)
         return Promise.resolve({
           root: develop,
           items: [row(develop, ONTOLOGY_COMMIT, 3000, [common]), row(common, SHARED_MESSAGE, 0, [])]
         });
-      }
-      if (request.root === "commit/" + experiment) {
+      if (request.root === "commit/" + experiment)
         return Promise.resolve({
           root: experiment,
           items: [row(experiment, "Experiment", 2000, [common]), row(common, SHARED_MESSAGE, 0, [])]
         });
-      }
       return Promise.resolve({
         root: feature,
         items: [row(feature, "Hybrid search", 1000, [common]), row(common, SHARED_MESSAGE, 0, [])]
       });
     }),
-    get: vi.fn().mockImplementation((request: { state: string }) =>
-      Promise.resolve({
-        state: request.state.slice(7),
-        parents: [],
-        committedAt: at,
-        consistency: { status: "valid", issues: [] },
-        hasData: false,
-        data: null
-      })
-    )
+    get: vi
+      .fn()
+      .mockImplementation((request: { state: string }) => Promise.resolve(resolved(request.state)))
   };
 }
 
@@ -97,21 +120,29 @@ export function VersionBrowserHarness({
   initialState = main
 }: {
   reader: VersionReader | null;
-  defaultBranch?: string;
+  defaultBranch?: string | null;
   initialState?: string;
 }) {
-  const history = useVersionHistory(reader, initialState, defaultBranch);
+  const domainReader =
+    reader !== null && "ontology" in reader && "object" in reader
+      ? (reader as VersionReader & DomainReader)
+      : null;
   return (
     <I18nextProvider i18n={i18n}>
-      <VersionBrowser history={history} />
+      <UiProvider>
+        <WorkspaceShell
+          versionReader={reader}
+          domainReader={domainReader}
+          initialVersionState={initialState}
+          defaultVersionBranch={defaultBranch}
+        />
+      </UiProvider>
     </I18nextProvider>
   );
 }
 
 export function findButton(text: string) {
-  const button = Array.from(
-    document.body.querySelectorAll<HTMLElement>("button,[role=menuitem]")
-  ).find(
+  const button = [...document.body.querySelectorAll<HTMLElement>("button,[role=menuitem]")].find(
     (element) => element.getAttribute("aria-label") === text || element.textContent.trim() === text
   );
   if (button === undefined) throw new Error("Missing button " + text);
@@ -135,7 +166,9 @@ export function checkbox(name: string) {
 }
 
 export function rows() {
-  return [...document.body.querySelectorAll<HTMLButtonElement>(".commit-row")];
+  return [
+    ...document.body.querySelectorAll<HTMLButtonElement>("button.commit-row,button.version-dag-row")
+  ];
 }
 
 export function namedRow(message: string) {
@@ -150,6 +183,10 @@ export function worldButton(name: string) {
   ].find((element) => element.getAttribute("aria-label") === name);
   if (item === undefined) throw new Error("Missing knowledge world " + name);
   return item;
+}
+
+export function worldToggle(name: string) {
+  return findButton("Expand knowledge world: " + name);
 }
 
 export function inputValue(label: string, value: string) {
@@ -183,23 +220,14 @@ export async function flush() {
 }
 
 export async function chooseWorld(name: string) {
-  const trigger = worldButton(name);
-  if (trigger.getAttribute("aria-expanded") !== "true") {
-    act(() => {
-      trigger.click();
-    });
-  }
-  const head = rows()[0];
-  if (head === undefined) throw new Error("Missing world head version");
   act(() => {
-    head.click();
+    worldButton(name).click();
   });
   await flush();
 }
 
-export async function openRelationships() {
-  click(WORLD_ACTIONS);
-  click("View version relationships");
+export async function openRelationships(name = "main") {
+  click("View history: " + name);
   await flush();
 }
 

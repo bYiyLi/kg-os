@@ -8,17 +8,21 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./app.js";
 import { i18n, selectLocale } from "./i18n/index.js";
 import { snapshot as settingsSnapshot } from "../../test/settings-fixture.js";
+import { DOMAIN_TITLE, mockDomainResponse } from "../../test/app-domain-fixture.js";
 
 const TOKEN_INPUT = "#kgos-access-token";
 const AUTH_DIALOG = ".authentication-dialog";
 const MAIN_STATE = "a81c2f".padEnd(64, "0");
+const SIDEBAR_DOMAIN = ".version-sidebar .domain-name";
+const HISTORY_ROUTE = "/evolution/ancestry";
+const PRESSED_ATTRIBUTE = "aria-pressed";
 
 function mockEvolutionResponse(target: string): object {
   if (target.includes("/evolution/branch/list")) {
     return { items: [{ name: "main", state: MAIN_STATE }] };
   }
   if (target.includes("/evolution/tag/list")) return { items: [] };
-  if (target.includes("/evolution/ancestry")) {
+  if (target.includes(HISTORY_ROUTE)) {
     return {
       root: MAIN_STATE,
       items: [
@@ -44,6 +48,22 @@ function mockEvolutionResponse(target: string): object {
   return { defaultBranch: "main", state: MAIN_STATE };
 }
 
+function jsonResponse(value: object) {
+  return Promise.resolve(
+    new Response(JSON.stringify(value), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    })
+  );
+}
+
+function fetchedRoute(route: string) {
+  return vi.mocked(fetch).mock.calls.some(([url]) => {
+    const address = url instanceof Request ? url.url : String(url);
+    return address.includes(route);
+  });
+}
+
 let host: HTMLDivElement;
 let root: Root;
 
@@ -54,50 +74,29 @@ beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.stubGlobal(
     "fetch",
-    vi.fn<typeof fetch>().mockImplementation((input) => {
+    vi.fn<typeof fetch>().mockImplementation((input, init) => {
       let target: string;
       if (typeof input === "string") target = input;
       else if (input instanceof URL) target = input.href;
       else target = input.url;
+      if (target.includes("/ontology/read") || target.includes("/object/read"))
+        return jsonResponse(mockDomainResponse(target, init));
       if (target.includes("/api/v1/setup/status"))
-        return Promise.resolve(
-          new Response(JSON.stringify({ state: "ready", credentialConfigured: true }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          })
-        );
-      if (target.includes("/web/settings/read"))
-        return Promise.resolve(
-          new Response(JSON.stringify(settingsSnapshot()), {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          })
-        );
+        return jsonResponse({ state: "ready", credentialConfigured: true });
+      if (target.includes("/web/settings/read")) return jsonResponse(settingsSnapshot());
       if (target.includes("/web/auth/session"))
         return Promise.resolve(new Response("{}", { status: 401 }));
       if (target.includes("/web/auth/logout"))
         return Promise.resolve(new Response(null, { status: 204 }));
       if (target.includes("/web/auth/login"))
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              accessToken: "kgws_" + "A".repeat(43),
-              daemonBootId: "e48245ac-51a4-4b6b-93ba-07bb4d0626a6"
-            })
-          )
-        );
-      return Promise.resolve(
-        new Response(
-          JSON.stringify(
-            target.includes("/web/data/info")
-              ? {
-                  daemonBootId: "e48245ac-51a4-4b6b-93ba-07bb4d0626a6",
-                  storageStatus: "unsupported"
-                }
-              : mockEvolutionResponse(target)
-          ),
-          { status: 200, headers: { "Content-Type": "application/json" } }
-        )
+        return jsonResponse({
+          accessToken: "kgws_" + "A".repeat(43),
+          daemonBootId: "e48245ac-51a4-4b6b-93ba-07bb4d0626a6"
+        });
+      return jsonResponse(
+        target.includes("/web/data/info")
+          ? { daemonBootId: "e48245ac-51a4-4b6b-93ba-07bb4d0626a6", storageStatus: "unsupported" }
+          : mockEvolutionResponse(target)
       );
     })
   );
@@ -143,8 +142,8 @@ async function renderConnectedApp() {
   expect(document.body.querySelector(AUTH_DIALOG)).toBeNull();
 }
 
-function buttonByName(label: string) {
-  const button = Array.from(document.body.querySelectorAll("button")).find(
+function buttonByName(label: string, container: ParentNode = document.body) {
+  const button = Array.from(container.querySelectorAll("button")).find(
     (element) =>
       element.getAttribute("aria-label") === label || element.textContent.trim() === label
   );
@@ -178,6 +177,11 @@ function versionDialog() {
   return dialog;
 }
 
+function mockNarrowLayout() {
+  const media = Object.assign(new EventTarget(), { matches: true });
+  vi.stubGlobal("matchMedia", () => media);
+}
+
 it("requires authentication before the static shell can be used", async () => {
   await renderApp();
   expect(document.body.querySelector<HTMLElement>(AUTH_DIALOG)?.hasAttribute("data-open")).toBe(
@@ -204,13 +208,10 @@ it("requires authentication before the static shell can be used", async () => {
   expect(document.body.querySelector(".version-sidebar .language-switcher")).toBeNull();
   expect(document.body.querySelector(".sidebar-handle")).not.toBeNull();
   expect(document.body.querySelector(".sidebar-collapse-button")).toBeNull();
-  expect(document.body.querySelector(".canvas-stage .mobile-versions-button")).not.toBeNull();
-  expect(document.body.querySelector(".mobile-versions-button")?.textContent).toBe("");
-  expect(document.body.querySelector(".mobile-versions-button")?.getAttribute("aria-label")).toBe(
-    i18n.t("versions.navigation")
-  );
-  expect(document.body.querySelectorAll(".mobile-versions-button svg")).toHaveLength(1);
-  expect(document.body.querySelectorAll(".canvas-toolbar button:disabled")).toHaveLength(5);
+  expect(document.body.querySelector(".mobile-versions-button")).toBeNull();
+  expect(document.body.querySelector<HTMLInputElement>(".graph-search input")?.disabled).toBe(true);
+  expect(document.body.querySelectorAll(".graph-canvas-controls button:disabled")).toHaveLength(5);
+  expect(document.body.querySelector(".graph-canvas-controls button:not(:disabled)")).toBeNull();
 });
 
 it("applies automatic and manual theme preferences through the settings dialog", async () => {
@@ -219,8 +220,8 @@ it("applies automatic and manual theme preferences through the settings dialog",
   expect(document.body.querySelector(".sidebar-bottom")?.textContent).toBe("Settings");
   await openSettings();
   expect(currentTheme()).toBe("dark");
-  expect(buttonByName("Follow system").getAttribute("aria-pressed")).toBe("true");
-  expect(buttonByName("Dark").getAttribute("aria-pressed")).toBe("false");
+  expect(buttonByName("Follow system").getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(buttonByName("Dark").getAttribute(PRESSED_ATTRIBUTE)).toBe("false");
   act(() => {
     buttonByName("Dark").click();
   });
@@ -230,7 +231,7 @@ it("applies automatic and manual theme preferences through the settings dialog",
   });
   expect(currentTheme()).toBe("light");
   expect(localStorage.getItem("kgos.web.theme")).toBe("light");
-  expect(buttonByName("Light").getAttribute("aria-pressed")).toBe("true");
+  expect(buttonByName("Light").getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
   act(() => {
     buttonByName("Light").click();
   });
@@ -245,7 +246,7 @@ it("applies automatic and manual theme preferences through the settings dialog",
   });
   expect(currentTheme()).toBe("dark");
   expect(localStorage.getItem("kgos.web.theme")).toBeNull();
-  expect(buttonByName("Follow system").getAttribute("aria-pressed")).toBe("true");
+  expect(buttonByName("Follow system").getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
 });
 
 it("fully hides and restores the version sidebar from the canvas-border handle", async () => {
@@ -265,7 +266,9 @@ it("fully hides and restores the version sidebar from the canvas-border handle",
   });
   expect(appShell()?.classList.contains("is-sidebar-collapsed")).toBe(false);
   expect(sidebar?.hasAttribute("inert")).toBe(false);
-  expect(document.body.querySelector(".version-sidebar .commit-list")).not.toBeNull();
+  expect(document.body.querySelector(".version-sidebar .domain-tree-list")).not.toBeNull();
+  expect(document.body.querySelectorAll(SIDEBAR_DOMAIN)).toHaveLength(1);
+  expect(document.body.querySelector(".version-sidebar .commit-list")).toBeNull();
   expect(currentTheme()).toBe("dark");
 });
 
@@ -285,6 +288,7 @@ it("resizes the sidebar by keyboard while keeping the canvas in place", async ()
 });
 
 it("opens a mobile version drawer and closes using the close control", async () => {
+  mockNarrowLayout();
   await renderConnectedApp();
   await act(async () => {
     buttonByName("Version navigation").click();
@@ -293,7 +297,10 @@ it("opens a mobile version drawer and closes using the close control", async () 
   const dialog = versionDialog();
   expect(dialog.getAttribute("role")).toBe("dialog");
   expect(dialog.hasAttribute("data-open")).toBe(true);
-  expect(dialog.querySelectorAll(".commit-item")).toHaveLength(1);
+  expect(dialog.querySelectorAll(".domain-name")).toHaveLength(1);
+  expect(dialog.textContent).toContain(DOMAIN_TITLE);
+  expect(dialog.querySelectorAll(".commit-item")).toHaveLength(0);
+  expect(fetchedRoute(HISTORY_ROUTE)).toBe(false);
   expect(dialog.querySelectorAll(".sidebar-settings-button")).toHaveLength(1);
   expect(dialog.querySelector(".theme-toggle")).toBeNull();
   expect(dialog.querySelector(".language-switcher")).toBeNull();
@@ -305,6 +312,7 @@ it("opens a mobile version drawer and closes using the close control", async () 
 });
 
 it("keeps the drawer open on internal clicks and closes on Escape", async () => {
+  mockNarrowLayout();
   await renderConnectedApp();
   await act(async () => {
     buttonByName("Version navigation").click();
@@ -322,6 +330,25 @@ it("keeps the drawer open on internal clicks and closes on Escape", async () => 
   });
   expect(document.querySelector(".version-drawer[data-open]")).toBeNull();
 });
+
+async function expectChineseHistoryOnDemand() {
+  await act(async () => {
+    buttonByName("关闭设置").click();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    buttonByName("查看历史：main").click();
+    await Promise.resolve();
+  });
+  const historyDialog = document.body.querySelector(".version-dag-dialog");
+  expect(historyDialog).not.toBeNull();
+  expect(historyDialog?.querySelector(".version-dag-world")?.textContent).toBe("main");
+  expect(historyDialog?.querySelectorAll(".version-dag-row")).toHaveLength(1);
+  expect(historyDialog?.textContent).toContain("Update knowledge model");
+  expect(historyDialog?.querySelector(".version-dag-row-meta")?.textContent).toContain("年");
+  expect(fetchedRoute(HISTORY_ROUTE)).toBe(true);
+  expect(buttonByName(DOMAIN_TITLE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+}
 
 it("switches language without losing authentication input or the connected workspace", async () => {
   await renderApp();
@@ -351,26 +378,32 @@ it("switches language without losing authentication input or the connected works
     await Promise.resolve();
   });
   expect(document.body.querySelector(AUTH_DIALOG)).toBeNull();
+  await act(async () => {
+    buttonByName(DOMAIN_TITLE).click();
+    await Promise.resolve();
+  });
+  act(() => {
+    buttonByName("Expand domain: " + DOMAIN_TITLE).click();
+  });
+  expect(document.body.querySelectorAll(SIDEBAR_DOMAIN)).toHaveLength(2);
   await openSettings();
+  const beforeLocaleChange = vi.mocked(fetch).mock.calls.length;
   const connectedLanguage = document.body.querySelector(".settings-dialog .language-switcher");
   await act(async () => {
     connectedLanguage?.querySelector<HTMLButtonElement>('[lang="zh-CN"]')?.click();
     await Promise.resolve();
   });
   expect(document.body.textContent).not.toContain("模拟数据");
-  expect(document.body.textContent).toContain("2小时前");
   expect(document.body.textContent).toContain("知识世界");
-  expect(document.body.querySelector(".history-region")?.getAttribute("aria-label")).toContain(
-    "main"
-  );
-  expect(buttonByName("main").getAttribute("aria-expanded")).toBe("true");
+  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(beforeLocaleChange);
+  expect(document.body.querySelector('[role="region"][aria-label="领域：main"]')).not.toBeNull();
+  expect(buttonByName("main").getAttribute("aria-current")).toBe("page");
+  expect(buttonByName("展开知识世界：main").getAttribute("aria-expanded")).toBe("true");
+  expect(buttonByName(DOMAIN_TITLE).getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
+  expect(document.body.querySelectorAll(SIDEBAR_DOMAIN)).toHaveLength(2);
   expect(currentTheme()).toBe("dark");
-  expect(
-    vi.mocked(fetch).mock.calls.some(([url]) => {
-      const address = url instanceof Request ? url.url : String(url);
-      return address.includes("/evolution/ancestry");
-    })
-  ).toBe(true);
+  expect(fetchedRoute(HISTORY_ROUTE)).toBe(false);
+  await expectChineseHistoryOnDemand();
 });
 
 it("invalidates an established connection after a boot change and requires explicit reconnect", async () => {

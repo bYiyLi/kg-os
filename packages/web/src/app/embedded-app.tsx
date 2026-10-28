@@ -8,7 +8,9 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 
 import { readMcpResult } from "../core/client/mcp-read.js";
 import { createMcpVersionReader } from "../features/version/mcp-version-reader.js";
+import type { DomainReader } from "../features/domain/domain-data.js";
 import type { VersionReader } from "../features/version/version-data.js";
+import type { GraphReader } from "../features/graph/graph-search.js";
 import { i18n, synchronizeHostLocale } from "./i18n/index.js";
 import { WorkspaceShell } from "./layout/workspace-shell.js";
 import type { Theme } from "../shared/lib/use-theme-preference.js";
@@ -22,7 +24,11 @@ interface Overview {
 
 type Connection =
   | { status: "loading" }
-  | { status: "ready"; data: Overview; versionReader: VersionReader }
+  | {
+      status: "ready";
+      data: Overview;
+      versionReader: VersionReader & DomainReader & { graph: GraphReader };
+    }
   | { status: "error" };
 
 export function readOverview(result: unknown): Overview {
@@ -58,11 +64,15 @@ function applyHostPreferences(app: McpApp, setTheme: (theme: Theme | undefined) 
   synchronizeHostLocale(typeof context?.locale === "string" ? context.locale : undefined);
 }
 
+function refreshBridge(app: McpApp | null, refresh: (app: McpApp) => Promise<void>) {
+  if (app !== null) void refresh(app);
+}
+
 function EmbeddedWorkspace() {
   const [connection, setConnection] = useState<Connection>({ status: "loading" });
   const [hostTheme, setHostTheme] = useState<Theme | undefined>();
   const appRef = useRef<McpApp | null>(null);
-  const readerRef = useRef<VersionReader | null>(null);
+  const readerRef = useRef<(VersionReader & DomainReader & { graph: GraphReader }) | null>(null);
   const generation = useRef(0);
   const refresh = useCallback(async (app: McpApp) => {
     const current = ++generation.current;
@@ -136,15 +146,15 @@ function EmbeddedWorkspace() {
     <WorkspaceShell
       hostTheme={hostTheme}
       versionReader={connection.status === "ready" ? connection.versionReader : null}
+      domainReader={connection.status === "ready" ? connection.versionReader : null}
+      graphReader={connection.status === "ready" ? connection.versionReader.graph : null}
       initialVersionState={connection.status === "ready" ? connection.data.state : null}
       defaultVersionBranch={connection.status === "ready" ? connection.data.defaultBranch : null}
       canvasChildren={
         <ConnectionPanel
           connection={connection}
           disabled={connection.status === "loading" || appRef.current === null}
-          onRefresh={() => {
-            if (appRef.current !== null) void refresh(appRef.current);
-          }}
+          onRefresh={refreshBridge.bind(null, appRef.current, refresh)}
         />
       }
     />
@@ -162,7 +172,10 @@ function ConnectionPanel({
 }) {
   const { t } = useTranslation();
   return (
-    <section className="embedded-connection" aria-label={t("embedded.title")}>
+    <section
+      className={"embedded-connection" + (connection.status === "ready" ? " is-ready" : "")}
+      aria-label={t("embedded.title")}
+    >
       <header className="embedded-connection-header">
         <h2>{t("embedded.title")}</h2>
         <Button variant="ghost" type="button" onClick={onRefresh} disabled={disabled}>

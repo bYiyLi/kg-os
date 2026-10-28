@@ -13,11 +13,10 @@ import {
   findButton,
   flush,
   mockReader,
-  namedRow,
-  worldButton
+  worldButton,
+  worldToggle
 } from "../../../test/version-browser-fixture.js";
 
-const RELATIONSHIPS = "View version relationships";
 const ACROSS_WORLDS = "View history across worlds";
 let host: HTMLDivElement;
 let root: Root;
@@ -29,7 +28,6 @@ beforeEach(async () => {
   document.body.append(host);
   root = createRoot(host);
 });
-
 afterEach(() => {
   act(() => {
     root.unmount();
@@ -45,7 +43,7 @@ async function renderMenu() {
   });
   click(WORLD_ACTIONS);
   await flush();
-  return { reader, relations: findButton(RELATIONSHIPS), across: findButton(ACROSS_WORLDS) };
+  return { reader, across: findButton(ACROSS_WORLDS) };
 }
 
 function key(element: HTMLElement, value: string) {
@@ -57,51 +55,32 @@ function key(element: HTMLElement, value: string) {
   return event;
 }
 
-it("moves between the actual world actions with arrows and wraps without opening a version", async () => {
-  const { reader, relations, across } = await renderMenu();
-  expect(key(relations, "ArrowDown").defaultPrevented).toBe(true);
-  expect(document.activeElement).toBe(across);
-  key(across, "ArrowDown");
-  expect(document.activeElement).toBe(relations);
-  key(relations, "ArrowUp");
-  expect(document.activeElement).toBe(across);
-  key(across, "ArrowUp");
-  expect(document.activeElement).toBe(relations);
-  expect(worldButton("main").getAttribute("aria-current")).toBe("page");
-  expect(namedRow("Merge experiment").getAttribute("aria-pressed")).toBe("true");
-  expect(reader.get).not.toHaveBeenCalled();
-  expect(document.body.querySelector(".version-dag-dialog")).toBeNull();
-});
-
-it("uses Home and End to focus the first and last world action", async () => {
-  const { reader, relations, across } = await renderMenu();
-  expect(key(relations, "End").defaultPrevented).toBe(true);
-  expect(document.activeElement).toBe(across);
-  expect(key(across, "Home").defaultPrevented).toBe(true);
-  expect(document.activeElement).toBe(relations);
-  expect(reader.get).not.toHaveBeenCalled();
-  expect(findButton(WORLD_ACTIONS).getAttribute("aria-expanded")).toBe("true");
-});
-
-it("skips the unavailable relationship action after the expanded world is collapsed", async () => {
-  const { reader } = await renderMenu();
-  click(WORLD_ACTIONS);
-  act(() => {
-    worldButton("main").click();
-  });
-  click(WORLD_ACTIONS);
-  const relations = findButton(RELATIONSHIPS);
-  const across = findButton(ACROSS_WORLDS);
-  expect(relations).toHaveProperty("disabled", true);
+it("keeps keyboard navigation within the remaining advanced history action", async () => {
+  const { reader, across } = await renderMenu();
+  expect(document.body.querySelectorAll('[role="menuitem"]')).toHaveLength(1);
   for (const value of ["ArrowDown", "ArrowUp", "Home", "End"]) {
     expect(key(across, value).defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(across);
   }
-  expect(worldButton("main").getAttribute("aria-expanded")).toBe("false");
+  expect(worldButton("main").getAttribute("aria-current")).toBe("page");
   expect(reader.get).not.toHaveBeenCalled();
+  expect(reader.ancestry).not.toHaveBeenCalled();
+  expect(document.body.querySelector(".version-dag-dialog")).toBeNull();
 });
 
-it("leaves ordinary keys alone and closes on Escape with focus returned to the action trigger", async () => {
+it("keeps per-branch history available independently of a collapsed domain tree", async () => {
+  const { reader } = await renderMenu();
+  click(WORLD_ACTIONS);
+  click("Expand knowledge world: main");
+  expect(worldToggle("main").getAttribute("aria-expanded")).toBe("false");
+  click("View history: main");
+  await flush();
+  expect(document.body.querySelector(".version-dag-world")?.textContent).toBe("main");
+  expect(reader.get).not.toHaveBeenCalled();
+  expect(reader.ancestry).toHaveBeenCalledOnce();
+});
+
+it("leaves ordinary keys alone and closes Escape back to the menu trigger", async () => {
   const { reader, across } = await renderMenu();
   expect(key(across, "x").defaultPrevented).toBe(false);
   expect(document.activeElement).toBe(across);

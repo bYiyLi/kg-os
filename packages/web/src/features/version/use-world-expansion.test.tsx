@@ -111,9 +111,9 @@ it("invalidates an old reader's pending expansion across disconnect and reconnec
     finish?.({ root: next, items: [] });
   });
   expect(signal?.aborted).toBe(true);
-  expect(history().expandedWorld).toBe("main");
+  expect(history().expandedWorld).toBeNull();
   expect(history().currentWorld).toBe("main");
-  expect(history().commits[0]?.state).toBe(head);
+  expect(history().commits).toEqual([]);
   expect(history().expandingWorld).toBeNull();
 });
 
@@ -204,6 +204,9 @@ it("retains only cached missing browsing and expanded worlds without duplicating
   const api = reader();
   await render(api);
   await update(() => {
+    history().openHistory("main");
+  });
+  await update(() => {
     history().toggleWorld("learning");
   });
   vi.mocked(api.branch.list).mockResolvedValue({ items: [{ name: "learning", state: other }] });
@@ -227,6 +230,9 @@ it("retains only cached missing browsing and expanded worlds without duplicating
 it("does not carry a failed world's pagination error into another expanded world", async () => {
   const api = reader();
   await render(api);
+  await update(() => {
+    history().openHistory("main");
+  });
   vi.mocked(api.ancestry).mockRejectedValueOnce(new Error("main page unavailable"));
   await update(() => {
     history().loadMoreExpandedWorld();
@@ -254,6 +260,9 @@ it("does not carry a failed world's pagination error into another expanded world
 it("cancels old paging on expansion or mode changes and ignores its delayed failure", async () => {
   const api = reader();
   await render(api);
+  await update(() => {
+    history().openHistory("main");
+  });
   let fail: ((error: Error) => void) | undefined;
   vi.mocked(api.ancestry).mockImplementationOnce(
     () =>
@@ -314,12 +323,13 @@ it("keeps a newly expanded world's child-effect auto-fill request alive", async 
         items: { state: typeof genesis; parents: []; committedAt: number }[];
       }) => void)
     | undefined;
-  vi.mocked(api.ancestry).mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      })
-  );
+  const ancestry = vi.mocked(api.ancestry).getMockImplementation();
+  vi.mocked(api.ancestry).mockImplementation((request, options) => {
+    if (request.cursor === undefined && ancestry !== undefined) return ancestry(request, options);
+    return new Promise((resolve) => {
+      finish = resolve;
+    });
+  });
   await update(() => {
     history().toggleWorld("learning");
   });

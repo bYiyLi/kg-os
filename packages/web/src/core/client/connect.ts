@@ -3,6 +3,7 @@ import type { WebDataInfoResult } from "@kgos/sdk";
 
 import { loginWebSession, restoreWebSession } from "./web-session.js";
 import type { WebAccess } from "./web-session.js";
+import { boundedGraphResponse } from "./bounded-graph-fetch.js";
 
 export type ConnectionLossReason = "changed" | "expired" | "offline";
 
@@ -83,7 +84,7 @@ function guardedFetch(
         stop("changed");
       }
     }
-    return response;
+    return boundedGraphResponse(input, init, response, combinedSignal);
   };
 }
 

@@ -138,7 +138,45 @@ for (const width of [375, 1100]) {
         const state = "commit/" + "a".repeat(64);
         const previous = "commit/" + "0".repeat(64);
         const learning = "commit/" + "b".repeat(64);
+        function readDomainTool(code: string): unknown {
+          const match = /\.read\((\{.*\})\)/.exec(code);
+          if (match?.[1] === undefined) throw new Error("Missing Domain read request");
+          const input = JSON.parse(match[1]) as { at: string; refs?: string[] };
+          const domains =
+            input.at === previous
+              ? []
+              : [
+                  { name: "Writing", includes: ["domain:Characters"] },
+                  { name: "Characters", includes: [] }
+                ];
+          if (code.includes("ontology.read"))
+            return {
+              state: input.at,
+              results: [
+                {
+                  kind: "overview",
+                  items: domains.map((domain) => ({
+                    kind: "domain",
+                    ref: "domain:" + domain.name,
+                    name: domain.name
+                  })),
+                  total: domains.length,
+                  markdown: ""
+                }
+              ]
+            };
+          return {
+            state: input.at,
+            results: (input.refs ?? []).map((ref) => ({
+              kind: "domain",
+              ref,
+              value: domains.find((domain) => "domain:" + domain.name === ref)
+            }))
+          };
+        }
         function readVersionTool(code: string): unknown {
+          if (code.includes("ontology.read") || code.includes("object.read"))
+            return readDomainTool(code);
           if (code.includes("branch.list"))
             return {
               items: [
@@ -193,6 +231,8 @@ for (const width of [375, 1100]) {
             };
           } else if (message.method === "tools/call") {
             const code = message.params?.arguments?.code ?? "";
+            const codes = JSON.parse(document.body.dataset["toolCodes"] ?? "[]") as string[];
+            document.body.dataset["toolCodes"] = JSON.stringify([...codes, code]);
             const value = readVersionTool(code);
             result = { content: [{ type: "text", text: JSON.stringify({ result: value }) }] };
           }
@@ -206,22 +246,24 @@ for (const width of [375, 1100]) {
     const app = page.frameLocator("iframe");
     await expect(app.locator(".app-shell")).toHaveAttribute("data-theme", "light");
     await expect(app.locator(".authentication-dialog")).toHaveCount(0);
+    await expect(app.locator(".mobile-versions-button")).toHaveCount(0);
+    await expect(app.locator(".sidebar-handle")).toBeVisible();
     if (width < 900)
       await app.getByRole("button", { name: "Version navigation", exact: true }).click();
     const history = width < 900 ? app.locator(".version-drawer") : app.locator(".version-sidebar");
     const novel = history.getByRole("button", { name: "novel", exact: true });
-    await expect(novel).toHaveAttribute("aria-expanded", "true");
-    await expect(
-      history
-        .getByRole("region", { name: "Version history: novel", exact: true })
-        .locator('.commit-row[aria-pressed="true"]')
-    ).toContainText("MCP migration fixture");
+    await expect(novel).toHaveAttribute("aria-current", "page");
+    await expect(history.locator(".commit-item")).toHaveCount(0);
+    const novelDomains = history.getByRole("region", { name: "Domains: novel", exact: true });
+    await expect(novelDomains.getByRole("button", { name: "Writing", exact: true })).toBeVisible();
+    await novelDomains.getByRole("button", { name: "Expand domain: Writing", exact: true }).click();
+    const characterDomain = novelDomains.getByRole("button", { name: "Characters", exact: true });
+    await characterDomain.click();
+    await expect(characterDomain).toHaveAttribute("aria-pressed", "true");
     const main = history.getByRole("button", { name: "main", exact: true });
     await main.click();
-    const mainHistory = history.getByRole("region", { name: "Version history: main", exact: true });
-    await expect(mainHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(0);
-    await mainHistory.getByRole("button", { name: /MCP migration fixture/ }).click();
-    await expect(mainHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(1);
+    await expect(main).toHaveAttribute("aria-current", "page");
+    await expect(novel).not.toHaveAttribute("aria-current", "page");
     const trigger = history.getByRole("button", { name: "Knowledge world actions" });
     await trigger.click();
     const actions = app.getByRole("menu");
@@ -244,29 +286,29 @@ for (const width of [375, 1100]) {
     await expect(actions).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await history.getByRole("button", { name: "learning", exact: true }).click();
-    const learningHistory = history.getByRole("region", {
-      name: "Version history: learning",
+    const historyTrigger = history.getByRole("button", {
+      name: "View history: learning",
       exact: true
     });
-    await expect(learningHistory.locator('.commit-row[aria-pressed="true"]')).toHaveCount(0);
-    await expect(history.locator(".commit-item")).toHaveCount(3);
-    const latest = learningHistory.getByRole("button", { name: /Learning world updated/ });
-    await latest.click();
-    await expect(latest).toHaveAttribute("aria-pressed", "true");
-    await history.getByRole("button", { name: /Initial MCP version/ }).click();
-    await expect(latest).toHaveAttribute("aria-pressed", "false");
-    await expect(latest).toContainText("Latest");
-    await history.getByRole("button", { name: "Back to latest" }).click();
-    await expect(latest).toHaveAttribute("aria-pressed", "true");
-    await history.getByRole("button", { name: "Knowledge world actions" }).click();
-    await app.getByRole("menuitem", { name: "View version relationships" }).click();
+    await historyTrigger.click();
     const relationships = app.getByRole("dialog", { name: "Version relationships", exact: true });
     await expect(relationships).toBeVisible();
+    await expect(relationships.locator(".version-dag-world")).toHaveText("learning");
+    const latest = relationships.getByRole("button", { name: /Learning world updated/ });
+    await expect(latest).toHaveAttribute("aria-pressed", "true");
+    await relationships.getByRole("button", { name: /Initial MCP version/ }).click();
+    await expect(latest).toHaveAttribute("aria-pressed", "false");
+    await expect(latest).toContainText("Latest");
+    await relationships.getByRole("button", { name: "Back to latest" }).click();
+    await expect(latest).toHaveAttribute("aria-pressed", "true");
     expect(await relationships.evaluate((element) => getComputedStyle(element).colorScheme)).toBe(
       "dark"
     );
+    if (width < 900) await expect(history).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(relationships).toBeHidden();
+    if (width < 900) await expect(history).toBeVisible();
+    await expect(historyTrigger).toBeFocused();
     await history.getByRole("button", { name: "Settings", exact: true }).click();
     const settings = app.getByRole("dialog", { name: "Settings", exact: true });
     await expect(settings).toBeVisible();
@@ -274,6 +316,11 @@ for (const width of [375, 1100]) {
     await settings.locator('[data-settings-category="connection"]').click();
     await expect(settings).toContainText("Open KG OS in a separate browser");
     await expect(settings.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
+    const codes = await page.evaluate(
+      () => JSON.parse(document.body.dataset["toolCodes"] ?? "[]") as string[]
+    );
+    expect(codes.some((code) => code.includes("ontology.read"))).toBe(true);
+    expect(codes.some((code) => code.includes("object.read"))).toBe(true);
     expect(requests).toEqual([]);
   });
 }
