@@ -1069,6 +1069,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **取舍与延后**：不新增 Doctor 专用 MCP/API、后台 Scheduler、内置领域模型、自动提示词安装、修复/写入或跨库发现服务。官方引导提示词的准确标签/版本/正文、知识质量规范 Skill、VLog Model/运行记录识别规则与各宿主可见性验证后续再冻结；无可得证据的项目必须显式 `UNKNOWN`。仓库 `docs/vlog/` 仍只用于开发过程，与知识库 `branch/vlog` 不同。
 - **后续设计澄清（2026-10-21）**：此处“VLog Model 后续冻结”**不再表示需要一套 KG OS 官方强制本体**。调用方实际 Ontology 是记录结构真源；`kgos-vlog-standards` 只附一套可选单 `VLogEntry`（18 Property、3必填）参考，已有合适模型应直接复用。Doctor 不以固定Model/字段为前提，按目标 `branch/vlog` 的真实模型和可核实的任务/Run/时间/结果证据只读判断，不足即 `UNKNOWN`。最新合同由 [VLog 与 Doctor owner](mcp.md#kgos-doctor-v1) 和 [历史 VLogEntry 测试案例](../../internal/kernel/testdata/vlog/legacy-vlogentry.md)；后续现行事件中心模型由 [D116](#d116-vlog-event-ontology-package) 取代维护。
 - **当前真源与计划**：[MCP Doctor v1 合同](mcp.md#kgos-doctor-v1)、[Evolution](evolution.md#branch-与-tag)、[Observability](observability.md)、[Phase 25](../development/phases/25-kgos-doctor.md)。本次只完成设计与计划，**尚未创作 Skill、实现检测、发布插件或执行运行验收**。
+- **后续验收状态调整（2026-10-28）**：上面的四种状态是 D104 初始设计的历史口径；当前 Doctor 验收仅使用 `PASS` / `FAIL` / `N/A`。适用必需项缺证据或宿主不开放读取能力时仍为 `FAIL（验收证据不足/受阻）`，但**不意味着已证实服务故障、配置不存在或行为违规**；必须说明缺少的证据和可行补验路径。确实不适用的可选项为 `N/A`。此变更只调整诊断验收合同，不新增宿主读权限或写入权限；现行细则以 [MCP Doctor owner](mcp.md#kgos-doctor-v1) 为准。
 
 <a id="d105-web-first-run-and-runtime-bootstrap"></a>
 
@@ -1204,3 +1205,12 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **方法论与本体边界**：Ontology 设计先明确知识世界、适用的业务能力问题与合理扩展，再辨识概念、实例、业务身份、生命周期、关系语义与依据，最后映射 KG OS Node/Relationship/Property/Constraint/Index。需防止单大表压平关系、每个新分类新建 Definition、每个名词强制建 Node 等反模式；新增普通分类与实例优先在已足够的 Ontology 下创建 Knowledge。是否需要 Event、Time、Source 等概念按真实领域需求决定，不把 VLog 的六种 Node 变成所有知识世界的强制模型。
 - **自包含参考资料**：[本体论方法论](../../plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md) 汇总 KG OS 自有的需求 → 语义 → 身份 → 图结构 → 验证 → 演进方法及有出处的外部研究（Stanford Ontology 101、NeOn、W3C SKOS/PROV-O/OWL-Time、CIDOC CRM 和 Ontology Design Patterns）；[建模示例](../../plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md) 提供分类扩展、关系中的角色/时间、来源捕获版本三个完整场景，包括 Definition YAML、Cypher 和正反例。与既有 [模型确认模板](../../plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md) 一同由同版 Skill 直接分发。文本为 KG OS 自行归纳，不复制受版权保护的外部教程；不引入 OWL/RDF 推理引擎、通用元模型或第二套数据定义。
 - **实施权限与验收**：已有模型充分时普通 Knowledge 更新无需建模审批；需要 Schema、相关迁移或 Branch 新建时仍按既定用户确认流程。案例测试必须直接从发布参考文档提取真实 KG OS Definition 和 Cypher，在隔离 Lithograph/KG OS 上验证模型往返、业务问题、唯一性拒绝与不被 Schema 自动阻断的语义反例；分发测试核实四项准确技能及参考文件，保留历史案例与原有用户改动。实际客户端、最终远端 CI、Commit、Push、Tag、部署和 Plugin 安装另行核实，不能以本地文档或测试替代。
+
+<a id="d118-kgos-doctor-six-checks"></a>
+
+### D118 KG OS Doctor 六项只读自检重构（2026-10-28）
+
+- **检查合同**：按需触发的 Doctor 统一检查 D0 版本、D1 全局引导词、D2 MCP/State、D3 官方 Skills、D4 Knowledge、D5 持续维护/VLog。D0 先核对实际 Plugin/Skills 与目标 MCP 的发行版本、GitHub 最新稳定 Release，有新版本只推荐；其它项目采用对应宿主及 SDK 的真实只读证据。
+- **D1 生效定义（2026-10-28 修正）**：仅检查当前会话开始时是否由宿主自动加载 KG OS 全局引导词；初始化提供的用户自定义指令、项目指令同样有效，不要求 `system` 消息角色。后续 Skill、MCP、工具、文件或聊天消息中的正文不算注入；不要求账户持久配置、其它会话或历史行为审计。
+- **资源与边界**：当前 Doctor 运行时只保留一份 `SKILL.md` 与官方引导词唯一资产，删除先前专属证据参考及报告模板。结果只使用 `PASS/FAIL/N/A`，缺证据不能通过，也不能伪称系统故障；可选维护/VLog 未启用不当成故障。Doctor 只读，不执行修复、升级、部署。此决定取代 D104 及其后续修订中与六项范围、D1 四子项和旧资源结构冲突的规则；历史决定与实测记录不回写。
+- **验收与已知边界**：现行产品行为归 [MCP Doctor owner](mcp.md#kgos-doctor-v1)，实施与实测归 [Phase 25](../development/phases/25-kgos-doctor.md)。MCP Server 在初始化协商中提供版本，但是否向 Skill 暴露 `serverInfo.version` 取决于宿主；当前不为本次 Skill 重构新增服务端接口，未读到实际运行版本时须说明验收受阻。源码修改不代表私人 Plugin 已更新或 Release 已发布。

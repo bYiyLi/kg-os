@@ -24,22 +24,13 @@ func doctorSkillText(t *testing.T, name string) string {
 	return string(raw)
 }
 
-func doctorSkillProbe(t *testing.T) string {
-	t.Helper()
-	blocks := regexp.MustCompile("(?s)```js\\n(.*?)\\n```").FindAllStringSubmatch(
-		doctorSkillText(t, "references/knowledge-checks.md"), -1)
-	if len(blocks) != 1 {
-		t.Fatalf("expected one published read probe, found %d", len(blocks))
-	}
-	return blocks[0][1]
-}
-
 func TestDoctorSkillResourceContract(t *testing.T) {
 	root, err := filepath.Abs(doctorSkillRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	parts := strings.SplitN(doctorSkillText(t, "SKILL.md"), "---\n", 3)
+	body := doctorSkillText(t, "SKILL.md")
+	parts := strings.SplitN(body, "---\n", 3)
 	if len(parts) != 3 || parts[0] != "" {
 		t.Fatal("missing Skill frontmatter")
 	}
@@ -56,50 +47,32 @@ func TestDoctorSkillResourceContract(t *testing.T) {
 		t.Fatalf("invalid Skill metadata: %+v", meta)
 	}
 	for _, required := range []string{
-		"用户明确要求", "实际检查", "禁止", "Knowledge 查询", "继续独立项目",
-		"不要求额外确认", "只读", "诊断完成不等于修复完成",
-		"[线性报告模板](references/report-template.md)", "每完成一项适用检查",
-		"结果展示按 D1 → D5 排序", "宿主不支持中途交付",
+		"全面自检覆盖 D0–D5", "定向自检", "只读",
+		"D0 · 版本检查", "serverInfo.version", "最新稳定 Release", "推荐升级",
+		"D1 · 全局引导词", "当前会话开始时", "宿主自动加载", "用户自定义指令或项目指令", "不要求 `system` 角色", "不算生效",
+		"D2 · MCP 与 State", "kgos_docs", "kgos_query", "evolution.get", "ontology.read",
+		"D3 · 官方 Skills", "SKILL.md", "接口兼容性",
+		"D4 · Knowledge", "graph.query", "有限结果",
+		"D5 · 持续维护与 VLog", "未启用的可选能力不视为故障",
+		"PASS", "FAIL", "N/A", "证据不足", "检查受阻",
+		"不修改知识库", "不执行修复、升级或部署",
 	} {
-		if !strings.Contains(doctorSkillText(t, "SKILL.md"), required) {
-			t.Fatalf("missing executable Doctor behavior: %s", required)
+		if !strings.Contains(body, required) {
+			t.Fatalf("missing executable Doctor check: %s", required)
 		}
-	}
-	if strings.Contains(doctorSkillText(t, "references/maintenance-evidence.md"), "kgos-maintenance-standards") {
-		t.Fatal("Doctor still depends on retired standalone Maintenance Skill")
-	}
-	if !strings.Contains(doctorSkillText(t, "references/host-checks.md"), "实际安装的 Release") ||
-		!strings.Contains(doctorSkillText(t, "references/knowledge-checks.md"), "执行真实、定向、有界的 Knowledge 只读查询") ||
-		!strings.Contains(doctorSkillText(t, "references/maintenance-evidence.md"), "VERIFIES") {
-		t.Fatal("Doctor evidence references do not cover version, real Knowledge query and event verification")
 	}
 	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
-	docPaths := regexp.MustCompile(`\b(?:sdk|cypher|guides)/[\w./-]+\.md\b`)
-	queue, seen := []string{filepath.Join(root, "SKILL.md")}, map[string]bool{}
-	for len(queue) > 0 {
-		path := queue[0]
-		queue = queue[1:]
-		if seen[path] {
-			continue
+	seen := map[string]bool{filepath.Join(root, "SKILL.md"): true}
+	for _, match := range links.FindAllStringSubmatch(body, -1) {
+		target := strings.SplitN(match[1], "#", 2)[0]
+		path := filepath.Clean(filepath.Join(root, target))
+		if !strings.HasPrefix(path, root+string(os.PathSeparator)) {
+			t.Fatalf("required resource escapes Doctor: %s", match[1])
 		}
-		seen[path] = true
-		raw, err := os.ReadFile(path)
-		if err != nil {
+		if _, err := os.ReadFile(path); err != nil {
 			t.Fatal(err)
 		}
-		for _, link := range links.FindAllStringSubmatch(string(raw), -1) {
-			target := strings.SplitN(link[1], "#", 2)[0]
-			next := filepath.Clean(filepath.Join(filepath.Dir(path), target))
-			if !strings.HasPrefix(next, root+string(os.PathSeparator)) {
-				t.Fatalf("required resource escapes standalone package: %s", link[1])
-			}
-			queue = append(queue, next)
-		}
-		for _, doc := range docPaths.FindAllString(string(raw), -1) {
-			if _, err := fs.ReadFile(embeddedDocs, "docs/"+doc); err != nil {
-				t.Fatalf("unavailable embedded documentation %s: %v", doc, err)
-			}
-		}
+		seen[path] = true
 	}
 	files := 0
 	err = filepath.WalkDir(root, func(path string, item fs.DirEntry, err error) error {
@@ -114,31 +87,8 @@ func TestDoctorSkillResourceContract(t *testing.T) {
 		}
 		return nil
 	})
-	if err != nil || files != 6 || len(seen) != 6 {
-		t.Fatalf("Doctor package resources: files=%d reachable=%d error=%v; want six", files, len(seen), err)
-	}
-	_ = doctorSkillProbe(t)
-}
-
-func TestDoctorLinearReportTemplateContract(t *testing.T) {
-	template := doctorSkillText(t, "references/report-template.md")
-	for _, required := range []string{
-		"## 1. 展示顺序",
-		"## 2. 单项结果片段",
-		"## 3. 依赖失败与结果更正",
-		"## 4. 结束语",
-		"D1 → D2 → D3 → D4 → D5",
-		"每项获得证据支持的结论或明确受阻后，立即输出",
-		"宿主不支持中途交付",
-		"未请求项目直接省略",
-		"D2 = FAIL",
-		"D4 = UNKNOWN",
-		"更正 Dn",
-		"重新生成一张重复 D1–D5 的总结表",
-	} {
-		if !strings.Contains(template, required) {
-			t.Fatalf("Doctor report template missing required decision: %s", required)
-		}
+	if err != nil || files != 2 || len(seen) != 2 {
+		t.Fatalf("Doctor package resources: files=%d reachable=%d error=%v; want Skill and guidance", files, len(seen), err)
 	}
 }
 
@@ -152,7 +102,6 @@ func TestDoctorGuidanceApprovedBaseline(t *testing.T) {
 	if finish <= start {
 		t.Fatal("guidance markers are reversed")
 	}
-	// Freeze the sole approved source, not its surrounding documentation headings.
 	block := body[start:finish+len(end)] + "\n"
 	const approved = "ed41a0d05e590b3e37ebb43804be24a1e71db9a8aea9483d77c31b382bd62bb6"
 	if got := fmt.Sprintf("%x", sha256.Sum256([]byte(block))); got != approved {

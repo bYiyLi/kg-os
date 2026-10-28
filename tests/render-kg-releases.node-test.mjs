@@ -56,11 +56,7 @@ test("only whitelisted public files are generated, deterministically", async () 
       first.files.filter((path) => path.startsWith("plugins/kgos/skills/kgos-doctor/")).sort(),
       [
         "plugins/kgos/skills/kgos-doctor/SKILL.md",
-        "plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md",
-        "plugins/kgos/skills/kgos-doctor/references/host-checks.md",
-        "plugins/kgos/skills/kgos-doctor/references/knowledge-checks.md",
-        "plugins/kgos/skills/kgos-doctor/references/maintenance-evidence.md",
-        "plugins/kgos/skills/kgos-doctor/references/report-template.md"
+        "plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md"
       ]
     );
     assert.deepEqual(

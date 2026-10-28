@@ -1,8 +1,8 @@
-# KG OS v0.3.6 私人 Plugin 安装指南
+# KG OS v0.3.7 私人 Plugin 安装指南
 
-供 AI 执行：用户已按[官网安装教程](https://kgos.sites.y2l.top/zh/install/v0.3.6/)部署并初始化服务，连接 ChatGPT 且只读调用通过。本指南接续已有应用，制作和安装版本化私人 Plugin、迁移定制、配置全局引导词并自检；[English guide](https://kgos.sites.y2l.top/en/install/v0.3.6/)提供相同用户流程。仅需基础 MCP 时，完成官网连接验收即可使用。
+供 AI 执行：用户已按[官网安装教程](https://kgos.sites.y2l.top/zh/install/v0.3.7/)部署并初始化服务，连接 ChatGPT 且只读调用通过。本指南接续已有应用，制作和安装版本化私人 Plugin、迁移定制、配置全局引导词并自检；[English guide](https://kgos.sites.y2l.top/en/install/v0.3.7/)提供相同用户流程。仅需基础 MCP 时，完成官网连接验收即可使用。
 
-适用发布版本：**KG OS v0.3.6**。配套资源：[正式 Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.6)、[官方 Plugin 与四个 Skill](https://github.com/bYiyLi/kg-releases/releases/download/v0.3.6/kgos-plugin-v0.3.6.zip)。本指南与同版官网手册配套，不自动改用其他版本资源。“同版”仅由 KG OS Release Tag 和同包产物确定；四个 Skill 与唯一引导词均取所选 Tag 的内容，不为引导词维护额外版本系列。
+适用发布版本：**KG OS v0.3.7**。配套资源：[正式 Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.7)、[官方 Plugin 与四个 Skill](https://github.com/bYiyLi/kg-releases/releases/download/v0.3.7/kgos-plugin-v0.3.7.zip)。本指南与同版官网手册配套，不自动改用其他版本资源。“同版”仅由 KG OS Release Tag 和同包产物确定；四个 Skill 与唯一引导词均取所选 Tag 的内容，不为引导词维护额外版本系列。
 
 ## 共用规则
 
@@ -15,9 +15,9 @@
 
 **起点**：沿用用户指定的应用、账户/Workspace 和服务地址；缺少时只问对应名称或目标。区分基础 MCP Plugin、应用/连接 ID 与私人 Plugin ID，不把 OAuth client_id 当应用 ID。读取指定对象的真实元数据和绑定，不遍历无关账户、设备或浏览器标签。AI 缺少执行工具与用户账户缺少能力分别说明，并给出启用入口或具体用户操作。
 
-**连接验收**：复用已有有效证据；需要新验证时，通过目标应用的 `kgos_docs` 读取当前 SDK 指南，再用 `kgos_query` 调用 `evolution.overview`、`evolution.get` 与同一不可变 State 的 `ontology.read`。确认实际绑定地址与用户目标一致、返回相同 State、`consistency.status=valid`、`consistency.issues=[]` 且 Ontology 可读；外层工具成功但结果含业务错误不能通过。空库可通过，不创建模型、知识、Branch 或 Commit。发现基础应用未就绪，指向[官网连接步骤](https://kgos.sites.y2l.top/zh/install/v0.3.6/#connect-chatgpt)，只暂停依赖它的安装操作。
+**连接验收**：复用已有有效证据；需要新验证时，通过目标应用的 `kgos_docs` 读取当前 SDK 指南，再用 `kgos_query` 调用 `evolution.overview`、`evolution.get` 与同一不可变 State 的 `ontology.read`。确认实际绑定地址与用户目标一致、返回相同 State、`consistency.status=valid`、`consistency.issues=[]` 且 Ontology 可读；外层工具成功但结果含业务错误不能通过。空库可通过，不创建模型、知识、Branch 或 Commit。发现基础应用未就绪，指向[官网连接步骤](https://kgos.sites.y2l.top/zh/install/v0.3.7/#connect-chatgpt)，只暂停依赖它的安装操作。
 
-**版本**：从当前连接可见的服务版本或已有部署验收记录核实 KG OS v0.3.6；缺少证据就请用户确认部署版本，不用 Plugin Manifest 推断服务版本。取得上方同版官方 Plugin 归档、Manifest、四个 Skill 与完整引用资源，核对发行版本及校验信息。服务版本不匹配时说明差异，让用户选择[对应版本手册](https://kgos.sites.y2l.top/zh/install/v0.3.6/)或明确服务升级计划，不自动升级或把其他版/候选资源套用到当前实例。本指南控制本次安装交互，随版资料用于核对技术事实。
+**版本**：从当前连接可见的服务版本或已有部署验收记录核实 KG OS v0.3.7；缺少证据就请用户确认部署版本，不用 Plugin Manifest 推断服务版本。取得上方同版官方 Plugin 归档、Manifest、四个 Skill 与完整引用资源，核对发行版本及校验信息。服务版本不匹配时说明差异，让用户选择[对应版本手册](https://kgos.sites.y2l.top/zh/install/v0.3.7/)或明确服务升级计划，不自动升级或把其他版/候选资源套用到当前实例。本指南控制本次安装交互，随版资料用于核对技术事实。
 
 **继续条件**：明确目标账户、已验证应用及真实绑定 ID、服务版本与可用官方基线。缺少连接或 Creator 能力时，提供具体恢复步骤；没有实际保存能力不能把下载 ZIP 称为已安装。
 
@@ -29,7 +29,7 @@
 
 **方案与授权**：简要列出目标账户与应用、官方资源版本、新 Plugin 名称、迁移清单/冲突、制作安装分工、引导词配置、验收及可选旧版清理。默认不公开、不扩大共享；用户选择冲突处理和迁移范围，明确同意后执行。无需迁移时直接给首次安装方案，已经确认的决定不重复询问。
 
-**版本名称**：每次创建独立的新 Plugin，不调用原地更新。名称包含官方版本，如 `KG OS v0.3.6`；同版再次制作使用 `KG OS v0.3.6 · r2` 等递增修订标识，并采用独立包名和新 Plugin ID。Manifest 使用宿主支持的版本格式，官方资源版本与私人修订分别记录，不伪称新的官方发行。
+**版本名称**：每次创建独立的新 Plugin，不调用原地更新。名称包含官方版本，如 `KG OS v0.3.7`；同版再次制作使用 `KG OS v0.3.7 · r2` 等递增修订标识，并采用独立包名和新 Plugin ID。Manifest 使用宿主支持的版本格式，官方资源版本与私人修订分别记录，不伪称新的官方发行。
 
 **继续条件**：用户确认具体方案、定制冲突、引导词保存方案或其已知限制及必要权限；未解决的定制迁移不能报完成，保留旧 Plugin 及其定制资料。
 
@@ -47,7 +47,7 @@
 
 **配置**：完整展示下方 Global AI Guidance（含标签），不用摘要或链接代替。ChatGPT Web 按[官方个性化说明](https://help.openai.com/en/articles/8096356-chatgpt-custom-instructions)进入 `Settings → Personalization`，找到自定义指令、保存并确认启用；界面不同先核实实际入口，不把项目/单次会话指令当全局配置。沿用容量预检结果；仍有内容冲突或空间不足时，仅提供实际已核实可用且适用范围明确的保存方案，由用户选择；不压缩、删节、覆盖或改写官方正文。宿主不支持完整保存时报告未配置及受影响范围，不用临时摘要替代，也不将单次贴入冒充全局加载。
 
-**生效与自检**：用户保存后，在目标账户的新会话选择已验收的新 Plugin，检查普通只读任务行为；不重贴正文或额外提醒读取来证明自动生效。再使用该 Plugin 的 `kgos-doctor` 做安装相关 D1–D3 只读检查，分别记录官方资源、当前可见指令差异、持久配置证据、普通任务行为、实际 MCP 调用及 Skill/迁移结果；已确认局部差异不能被完整配置不可见掩盖；Doctor 本次探测不代替普通任务行为。隐藏指令来源、自动选择或轨迹不可见时记为不可观测，不索取隐藏系统指令，也不把它们设成永远无法通过的硬门槛。已确认缺失或错误仍须处理。D4 知识质量、D5 维护调度和业务写入不属于安装必要项。
+**生效与自检**：用户保存后，在目标账户的新会话选择已验收的新 Plugin，检查普通只读任务行为；不重贴正文或额外提醒读取来证明自动生效。再使用该 Plugin 的 `kgos-doctor` 做安装相关 D0–D3 只读检查，分别记录版本、当前会话开始时宿主自动加载的官方引导词（含用户自定义或项目指令，不要求 `system` 角色）、实际 MCP 调用及 Skill/迁移结果；后续 Skill、工具、文件或聊天消息读到正文不算 D1 生效。持久配置回读与普通任务行为属于独立安装验收，不是 Doctor D1 的必需检查；无法取得可信初始化证据时如实报告，不能据此判定引导词未配置或未生效。D4 Knowledge、D5 维护/VLog 与业务写入不属于安装必要项。
 
 **旧版清理**：新 Plugin 的可操作必要项与定制迁移验收后，用户可选择卸载指定旧 Plugin；已有明确授权直接执行。清理只针对旧 Plugin，不删除基础 MCP 应用、共享连接或知识数据；界面操作会连带删除依赖时停止该动作并说明影响。结果未知先查状态，保留可恢复的旧包/定制资料。
 
