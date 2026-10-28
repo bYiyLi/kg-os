@@ -106,12 +106,14 @@ jobs:
           # Keep pushes on the public repository's SSH deploy key. Do not let
           # an earlier checkout's global URL rewrite select its OAuth token.
           git config --local --get core.sshCommand >/dev/null
+          PUBLIC_SSH_REMOTE='ssh://git@github.com/bYiyLi/kg-releases.git'
+          GIT_CONFIG_GLOBAL=/dev/null git ls-remote "$PUBLIC_SSH_REMOTE" HEAD >/dev/null
           if ! git diff --cached --quiet; then
             git commit -m "build: sync kg-os ${SOURCE_SHA:0:12}"
-            GIT_CONFIG_GLOBAL=/dev/null git push origin HEAD:main
+            GIT_CONFIG_GLOBAL=/dev/null git push "$PUBLIC_SSH_REMOTE" HEAD:main
           fi
           if [[ "$SOURCE_REF" == refs/tags/* ]]; then
             TAG=${SOURCE_REF#refs/tags/}
             git tag "$TAG"
-            GIT_CONFIG_GLOBAL=/dev/null git push origin "refs/tags/$TAG"
+            GIT_CONFIG_GLOBAL=/dev/null git push "$PUBLIC_SSH_REMOTE" "refs/tags/$TAG"
           fi
