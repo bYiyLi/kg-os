@@ -111,9 +111,12 @@ jobs:
           while IFS= read -r key; do
             git config --local --unset-all "$key"
           done < <(git config --local --name-only --get-regexp '^url\..*\.insteadof$' || true)
-          PUBLIC_SSH_REMOTE='ssh://git@github.com/bYiyLi/kg-releases.git'
+          # Use the same scp-style SSH remote that checkout successfully fetched.
+          # Refuse HTTP transport rather than silently falling back to OAuth.
+          PUBLIC_SSH_REMOTE='git@github.com:bYiyLi/kg-releases.git'
           ssh_git() {
-            GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_COUNT=0 git "$@"
+            GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_COUNT=0 \
+              git -c protocol.http.allow=never -c protocol.https.allow=never "$@"
           }
           ssh_git ls-remote "$PUBLIC_SSH_REMOTE" HEAD >/dev/null
           if ! git diff --cached --quiet; then
