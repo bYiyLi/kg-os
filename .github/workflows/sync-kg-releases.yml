@@ -103,17 +103,25 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          # Keep pushes on the public repository's SSH deploy key. Do not let
-          # an earlier checkout's global URL rewrite select its OAuth token.
+          # GitHub checkout may install HTTPS credentials and URL rewrites even
+          # when an SSH key is configured. Keep only the public checkout's SSH
+          # command for publishing; an OAuth token lacks workflow-file scope.
           git config --local --get core.sshCommand >/dev/null
+          git config --local --unset-all http.https://github.com/.extraheader || true
+          while IFS= read -r key; do
+            git config --local --unset-all "$key"
+          done < <(git config --local --name-only --get-regexp '^url\..*\.insteadof$' || true)
           PUBLIC_SSH_REMOTE='ssh://git@github.com/bYiyLi/kg-releases.git'
-          GIT_CONFIG_GLOBAL=/dev/null git ls-remote "$PUBLIC_SSH_REMOTE" HEAD >/dev/null
+          ssh_git() {
+            GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_COUNT=0 git "$@"
+          }
+          ssh_git ls-remote "$PUBLIC_SSH_REMOTE" HEAD >/dev/null
           if ! git diff --cached --quiet; then
             git commit -m "build: sync kg-os ${SOURCE_SHA:0:12}"
-            GIT_CONFIG_GLOBAL=/dev/null git push "$PUBLIC_SSH_REMOTE" HEAD:main
+            ssh_git push "$PUBLIC_SSH_REMOTE" HEAD:main
           fi
           if [[ "$SOURCE_REF" == refs/tags/* ]]; then
             TAG=${SOURCE_REF#refs/tags/}
             git tag "$TAG"
-            GIT_CONFIG_GLOBAL=/dev/null git push "$PUBLIC_SSH_REMOTE" "refs/tags/$TAG"
+            ssh_git push "$PUBLIC_SSH_REMOTE" "refs/tags/$TAG"
           fi
