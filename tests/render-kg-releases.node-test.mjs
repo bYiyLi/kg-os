@@ -47,10 +47,13 @@ test("only whitelisted public files are generated, deterministically", async () 
       ]
     );
     assert.deepEqual(
-      first.files.filter((path) =>
-        path.startsWith("plugins/kgos/skills/kgos-knowledge-standards/")
-      ),
-      ["plugins/kgos/skills/kgos-knowledge-standards/SKILL.md"]
+      first.files
+        .filter((path) => path.startsWith("plugins/kgos/skills/kgos-knowledge-standards/"))
+        .sort(),
+      [
+        "plugins/kgos/skills/kgos-knowledge-standards/SKILL.md",
+        "plugins/kgos/skills/kgos-knowledge-standards/references/quality-audit.md"
+      ]
     );
     assert.deepEqual(
       first.files.filter((path) => path.startsWith("plugins/kgos/skills/kgos-doctor/")).sort(),
