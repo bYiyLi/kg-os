@@ -6,6 +6,7 @@ settings:
 
 overrides:
   body-parser: 2.4.0
+  re2js: 2.8.7
   smol-toml: 1.9.1
   re2js: 2.8.7
   source-map-js: 1.2.2
@@ -104,7 +105,7 @@ importers:
   packages/cli:
     dependencies:
       '@kgos/sdk':
-        specifier: workspace:0.3.8
+        specifier: workspace:0.3.9
         version: link:../sdk
       smol-toml:
         specifier: 1.9.1
