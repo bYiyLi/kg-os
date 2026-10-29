@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
 import { createGraphRuntime, signInGraph } from "./graph-runtime.js";
-import { nodeCenter } from "./graph-g6-geometry.js";
 
 test.use({ colorScheme: "light", reducedMotion: "reduce", viewport: { width: 1280, height: 900 } });
 test.setTimeout(90_000);
@@ -45,20 +44,20 @@ test("switching selected nodes restores real G6 Canvas brightness", async ({ pag
     const secondId = await second.getAttribute("data-node-id");
     if (secondId === null) throw new Error("Fixture node ID is missing");
 
-    const pointA = await nodeCenter(first);
-    await page.mouse.click(pointA.x, pointA.y);
+    // Select with the accessible keyboard entrypoint: this test owns G6
+    // Canvas brightness, while native pointer hit-testing has separate E2E.
+    await first.press("Enter");
     await expect(first).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => renderedNodeAlpha(page, runtime.targetId)).toBeGreaterThan(220);
     await expect.poll(() => renderedNodeAlpha(page, secondId)).toBeLessThan(90);
 
-    const pointB = await nodeCenter(second);
-    await page.mouse.click(pointB.x, pointB.y);
+    await second.press("Enter");
     await expect(second).toHaveAttribute("aria-pressed", "true");
     await expect(first).toHaveAttribute("aria-pressed", "false");
     await expect.poll(() => renderedNodeAlpha(page, secondId)).toBeGreaterThan(220);
     await expect.poll(() => renderedNodeAlpha(page, runtime.targetId)).toBeLessThan(90);
 
-    await page.mouse.click(pointA.x, pointA.y);
+    await first.press("Enter");
     await expect(first).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => renderedNodeAlpha(page, runtime.targetId)).toBeGreaterThan(220);
   } finally {

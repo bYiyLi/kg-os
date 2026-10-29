@@ -88,6 +88,9 @@ export class FakeG6Graph {
     this.calls.push("fit");
     return Promise.resolve();
   }
+  resize() {
+    this.calls.push("resize");
+  }
   focusElement(id: string) {
     this.calls.push("focus:" + id);
     return Promise.resolve();

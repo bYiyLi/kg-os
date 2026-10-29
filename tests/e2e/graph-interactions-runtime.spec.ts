@@ -197,6 +197,7 @@ test("ordinary wheel zoom keeps the cursor anchor and graph shortcuts do not ste
   graph
 }) => {
   const target = item(page, graph.targetId);
+  await stableScreenNode(target);
   // The searched node can appear under the floating search or toolbar.
   // Scroll over the unobstructed scene so this checks camera anchoring,
   // not whether a workspace overlay intercepts a wheel event.
@@ -209,7 +210,15 @@ test("ordinary wheel zoom keeps the cursor anchor and graph shortcuts do not ste
   await page.mouse.move(cursor.x, cursor.y);
   await page.mouse.wheel(0, -90);
   await expect.poll(async () => (await camera(target)).a).toBeGreaterThan(before.a);
-  closePoint(atScreen(await camera(target), anchor), cursor);
+  // G6 updates zoom before its keyboard proxy has synced the transform.
+  // Wait for the actual cursor-anchored projection rather than sampling a
+  // temporary mixed zoom/new-matrix frame.
+  await expect
+    .poll(async () => {
+      const projected = atScreen(await camera(target), anchor);
+      return Math.hypot(projected.x - cursor.x, projected.y - cursor.y);
+    })
+    .toBeLessThan(2);
   const after = await camera(target);
   const search = page.getByRole("searchbox", { name: "Search knowledge", exact: true });
   await search.fill("");

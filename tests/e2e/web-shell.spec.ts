@@ -59,9 +59,11 @@ test("renders API-backed world navigation with a blank graph canvas", async ({ p
   expect(metrics.sidebarWidth).toBeGreaterThanOrEqual(240);
   expect(metrics.sidebarWidth).toBeLessThanOrEqual(320);
   expect(metrics.sidebarBorder).toBe("0px");
-  // The new overlay navigation has an opaque page background so the
-  // separate right card retains its own visible border and corners.
-  expect(metrics.sidebarBackground).toBe(metrics.pageBackground);
+  // Navigation is transparent over the very same gradient-rendering shell.
+  // Matching computed colors would be incorrect: the gradient is visible
+  // through the sidebar, with no separate background or seam.
+  expect(metrics.sidebarBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(metrics.pageBackground).not.toBe("rgba(0, 0, 0, 0)");
   expect(metrics.selectedColor).not.toBe(metrics.sidebarColor);
   expect(metrics.canvasBorder).toBe("1px");
   expect(metrics.canvasTop).toBeLessThan(30);
@@ -271,7 +273,7 @@ test("keeps version navigation available at 320 CSS px without horizontal overfl
     "aria-pressed",
     "true"
   );
-  await page.keyboard.press("Escape");
+  await relationships.press("Escape");
   await expect(relationships).toBeHidden();
   await expect(drawer).toBeVisible();
   await expect(historyTrigger).toBeFocused();
