@@ -52,6 +52,17 @@
 
 **避免两个极端**：不把一切压成一个通用 Record/Entity 搭配大量 text、JSON 或 *type* 字符串；也不把每个术语、任务阶段、状态、计数和时间戳都机械拆成 Node。结构由独立身份、关系和实际查询要求驱动。
 
+### Domain：何时组织（仅有关时）
+
+Domain 是可选的 Ontology 导航组织，不是 Knowledge 分类实例或数据容器。已有模型可从全局清楚找到时无需为了形式完整新建 Domain；当多组 Definition 的职责、规模或阅读路径已经需要分组时，先查看现有 Domain 的名称、说明和直接成员，能复用就不新增。
+
+- **划分依据**：按用户需要理解的业务模型范围组织，写清每个 Domain 涵盖与不涵盖什么；使用准确的 `domain:`、`node:`、`relationship:` Ref 作为 `includes`，而不是按名称猜成员或把 Knowledge 实例放入 Domain。
+- **共享与跨域**：一份 Definition 可以属于多个 Domain，也可以不属于任何 Domain；跨 Domain 的真实 Knowledge Relationship 仍按同一图中的实际端点建模，不能因为导航分组复制实体或拆分 Branch。
+- **组织边界**：Domain 不提供 namespace、业务键作用域、查询过滤、权限或独立版本。底层允许多父级与循环，但方案仍应避免无实际导航收益的重复层级与循环；不假定它会自动搜索、索引或隔离成员。
+- **验证**：用固定 State 的全局 Overview 与目标 Domain 直接成员阅读检查可发现性、说明和跨组关联；改变 `includes` 不意味着修改成员 Definition，更不意味着迁移 Knowledge。
+
+例如 `domain:Research` 与 `domain:Projects` 都可以包含同一个 `node:Source`；两处引用的是同一份 Definition，不是两份 Source Knowledge。若删除 `domain:Research`，只删除该 Domain 及其组织关系，`node:Source`、业务关系和 Knowledge 不会随之删除。
+
 ### 第四步：映射为可解释的 Property Graph
 
 - 为每个 Node Definition 写明**本质、身份依据、适用/排除条件、与相似概念的区别**，而不是仅列字段。
@@ -59,6 +70,35 @@
 - `unique`、`required`、类型及 Index 只承诺当前数据库合同能实际保证的规则；不要把业务推理、跨对象条件、时间覆盖、跨 Branch 引用或证据真实性说成 Schema 已自动强制。
 - 分清 **Schema Definition 名称、数据库 elementId、业务键和关联目标身份**；实际引用或共享对象要核实当前 State。跨 Branch/Instance 的字符串定位不是跨 Snapshot Relationship。
 - 可选复用官方 `kgos-ontologies` 的已核实模型，但必须比对现有语义并按需选取；不可访问时在已知需求下独立建模。参考模型、图示和例子不是当前数据库已安装证据。
+
+### 检索需求驱动的 Index 设计
+
+索引是为**已经明确的查询和检索入口**服务的访问能力，不是本体越完整就越应该多建的字段装饰。先对照实际 Ontology 的 Property、Constraint、已有 Index、代表性 Knowledge 和真实查询；只在现有能力不能满足查找/覆盖/性能需求时提出最小的索引变化。对每项候选说明“谁用哪种查询、找什么对象、哪些字段和 Definition 必须被覆盖”，无依据的全字段自动索引应舍弃。
+
+| 需要回答的查询 | 优先检查或考虑 | 不应混淆 |
+| --- | --- | --- |
+| 按稳定业务键精确查找、验证唯一性 | 已有 `key` / `unique` 约束及其 owning Range Index | 不重复建立同目标、同有序字段的独立 Range Index；Index 不替代真实业务身份 |
+| 结构化相等/范围/排序，或字符串的包含条件 | 按实际 Cypher 谓词与引擎能力评估 `range`、`text`；空间条件考虑 `point` | `text` 不是分词全文检索；不要未经执行计划或测量就断言新索引必然加速 |
+| 按自然语言词项、短语或正文查找 | `fulltext`，选有业务意义的 `STRING` 来源字段、目标类型及合适的分词配置 | 不把 TEXT/LIKE、字段名称命中当作真正的全文召回；分词效果取决于已配置 analyzer |
+| 用不同说法寻找相近含义 | KG OS 公共 `type: vector`（底层 Managed Semantic），选择一条能独立承载语义的 `STRING` 来源字段 | 不是 caller-owned Vector Property；当前每索引只支持单来源字段，不自动拼接标题和正文或切块 |
+| 同时需要精确术语和语义近邻 | 各自有必要时组合 Full-text 与 Managed Semantic，并由实际查询层融合候选 | 不要求每个 Definition 都有双索引，不混合不同分数作为概率 |
+
+决定索引前逐项检查：
+
+1. **覆盖匹配**：真实查询入口能否发现并调用该索引？它搜索 Node 还是 Relationship，期望的 Label / Type、来源字段和语言是否均被覆盖？Domain membership 不是 Index target，也不会自动限定搜索范围。
+2. **放置与复用**：单字段索引放对应 Property；多字段或跨 Definition 的索引按当前 Ontology 公共合同在 Definition 顶层表达。仅 Full-text 和 Managed Semantic 能跨同类 Definition 共享 targets；语义共享要求各目标有同名 `STRING` 来源字段且一个索引只取一个字段。复用已有可满足需求的索引，不因 Domain 不同复制同一份共享索引；多字段 Full-text 不等于多字段语义。
+3. **可用性与代价**：核对目标 State 中既有索引、现实数据规模与查询负载，评估存储/更新成本；Managed Semantic 还需检查 Provider 的可用性、费用与数据外发条件。没有明确收益时不为所有 String、所有新 Definition 或每种搜索通道预建索引。
+4. **配置与权限边界**：创建/修改 Index 是 Ontology 变更，需要明确授权；使用当前 `kgos_docs` 取得可表达的 YAML / Patch 及 Runtime 合同。Full-text 的 analyzer、Semantic 的 Provider/模型/维度并非让 AI 逐索引随意添加的公共字段，现有历史配置不能用新 Runtime 配置静默覆盖。
+
+**共享索引的修改与删除**：一个共享 Index 在多个 Definition 中显示仍是一份全局资源。例如 `shared_text` 覆盖 `node:Document` 和 `node:Note`，若只需取消 Note 的覆盖，应将完整 `targets` 从两个 Ref 调整为仅含 `node:Document`，并核对保留目标的检索仍然有效。**从任一参与 Definition 显式删除整条共享 Index 声明，含义是全局删除该索引**；不是移除该 Definition 的成员资格。索引收窄为单 Definition、单字段后，回读可能将它投影到 Property 内；后续删除或修改应以最新 canonical 位置为准，不能只清空原先的顶层 `indexes` 就宣称已删除。删除受索引依赖的字段或 Definition 也不能默认静默缩小索引，必须核对影响并按当前合同协调变更。不要为同步共享展示而重复编辑所有参与 Definition。
+
+**结构化条件与语义 Top-K**：当前 `db.index.semantic.queryNodes/queryRelationships` 的 `limit` 限制的是先返回的语义候选；在 `YIELD` 后附加 `WHERE` 只过滤这些候选，并不能保证得到条件范围内最相似的 K 项。比如先取全图前 10 条，再筛出项目 A 的知识，可能遗漏排在第 11 名的项目 A 知识。公共 Ontology 暂不支持 `filterProperties`；调大 `limit` 只能扩大候选，不应冒充严格的“项目 A 内 Top-K”。若业务确实要求这种保证，应指出现有能力边界，区分可接受的部分候选检索与待解决的执行能力缺口，不能为了满足描述而发明索引配置或查询语法。
+
+**长文本的语义粒度**：托管语义索引使用来源 Property 的原始 UTF-8 字符串，不自动截断、切块或将多个字段拼接。对于很长或包含多个主题的正文，先核实 Provider 的输入限制、成本，以及用户要查的是整篇文档还是独立片段；单一向量能建成不代表能按段落准确召回。确需片段级身份、出处和关系时，按实际业务需求另行设计适当的 Knowledge/Definition；不得默认新增隐藏 chunk 节点、内部向量字段或未经确认的自动拆分流程。
+
+将选择结果写成最小方案：具体查询问题 → Index 名称/类型 → 来源字段及完整 targets → 预期覆盖与收益 → 已有索引复用/额外代价 → 验证方法。查询本来可用、数据很少、尚无检索需求或依赖条件未确认时，允许明确选择**不新增索引**，不将“当前某种索引数量为零”视为建模失败。
+
+获准实施后用同一固定 State 回读真实 Definition 与 `SHOW INDEXES`（或当前支持的等价查询），核对名称、类型、实体范围、字段和实际状态。对代表性问题用真实查询入口验证正确命中、遗漏、排序与 Top-K/覆盖限制；必要时以实际查询计划或耗时证据检验性能收益。全文 analyzer 不匹配、语义 Provider 不可用、没有建索引、搜索无命中和部分覆盖是不同结果；Index ONLINE、Patch 成功或合成案例通过均不能单独证明用户搜索可用。未获数据写入授权不往生产库放置测试知识，验证受阻则如实标明未覆盖范围。
 
 ### 第五步：用正反例和实际查询验收
 
@@ -89,6 +129,12 @@
 | 把人名、标题、URL 当作全局唯一键 | 同名、重命名、来源版本、业务作用域是否已处理？ |
 | 把“后来发生”写成“导致发生” | 哪些有据的关系只能表示先后，哪些有因果证据？ |
 | 为新主题默认新建 Branch | 当前是否真有独立 State 演进或管理职责？ |
+| 只因术语多就为所有字段建全文/语义索引 | 哪个具体查询入口需要哪些字段、目标和召回方式？ |
+| 认为 Index ONLINE 就保证 Web 搜索有效 | 真实搜索入口是否覆盖该类型与字段，Provider 和分词是否实际可用？ |
+| 想移除一个共享索引成员却删掉整条声明 | 是否应调整完整 `targets`，其余 Definition 还需要该索引吗？ |
+| 把语义 Top-K 的结果经 `WHERE` 过滤后视为子集 Top-K | 筛选对象是否可能被全局 `limit` 提前排除？ |
+| 认为语义索引自动切块或截断长文 | 来源字段全文是否超出 Provider 限制，用户需要文档级还是片段级检索？ |
+| 把 Domain 当作命名空间或筛选条件 | 这些条件应由业务键作用域和实际 Cypher 表达吗？ |
 | 只展示 YAML、没有实际查询或实例 | 哪些 Competency Questions 得到了可核实回答？ |
 | 宣称本体自动推断分类、传递或来源真实性 | KG OS 当前是否实际提供相应推理或执行规则？ |
 

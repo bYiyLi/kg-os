@@ -1226,3 +1226,12 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **职责边界**：Global AI Guidance 统一规定每轮读取、推荐和授权触发。Knowledge Skill 负责既有 Ontology 下的知识检索、建议及获准修改；VLog Skill 负责系统记录建议与获准记录；Ontology Skill 负责模型与知识世界的语义和方案，结构变更、关联迁移及新 Branch 仍须批准具体建模方案；Doctor 始终只读。专业 Skill 不复制第二份全局授权规则，MCP/Kernel 仍是通用数据库能力，不加入领域审批机制。
 - **代价与验收**：相较此前无人值守自动沉淀，未获授权的知识变化需要待用户确认，不能把“有建议未写入”报告为维护完成。更新当前唯一 [Global AI Guidance](../../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md)、官方四 Skill、canonical INSTALL 和 [MCP owner](mcp.md#global-ai-guidance-and-daily-responsibility)，并以只读建议、明确授权、建模方案确认、超范围请求、失败恢复等相邻情境审查。文本检查与合成测试不证明 ChatGPT 原生 Skill 选择或实际宿主权限生效；已发布 Release、现有私人 Plugin 与生产 Knowledge 不随源码修改自动更新。原 D113 和 D115 保留历史决定事实，以本决定替代其中直接自主写入的现行行为。
 - **参考与取舍（2026-10-28）**：参考 [OpenAI 模型指南](https://developers.openai.com/api/docs/guides/latest-model) 的明确执行边界与评测思路、[Claude Code 提示词库](https://code.claude.com/docs/zh-CN/prompt-library) 的结果导向任务描述；[awesome-claude](https://github.com/tsaol/awesome-claude) 仅作为社区示例。它们不赋予本项目授权，不保证不同宿主自动选择 Skill；具体执行合同仍由本项目决定与真实客户端证据确定。
+
+<a id="d120-doctor-official-ontology-review"></a>
+
+### D120 Doctor 官方本体发现与适用性检查（2026-10-29）
+
+- **决定**：在 [D118](#d118-kgos-doctor-six-checks) 的六项只读诊断后新增非阻断 D6：发现官方 `bYiyLi/kgos-ontologies` 模型，比较授权目标世界的 Ontology，报告有证据的升级候选及可能适用的新模型。全面检查为轻量发现与有界对比；用户定向要求时再深入核对相关 Definition。D0–D5 原验收与四个核心 Skill 清单不变。
+- **识别与判断**：官方目录实时发现，不能在 Doctor 维护模型清单；比较版本固定 Tag 对应 Commit 或完整 Commit，区分正式发布与主干未发布内容。先核实采用来源，缺记录只能称结构相似或来源未知；比对 Node、Relationship、Property、Constraint、Index、Domain、用途和定制差异，版本变化或同名不自动证明缺陷。只有可靠采用版本、后续官方版本及有意义影响同时成立才建议升级。未采用模型仅结合实际需求最多推荐 3 个，已有等价结构优先复用。
+- **边界与证据**：只读取获准 Instance/Branch/State；官方访问失败、版本/范围证据不足不得替代为历史记忆或臆测，只标 D6 检查受阻，不影响 D0–D5 或宣称 KG OS 运行故障。Doctor 不导入模型、不修改 Schema/Knowledge/Branch、不自动安装领域 Skill；深入语义设计与迁移方案归 `kgos-ontology-standards`，实施仍需实际授权。
+- **验收**：保持单个 `SKILL.md` 与原引导资产，不新增 MCP Tool、内核领域模型或独立参考材料；更新 [MCP Doctor 真源](mcp.md#kgos-doctor-v1)、[Phase 25](../development/phases/25-kgos-doctor.md)、针对性合同和正反场景。静态及场景资料不等于目标 ChatGPT 插件已更新或真实自动选用通过。

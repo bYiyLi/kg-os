@@ -1,6 +1,6 @@
 ---
 name: kgos-knowledge-standards
-description: Use for KG OS Knowledge retrieval, evidence-based answers, relationship analysis, change recommendations, authorized updates and quality correction under an existing Ontology. Not for Ontology/Branch design, VLog-specific records or environment diagnosis.
+description: Use for KG OS Knowledge retrieval, evidence-based answers, authorized updates, quality review, scoped or full knowledge-quality audits, and evidence-based correction under an existing Ontology. Not for Ontology/Branch design, VLog-specific records or environment diagnosis.
 ---
 
 # KG OS 知识规范
@@ -13,6 +13,7 @@ description: Use for KG OS Knowledge retrieval, evidence-based answers, relation
 - **变更建议**：依据真实模型和记录判断是否需要创建、补充、纠正或整理，明确建议的目标与范围。
 - **获准创建与更新**：在既有模型下新增、复用、关联、补充或纠正知识。
 - **质量维护**：确认并处理有证据的重复、冲突、过时、缺漏或错误关系。
+- **独立质量审计**：按请求只读审核单条、指定范围或整个知识世界的知识可信性、关联与实际使用价值，给出可复核问题和改进建议。
 
 只选择本次任务需要的操作，不把检索、建议、写入与巡检变成固定流水线。用户明确要求执行具体变更、批准已展示的具体方案，或已有明确且仍覆盖本次操作的批量授权时，在该范围内执行；仅要求讨论、只读、建议或本轮明确不保存时，不得写入。发现“值得保存”不构成写入授权。每轮读取与变更检查的触发由 Global AI Guidance 负责，本 Skill 只负责 Knowledge 的专业处理。
 
@@ -46,19 +47,20 @@ description: Use for KG OS Knowledge retrieval, evidence-based answers, relation
 
 现有字段能忠实表达事实、意见、计划或不确定性时直接复用，不强制增加模型字段。确实无法表达必要事实时，指出具体结构缺口和受阻内容，由 `kgos-ontology-standards` 负责模型或知识世界方案及用户确认；本 Skill 不自行修改 Definition、Property、Constraint、Index 或 Branch。可独立完成的 Knowledge 操作继续，普通写入不因模型 Skill 的存在额外要求审批。
 
-## 4. 维护知识质量
+## 4. 维护与审计知识质量
 
-需要整理知识或日常工作发现实际质量疑点时，按目标范围和真实证据区分：
+写入前后、日常使用发现疑点或用户明确要求质量审计时，按具体知识的用途选择需要核验的维度，而非强制所有节点填写相同字段：
 
-- **重复**：是否确属同一身份、事实和作用域；同名、相似或相同正文不足以判定。
-- **冲突**：同主体、同条件、同时间的事实是否互斥，还是来源、观点与适用范围不同。
-- **过时**：事实是否已确认失效、只是历史上有效，还是缺少当前证据；较旧不等于错误。
-- **缺失**：是否在已覆盖范围内确实缺少必要知识或关系，而非查询漏页、过滤或搜索未命中。
-- **错误**：是否有可靠依据证实内容、身份或关系有误，而非单纯与某条来源不同。
+- **真实性与证据**：核对重要主张是否被实际来源支持，区分来源陈述、观察、推断与验证；存在 Source 或 Commit 不等于内容真实。
+- **完整性与可用性**：判断当前问题所需的关键事实、条件、解释与关系是否足够；字段空缺仅表示未知或可能的用途缺口，不直接证明错误。
+- **身份与一致性**：按稳定身份、作用域和业务时间检查重复与相斥事实；同名、相似和不同来源观点不自动成为重复或冲突。
+- **时间与有效性**：区别事实发生时间、来源观察时间、业务有效期间及 Commit 时间；较旧不等于过期，缺状态不等于失效。
+- **图关系与追溯**：确认关系类型、端点、方向、成立条件与证据用途，检查有无无据连接或当前用途必需而未记录的关联。
+- **可发现与复用**：重要知识应能在实际模型、索引和固定 State 下回答代表性的业务问题；检索不到可能是查询覆盖、模型或数据缺口，不自动判定事实不存在。
 
-先区分已证实问题、待核实候选和合理差异。未获变更授权时提出有证据的最小修正建议；已证实且授权覆盖时选择最小必要的保留、补充、纠正或审慎去重，核对相关关系与受影响对象；不能裁决时保留实际争议及未知，不任意选择赢家、删除节点或批量重连。
+用户要求独立质量审计（单条、指定范围或全知识世界），或决策、现行规则等直接指导后续行动的知识需要深入验收时，读取 [知识质量审计方法](references/quality-audit.md)，依其方法明确对象、固定 State、证据强度、结构覆盖与语义核验深度、实际用途及报告披露范围。通常的简单知识检查不必加载这份参考，也不自动扩成全库审计。
 
-局部问题不自动升级为全库巡检；用户要求完整覆盖时不得以抽样、Top-K 或首批结果声称全部完成。没有真实问题时保留原状，不为展示维护产出制造改动。
+审计发现分为**已证实问题、待核实风险、合理差异和未检查/证据不足**；每项重要发现给出实际对象、固定 State、依据、用途影响与最小修正建议。不得用空字段率、Schema 合格、相似分数或通用质量总分替代事实判断。未获变更授权时止于建议；已证实且授权覆盖时才最小补充、纠正或审慎去重，保留无关数据和仍有效的历史；不能裁决则保留争议。局部抽样、Top-K 和未完成分页不能声称全库已验收；无问题时不制造修改。
 
 ## 5. 执行与核实
 
@@ -68,12 +70,12 @@ description: Use for KG OS Knowledge retrieval, evidence-based answers, relation
 
 写入可能产生新 Commit 且方法支持 `message` 时，按需通过 `kgos_docs` 读取 `guides/evolution.md` 的提交说明规则；依据已核实的知识世界用途与本次真实变化填写说明。实际产生新 Commit 后回读该 State 的原始 Message；没有新 Commit 时不为补说明制造额外提交。
 
-写入后必须在实际返回的 State（未返回时先核实目标 Branch 当前 State）回读 Knowledge、属性及关系，核实语义、必要约束和相关影响。质量维护还要确认原问题是否解决；工具成功、Schema 接受或提交回执均不代替内容验证。
+写入后必须在实际返回的 State（未返回时先核实目标 Branch 当前 State）回读 Knowledge、属性及关系，核实语义、必要约束和相关影响。对于会直接指导后续决策或操作的知识，或明确要求使用验收的任务，还要按其真实用途运行代表性检索/图关系问题，确认结论、来源和适用范围足以支撑回答；无法回答时区分缺知识、缺关系、检索覆盖与来源不足。质量维护还要确认原问题是否解决；工具成功、Schema 接受或提交回执均不代替内容验证。
 
 发生超时、断线、取消、部分成功或结果不明时，先核对原目标 Branch 的当前 State、知识身份、关系及已出现的变化，再恢复尚未完成且仍在授权范围内的部分；禁止换键重复创建、盲目重试或假定全部回滚。准确区分当前结果、是否由本次调用造成、已验证、未执行和仍未知的部分。
 
 ## 6. 边界
 
-不得由本 Skill 直接设计或改动 Ontology、创建/合并 Branch、安排 Scheduler 或执行环境诊断。模型和知识世界方案归 `kgos-ontology-standards`；系统活动记录的专业语义归 `kgos-vlog-standards`，环境诊断归 `kgos-doctor`。跨职责任务由宿主选择对应 Skill，不因切换 Skill 新增权限或中断已获授权的独立工作。
+不得由本 Skill 直接设计或改动 Ontology、创建/合并 Branch、安排 Scheduler 或执行环境诊断。模型和知识世界方案归 `kgos-ontology-standards`；VLog 事件的执行尝试、验收及复盘专业质量归 `kgos-vlog-standards`，本 Skill 的通用事实、来源与范围判断可按需协同使用，不替代事件判据；环境及运行就绪诊断归 `kgos-doctor`，不等于全量业务知识质量审计。跨职责任务由宿主选择对应 Skill，不因切换 Skill 新增权限或中断已获授权的独立工作。
 
 明确只读、不保存等用户禁令及宿主权限必须遵守。完成所需读取、建议或已授权修改及回读后，继续交付原用户任务；不另造评分、固定报告或无关维护工作流。

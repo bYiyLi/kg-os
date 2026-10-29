@@ -6,7 +6,8 @@
       "entry": [
         "scripts/prepare-lithograph.mjs",
         "scripts/prepare-jieba.mjs",
-        "scripts/mcp-dev-accept-unified.mjs"
+        "scripts/mcp-dev-accept-unified.mjs",
+        "scripts/sync-vlog-ontology.mjs"
       ],
       "project": ["config/test/*.ts", "scripts/*.mjs", "tests/**/*.ts"]
     },

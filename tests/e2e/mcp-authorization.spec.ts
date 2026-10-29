@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
+import { mockEmptyGraphQuery } from "./graph-empty-fixture.js";
 import { mockVersionRoutes, states } from "./version-fixture.js";
 
 const bootID = "69b27834-2c34-4e80-a9c2-b5ac05867e1b";
@@ -53,6 +54,11 @@ async function mockWebConnection(page: Page, loggedIn: boolean, validDetails = t
     });
   });
   await mockVersionRoutes(page);
+  await mockEmptyGraphQuery(page, async (route, body) => {
+    expect(route.request().headers()["authorization"]).toBe("Bearer " + webToken);
+    expect(route.request().headers()["x-kgos-expected-daemon-boot"]).toBe(bootID);
+    await route.fulfill({ json: body });
+  });
   await page.route("**/oauth/request?*", async (route) => {
     detailReads++;
     expect(route.request().headers()["authorization"]).toBe("Bearer " + webToken);
@@ -225,6 +231,14 @@ test("authorization surfaces and actions inherit both Web theme token sets", asy
     "background-color",
     "rgb(90, 69, 199)"
   );
+  // The button's foreground color has its own theme transition. Its computed
+  // value must settle to the exact design token before the final comparison.
+  await expect
+    .poll(async () => {
+      const colors = await inspect();
+      return colors.approveText === colors.expectedActionText;
+    })
+    .toBe(true);
   const light = await inspect();
   expect(light.theme).toBe("light");
   expect(light.scheme).toBe("light");

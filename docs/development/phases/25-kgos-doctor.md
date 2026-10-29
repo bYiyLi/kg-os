@@ -4,18 +4,19 @@
 
 ## 当前目标与状态
 
-**状态：`in_progress`（2026-10-28）**。Doctor 是用户按需触发的只读自检 Skill，现行合同见 [MCP Doctor 设计](../../design/mcp.md#kgos-doctor-v1)、[D118](../../design/decisions.md#d118-kgos-doctor-six-checks) 和 [Skill 正文](../../../plugins/kgos/skills/kgos-doctor/SKILL.md)。历史 D104 的五项诊断、四状态及参考文件结构由本次六项检查取代；对应历史测试与评审仍保留在下文，不作为当前验收规则。
+**状态：`in_progress`（2026-10-29）**。Doctor 是用户按需触发的只读自检 Skill，现行合同见 [MCP Doctor 设计](../../design/mcp.md#kgos-doctor-v1)、[D118 六项原基线](../../design/decisions.md#d118-kgos-doctor-six-checks)、[D120 官方 Ontology 扩展](../../design/decisions.md#d120-doctor-official-ontology-review) 和 [Skill 正文](../../../plugins/kgos/skills/kgos-doctor/SKILL.md)。历史 D104 的五项诊断、四状态及参考文件结构已由 D118 取代；D120 新增非阻断 D6，历史测试与评审不改写。
 
-**目标**：通过简洁的单文件 Skill，在明确授权的可见范围执行 D0–D5 六项真实检查，逐项给出证据、结果与必要建议。官方全局引导词正文仍由 [唯一资产](../../../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md) 维护，不随 Doctor 重构而修改。实际 MCP/SDK 签名与操作方法由 `kgos_docs` 提供；不增加内置 Agent、调度器或 Doctor 专用接口。
+**目标**：通过简洁的单文件 Skill，在明确授权的可见范围执行 D0–D6 七项只读检查，逐项给出证据、结果与必要建议。D6 只读发现、对比和推荐官方 Ontology，不影响前六项。官方全局引导词仍由 [唯一资产](../../../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md) 维护；实际 MCP/SDK 合同由 `kgos_docs` 提供，不增加 Agent、调度器或 Doctor 专用接口。
 
 ## Feature 与验收
 
 | Feature | 当前工作 | 验收 |
 | --- | --- | --- |
-| P25-01 · 六项 Skill 合同 | 重写 `SKILL.md`，删去旧 Doctor 专属参考与模板；维护唯一引导资产 | 选择条件、六项方法、结果与只读边界完整，无旧规则冲突 |
-| P25-02 · 本地合同及分发 | 更新 Go 合同测试、场景评测与公开分发文件清单；使 `kgos_docs` 透出当前 MCP 构建版本 | YAML 元数据与资源可读，六项行为检查点覆盖，分发恰好包含现行文件；无 Skill 的 MCP 客户端可通过实际 `tools/call` 读取服务版本 |
+| P25-01 · Doctor Skill 合同 | 单份 `SKILL.md` 保留 D0–D5 并增加只读 D6，唯一引导资产不变 | 选择条件、七项方法、结果与职责边界完整，无旧规则冲突 |
+| P25-02 · 本地合同及分发 | 更新 Go 合同测试、场景评测与公开分发文件清单；`kgos_docs` 返回当前 MCP 构建版本 | YAML 元数据与资源可读，D0–D6 检查点覆盖，Doctor 仍仅两份运行时资源；不新增 MCP Tool |
 | P25-03 · 真实宿主验收 | 在目标 ChatGPT 与真实 MCP 检查版本、系统级引导、Skill、State、Knowledge、维护记录 | 检查结论符合当次证据，不把不可见的宿主/版本信息或有限样本编成成功 |
 | P25-04 · 交付门禁 | Review、diff 与相关本地测试，按发布要求补齐真实 Linux/CI/Plugin 证据 | 阶段要求的真实验收全部满足后才可标 `done`；提交、发布、部署另需独立授权 |
+| P25-05 · 官方 Ontology 发现与比较 | 在 D6 比对固定来源版本、实际模型、升级候选与业务适用性；补正反场景 | 无来源不冒充已采用，目录失败不阻断 D0–D5，模型差异/缺席不自动判故障；不安装领域 Skill |
 
 ## 当前 Acceptance
 
@@ -25,7 +26,8 @@
 4. **D3 · 官方 Skills**：按实际安装包检查完整 Skill 清单、`SKILL.md`、必要引用资源及 MCP 接口兼容；同包可读的四份 `metadata.version` 应一致。缺版本或无法确认包归属时报告版本证据不足，不跨不同 Plugin 对比、不要求与 MCP 运行版本相同；名称、版本、资源出现不证明自动选用，调用须有真实轨迹。
 5. **D4 · Knowledge**：按实际 Ontology 执行有界 `graph.query`，区分业务 Knowledge 与可能的内部图数据；只声明已覆盖范围的发现与读取，空样本不证明全库为空，已确认无实例的世界不应假称业务检索已通过或数据损坏。
 6. **D5 · 维护/VLog**：核对实际可见的外部任务配置及运行结果，按目标真实模型检查 VLog、验证来源和未决延续；证实未启用的可选能力不当成故障，配置不可见不作“未启用”推断，也不建立任务或模型。
-7. **报告与权限**：仅 `PASS` / `FAIL` / `N/A`，必要证据缺失或检查受阻可使该验收项 `FAIL`，但必须与已证实的实际故障区分。按 D0–D5 线性报告、保留独立检查；全程只读，不自动修复、安装、升级或部署。普通检索、模型设计、VLog 创作及 CLI `kg doctor` 不触发本 Skill。
+7. **D6 · 官方 Ontology**：实时发现公开 `kgos-ontologies`，固定 Tag/Commit 对比授权 State 中相关 Definition 与采用证据；区分结构相似、定制、实际缺口及后续正式版本，只在有证据的收益/影响下建议升级；其他模型最多推荐 3 个有明确需求的候选。未采用、已有等价模型与官方不可访问不当作 KG OS 服务故障；检查受阻只影响 D6。
+8. **报告与权限**：仅 `PASS` / `FAIL` / `N/A`，必要证据缺失或检查受阻可使该验收项 `FAIL`，但必须与已证实的实际故障区分。按 D0–D6 线性报告、保留独立检查；全程只读，不自动修复、安装、升级或部署。普通检索、模型设计、VLog 创作及 CLI `kg doctor` 不触发本 Skill。
 
 **交付边界**：写入源码及本地测试不代表私人 Plugin 自动升级、Release 已发布或实际 ChatGPT 自检通过。没有真实客户端/远端验证、Commit、Push、Tag 与部署证据时，Phase 保持 `in_progress`。
 

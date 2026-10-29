@@ -159,6 +159,15 @@ func loadOntologySkillCase(t *testing.T, example ontologySkillCase) (*host.Runti
 					*ptr = alias
 				}
 			}
+			for i := range value.Definition.Indexes {
+				for j, target := range value.Definition.Indexes[i].Targets {
+					alias, ok := aliases[target]
+					if !ok {
+						t.Fatalf("unresolved example Index target %s", target)
+					}
+					value.Definition.Indexes[i].Targets[j] = alias
+				}
+			}
 		}
 		if value.Domain != nil {
 			for i, ref := range value.Domain.Includes {

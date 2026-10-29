@@ -1,8 +1,10 @@
+<!-- GENERATED SNAPSHOT from https://github.com/bYiyLi/kgos-ontologies/blob/88c54f2f7517dfa0e464f9344c2116c7501ddf3f/models/vlog/ontology.md ; do not edit this copy manually. -->
+
 # VLog 事件中心本体参考
 
-**用途**：在已有模型不足以准确记录系统事件及其关联时，为 `branch/vlog` 提供一套可复用的 KG OS Property Graph Ontology。模型用于系统记录，不是 Kernel 预置的领域 Schema，不会因为安装 Skill 自动创建；使用前必须核对目标 State 的现有 Definition，实际结构变化遵循 `kgos-ontology-standards` 的具体方案授权规则。
+**用途**：在已有模型不足以准确记录系统事件及其关联时，为系统事件知识世界（例如 `branch/vlog`）提供一套可复用的 KG OS Property Graph Ontology。模型用于系统记录，不是 Kernel 预置的领域 Schema，不会因为阅读模型或安装 Skill 自动创建；使用前必须核对目标 State 的现有 Definition，实际结构变化遵循 `kgos-ontology-standards` 的具体方案授权规则。
 
-本文件是本包**完整 Definition YAML 的唯一真源**。每个 `yaml` 代码块恰好是一份 KG OS 可编辑 Node / Relationship Definition body，标题是对应的 Object Ref；不把 Markdown 标题、Object metadata 或代码围栏放入 YAML。运行测试从本文件提取这些代码块，不维护第二份模型副本。
+公开仓库的 `models/vlog/ontology.md` 是 VLog 模型包**完整 Definition YAML 的唯一维护真源**。每个 `yaml` 代码块恰好是一份 KG OS 可编辑 Node / Relationship Definition body，标题是对应的 Object Ref；不把 Markdown 标题、Object metadata 或代码围栏放入 YAML。使用方 Skill 只能从明确的 Git Commit 生成固定快照，不单独维护第二份模型。运行测试直接提取这些代码块。
 
 ## 1. 本体论与适用边界
 

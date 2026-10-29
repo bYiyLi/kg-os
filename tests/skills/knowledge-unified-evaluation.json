@@ -103,6 +103,7 @@
       "id": "vlog-boundary",
       "prompt": "记录一次系统部署及验证结果，遵守 VLog 的专业归属。",
       "expectedApplies": false,
+      "expectedOtherSkill": "kgos-vlog-standards",
       "criteria": ["VLog 专业记录优先选择 VLog Skill", "Knowledge 规则不改写独立 VLog 语义"]
     },
     {
@@ -153,6 +154,109 @@
         "明确授权的全有或全无更新可以通过实际支持的单次原子 Patch 完成",
         "不因安全约束额外要求用户再批准常规写入",
         "回读本次结果 State 与三个对象和关系，核实提交影响"
+      ]
+    },
+    {
+      "id": "quality-audit-source-claims",
+      "prompt": "请对一项现有技术决策做独立知识质量审计：核实证据是否真正支持它的具体主张，只报告问题，不改库。",
+      "expectedApplies": true,
+      "criteria": [
+        "选择 Knowledge 的独立审计能力并读取按需方法参考",
+        "固定目标 State，核对实际决策、相关来源内容及关系",
+        "区分证据支持、风险、未知和合理差异，不执行修改"
+      ]
+    },
+    {
+      "id": "quality-audit-full-versus-sample",
+      "prompt": "全面审计一个知识世界。只检索到了前十条搜索结果，能否据此报告整个知识世界质量合格？",
+      "expectedApplies": true,
+      "criteria": [
+        "全量审计明确业务分母和固定 State，排除内部元数据",
+        "分页或 Top-K 不充分不得声称全覆盖",
+        "说明已检查、未检查及证据不足的范围"
+      ]
+    },
+    {
+      "id": "quality-audit-question-acceptance",
+      "prompt": "一项工程决定已经写入且 Schema 检查通过，但用户仍无法回答为什么采用该方案、适用哪个项目、证据是什么。知识质量审核应怎么办？",
+      "expectedApplies": true,
+      "criteria": [
+        "以决策真实用途确定代表性检索与图关联问题",
+        "核对答案与来源而非只相信写入成功或结构一致",
+        "识别内容、证据、关系和检索覆盖缺口，只有实际模型问题才建议变更本体"
+      ]
+    },
+    {
+      "id": "quality-scope-vlog-specialized",
+      "prompt": "请审核 branch/vlog 中一次部署故障的所有尝试、实际修复验证和经验是否足以复盘；普通质量维度可以按需复用。",
+      "expectedApplies": false,
+      "expectedOtherSkill": "kgos-vlog-standards",
+      "criteria": [
+        "VLog 事件与验收质量由 VLog Skill 优先负责",
+        "通用来源或范围标准可协同使用，但不接管事件专业判据",
+        "只审核不自动记录或修复"
+      ]
+    },
+    {
+      "id": "quality-scope-doctor-diagnostic",
+      "prompt": "请检查 KG OS MCP 是否正常、服务版本是否匹配、Skill 是否安装，运行 D0–D5 自检。",
+      "expectedApplies": false,
+      "expectedOtherSkill": "kgos-doctor",
+      "criteria": [
+        "系统与客户端诊断应优先选择 Doctor 而非全库知识审计",
+        "不把 Schema 一致性通过当知识质量合格",
+        "不自动修复或写入"
+      ]
+    },
+    {
+      "id": "quality-scope-ontology-structure",
+      "prompt": "我们需要新增 Rule 到 Source 的证据关系定义，请审查本体结构和端点约束，并给出建模方案。",
+      "expectedApplies": false,
+      "expectedOtherSkill": "kgos-ontology-standards",
+      "criteria": [
+        "新增 Definition 和关系约束归 Ontology Skill",
+        "Knowledge 只指出已证实的表达缺口，不直接变更本体",
+        "模型方案需实际确认后才可写入"
+      ]
+    },
+    {
+      "id": "quality-date-source-pair",
+      "prompt": "已有 Decision 的 decidedOn 为空。A 的唯一资料明确标注决策于 2026-10-28 形成；B 的资料没有日期。请分别审核 A 和 B，并提出最小建议，别直接填今天。",
+      "expectedApplies": true,
+      "criteria": [
+        "A 先核对来源日期的业务含义，有证据的表达缺口可建议补充",
+        "B 的未知日期不直接判错误或编造",
+        "分析与建议不授权写入"
+      ]
+    },
+    {
+      "id": "quality-authorized-fix-pair",
+      "prompt": "先只审计 D1 的证据关系并提建议；如果我随后明确批准对 D1 和指定关系的修复方案，再按批准范围执行。",
+      "expectedApplies": true,
+      "criteria": [
+        "第一阶段只读，不能因预期将来批准而先写入",
+        "后续实际获得具体批准才核对当前 State 并修改",
+        "修复后需核对关系和实际使用问题，不扩大范围"
+      ]
+    },
+    {
+      "id": "quality-report-minimum-disclosure",
+      "prompt": "审计一个私有系统的知识来源。用户只能查看项目级结论，来源中包含凭证字段和本地私有文件路径。请给出不泄露内容的审计结论。",
+      "expectedApplies": true,
+      "criteria": [
+        "遵守来源和报告读者的实际披露权限，能读取不等于能公开原文",
+        "仅提供已授权的必要摘要和安全的证据定位，不输出凭证或敏感原始路径",
+        "不因不能披露原文就编造事实或隐瞒审计覆盖限制"
+      ]
+    },
+    {
+      "id": "quality-audit-prioritize-impact",
+      "prompt": "审计发现一条会影响生产部署决策的结论缺少运行证据；另有十条低影响目录项缺少可选备注。请提出审查优先级，不能靠空字段数量直接排名。",
+      "expectedApplies": true,
+      "criteria": [
+        "优先核查可能误导真实部署或高影响行动的证据缺口",
+        "不把风险程度等同于事实真假或直接判来源错误",
+        "保留真实影响、范围和可核实依据，不要求统一质量总分"
       ]
     },
     {

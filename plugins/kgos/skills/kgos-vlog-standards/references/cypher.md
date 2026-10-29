@@ -1,8 +1,10 @@
+<!-- GENERATED SNAPSHOT from https://github.com/bYiyLi/kgos-ontologies/blob/88c54f2f7517dfa0e464f9344c2116c7501ddf3f/models/vlog/cypher.md ; do not edit this copy manually. -->
+
 # VLog 常见业务查询
 
 这些查询只适用于 [事件中心本体](ontology.md) 中相应 Definition 已在目标 State 真实存在的场景。所有查询均为只读示例，传入实际用户任务确认过的参数，先固定查询 State；不默认当前分支就是 `branch/vlog`。没有查询结果不等于系统现实中未发生相应事件，分页、权限与查询覆盖须按实际需要核实。
 
-每个 `Qn` 小节恰好包含一个完整 `cypher` 代码块。仓库的隔离测试从本文件直接提取并执行查询，测试数据不在运行时 Skill 中分发。
+每个 `Qn` 小节恰好包含一个完整 `cypher` 代码块。同目录的合成测试资料用于隔离 KG OS/Lithograph 运行验证，公开仓库的 CI 仅进行静态一致性检查；Skill 快照从指定 Git Commit 生成，不单独修改查询。
 
 ## Q1：按事件类别查询
 

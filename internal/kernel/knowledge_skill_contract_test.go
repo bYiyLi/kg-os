@@ -57,11 +57,32 @@ func TestKnowledgeSkillResourceContract(t *testing.T) {
 	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 {
 		t.Fatalf("invalid declared metadata: %+v", meta)
 	}
-	for _, expected := range []string{"## 2. 检索与理解", "## 3. 创建与更新 Knowledge", "## 4. 维护知识质量", "## 5. 执行与核实", "kgos-ontology-standards", "kgos_docs"} {
+	for _, expected := range []string{"## 2. 检索与理解", "## 3. 创建与更新 Knowledge", "## 4. 维护与审计知识质量", "## 5. 执行与核实", "独立质量审计", "references/quality-audit.md", "kgos-ontology-standards", "kgos_docs"} {
 		if !strings.Contains(string(body), expected) {
 			t.Fatalf("unified Knowledge Skill lacks %q", expected)
 		}
 	}
+	methodPath := filepath.Join(root, "references", "quality-audit.md")
+	method, err := os.ReadFile(methodPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{
+		"## 1. 确定范围和证据边界",
+		"## 3. 审计步骤与问题验收",
+		"## 4. 容易误判的场景",
+		"已证实问题",
+		"待核实风险",
+		"未检查/证据不足",
+		"全量审计",
+		"W3C Data Quality Vocabulary",
+		"W3C PROV-O",
+	} {
+		if !strings.Contains(string(method), expected) {
+			t.Fatalf("quality-audit reference lacks %q", expected)
+		}
+	}
+	allowed := map[string]bool{filepath.Join(root, "SKILL.md"): true, methodPath: true}
 	count := 0
 	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -69,14 +90,14 @@ func TestKnowledgeSkillResourceContract(t *testing.T) {
 		}
 		if !entry.IsDir() {
 			count++
-			if path != filepath.Join(root, "SKILL.md") {
+			if !allowed[path] {
 				return fmt.Errorf("unexpected runtime Knowledge resource: %s", path)
 			}
 		}
 		return nil
 	})
-	if err != nil || count != 1 {
-		t.Fatalf("resource graph: files=%d err=%v; want only SKILL.md", count, err)
+	if err != nil || count != len(allowed) {
+		t.Fatalf("resource graph: files=%d err=%v; want SKILL.md and quality-audit.md", count, err)
 	}
 	for file, expected := range map[string]int{
 		"evidence-decisions.md": 2, "identity-decisions.md": 1,

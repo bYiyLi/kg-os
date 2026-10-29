@@ -264,6 +264,188 @@
         "只变更指定 Definition 的一个可选属性，不重构或创建新 Branch",
         "按返回 State 回读修改后的 Definition、既有数据和必要查询"
       ]
+    },
+    {
+      "id": "index-business-key-vs-fulltext",
+      "prompt": "已有 Product.sku KEY、title STRING 和 description STRING。用户要按 sku 精确找产品，也要输入正文关键词找产品，建议给所有 STRING 各建一个 RANGE、TEXT、FULLTEXT 索引。请只读评审。",
+      "expectedApplies": true,
+      "criteria": [
+        "从精确业务键与正文词项两个实际查询选择不同路径，不把索引视为字段装饰",
+        "复用 KEY 拥有的 Range Index，不重复同目标与同字段的独立 Range",
+        "按明确查询需求规划必要的全文字段与实际验证，不默认遍历全字段建索引"
+      ]
+    },
+    {
+      "id": "index-semantic-source-and-provider",
+      "prompt": "Document 有 title 和 body 两个 STRING。要支持中文全文搜索，以及用不同措辞找含义相近的长正文。如何构建 Index？先给方案，当前没有核实 Embedding Provider。",
+      "expectedApplies": true,
+      "criteria": [
+        "区分分词全文与 Managed Semantic，分析实际被检索字段和目标 Definition",
+        "KG OS 语义索引只取一个 STRING 来源字段，不虚构 title+body 拼接或内部向量属性",
+        "检查全文 analyzer 与 Provider 可用性及真实使用成本，未验 Provider 不承诺实际语义命中",
+        "只提出最小模型与索引方案，不在未授权时写库"
+      ]
+    },
+    {
+      "id": "index-domain-is-not-target",
+      "prompt": "两个 Domain 同时包含 node:Source，另外还有 node:Decision 与 node:Rule，它们都有 title STRING。现在想跨 Domain 搜标题。能否每个 Domain 建一个全局 Index，并让 Domain 自动过滤知识？",
+      "expectedApplies": true,
+      "criteria": [
+        "Index 按真实 Definition/Property 和查询入口确定 targets，不把 Domain 作为 Index scope",
+        "核对可复用的跨 Definition Full-text 或适用的字段索引，不重复索引共享 Definition",
+        "Domain 不自动过滤 Knowledge，跨模型关系与业务条件由真实图查询表达"
+      ]
+    },
+    {
+      "id": "index-coverage-and-readiness",
+      "prompt": "目标知识世界的 FULLTEXT 和 SEMANTIC 数量都为零，Web 搜索体验不好。能否直接给所有节点建双索引，并在 SHOW INDEXES 返回 ONLINE 后宣布检索完成？",
+      "expectedApplies": true,
+      "criteria": [
+        "确认具体 Web 查询入口、可发现的 Index 类型、目标字段和实际用户问题，数量为零不等于所有字段都需要索引",
+        "索引变更属于 Ontology 方案并需要相应具体授权，不隐式批量写库",
+        "验证正确命中、遗漏、语言分词、Provider 错误及 Top-K 覆盖，ONLINE 不等于真实搜索可用"
+      ]
+    },
+    {
+      "id": "domain-optional-model-navigation",
+      "prompt": "小型图只有 Project、Decision 和关联关系。所有定义在全局概览中都能清楚找到。为了达到优秀本体质量，必须先建一层 Domain 吗？",
+      "expectedApplies": true,
+      "criteria": [
+        "没有导航必要时保留扁平 Ontology，不要求必建 Domain",
+        "Domain 仅组织 Definition，不改变业务图语义、Knowledge 或检索范围",
+        "不因业务主题而拆出新 Branch"
+      ]
+    },
+    {
+      "id": "domain-shared-definition-and-cross-domain-edge",
+      "prompt": "同一知识世界中，研究和项目两个 Domain 都需要引用 Source 定义，Decision 与 Source 已有真实关系。请设计 Domain 组织，不拆库。",
+      "expectedApplies": true,
+      "criteria": [
+        "检查并复用已有 Domain，按业务模型阅读范围决定是否扩展与包含哪些准确 Ref",
+        "允许 Source Definition 被多个 Domain 引用，不复制业务实体、关系或分支",
+        "跨 Domain 的图关系仍可被正常查询，不把组织边当成 Knowledge 关系或权限",
+        "如果要修改 includes 则明确变更范围并按具体授权执行"
+      ]
+    },
+    {
+      "id": "shared-index-target-change-not-delete",
+      "prompt": "已有跨 node:Document 与 node:Note 的共享 FULLTEXT 索引 shared_text。现在只想让 Note 不再被此索引覆盖，Document 仍可按正文搜索。请评审最小索引变更方案，不写入。",
+      "expectedApplies": true,
+      "criteria": [
+        "按完整 targets 将 Note 移出，保留 Document 和同一共享索引身份",
+        "不能从 Note 的展示中删除整条共享 Index 声明来表示仅取消它的覆盖",
+        "说明前后目标及两类实际检索的验证方式，不在只读评审中写入"
+      ]
+    },
+    {
+      "id": "shared-index-deletion-is-global",
+      "prompt": "shared_summary 同时覆盖 node:Rule 和 node:Decision。请只读评审：我从 Rule 的 Definition YAML 里删除整个 shared_summary Index，Decision 的同名声明还在，所以不会影响 Decision 吧？",
+      "expectedApplies": true,
+      "criteria": [
+        "明确从任一参与 Definition 显式删除整条共享索引会删除全局资源",
+        "区分删除资源与调整 targets，核对所有受影响的 Definition",
+        "指出对 Decision 检索的影响并提出最小安全替代，不执行未授权的写入"
+      ]
+    },
+    {
+      "id": "semantic-filter-after-limit-not-scoped-top-k",
+      "prompt": "用户想获取项目 A 内语义最近的 10 条规则。有人建议先用 semantic.queryNodes(...,{limit:10}) 取得全图最相似 10 条，再 WHERE project='A'，并宣称得到 A 内 Top-10。请评审索引与查询设计。",
+      "expectedApplies": true,
+      "criteria": [
+        "区分全局 Top-K 后过滤与过滤范围内真正 Top-K，指出前者可能漏掉 A 的候选",
+        "说明当前 Managed Semantic 公共 Index 没有 filterProperties，不能虚构内层过滤语法",
+        "可以提出明确的有界候选替代或能力缺口，但不能保证未证实的范围 Top-K"
+      ]
+    },
+    {
+      "id": "semantic-long-document-without-auto-chunk",
+      "prompt": "一篇研究资料正文几十万字，用户要按语义搜索其中某段具体论证。只给正文建一个 Managed Semantic Index 就能保证按段落命中，且 KG OS 会自动切块吗？先审方案。",
+      "expectedApplies": true,
+      "criteria": [
+        "说明单来源 STRING 使用原文，不自动截断、分块或拼接字段",
+        "核对 Provider 输入限制、费用和整篇与片段级语义粒度，不保证段落准确召回",
+        "仅在实际片段级身份、来源、关联需求存在时考虑明示的模型扩展，不发明隐藏 Chunk"
+      ]
+    },
+    {
+      "id": "domain-removal-keeps-model-and-knowledge",
+      "prompt": "同一 Source Definition 被 Research 和 Projects 两个 Domain 组织。只需删掉 Research Domain，Projects、Source Definition、Source Knowledge 和业务关系必须保留。请说明影响范围。",
+      "expectedApplies": true,
+      "criteria": [
+        "Domain 删除只移除该 Domain 及组织关系，不能当作级联删除 Schema 或 Knowledge",
+        "检查 Source 在 Projects 的组织引用和跨组真实关系仍然有效",
+        "按实际受影响 Domain 与 includes 说明变更和权限，不擅自执行"
+      ]
+    },
+    {
+      "id": "pure-knowledge-retrieval-no-ontology",
+      "prompt": "只查询现有项目知识库里与缓存策略相关的 Rule 和 Source，并给出引用，不设计或调整本体。",
+      "expectedApplies": false,
+      "criteria": [
+        "由 Knowledge 检索职责按实际模型和索引完成读取",
+        "不因出现知识、Rule 或 Source 自动启动 Ontology 方案",
+        "不创建 Index 或 Domain"
+      ]
+    },
+    {
+      "id": "pure-knowledge-instance-update-no-ontology",
+      "prompt": "已确认已有 Rule 模型可以表达这个事实，请将某条已定位 Rule Knowledge 的 requirement 从 A 修正为 B，不修改任何 Definition。",
+      "expectedApplies": false,
+      "criteria": [
+        "普通 Knowledge 写入由知识规范负责",
+        "不新增模型审核或索引设计",
+        "按已有写入授权与回读验证处理"
+      ]
+    },
+    {
+      "id": "vlog-event-write-under-existing-model",
+      "prompt": "按已经存在且足够的 VLog Event/Source 模型记录本次真实部署验证事件和对应证据，不改变模型。",
+      "expectedApplies": false,
+      "criteria": [
+        "由 VLog 专业规范判断事件身份、证据和保存",
+        "不因为 Event/Source 出现就另行建模",
+        "不自动创建 Domain 或 Branch"
+      ]
+    },
+    {
+      "id": "doctor-provider-connection-diagnostic",
+      "prompt": "只诊断当前 KG OS 的 Embedding Provider 是否连接和鉴权正常，检查为何语义查询报网络错误，不要修改索引或 Ontology。",
+      "expectedApplies": false,
+      "criteria": [
+        "只读系统诊断归 Doctor 或实际运维能力，不进入 Ontology 建模",
+        "Provider 错误不是自动创建新的 Semantic Index 的依据",
+        "没有授权不修改运行配置"
+      ]
+    },
+    {
+      "id": "index-list-read-only-without-model-review",
+      "prompt": "在指定只读 State 执行 SHOW INDEXES，列出真实名称、类型和 ONLINE 状态即可，无需评估或更改索引。",
+      "expectedApplies": false,
+      "criteria": [
+        "这是一次只读数据库状态查询，不要求 Ontology Skill 设计方案",
+        "仅报告实际查询覆盖的 State 和返回值",
+        "不隐式创建或调整 Index"
+      ]
+    },
+    {
+      "id": "web-search-interaction-not-ontology",
+      "prompt": "把 KG OS Web 搜索框从按 Enter 执行改成输入时显示加载状态，只调整前端交互与测试，不改变检索索引定义。",
+      "expectedApplies": false,
+      "criteria": [
+        "这是 Web 工程任务，不因出现搜索词触发本体重建",
+        "保留已有 Ontology 和知识数据",
+        "根据前端实现合同处理相应测试"
+      ]
+    },
+    {
+      "id": "query-failure-no-schema-change",
+      "prompt": "同一个知识搜索索引先前能用，现在查询服务报超时。先只读定位超时与 Provider 日志，不审核或修改 Schema。",
+      "expectedApplies": false,
+      "criteria": [
+        "超时诊断属于运行时/运维职责，不自动进入 Ontology",
+        "不能把暂时查询失败等同于应重建索引",
+        "保留指定只读范围，不绕过宿主诊断权限"
+      ]
     }
   ]
 }

@@ -1,6 +1,6 @@
 # KG OS 本体论建模案例
 
-本文件包含三个**合成业务场景**，用于从实际问题出发判断概念、身份、关系和分类，并用 KG OS 公共 Definition YAML 与 Cypher 表达。各案例彼此独立，属于教学与隔离测试数据，不是生产事实、通用强制 Schema 或可跨案例一次导入的完整 Ontology。
+本文件包含四个**合成业务场景**，用于从实际问题出发判断概念、身份、关系、分类及检索覆盖，并用 KG OS 公共 Definition YAML 与 Cypher 表达。各案例彼此独立，属于教学与隔离测试数据，不是生产事实、通用强制 Schema 或可跨案例一次导入的完整 Ontology。
 
 使用顺序：先说明要回答什么问题及为什么如此建模，再读取相应 `### node:` / `### relationship:` 下完整 `yaml` 代码块；实际操作依据当前 `kgos_docs`、目标 State 和授权执行。仓库的真实 Lithograph 测试从**本文件原文**创建 Definition、写入合成数据、查询和验证反例，不复制第二份 YAML。
 
@@ -368,6 +368,163 @@ MATCH (n:KnowledgeNote {noteKey:'N2'}) RETURN n.summary AS assertion
 {"columns":["assertion"],"rows":[["Unsubstantiated assertion"]]}
 ```
 
+## 案例 D：跨 Domain 复用 Definition 与共享全文索引
+
+**能力问题**：研究笔记与项目记录能否在一个知识世界中共享标题全文检索，并保留真实的跨领域引用关系？Domain 组织是否需要复制业务节点？
+
+**语义决策**：Research 与 Projects 只是模型导航，两者的 Definition 仍属于同一 Property Graph；`USED_IN` 以实际业务关系连接两种 Knowledge。共享的 `shared_titles` 是一份跨 Definition 的 FULLTEXT 索引，两个 Definition 显示同一完整声明，不产生两个索引。这里只需全文检索，不因字符串字段存在就自动创建 Managed Semantic Index。
+
+### node:ResearchDocument
+
+```yaml
+name: "ResearchDocument"
+description: "可按明确来源身份追踪的研究文档；并非整个 Research Domain 的数据容器。"
+properties:
+  - name: "docKey"
+    type: "STRING"
+    required: true
+    unique: true
+  - name: "title"
+    type: "STRING"
+    required: true
+constraints: []
+indexes:
+  - name: "shared_titles"
+    type: "fulltext"
+    targets:
+      - "node:ProjectRecord"
+      - "node:ResearchDocument"
+    properties:
+      - "title"
+```
+
+### node:ProjectRecord
+
+```yaml
+name: "ProjectRecord"
+description: "带有项目内稳定身份的记录；可被研究文档关联。"
+properties:
+  - name: "recordKey"
+    type: "STRING"
+    required: true
+    unique: true
+  - name: "title"
+    type: "STRING"
+    required: true
+constraints: []
+indexes:
+  - name: "shared_titles"
+    type: "fulltext"
+    targets:
+      - "node:ProjectRecord"
+      - "node:ResearchDocument"
+    properties:
+      - "title"
+```
+
+### relationship:USED_IN
+
+```yaml
+name: "USED_IN"
+description: "一份研究文档实际用于某个项目记录；同现不构成使用关系。"
+from: "node:ResearchDocument"
+to: "node:ProjectRecord"
+properties:
+  - name: "usage"
+    type: "STRING"
+    description: "可核实的使用方式。"
+constraints: []
+```
+
+### domain:Research
+
+```yaml
+name: "Research"
+description: "组织研究文档及其跨模型使用关系。"
+includes:
+  - "node:ResearchDocument"
+  - "relationship:USED_IN"
+```
+
+### domain:Projects
+
+```yaml
+name: "Projects"
+description: "组织项目记录；不隔离其它 Domain 里的实体。"
+includes:
+  - "node:ProjectRecord"
+```
+
+## 合成实例 D
+
+```cypher
+CREATE (r:ResearchDocument {docKey:'R1',title:'graph search'}),
+       (p:ProjectRecord {recordKey:'P1',title:'graph indexing'}),
+       (r)-[:USED_IN {usage:'citation'}]->(p)
+```
+
+## 验证问题 D
+
+### Q1：共享全文索引能命中两类 Definition 吗？
+
+```cypher
+CALL db.index.fulltext.queryNodes('shared_titles','graph',{limit:10})
+YIELD node,score RETURN node.title AS title ORDER BY title
+```
+
+```json
+{"columns":["title"],"rows":[["graph indexing"],["graph search"]]}
+```
+
+### Q2：研究文档能否通过实际关系连接项目记录？
+
+```cypher
+MATCH (:ResearchDocument {docKey:'R1'})-[u:USED_IN]->(p:ProjectRecord)
+RETURN p.recordKey AS record,u.usage AS usage
+```
+
+```json
+{"columns":["record","usage"],"rows":[["P1","citation"]]}
+```
+
+### Q3：共享索引是否确实只有一个物理定义？
+
+```cypher
+SHOW ALL INDEXES YIELD name,type,entityType
+WHERE name='shared_titles' RETURN name,type,entityType
+```
+
+```json
+{"columns":["name","type","entityType"],"rows":[["shared_titles","FULLTEXT","NODE"]]}
+```
+
+## 数据库反例 D
+
+重复的项目业务键应该被 Constraint 拒绝；Domain 不能当作另一套唯一性作用域。
+
+```cypher
+CREATE (:ProjectRecord {recordKey:'P1',title:'duplicate'})
+```
+
+## 语义反例 D
+
+另一条项目记录即使也被全文检索命中，仍不自动与研究文档构成业务关联。
+
+```cypher
+CREATE (:ProjectRecord {recordKey:'P2',title:'graph review'})
+```
+
+## 语义检查 D
+
+```cypher
+MATCH (:ResearchDocument {docKey:'R1'})-[:USED_IN]->(p:ProjectRecord {recordKey:'P2'})
+RETURN count(p) AS links
+```
+
+```json
+{"columns":["links"],"rows":[[0]]}
+```
+
 ---
 
-上述三个示例分别展示了**分类扩展、本体角色/关系时间、来源版本身份**。需要系统日志的专用事件 Ontology 时，可在确实安装且适用的情况下选择 `kgos-vlog-standards`；不能把它强制作为所有领域的默认基础本体。模型决定应以 [本体论方法论](ontology-methodology.md) 与当前知识世界真实需求为准。
+上述四个示例分别展示了**分类扩展、角色与关系时间、来源版本身份、跨 Domain 与共享全文索引**。共享 Index 的 `targets` 变更与全局删除，以及语义过滤后 Top-K、长文本的边界，按需参照 [本体论方法论](ontology-methodology.md#检索需求驱动的-index-设计)，不把教学搜索结果当作生产质量验收。需要系统日志的专用事件 Ontology 时，可在确实安装且适用的情况下选择 `kgos-vlog-standards`；不能把它强制作为所有领域的默认基础本体。

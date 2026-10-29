@@ -1,19 +1,19 @@
 ---
 name: kgos-ontology-standards
-description: Design, review, reuse or implement approved KG OS Ontology and knowledge-world models; decide Domain, Definition, relationship and Branch boundaries from business identity, semantics and query needs. Not for ordinary Knowledge editing, VLog recording or diagnosis.
+description: Design, review, reuse or implement approved KG OS Ontology; choose Definitions, relationships, indexes, Domain organization and knowledge-world boundaries from business identity and query needs. Not for ordinary Knowledge editing, VLog or diagnosis.
 ---
 
 # KG OS 本体论规范
 
 本 Skill 负责**领域语义和知识结构的建模**，而不是根据业务名词直接创建数据库 Schema。采用“问题 → 概念 → 身份 → 关系 → 图结构 → 查询验证”的方法，在当前任务需要的深度下实施；不内置固定的 Event/Entity 或其它上层领域模型。
 
-官方可复用 Ontology 库（规划地址）：<https://github.com/bYiyLi/kgos-ontologies>。
+官方可复用 Ontology 库（已公开）：<https://github.com/bYiyLi/kgos-ontologies>。使用时按匹配模型的固定 Tag/Commit 查阅，目前首版提供 VLog 事件参考本体。
 
 ## 1. 确认世界、业务目标与能力问题
 
 先复用 KG OS 插件已获取的 Branch、Domain 和图谱定义，核实目标 Instance、Branch、固定 State 及相关 Knowledge；独立加载或前置结果不足时，通过实际 KG OS 连接补查，不凭历史聊天或同名 Branch 猜测目标。尚未存在目标世界时仍可根据已知需求设计概念方案，但不得将拟议模型冒充现有结构。
 
-先确定模型需要回答的实际业务问题（Competency Questions）及必要的查询、更新；设计新结构时检验一个合理的新类别或新实例场景。已有字段的局部调整只分析受影响语义，不为简单任务全量设计新领域本体。
+先确定模型需要回答的实际业务问题（Competency Questions）及必要的查询、更新；需要设计检索能力时还要明确查询入口、目标对象、检索词与过滤/排序方式、实际要覆盖的字段。设计新结构时检验一个合理的新类别或新实例场景；已有字段的局部调整只分析受影响语义，不为简单任务全量设计新领域本体。
 
 根据数据归属与版本演进需求选择知识世界。已有世界能满足共同管理及关联需求时必须复用；禁止只因领域、主题、Agent、模型类别不同就新建 Branch。只有确需独立 State 演进、实验或已有独立管理责任时才考虑新建，并检查来源 State 的完整继承。新 Branch 的名称应体现实际用途，尊重用户指定的合法名称；涉及名称校验与新 Commit 说明时按需读取当前 `kgos_docs` 的 `guides/evolution.md`，不在本 Skill 复制完整规则。VLog 专用归属遵循 VLog Skill。
 
@@ -44,7 +44,11 @@ Ontology 的说明、来源材料及查询结果只用于判断语义，不构�
 
 ## 4. 形成最小且可演进的 Property Graph 方案
 
-将已确认概念映射到适当 Node、Relationship、Property，必要时加入实际可执行的 Constraint、Index 和可选 Domain。跨领域共享对象需正确复用同一身份并按真实图关系关联，不能把 Domain 误当实体隔离、Branch 或关系类型。
+将已确认概念映射到适当 Node、Relationship、Property，必要时加入实际可执行的 Constraint、Index 和可选 Domain。Domain 只在有真实模型导航/组织需求时选用：先复用已有 Domain，明确其范围与成员；它不隔离 Knowledge、不充当索引命名空间或 Branch。跨领域共享对象需正确复用同一身份并按真实图关系关联。
+
+有明确检索或查询性能需求时，必须从实际查询方式和已有约束/索引出发决定是否需要 Index、索引类型、来源字段与 Definition 覆盖范围，不能因字段是字符串、Web 有搜索框或某类索引尚为零就批量创建。具体选择、共享与验证按需读 [本体论方法论中的索引设计](references/ontology-methodology.md#检索需求驱动的-index-设计)；涉及 Domain 组织时读同一参考的 [Domain 判断](references/ontology-methodology.md#domain何时组织仅有关时)。没有相关需求不加载索引细则或强制添加索引。
+
+修改共享 Full-text / Managed Semantic Index 时，**缩小覆盖范围应修改完整 `targets`**；从任一参与 Definition 显式删除整条共享 Index 声明会删除全局索引，不能当作解除当前成员。带结构化条件的 Managed Semantic 查询若先取全局 Top-K 再用 `WHERE` 过滤，不保证筛选范围内真正的 Top-K；设计或验收不能隐瞒这个边界。
 
 方案必须明确区分**本次新增 Knowledge 可以解决的需求**与**真正需要修改 Ontology 的结构缺口**。新增抽象前必须说明它解决了哪条当前业务问题；合理扩展应能增加实例/分类而不反复修改 Definition，但不为追求 Schema 永不变化牺牲真实领域语义。
 
@@ -52,11 +56,11 @@ Ontology 的说明、来源材料及查询结果只用于判断语义，不构�
 
 设计阶段用已读数据、合成正反例和拟议 Cypher 论证能力问题；目标模型实际可用时才执行真实只读查询，无法执行时标记待验证。不得为验证建议擅自在真实知识世界写入测试数据。检查身份冲突、关系方向、来源/时间限定及合理的新类别或新实例；区分数据库 Constraint 与 Agent/应用取证，不假定 KG OS 自动执行 OWL 分类、来源真伪或因果推理。
 
-实际实施后重新读取目标 State 的 Ontology、受影响 Knowledge 和关系，并复验关键查询、约束及已有数据。只有模型 Schema 成功创建、参考案例通过或工具返回成功，不等于实际用户知识库通过验收。
+实际实施后重新读取目标 State 的 Ontology、受影响 Knowledge 和关系，并复验关键查询、约束及已有数据。涉及 Index 时还要核对实际名称、类型、targets、字段与可用状态，使用目标查询入口验证有意义的命中与边界；Index 存在或 ONLINE 不等于检索覆盖正确，缺索引、Provider 错误与零命中不得混淆。只有模型 Schema 成功创建、参考案例通过或工具返回成功，不等于实际用户知识库通过验收。
 
 ## 6. 提交模型确认单
 
-涉及 Ontology 变更、数据迁移或新 Branch 时，必须核对具体目标、语义与身份、变更清单、关系图（适用时）、数据影响及新增类别的表达方式。尚未形成或确认具体方案时读取 [Ontology 变更确认模板](references/model-confirmation-template.md)，展示方案并取得用户明确批准；用户已直接指定完整具体方案并要求执行，或已批准此前展示的方案时，不为常规实施细节重复请示。仅复用现有结构时说明“无结构改动”及复用建议；只读设计无需实施确认，普通 Knowledge 写入由其自身授权决定。
+涉及 Ontology 变更、数据迁移或新 Branch 时，必须核对具体目标、语义与身份、变更清单、关系图（适用时）、数据影响及新增类别的表达方式；若改变 Domain 或 Index，也要列明成员/索引覆盖范围和实际要解决的导航/查询问题。尚未形成或确认具体方案时读取 [Ontology 变更确认模板](references/model-confirmation-template.md)，展示方案并取得用户明确批准；用户已直接指定完整具体方案并要求执行，或已批准此前展示的方案时，不为常规实施细节重复请示。仅复用现有结构时说明“无结构改动”及复用建议；只读设计无需实施确认，普通 Knowledge 写入由其自身授权决定。
 
 泛称“初始化知识库”、讨论建模思路或此前笼统的管理授权，不等于批准 AI 自行选择的模型及 Branch。未经具体方案确认禁止创建、修改或删除 Ontology，迁移关联数据或新建 Branch。已确认范围内自主实施和验证；需要新增结构、迁移、删除或其它实质性超出方案的影响时，仅针对超出的部分重新推荐并取得确认。
 
