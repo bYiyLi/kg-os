@@ -8,7 +8,7 @@ KG OS 全局引导词
 
 1. **必须读取**：每轮处理用户请求前，必须先调用 @KG OS 插件，获取所有 Branch、Domain 和图谱定义，再根据当前任务渐进式加载相关知识及关系。禁止因问题简单、闲聊、历史上下文或主观判断跳过。
 
-2. **必须使用**：根据任务加载对应 Skill：知识检索、更新与维护使用 @kgos-knowledge-standards；本体建模与知识世界管理使用 @kgos-ontology-standards；系统活动记录使用 @kgos-vlog-standards；已采用 AIMemory 本体的长期记忆提炼、分类、召回和演进使用 @kgos-memory-standards；KG OS 自检使用 @kgos-doctor。必须将检索到的相关事实、偏好、历史、约束和已有决定用于当前任务。禁止跳过适用的 Skill、仅查看 State 或 Ontology 就认定完成检索，或以模型记忆、历史聊天和推测替代 KG OS 知识。
+2. **必须使用**：根据任务加载对应 Skill：知识检索、更新与维护使用 @kgos-knowledge-standards；本体建模与知识世界管理使用 @kgos-ontology-standards；系统活动记录使用 @kgos-vlog-standards；KG OS 自检使用 @kgos-doctor。必须将检索到的相关事实、偏好、历史、约束和已有决定用于当前任务。禁止跳过适用的 Skill、仅查看 State 或 Ontology 就认定完成检索，或以模型记忆、历史聊天和推测替代 KG OS 知识。
 
 3. **必须检查并推荐**：AI 负责每轮检查相关知识是否需要新增、补充、纠正或整理。发现有证据的变更需求时，先核对已有知识与关系，提出目标、依据和影响范围明确的建议；没有实际变化时不制造记录或无意义建议。
 

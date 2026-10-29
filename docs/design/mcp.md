@@ -675,9 +675,9 @@ flowchart TD
 
 ### 当前官方 Skill 清单（D115/D117）
 
-**当前源码目标为五个**：`kgos-ontology-standards`、`kgos-knowledge-standards`、`kgos-vlog-standards`、`kgos-memory-standards`、`kgos-doctor`。前四个原有基础 Skill 的职责不变，新增 Memory Skill 只负责已采用 AIMemory 模型时的记忆专业判断，源自独立公开本体仓库的同一固定 Commit。原 Ontology/Branch 的统一职责由 Ontology Skill 承担（原临时名称 Modeling 已按 D117 改名）；原 Knowledge/Retrieval/Maintenance 已统一为 Knowledge。已发行 v0.3.5 的七 Skill 属于历史真实资产，当前源码、发布版本和私人 Plugin 的安装状态必须分别核对。
+**当前 KG OS 官方 Plugin 保留四个 Skill**：`kgos-ontology-standards`、`kgos-knowledge-standards`、`kgos-vlog-standards`、`kgos-doctor`。领域专属的 AIMemory Skill 不纳入此清单，使用方采用对应领域本体时按需独立安装。原 Ontology/Branch 的统一职责由 Ontology Skill 承担（原临时名称 Modeling 已按 D117 改名）；原 Knowledge/Retrieval/Maintenance 已统一为 Knowledge。已发行 v0.3.5 的七 Skill 属于历史真实资产，当前源码、发布版本和私人 Plugin 的安装状态必须分别核对。
 
-公开分发仍从私有 `plugins/kgos/` 导出对应版本的 Skill 及资源；`kgos-ontologies` 是独立的可选模型仓库，不是 Plugin 的运行时外部依赖。**五份原始 `SKILL.md` 不存独立版本号**；导出时以已校验的 `package.json` / `plugin.json.version`（正式 Tag 必须同版）为唯一来源，向五份分发副本的 YAML 头部注入相同的字符串 `metadata.version`。预发布版本沿用同一格式，引用资源保持原样，打包 ZIP 直接使用导出文件；旧 Tag 与用户已安装的私人 Plugin 不回写，也不声称宿主必然暴露该元数据。已发布安装快照不改写，新版本按确切 Tag 的资源和手册交付。
+KG OS 官方 Plugin 从私有 `plugins/kgos/` 导出自身四个 Skill 及对应资源；`kgos-ontologies` 是独立可选的领域模型及专属 Skill 发布来源，不是 Plugin 的运行时依赖。**四份官方 `SKILL.md` 不存独立版本号**；发行时以已校验的 `package.json` / `plugin.json.version`（正式 Tag 必须同版）为唯一来源，仅向官方 Plugin 分发副本注入相同字符串 `metadata.version`。旧 Tag、现有用户私人 Plugin 和独立领域 Skill 不回写；安装/可见/实际使用状态分别验收。
 
 <a id="kgos-standards-skill-suite"></a>
 
@@ -688,7 +688,6 @@ flowchart TD
 | `kgos-ontology-standards` | 领域本体语义、概念/实例与身份、关系结构、Ontology 复用及演进、知识世界选择与模型确认 | 不接管普通 Knowledge 编辑或版本引擎实现 |
 | `kgos-knowledge-standards` | 既有模型下的 Knowledge 检索与证据使用、创建更新、关系管理、质量维护和结果验证 | 不修改 Schema/新建 Branch，不接管 VLog/Doctor |
 | `kgos-vlog-standards` | 独立 `branch/vlog` 中系统活动、维护、决定及执行结果记录质量 | 不承担普通知识管理或模型设计 |
-| `kgos-memory-standards` | 在已采用 AIMemory 领域模型的知识世界中，规范记忆类型/主题/召回线索、证据、时空和有据演进 | 不接管通用 Knowledge、VLog、Ontology、自动执行和授权管理 |
 | `kgos-doctor` | KG OS 指令、客户端、MCP/Skill 和知识库就绪性的只读诊断 | 不执行修复 |
 
 全局引导负责每轮强制 KG OS 读取/检索、检查变更需求及未授权时推荐的触发条件；专业 Skill 负责相关操作的质量，不重复维护一套强制触发正文。Knowledge 的读取、建议、获准写入与维护不构成固定流水线；根据用户实际需求选择必要动作，不自动升级为全库巡检。用户明确要求执行具体变更或批准已展示方案后才写入；模型结构变化和 Branch 创建仍遵守 Ontology Skill 的具体方案确认。无 Skill 的 MCP 仍可依 `kgos_docs` 使用确定性能力。
@@ -705,11 +704,9 @@ VLog 独立归属保持不变，Domain 只组织 Ontology；Branch 是完整版�
 
 官方可复用模型库已公开于 <https://github.com/bYiyLi/kgos-ontologies>，首版 `v0.1.0` 为 VLog 事件参考模型，AIMemory 的当前模型、Skill 与确切 Commit 见下一节。模型仍为可选参考，不预置到 Kernel，不因安装 Skill 而自动导入；不可访问或没有适用模型时不停止独立建模。Ontology Skill 的方法论、教学案例与确认模板仍负责完整的模型方案确认；已有业务模型优先复用，不把公共模型强制迁入业务知识世界。
 
-#### AIMemory 领域本体与专业 Skill
+#### 领域专属 Skill 与公开本体库
 
-KG OS 不内置长期记忆本体，也不提供独立的 Memory Agent、后台任务或访问控制层。可选 AIMemory 模型与专业 Skill 的**唯一可维护真源**位于 `kgos-ontologies/models/ai-memory/`：`ontology.md` 定义四种核心 Node（Memory、MemoryKind、MemoryTopic、MemoryCue）、八种 Relationship 与可选 `domain:AIMemory`；`skills/kgos-memory-standards/SKILL.md` 规范提炼、分类、主题整理、情境召回及有据演进。记忆类型、主题和 Cue 是普通 Knowledge；Source、Event、Place 和领域对象按当前 State 的真实语义复用，不跨 Branch 建立图边。Domain 不提供实例隔离或访问控制。
-
-KG OS Plugin 通过 `node scripts/sync-memory-ontology.mjs ../kgos-ontologies <tag-or-commit>` 从公开仓库不可变 Commit **生成** `plugins/kgos/skills/kgos-memory-standards/` 的 Skill 与本体、查询快照，使用 `--check` 验证一致性。当前固定模型 Commit 为 `76c95e433033d6802f368166be792c5a466c636d`。生成的 `tests/` 仅用于源码测试，不随 Plugin 发布；分发的 Skill 和资源按 KG OS 产品发行版本统一注入 metadata.version，不在公共本体仓库人工复制第二份版本。公开仓库的静态校验、KG OS/Lithograph 隔离数据库验收、目标 ChatGPT 实际 Skill 选择与安装属于三种独立证据；没有实施的阶段不宣称通过。
+公开的 [kgos-ontologies](https://github.com/bYiyLi/kgos-ontologies) 独立维护包括 [AIMemory](https://github.com/bYiyLi/kgos-ontologies/tree/main/models/ai-memory) 在内的可选领域本体、配套查询、测试与专业 Skill。具体 Memory 模型语义和指令仅以公开领域包为真源，**不进入 KG OS Kernel、官方 Plugin 四 Skill 清单、Doctor D3 必需项或 Global AI Guidance**。使用方选择该模型后，可自行从固定 Git Commit 生成并安装独立 Memory Skill；它使用已授权 KG OS MCP，但不自动创建 Ontology、Knowledge、Branch 或后台 Agent。安装者可同时使用官方四个 Skill 和按需安装的领域 Skill，彼此独立版本化；既有 VLog 官方 Skill 的迁移不属于本次调整。
 
 <a id="knowledge-standards-authoring"></a>
 <a id="retrieval-standards-authoring"></a>

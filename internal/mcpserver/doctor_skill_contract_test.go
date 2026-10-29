@@ -103,8 +103,7 @@ func TestDoctorGuidanceApprovedBaseline(t *testing.T) {
 		t.Fatal("guidance markers are reversed")
 	}
 	block := body[start:finish+len(end)] + "\n"
-	// Current official guidance includes the optional AIMemory Skill selection.
-	const approved = "896780b9e644ffa04673dfda68f589a67616131594a725e5c0cfb4fc383834bf"
+	const approved = "964fbcb5d343424808d49488bfeb13c5c1a96a5ef2dfa85d5d0901cb5b0d3f0e"
 	if got := fmt.Sprintf("%x", sha256.Sum256([]byte(block))); got != approved {
 		t.Fatalf("approved guidance text changed: sha256=%s", got)
 	}

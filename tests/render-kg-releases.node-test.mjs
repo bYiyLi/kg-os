@@ -33,7 +33,7 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.ok(first.files.length > 50);
     assert.deepEqual(
       first.files.filter((path) => /^plugins\/kgos\/skills\/[^/]+\/SKILL\.md$/.test(path)).length,
-      5
+      4
     );
     assert.deepEqual(
       first.files
@@ -72,18 +72,9 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.ok(
       !first.files.some((path) => path.startsWith("plugins/kgos/skills/kgos-vlog-standards/tests/"))
     );
-    assert.deepEqual(
-      first.files
-        .filter((path) => path.startsWith("plugins/kgos/skills/kgos-memory-standards/"))
-        .sort(),
-      [
-        "plugins/kgos/skills/kgos-memory-standards/SKILL.md",
-        "plugins/kgos/skills/kgos-memory-standards/references/cypher.md",
-        "plugins/kgos/skills/kgos-memory-standards/references/ontology.md"
-      ]
-    );
     assert.ok(
-      !first.files.some((path) => path.startsWith("plugins/kgos/skills/kgos-memory-standards/tests/"))
+      !first.files.some((path) => path.startsWith("plugins/kgos/skills/kgos-memory-standards/")),
+      "Optional domain Skills are not part of the KG OS core Plugin"
     );
     assert.deepEqual(
       first.files.filter(
@@ -156,7 +147,6 @@ test("only whitelisted public files are generated, deterministically", async () 
       [
         "kgos-doctor",
         "kgos-knowledge-standards",
-        "kgos-memory-standards",
         "kgos-ontology-standards",
         "kgos-vlog-standards"
       ].sort()
@@ -170,7 +160,7 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.deepEqual(
       sourceSkillDirs,
       (await readdir(join(directory, "plugins/kgos/skills"))).sort(),
-      "Private source must contain exactly the five official Skills; do not retain retired independent Skills"
+      "Private source must contain exactly the four official Skills; do not retain retired independent Skills"
     );
     assert.equal(
       await readFile(join(directory, "INSTALL.md"), "utf8"),
@@ -192,7 +182,6 @@ test("only whitelisted public files are generated, deterministically", async () 
     for (const skill of [
       "kgos-doctor",
       "kgos-knowledge-standards",
-      "kgos-memory-standards",
       "kgos-ontology-standards",
       "kgos-vlog-standards"
     ]) {
@@ -661,7 +650,6 @@ test("stable Plugin archive embeds the matching rendered installer and all relea
     for (const skill of [
       "kgos-doctor",
       "kgos-knowledge-standards",
-      "kgos-memory-standards",
       "kgos-ontology-standards",
       "kgos-vlog-standards"
     ]) {
@@ -703,7 +691,6 @@ test("stable Plugin archive embeds the matching rendered installer and all relea
     for (const skill of [
       "kgos-doctor",
       "kgos-knowledge-standards",
-      "kgos-memory-standards",
       "kgos-ontology-standards",
       "kgos-vlog-standards"
     ]) {
