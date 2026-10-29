@@ -1,6 +1,6 @@
 {
   "name": "kgos",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "private": true,
   "description": "KG OS monorepo",
   "license": "AGPL-3.0-only",
@@ -91,6 +91,7 @@
     ],
     "overrides": {
       "body-parser": "2.4.0",
+      "re2js": "2.8.7",
       "smol-toml": "1.9.1",
       "source-map-js": "1.2.2",
       "undici": "8.12.2",
