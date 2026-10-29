@@ -1,0 +1,257 @@
+{
+  "purpose": "Only synthetic cases. Exact Qn Cypher in cypher.md; VLog companion schemas only in same isolated target State.",
+  "cases": [
+    {
+      "id": "by-kind-semantic",
+      "query": "Q1",
+      "params": {
+        "ownerKey": "owner-a",
+        "kindKey": "semantic"
+      },
+      "columns": [
+        "memoryKey",
+        "summary"
+      ],
+      "rows": [
+        [
+          "owner-a:focus-new",
+          "Keep the graph center magnified"
+        ],
+        [
+          "owner-a:focus-old",
+          "Use pointer hover for graph magnification"
+        ]
+      ]
+    },
+    {
+      "id": "new-kind-without-schema",
+      "query": "Q1",
+      "params": {
+        "ownerKey": "owner-a",
+        "kindKey": "reflective"
+      },
+      "columns": [
+        "memoryKey",
+        "summary"
+      ],
+      "rows": [
+        [
+          "owner-a:reflection",
+          "Reflect on implementation tradeoffs"
+        ]
+      ]
+    },
+    {
+      "id": "direct-topic",
+      "query": "Q2",
+      "params": {
+        "ownerKey": "owner-a",
+        "topicKey": "graph-interaction"
+      },
+      "columns": [
+        "memoryKey",
+        "lifecycle"
+      ],
+      "rows": [
+        [
+          "owner-a:focus-new",
+          "current"
+        ],
+        [
+          "owner-a:focus-old",
+          "superseded"
+        ],
+        [
+          "owner-a:library-first",
+          "current"
+        ],
+        [
+          "owner-a:next-review",
+          "current"
+        ],
+        [
+          "owner-a:review",
+          "current"
+        ]
+      ]
+    },
+    {
+      "id": "child-topic",
+      "query": "Q3",
+      "params": {
+        "ownerKey": "owner-a",
+        "parentKey": "kgos-web"
+      },
+      "columns": [
+        "memoryKey",
+        "topicKey"
+      ],
+      "rows": [
+        [
+          "owner-a:focus-new",
+          "graph-interaction"
+        ],
+        [
+          "owner-a:focus-old",
+          "graph-interaction"
+        ],
+        [
+          "owner-a:library-first",
+          "graph-interaction"
+        ],
+        [
+          "owner-a:next-review",
+          "graph-interaction"
+        ],
+        [
+          "owner-a:review",
+          "graph-interaction"
+        ]
+      ]
+    },
+    {
+      "id": "graph-recall-cue",
+      "query": "Q4",
+      "params": {
+        "ownerKey": "owner-a",
+        "cueKey": "graph-development"
+      },
+      "columns": [
+        "memoryKey",
+        "summary"
+      ],
+      "rows": [
+        [
+          "owner-a:focus-new",
+          "Keep the graph center magnified"
+        ],
+        [
+          "owner-a:library-first",
+          "Evaluate mature graph libraries before implementing custom gestures"
+        ]
+      ]
+    },
+    {
+      "id": "source-evidence",
+      "query": "Q5",
+      "params": {
+        "memoryKey": "owner-a:focus-new"
+      },
+      "columns": [
+        "sourceKey",
+        "locator",
+        "evidenceUse"
+      ],
+      "rows": [
+        [
+          "chat-01",
+          "fixture:chat-01",
+          "user-stated"
+        ]
+      ]
+    },
+    {
+      "id": "real-supersession",
+      "query": "Q6",
+      "params": {
+        "oldKey": "owner-a:focus-old"
+      },
+      "columns": [
+        "currentKey",
+        "oldKey"
+      ],
+      "rows": [
+        [
+          "owner-a:focus-new",
+          "owner-a:focus-old"
+        ]
+      ]
+    },
+    {
+      "id": "owner-a-current",
+      "query": "Q7",
+      "params": {
+        "ownerKey": "owner-a"
+      },
+      "columns": [
+        "memoryKey"
+      ],
+      "rows": [
+        [
+          "owner-a:focus-new"
+        ],
+        [
+          "owner-a:library-first"
+        ],
+        [
+          "owner-a:next-review"
+        ],
+        [
+          "owner-a:reflection"
+        ],
+        [
+          "owner-a:review"
+        ]
+      ]
+    },
+    {
+      "id": "other-owner-not-mixed",
+      "query": "Q7",
+      "params": {
+        "ownerKey": "owner-b"
+      },
+      "columns": [
+        "memoryKey"
+      ],
+      "rows": [
+        [
+          "owner-b:focus"
+        ]
+      ]
+    },
+    {
+      "id": "actual-event-and-place",
+      "query": "Q8",
+      "params": {
+        "eventKey": "review-01",
+        "placeKey": "studio-a"
+      },
+      "columns": [
+        "memoryKey",
+        "eventKey"
+      ],
+      "rows": [
+        [
+          "owner-a:library-first",
+          "review-01"
+        ],
+        [
+          "owner-a:review",
+          "review-01"
+        ]
+      ]
+    },
+    {
+      "id": "about-shared-entity",
+      "query": "Q9",
+      "params": {
+        "ownerKey": "owner-a",
+        "entityKey": "project-kgos"
+      },
+      "columns": [
+        "memoryKey",
+        "entityName"
+      ],
+      "rows": [
+        [
+          "owner-a:focus-new",
+          "KG OS"
+        ],
+        [
+          "owner-a:library-first",
+          "KG OS"
+        ]
+      ]
+    }
+  ]
+}
