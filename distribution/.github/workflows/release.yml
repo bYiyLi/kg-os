@@ -263,15 +263,13 @@ jobs:
               fi
               echo "The public release tag belongs to this distribution repository, not the private source."
             } > "$RUNNER_TEMP/kgos-release-notes.md"
-            RELEASE_ARGS=(
-              "$TAG" --repo "$GITHUB_REPOSITORY"
-              --target "$GITHUB_SHA" --title "KG OS $TAG"
-              --notes-file "$RUNNER_TEMP/kgos-release-notes.md"
-            )
+            RELEASE_FLAGS=()
             if [ "$EXPECTED_PRERELEASE" = true ]; then
-              RELEASE_ARGS+=(--prerelease --latest=false)
+              RELEASE_FLAGS=(--prerelease --latest=false)
             fi
-            gh release create "${RELEASE_ARGS[@]}"
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "KG OS $TAG" \
+              --notes-file "$RUNNER_TEMP/kgos-release-notes.md" "${RELEASE_FLAGS[@]}"
           fi
           gh release upload "$TAG" "$RUNNER_TEMP/kgos-plugin-$TAG.zip" \
             --repo "$GITHUB_REPOSITORY" --clobber
