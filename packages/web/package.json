@@ -11,6 +11,7 @@
     "dev": "vite --host 127.0.0.1 --port 5174 --strictPort"
   },
   "dependencies": {
+    "@antv/g6": "5.1.1",
     "@base-ui/react": "1.9.0",
     "@kgos/sdk": "workspace:*",
     "@modelcontextprotocol/ext-apps": "2.0.3",

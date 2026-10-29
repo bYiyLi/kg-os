@@ -93,9 +93,9 @@ export function useCanvasActions(
 
   function focusGraph(id?: string | null) {
     const target = Array.from(
-      surface.current?.querySelectorAll<SVGElement>("[data-graph-id]") ?? []
+      surface.current?.querySelectorAll<HTMLElement>("[data-graph-id]") ?? []
     ).find((element) => element.getAttribute("data-graph-id") === id);
-    (target ?? surface.current?.querySelector<SVGSVGElement>(".graph-scene"))?.focus();
+    (target ?? surface.current?.querySelector<HTMLElement>(".graph-scene"))?.focus();
   }
   function closeDetails() {
     const selected = explorer.selected;

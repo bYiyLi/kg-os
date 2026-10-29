@@ -96,7 +96,7 @@ export function useGraphSearch(context: SearchContext) {
 
   async function search(query: string) {
     const { reader, state } = context;
-    if (reader === null || state === null || query.trim() === "") return;
+    if (reader === null || state === null) return;
     clear();
     const active = task.begin();
     setScene((value) => value + 1);

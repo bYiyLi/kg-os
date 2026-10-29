@@ -7,6 +7,7 @@ import {
   readOnlySettingsSnapshot,
   selectChineseLanguage
 } from "./settings-navigation.js";
+import { mockEmptyGraphQuery } from "./graph-empty-fixture.js";
 import { mockVersionRoutes, states } from "./version-fixture.js";
 
 async function mockConnectedInstance(page: Page) {
@@ -60,6 +61,10 @@ async function mockConnectedInstance(page: Page) {
     });
   });
   await mockVersionRoutes(page);
+  await mockEmptyGraphQuery(page, async (route, body) => {
+    expect(route.request().headers()["authorization"]).toBe("Bearer kgws_" + "A".repeat(43));
+    await route.fulfill({ json: body });
+  });
   return () => requestCount;
 }
 

@@ -8,40 +8,46 @@ import { authenticate } from "./web-shell-fixture.js";
 test.use({ colorScheme: "light", reducedMotion: "reduce", hasTouch: true });
 
 async function expectBorderAlignment(handle: Locator) {
-  const geometry = await handle.evaluate((element) => {
-    const canvas = document.querySelector(".canvas-stage");
-    const contour = element.querySelector(".sidebar-handle-contour");
-    const surface = element.querySelector(".sidebar-handle-surface");
-    const edge = element.querySelector(".sidebar-handle-edge");
-    const shell = document.querySelector(".app-shell");
-    const search = document.querySelector(".graph-search");
-    if (
-      canvas === null ||
-      contour === null ||
-      surface === null ||
-      edge === null ||
-      shell === null ||
-      search === null
-    )
-      throw new Error("Missing canvas border layers");
-    const bounds = element.getBoundingClientRect();
-    const canvasBounds = canvas.getBoundingClientRect();
-    const searchBounds = search.getBoundingClientRect();
-    return {
-      x: bounds.x,
-      width: bounds.width,
-      height: bounds.height,
-      join: bounds.x + 5 - canvasBounds.x,
-      center: bounds.y + bounds.height / 2 - canvasBounds.y - canvasBounds.height / 2,
-      searchCenter:
-        searchBounds.x + searchBounds.width / 2 - canvasBounds.x - canvasBounds.width / 2,
-      mirror: new DOMMatrix(getComputedStyle(contour).transform).a,
-      fill: getComputedStyle(surface).fill,
-      background: getComputedStyle(shell).backgroundColor,
-      border: getComputedStyle(canvas).borderLeftColor,
-      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
-    };
-  });
+  const readGeometry = () =>
+    handle.evaluate((element) => {
+      const canvas = document.querySelector(".canvas-stage");
+      const contour = element.querySelector(".sidebar-handle-contour");
+      const surface = element.querySelector(".sidebar-handle-surface");
+      const edge = element.querySelector(".sidebar-handle-edge");
+      const shell = document.querySelector(".app-shell");
+      const search = document.querySelector(".graph-search");
+      if (
+        canvas === null ||
+        contour === null ||
+        surface === null ||
+        edge === null ||
+        shell === null ||
+        search === null
+      )
+        throw new Error("Missing canvas border layers");
+      const bounds = element.getBoundingClientRect();
+      const canvasBounds = canvas.getBoundingClientRect();
+      const searchBounds = search.getBoundingClientRect();
+      return {
+        x: bounds.x,
+        width: bounds.width,
+        height: bounds.height,
+        join: bounds.x + 5 - canvasBounds.x,
+        center: bounds.y + bounds.height / 2 - canvasBounds.y - canvasBounds.height / 2,
+        searchCenter:
+          searchBounds.x + searchBounds.width / 2 - canvasBounds.x - canvasBounds.width / 2,
+        mirror: new DOMMatrix(getComputedStyle(contour).transform).a,
+        fill: getComputedStyle(surface).fill,
+        background: getComputedStyle(shell).backgroundColor,
+        border: getComputedStyle(canvas).borderLeftColor,
+        overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
+      };
+    });
+  // setViewportSize resolves before Chromium has necessarily applied the
+  // new media-query styles; keep the same 1px centering requirement after
+  // the browser commits its responsive layout.
+  await expect.poll(async () => Math.abs((await readGeometry()).searchCenter)).toBeLessThan(1);
+  const geometry = await readGeometry();
   expect(geometry.x).toBeGreaterThanOrEqual(0);
   expect(geometry.width).toBe(44);
   expect(geometry.height).toBe(112);

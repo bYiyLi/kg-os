@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ResolvedState } from "@kgos/sdk";
 
 import type { GraphReader } from "./graph-search.js";
@@ -42,6 +42,11 @@ function CanvasSession({ reader, state, blocked }: CanvasProps) {
   const explorer = useGraphExplorer(reader, state);
   const disabled = blocked || reader === null || state === null;
   const actions = useCanvasActions(explorer, surface, scene, disabled);
+  // A new connection/State mounts a new session. Load real knowledge without
+  // requiring a keyword; React StrictMode may re-run the effect safely.
+  useEffect(() => {
+    if (reader !== null && state !== null) void explorer.search("");
+  }, [reader, state]);
   return (
     <div className="knowledge-canvas" ref={surface} onKeyDown={actions.keyDown}>
       <GraphScene
@@ -49,7 +54,9 @@ function CanvasSession({ reader, state, blocked }: CanvasProps) {
         ref={scene}
         data={explorer.data}
         selected={explorer.selected}
+        highlighted={explorer.highlighted}
         onSelect={explorer.select}
+        onFocusNode={explorer.focusNode}
         onToggleExpand={(id) => {
           explorer.toggleExpand(id);
         }}
@@ -65,7 +72,9 @@ function CanvasSession({ reader, state, blocked }: CanvasProps) {
         onSearch={(query) => {
           void explorer.search(query);
         }}
-        onClear={explorer.clear}
+        onClear={() => {
+          void explorer.search("");
+        }}
       />
       <GraphSearchStatus
         data={explorer.data}

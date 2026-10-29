@@ -1,6 +1,13 @@
 export const SEARCH_LIMIT = 50;
+export const RECENT_LIMIT = 200;
 export const INDEX_LIMIT = 16;
 export const NEIGHBOR_LIMIT = 25;
+
+// Element identities are allocation-order surrogates, not knowledge timestamps.
+// Decimal lengths are ordered first so n:99 never sorts after n:100.
+export const recentQuery = `MATCH (n)
+WHERE NOT n:__kgos_internal
+RETURN n ORDER BY size(elementId(n)) DESC, elementId(n) DESC LIMIT $limit`;
 
 export const keywordQuery = `MATCH (n)
 WHERE NOT n:__kgos_internal

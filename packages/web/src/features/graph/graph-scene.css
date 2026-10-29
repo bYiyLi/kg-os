@@ -1,8 +1,8 @@
-/* cspell:words nums */
-
+/* G6 owns the drawing and pointer interactions; the keyboard proxies remain in the accessibility tree. */
 .graph-scene {
   position: absolute;
   inset: 0;
+  /* Card and canvas stay in place while the sidebar slides above them. */
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -10,142 +10,41 @@
   touch-action: none;
   user-select: none;
 }
-
 .knowledge-canvas > .graph-scene:focus {
   outline: none;
 }
-
-.graph-scene.is-dragging,
-.graph-scene.is-dragging .graph-node,
-.graph-scene.is-dragging .graph-relationship {
-  cursor: grabbing;
-}
-
 .graph-scene.is-disabled {
   pointer-events: none;
 }
-
-.graph-node,
-.graph-relationship {
-  outline: none;
+.graph-scene-renderer {
+  position: absolute;
+  inset: 0;
 }
-
-.graph-node {
-  cursor: grab;
+.graph-scene-renderer canvas {
+  display: block;
 }
-
-.graph-relationship {
-  cursor: pointer;
+.graph-scene-keyboard {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
-
-.graph-node-target {
-  fill: transparent;
+.graph-node-keyboard,
+.graph-relationship-keyboard {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
 }
-
-.graph-node-halo {
-  fill: var(--color-canvas);
-}
-
-.graph-node-dot {
-  fill: var(--graph-node-color);
-}
-
-.graph-node-ring {
-  fill: none;
-  stroke: transparent;
-  stroke-width: 1.5;
-}
-
-.graph-node.is-selected .graph-node-ring,
-.graph-node:hover .graph-node-ring,
-.graph-node:focus-visible .graph-node-ring {
-  stroke: var(--color-focus);
-}
-
-.graph-node-ring,
-.graph-node-dot {
-  transition:
-    stroke var(--motion-fast),
-    fill var(--motion-fast);
-}
-
-.graph-node-busy {
-  fill: none;
-  stroke: var(--color-primary);
-  stroke-width: 1.5;
-  stroke-dasharray: 14 12;
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: graph-node-loading 900ms linear infinite;
-}
-
-.graph-node-expanded-mark {
-  fill: var(--color-primary);
-  stroke: var(--color-canvas);
-  stroke-width: 1.5;
-}
-
-.graph-node-pin-mark {
-  fill: var(--color-text);
-  stroke: var(--color-canvas);
-  stroke-width: 1.5;
-}
-
-@keyframes graph-node-loading {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.graph-node-label,
-.graph-edge-label {
-  fill: var(--color-text);
-  font-family: inherit;
-  font-size: 12px;
-  paint-order: stroke;
-  stroke: var(--color-canvas);
-  stroke-linejoin: round;
-  stroke-width: 4;
-}
-
-.graph-node.is-selected .graph-node-label {
-  font-weight: 650;
-}
-
-.graph-edge {
-  fill: none;
-  stroke: var(--graph-edge);
-  stroke-width: 1.25;
-}
-
-.graph-edge-target {
-  fill: none;
-  stroke: transparent;
-  stroke-width: 16;
-}
-
-.graph-relationship.is-highlighted .graph-edge,
-.graph-relationship:hover .graph-edge,
-.graph-relationship:focus-visible .graph-edge {
-  stroke: var(--color-primary);
-  stroke-width: 1.8;
-}
-
-.graph-relationship:focus-visible .graph-edge {
-  stroke-width: 3;
-}
-
-.graph-arrow {
-  fill: var(--graph-edge);
-}
-
-.graph-arrow-selected {
-  fill: var(--color-primary);
-}
-
-.graph-edge-label {
-  font-family: var(--font-code);
-  font-size: 10px;
+.graph-relationship-keyboard {
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
 }
 
 .graph-canvas-controls {

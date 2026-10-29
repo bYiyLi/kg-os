@@ -7,7 +7,7 @@ const allowed = new Set(
   (
     "MIT;MIT*;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;MPL-2.0;" +
     "Python-2.0;CC0-1.0;BlueOak-1.0.0;CC-BY-3.0;CC-BY-4.0;CC-BY-SA-4.0;" +
-    "(BSD-2-Clause OR MIT OR Apache-2.0);(MIT AND CC-BY-3.0);" +
+    "(BSD-2-Clause OR MIT OR Apache-2.0);(MIT AND CC-BY-3.0);MIT AND ISC;" +
     "Custom: https://github.com/streetsidesoftware/cspell"
   ).split(";")
 );

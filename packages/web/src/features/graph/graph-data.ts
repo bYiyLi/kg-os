@@ -22,6 +22,10 @@ export interface GraphData {
 
 const GRAPH_NODE_LIMIT = 200;
 const GRAPH_RELATIONSHIP_LIMIT = 400;
+// A search may return 200 entry nodes, but their real neighbors must still
+// have room in the cumulative, read-only graph displayed by the explorer.
+const VISIBLE_NODE_LIMIT = 400;
+const VISIBLE_RELATIONSHIP_LIMIT = 800;
 
 export function emptyGraph(): GraphData {
   return { nodes: [], relationships: [], limited: false };
@@ -124,14 +128,14 @@ export function mergeGraph(base: GraphData, addition: GraphData): GraphData {
   const relationships = new Map<string, GraphRelationship>();
   let limited = base.limited || addition.limited;
   for (const item of [...base.nodes, ...addition.nodes]) {
-    limited = append(nodes, item, GRAPH_NODE_LIMIT) || limited;
+    limited = append(nodes, item, VISIBLE_NODE_LIMIT) || limited;
   }
   for (const item of [...base.relationships, ...addition.relationships]) {
     if (!nodes.has(item.start) || !nodes.has(item.end)) {
       limited = true;
       continue;
     }
-    limited = append(relationships, item, GRAPH_RELATIONSHIP_LIMIT) || limited;
+    limited = append(relationships, item, VISIBLE_RELATIONSHIP_LIMIT) || limited;
   }
   return { nodes: [...nodes.values()], relationships: [...relationships.values()], limited };
 }

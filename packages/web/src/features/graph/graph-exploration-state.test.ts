@@ -98,12 +98,12 @@ it("counts pending origins inside the existing node budget without retaining dup
     graph([node(1), node(2)], [edge(1)])
   );
   const loading = removeExpansion(startPendingExpansion(parent, "n:2"), "n:1");
-  const addition = graph(Array.from({ length: 201 }, (_, index) => node(index + 1)));
+  const addition = graph(Array.from({ length: 401 }, (_, index) => node(index + 1)));
   const bounded = addExpansion(loading, "n:1", addition);
-  expect(visibleGraph(bounded).nodes).toHaveLength(200);
+  expect(visibleGraph(bounded).nodes).toHaveLength(400);
   expect(visibleGraph(bounded).limited).toBe(true);
   expect(bounded.pending.get("n:2")).toBe(bounded.expansions.get("n:1")?.nodes[1]);
-  expect(bounded.expansions.get("n:1")?.nodes.some((item) => item.id === "n:201")).toBe(false);
+  expect(bounded.expansions.get("n:1")?.nodes.some((item) => item.id === "n:401")).toBe(false);
 });
 
 it("hiding an origin retained only by a request replaces the last undo target without reviving it", () => {
@@ -163,24 +163,24 @@ it("preserves local hiding and other expansion sources when seeds are replaced",
   ]);
 });
 
-it("keeps the node budget in backing sources and marks excluded neighbors as partial", () => {
+it("reserves room for real neighbors after 200 search entries are visible", () => {
   const nodes = Array.from({ length: 200 }, (_, index) => node(index + 1));
   const seeded = replaceSeeds(emptySources(), graph(nodes));
   const expanded = addExpansion(seeded, "n:1", graph([node(1), node(201)], [edge(1, 1, 201)]));
   const contribution = expanded.expansions.get("n:1");
-  expect(contribution?.nodes.map((item) => item.id)).toEqual(["n:1"]);
-  expect(contribution?.relationships).toEqual([]);
-  expect(visibleGraph(expanded).nodes).toHaveLength(200);
-  expect(visibleGraph(expanded).limited).toBe(true);
+  expect(contribution?.nodes.map((item) => item.id)).toEqual(["n:1", "n:201"]);
+  expect(contribution?.relationships.map((item) => item.id)).toEqual(["r:1"]);
+  expect(visibleGraph(expanded).nodes).toHaveLength(201);
+  expect(visibleGraph(expanded).limited).toBe(false);
   expect(visibleGraph(removeExpansion(expanded, "n:1")).limited).toBe(false);
 });
 
 it("does not retain excess relationships in source chunks", () => {
-  const edges = Array.from({ length: 400 }, (_, index) => edge(index + 1));
+  const edges = Array.from({ length: 800 }, (_, index) => edge(index + 1));
   const seeded = replaceSeeds(emptySources(), graph([node(1), node(2)], edges));
-  const expanded = addExpansion(seeded, "n:1", graph([node(1), node(2)], [edge(401)]));
+  const expanded = addExpansion(seeded, "n:1", graph([node(1), node(2)], [edge(801)]));
   expect(expanded.expansions.get("n:1")?.relationships).toEqual([]);
-  expect(visibleGraph(expanded).relationships).toHaveLength(400);
+  expect(visibleGraph(expanded).relationships).toHaveLength(800);
   expect(visibleGraph(expanded).limited).toBe(true);
 });
 

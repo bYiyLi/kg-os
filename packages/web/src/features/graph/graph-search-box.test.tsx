@@ -155,7 +155,9 @@ it("submits the actual query after composition ends and never searches composing
 it("clears the visible query through its callback and keeps search focused", () => {
   render();
   setQuery("KG OS");
-  const clear = host.querySelector<HTMLButtonElement>('[aria-label="Clear search and canvas"]');
+  const clear = host.querySelector<HTMLButtonElement>(
+    '[aria-label="' + i18n.t("graph.clearSearch") + '"]'
+  );
   if (clear === null) throw new Error("Missing clear search button");
   act(() => {
     clear.click();
@@ -169,7 +171,7 @@ it("clears the visible query through its callback and keeps search focused", () 
 it("offers cancellation during a pending search and returns focus to the input", () => {
   render(false, true);
   const cancel = host.querySelector<HTMLButtonElement>(
-    '[aria-label="Cancel search and clear canvas"]'
+    '[aria-label="' + i18n.t("graph.cancelSearch") + '"]'
   );
   if (cancel === null) throw new Error("Missing cancel search button");
   act(() => {

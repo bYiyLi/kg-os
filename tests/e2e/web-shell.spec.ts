@@ -46,6 +46,7 @@ test("renders API-backed world navigation with a blank graph canvas", async ({ p
       sidebarWidth: sidebar?.getBoundingClientRect().width ?? 0,
       sidebarBorder: sidebar === null ? "" : getComputedStyle(sidebar).borderTopWidth,
       sidebarBackground: sidebar === null ? "" : getComputedStyle(sidebar).backgroundColor,
+      pageBackground: shell === null ? "" : getComputedStyle(shell).backgroundColor,
       selectedColor: selected === null ? "" : getComputedStyle(selected).color,
       sidebarColor: sidebar === null ? "" : getComputedStyle(sidebar).color,
       canvasBorder: canvas === null ? "" : getComputedStyle(canvas).borderTopWidth,
@@ -58,7 +59,9 @@ test("renders API-backed world navigation with a blank graph canvas", async ({ p
   expect(metrics.sidebarWidth).toBeGreaterThanOrEqual(240);
   expect(metrics.sidebarWidth).toBeLessThanOrEqual(320);
   expect(metrics.sidebarBorder).toBe("0px");
-  expect(metrics.sidebarBackground).toBe("rgba(0, 0, 0, 0)");
+  // The new overlay navigation has an opaque page background so the
+  // separate right card retains its own visible border and corners.
+  expect(metrics.sidebarBackground).toBe(metrics.pageBackground);
   expect(metrics.selectedColor).not.toBe(metrics.sidebarColor);
   expect(metrics.canvasBorder).toBe("1px");
   expect(metrics.canvasTop).toBeLessThan(30);
@@ -107,9 +110,10 @@ test("switches themes and hides the entire sidebar from the canvas border", asyn
   expect(handleBox?.width).toBe(44);
   expect(handleBox?.height).toBe(112);
   await expect(handle.locator(".sidebar-handle-contour")).toHaveAttribute("viewBox", "0 0 44 112");
-  // The longer, shallower S-curve joins the canvas edge without forming a separate tab.
-  expect(Math.abs((handleBox?.x ?? 0) + 39 - (before?.x ?? 0))).toBeLessThan(1);
-  expect(Math.abs((before?.x ?? 0) - ((handleBox?.x ?? 0) + 25) - 14)).toBeLessThan(1);
+  // The independent card border stays two CSS pixels beyond the S-curve,
+  // while the navigation handle remains integrated rather than a separate tab.
+  expect(Math.abs((handleBox?.x ?? 0) + 41 - (before?.x ?? 0))).toBeLessThan(1);
+  expect(Math.abs((before?.x ?? 0) - ((handleBox?.x ?? 0) + 25) - 16)).toBeLessThan(1);
   const borderAppearance = await handle.evaluate((element) => {
     const canvas = document.querySelector(".canvas-stage");
     const surface = element.querySelector(".sidebar-handle-surface");

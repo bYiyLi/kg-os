@@ -100,9 +100,9 @@ it("does not send a query for an empty seed list and does not fabricate seed met
   });
 });
 
-it("rejects oversized seed input instead of silently searching only its first fifty entries", async () => {
+it("rejects oversized seed input instead of silently searching only its first 200 entries", async () => {
   const api = reader();
-  const ids = Array.from({ length: 51 }, (_, index) => "n:" + String(index));
+  const ids = Array.from({ length: 201 }, (_, index) => "n:" + String(index));
   await expect(connectKnowledge(api, state, ids, signal())).rejects.toThrow();
   expect(api.query).not.toHaveBeenCalled();
 });

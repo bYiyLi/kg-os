@@ -33,7 +33,16 @@ export function useGraphSelection(context: {
   state: ResolvedState | null;
   searching: boolean;
 }) {
-  const [selected, select] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const select = (id: string | null) => {
+    setSelected(id);
+    setHighlighted(null);
+  };
+  const focusNode = (id: string) => {
+    setSelected(null);
+    setHighlighted(id);
+  };
   const [notice, onNotice] = useState<GraphNotice | null>(null);
   const store = useGraphSources();
   const expansions = useGraphExpansions({ ...context, ...store, onNotice });
@@ -55,6 +64,7 @@ export function useGraphSelection(context: {
 
   function toggleExpand(id: string) {
     if (context.searching) return;
+    setHighlighted(id);
     if (expansions.hasRequest(id) || store.getSources().expansions.has(id)) collapse(id);
     else void expansions.expand(id);
   }
@@ -63,7 +73,8 @@ export function useGraphSelection(context: {
     if (id === null || context.searching) return;
     expansions.cancel(id);
     store.update((sources) => hideElement(sources, id));
-    select((current) => (current === id ? null : current));
+    setSelected((current) => (current === id ? null : current));
+    setHighlighted((current) => (current === id ? null : current));
     onNotice({ kind: "hidden", id });
   }
 
@@ -76,12 +87,14 @@ export function useGraphSelection(context: {
 
   return {
     data,
+    highlighted,
     getSeeds: () => store.getSources().seed,
     setSeeds: (seed: GraphData) => {
       store.update((sources) => replaceSeeds(sources, seed));
     },
     selected,
     select,
+    focusNode,
     reset,
     notice,
     expand: (id = selected) => (id === null ? Promise.resolve() : expansions.expand(id)),

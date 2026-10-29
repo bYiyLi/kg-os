@@ -171,15 +171,46 @@ it("merges expansion without mutating previous data or clearing an existing limi
 it("applies the same graph budget when many small expansions are merged", () => {
   const initial = projectGraph(Array.from({ length: 200 }, (_, i) => [node(i + 1)]));
   const merged = mergeGraph(initial, projectGraph([[node(201)]]));
-  expect(merged.nodes).toHaveLength(200);
-  expect(merged.limited).toBe(true);
+  expect(merged.nodes).toHaveLength(201);
+  expect(merged.limited).toBe(false);
+  const overflow = mergeGraph(
+    merged,
+    projectGraph(Array.from({ length: 200 }, (_, i) => [node(i + 202)]))
+  );
+  expect(overflow.nodes).toHaveLength(400);
+  expect(overflow.nodes.some((item) => item.id === "n:401")).toBe(false);
+  expect(overflow.limited).toBe(true);
 });
 
-it("omits edges whose endpoint was excluded by the graph's node budget", () => {
+it("retains newly requested neighbors after all search entries are already displayed", () => {
   const initial = projectGraph(Array.from({ length: 200 }, (_, i) => [node(i + 1)]));
   const addition = projectGraph([[node(201), relationship(1, "n:1", "n:201")]]);
   const merged = mergeGraph(initial, addition);
-  expect(merged.nodes).toHaveLength(200);
+  expect(merged.nodes).toHaveLength(201);
+  expect(merged.relationships).toHaveLength(1);
+  expect(merged.limited).toBe(false);
+});
+
+it("caps the cumulative displayed graph at 400 nodes and 800 relationships", () => {
+  const first = projectGraph(Array.from({ length: 200 }, (_, i) => [node(i + 1)]));
+  const second = projectGraph(Array.from({ length: 200 }, (_, i) => [node(i + 201)]));
+  const full = mergeGraph(first, second);
+  expect(full.nodes).toHaveLength(400);
+  expect(full.limited).toBe(false);
+  const overflow = mergeGraph(full, projectGraph([[node(401), relationship(1, "n:1", "n:401")]]));
+  expect(overflow.nodes).toHaveLength(400);
+  expect(overflow.relationships).toEqual([]);
+  expect(overflow.limited).toBe(true);
+});
+
+it("omits edges whose endpoint was excluded by the graph's node budget", () => {
+  const initial = mergeGraph(
+    projectGraph(Array.from({ length: 200 }, (_, i) => [node(i + 1)])),
+    projectGraph(Array.from({ length: 200 }, (_, i) => [node(i + 201)]))
+  );
+  const addition = projectGraph([[node(401), relationship(1, "n:1", "n:401")]]);
+  const merged = mergeGraph(initial, addition);
+  expect(merged.nodes).toHaveLength(400);
   expect(merged.relationships).toEqual([]);
   expect(merged.limited).toBe(true);
 });

@@ -16,6 +16,7 @@ import {
   indexQuery,
   keywordQuery,
   neighborQuery,
+  recentQuery,
   semanticQuery
 } from "./graph-queries.js";
 
@@ -47,6 +48,7 @@ function reply(
 }
 
 interface Fixture {
+  recent?: JsonValue[][];
   keyword?: JsonValue[][];
   fulltext?: JsonValue[][];
   semantic?: JsonValue[][];
@@ -60,6 +62,7 @@ function fixture(options: Fixture = {}): GraphReader {
     query: vi.fn<GraphReader["query"]>().mockImplementation(async (request) => {
       await Promise.resolve();
       if (options.fail?.includes(request.cypher) === true) throw new Error("Unavailable");
+      if (request.cypher === recentQuery) return reply(request, ["n"], options.recent ?? []);
       if (request.cypher === keywordQuery) return reply(request, ["n"], options.keyword ?? []);
       if (request.cypher === neighborQuery)
         return reply(request, ["n", "r", "m"], options.neighbors ?? []);
@@ -87,8 +90,9 @@ function search(reader: GraphReader, at: ResolvedState, query: string, requestSi
 
 afterEach(() => vi.useRealTimers());
 
-it("runs three real routes at the same immutable State and fuses ranks instead of raw scores", async () => {
+it("runs all four routes at one immutable State and ranks search matches above recent fallback", async () => {
   const reader = fixture({
+    recent: [[node(9)], [node(2)]],
     keyword: [[node(1)], [node(2)]],
     catalogs: { fulltext: ["text"], semantic: ["semantic"] },
     fulltext: [
@@ -101,18 +105,42 @@ it("runs three real routes at the same immutable State and fuses ranks instead o
     ]
   });
   const result = await search(reader, state, "example", signal());
-  expect(result.data.nodes.map((item) => item.id)).toEqual(["n:2", "n:3", "n:1"]);
+  expect(result.data.nodes.map((item) => item.id)).toEqual(["n:2", "n:3", "n:1", "n:9"]);
   expect(result.data.relationships).toEqual([]);
   expect(result.routes).toEqual([
+    { kind: "recent", status: "ok", count: 2, limited: false },
     { kind: "keyword", status: "ok", count: 2, limited: false },
     { kind: "fulltext", status: "ok", count: 2, limited: false },
     { kind: "semantic", status: "ok", count: 2, limited: false }
   ]);
-  expect(vi.mocked(reader.query).mock.calls).toHaveLength(5);
+  expect(vi.mocked(reader.query).mock.calls).toHaveLength(6);
   for (const [request, options] of vi.mocked(reader.query).mock.calls) {
     expect(request.at).toBe(state);
     expect(options?.signal).toBeInstanceOf(AbortSignal);
   }
+});
+
+it("preserves high-relevance nodes when recent knowledge fills all 200 slots", async () => {
+  const recent = Array.from({ length: 201 }, (_, index) => [node(500 - index)]);
+  const reader = fixture({ recent, keyword: [[node(1)]] });
+  const result = await search(reader, state, "example", signal());
+  expect(result.data.nodes).toHaveLength(200);
+  expect(result.data.nodes[0]?.id).toBe("n:1");
+  expect(result.data.nodes.at(-1)?.id).toBe("n:302");
+  expect(result.routes[0]).toEqual({ kind: "recent", status: "ok", count: 200, limited: true });
+  expect(result.data.limited).toBe(true);
+});
+
+it("keeps recent knowledge when semantic search fails and other routes have no hits", async () => {
+  const reader = fixture({
+    recent: [[node(42)], [node(41)]],
+    catalogs: { semantic: ["embedding"] },
+    fail: [semanticQuery]
+  });
+  const result = await search(reader, state, "unmatched words", signal());
+  expect(result.data.nodes.map((item) => item.id)).toEqual(["n:42", "n:41"]);
+  expect(result.routes.map((route) => route.status)).toEqual(["ok", "ok", "unconfigured", "error"]);
+  expect(result.data.limited).toBe(true);
 });
 
 it("keeps user text and real index names as parameters rather than executable Cypher", async () => {
@@ -135,6 +163,7 @@ it("keeps user text and real index names as parameters rather than executable Cy
 it("reports missing indexes separately from an actual completed zero-match keyword search", async () => {
   const result = await search(fixture(), state, "nothing", signal());
   expect(result.routes).toEqual([
+    { kind: "recent", status: "ok", count: 0, limited: false },
     { kind: "keyword", status: "ok", count: 0, limited: false },
     { kind: "fulltext", status: "unconfigured", count: 0, limited: false },
     { kind: "semantic", status: "unconfigured", count: 0, limited: false }
@@ -142,13 +171,17 @@ it("reports missing indexes separately from an actual completed zero-match keywo
   expect(result.data).toEqual({ nodes: [], relationships: [], limited: false });
 });
 
-it("does not send an empty search or perform fallback writes", async () => {
-  const reader = fixture();
-  expect(await search(reader, state, " \n ", signal())).toEqual({
-    data: { nodes: [], relationships: [], limited: false },
-    routes: []
+it("loads recent knowledge when no keyword was supplied without running indexed routes", async () => {
+  const reader = fixture({ recent: [[node(12)], [node(9)]] });
+  const result = await search(reader, state, " \n ", signal());
+  expect(result.data.nodes.map((item) => item.id)).toEqual(["n:12", "n:9"]);
+  expect(result.routes).toEqual([{ kind: "recent", status: "ok", count: 2, limited: false }]);
+  expect(vi.mocked(reader.query).mock.calls).toHaveLength(1);
+  expect(vi.mocked(reader.query).mock.calls[0]?.[0]).toMatchObject({
+    at: state,
+    cypher: recentQuery,
+    params: { limit: 201 }
   });
-  expect(reader.query).not.toHaveBeenCalled();
 });
 
 it("preserves successful routes when semantic provider or index discovery fails", async () => {
@@ -159,7 +192,7 @@ it("preserves successful routes when semantic provider or index discovery fails"
   });
   const result = await search(reader, state, "example", signal());
   expect(result.data.nodes.map((item) => item.id)).toEqual(["n:1"]);
-  expect(result.routes[2]).toEqual({ kind: "semantic", status: "error", count: 0, limited: true });
+  expect(result.routes[3]).toEqual({ kind: "semantic", status: "error", count: 0, limited: true });
   expect(result.data.limited).toBe(true);
   const failedCatalog = await search(
     fixture({ keyword: [[node(2)]], fail: [indexQuery] }),
@@ -168,7 +201,7 @@ it("preserves successful routes when semantic provider or index discovery fails"
     signal()
   );
   expect(failedCatalog.data.nodes.map((item) => item.id)).toEqual(["n:2"]);
-  expect(failedCatalog.routes.map((route) => route.status)).toEqual(["ok", "error", "error"]);
+  expect(failedCatalog.routes.map((route) => route.status)).toEqual(["ok", "ok", "error", "error"]);
 });
 
 it("publishes keyword matches while semantic is still loading and keeps them after provider failure", async () => {
@@ -186,14 +219,14 @@ it("publishes keyword matches while semantic is still loading and keeps them aft
   await vi.waitFor(() => {
     expect(
       progress.mock.calls.some(
-        ([value]) => value.data.nodes[0]?.id === "n:1" && value.routes[2]?.status === "loading"
+        ([value]) => value.data.nodes[0]?.id === "n:1" && value.routes[3]?.status === "loading"
       )
     ).toBe(true);
   });
   provider.reject(new Error("Provider unavailable"));
   const result = await pending;
   expect(result.data.nodes.map((item) => item.id)).toEqual(["n:1"]);
-  expect(result.routes[2]?.status).toBe("error");
+  expect(result.routes[3]?.status).toBe("error");
   expect(progress).toHaveBeenLastCalledWith(result);
 });
 
@@ -231,7 +264,7 @@ it("retains matches from an index when another index in that route fails", async
   });
   const result = await search(reader, state, "example", signal());
   expect(result.data.nodes.map((item) => item.id)).toEqual(["n:1"]);
-  expect(result.routes[1]).toEqual({ kind: "fulltext", status: "error", count: 1, limited: true });
+  expect(result.routes[2]).toEqual({ kind: "fulltext", status: "error", count: 1, limited: true });
 });
 
 it("caps index fan-out and candidate lists while making the restricted scope visible", async () => {
@@ -242,9 +275,9 @@ it("caps index fan-out and candidate lists while making the restricted scope vis
     fulltext: [[node(100), 0.9]]
   });
   const result = await search(reader, state, "example", signal());
-  expect(result.data.nodes).toHaveLength(50);
-  expect(result.routes[0]).toMatchObject({ count: 50, limited: true });
-  expect(result.routes[1]).toMatchObject({ count: 1, limited: true });
+  expect(result.data.nodes).toHaveLength(51);
+  expect(result.routes[1]).toMatchObject({ count: 50, limited: true });
+  expect(result.routes[2]).toMatchObject({ count: 1, limited: true });
   expect(result.data.limited).toBe(true);
   expect(
     vi.mocked(reader.query).mock.calls.filter(([request]) => request.cypher === fulltextQuery)
@@ -258,7 +291,12 @@ it("rejects malformed graphs, mismatched State and invalid score rows as route e
     fulltext: [[node(2), "wrong"]]
   });
   const result = await search(reader, state, "example", signal());
-  expect(result.routes.map((route) => route.status)).toEqual(["error", "error", "unconfigured"]);
+  expect(result.routes.map((route) => route.status)).toEqual([
+    "ok",
+    "error",
+    "error",
+    "unconfigured"
+  ]);
   const mismatched = fixture({ keyword: [[node(1)]] });
   const original = mismatched.query;
   mismatched.query = vi.fn<GraphReader["query"]>().mockImplementation(async (request, options) => ({
@@ -267,14 +305,19 @@ it("rejects malformed graphs, mismatched State and invalid score rows as route e
   }));
   const rejected = await search(mismatched, state, "example", signal());
   expect(rejected.data.nodes).toEqual([]);
-  expect(rejected.routes.map((route) => route.status)).toEqual(["error", "error", "error"]);
+  expect(rejected.routes.map((route) => route.status)).toEqual([
+    "error",
+    "error",
+    "error",
+    "error"
+  ]);
 });
 
 it("does not display internal marker nodes even when a transport returns them", async () => {
   const internal = { ...node(1), labels: ["__kgos_internal"] };
   const result = await search(fixture({ keyword: [[internal]] }), state, "example", signal());
   expect(result.data.nodes).toEqual([]);
-  expect(result.routes[0]?.status).toBe("error");
+  expect(result.routes[1]?.status).toBe("error");
 });
 
 it("rejects conflicting payloads instead of inventing a merged knowledge object", async () => {
@@ -306,7 +349,7 @@ it("times out reads without turning a partial failure into a successful empty gr
   const pending = search(reader, state, "example", signal());
   await vi.advanceTimersByTimeAsync(15_001);
   const result = await pending;
-  expect(result.routes.map((route) => route.status)).toEqual(["error", "error", "error"]);
+  expect(result.routes.map((route) => route.status)).toEqual(["error", "error", "error", "error"]);
   expect(result.data.limited).toBe(true);
   expect(vi.getTimerCount()).toBe(0);
 });
@@ -339,8 +382,8 @@ it("limits the accumulated response encoding across many otherwise valid index r
   });
   const result = await search(reader, state, "example", signal());
   expect(result.data.nodes.map((item) => item.id)).toEqual(["n:1"]);
-  expect(result.routes[0]?.status).toBe("ok");
-  expect(result.routes[1]).toMatchObject({ status: "error", limited: true });
+  expect(result.routes[1]?.status).toBe("ok");
+  expect(result.routes[2]).toMatchObject({ status: "error", limited: true });
   expect(result.data.limited).toBe(true);
 });
 

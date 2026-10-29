@@ -481,16 +481,16 @@ it("unmount aborts an independent expansion and empty searches never read connec
   root = createRoot(document.createElement("div"));
 });
 
-it("unmount aborts outstanding work and blank input never starts retrieval", async () => {
+it("blank input starts recent retrieval and unmount aborts outstanding work", async () => {
   await act(async () => {
     await explorer.search("  ");
   });
-  expect(searchKnowledge).not.toHaveBeenCalled();
+  expect(searchKnowledge).toHaveBeenCalledWith(reader, state, "", expect.any(Object));
   vi.mocked(searchKnowledge).mockReturnValue(pending<KnowledgeSearchResult>().promise);
   act(() => {
     void explorer.search("first");
   });
-  const signal = vi.mocked(searchKnowledge).mock.calls[0]?.[3].signal;
+  const signal = vi.mocked(searchKnowledge).mock.lastCall?.[3].signal;
   act(() => {
     root.unmount();
   });

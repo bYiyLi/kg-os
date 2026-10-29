@@ -19,6 +19,8 @@ import {
   keywordQuery,
   NEIGHBOR_LIMIT,
   neighborQuery,
+  RECENT_LIMIT,
+  recentQuery,
   SEARCH_LIMIT,
   semanticQuery
 } from "./graph-queries.js";
@@ -28,7 +30,7 @@ export interface GraphReader {
 }
 
 export interface SearchRoute {
-  kind: "keyword" | "fulltext" | "semantic";
+  kind: "recent" | "keyword" | "fulltext" | "semantic";
   status: "loading" | "ok" | "unconfigured" | "error";
   count: number;
   limited: boolean;
@@ -209,6 +211,16 @@ async function keywordRoute(run: RunQuery, state: ResolvedState, query: string) 
   return routeResult("keyword", nodes, "ok", rows.length > SEARCH_LIMIT);
 }
 
+async function recentRoute(run: RunQuery, state: ResolvedState): Promise<RouteResult> {
+  const rows = await run({
+    request: { at: state, cypher: recentQuery, params: { limit: RECENT_LIMIT + 1 } },
+    columns: ["n"],
+    rows: RECENT_LIMIT + 1
+  });
+  const nodes = nodesFromRows(rows.slice(0, RECENT_LIMIT), false);
+  return routeResult("recent", nodes, "ok", rows.length > RECENT_LIMIT);
+}
+
 function indexNames(rows: JsonValue[][], type: string): string[] {
   const names = new Set<string>();
   for (const row of rows) {
@@ -322,12 +334,17 @@ async function protectRoute(
 }
 
 function combinedResults(results: RouteResult[]): KnowledgeSearchResult {
-  const ranked = rankLists(results.map((result) => result.nodes));
+  // "Recent" guarantees breadth but must never vote in relevance scoring.
+  const ranked = rankLists(
+    results.filter((result) => result.route.kind !== "recent").map((result) => result.nodes)
+  );
+  const recent = results.find((result) => result.route.kind === "recent")?.nodes ?? [];
+  const merged = [...distinctCandidates([...ranked, ...recent]).values()];
   return {
     data: {
-      nodes: ranked.slice(0, SEARCH_LIMIT),
+      nodes: merged.slice(0, RECENT_LIMIT),
       relationships: [],
-      limited: ranked.length > SEARCH_LIMIT || results.some((result) => result.route.limited)
+      limited: merged.length > RECENT_LIMIT || results.some((result) => result.route.limited)
     },
     routes: results.map((result) => result.route)
   };
@@ -342,20 +359,19 @@ export async function searchKnowledge(
   const { signal, onProgress } = options;
   signal.throwIfAborted();
   const term = query.trim();
-  if (term === "") return { data: emptyGraph(), routes: [] };
   const run = queryRunner(reader, signal);
-  const kinds: SearchRoute["kind"][] = ["keyword", "fulltext", "semantic"];
+  const kinds: SearchRoute["kind"][] =
+    term === "" ? ["recent"] : ["recent", "keyword", "fulltext", "semantic"];
   const results = kinds.map((kind) => routeResult(kind, [], "loading"));
-  const operations = [
-    () => keywordRoute(run, state, term),
-    () => indexedRoute(run, { state, query: term, kind: "fulltext" }),
-    () => indexedRoute(run, { state, query: term, kind: "semantic" })
-  ];
+  const operations: Record<SearchRoute["kind"], () => Promise<RouteResult>> = {
+    recent: () => recentRoute(run, state),
+    keyword: () => keywordRoute(run, state, term),
+    fulltext: () => indexedRoute(run, { state, query: term, kind: "fulltext" }),
+    semantic: () => indexedRoute(run, { state, query: term, kind: "semantic" })
+  };
   await Promise.all(
     kinds.map(async (kind, index) => {
-      const operation = operations[index];
-      if (operation === undefined) invalidResponse();
-      results[index] = await protectRoute(kind, operation, signal);
+      results[index] = await protectRoute(kind, operations[kind], signal);
       signal.throwIfAborted();
       onProgress?.(combinedResults(results));
     })
@@ -403,7 +419,7 @@ export async function expandKnowledge(
 }
 
 function connectionSeeds(nodeIds: readonly string[]): Set<string> {
-  if (!Array.isArray(nodeIds) || nodeIds.length > SEARCH_LIMIT) invalidResponse();
+  if (!Array.isArray(nodeIds) || nodeIds.length > RECENT_LIMIT) invalidResponse();
   const ids = new Set<string>();
   for (const id of nodeIds) {
     if (
@@ -429,8 +445,8 @@ function validateConnection(row: JsonValue[], ids: ReadonlySet<string>) {
   if (relationship["start"] !== start || relationship["end"] !== end) invalidResponse();
 }
 
-// Read relationships among the already chosen seed identities, without loading
-// any external neighbors or changing the three search routes and their ranks.
+// Read relationships among the chosen seed identities, without adding neighbors
+// or changing any route's rank.
 export async function connectKnowledge(
   reader: GraphReader,
   state: ResolvedState,

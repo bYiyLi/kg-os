@@ -203,7 +203,9 @@ async function clickControl(key: string) {
 }
 
 function requestOptions(): Parameters<typeof searchKnowledge>[3] {
-  const options = vi.mocked(searchKnowledge).mock.calls[0]?.[3];
+  const options = vi
+    .mocked(searchKnowledge)
+    .mock.calls.findLast(([, , query]) => query.trim() !== "")?.[3];
   if (options === undefined) throw new Error("Missing search request options");
   return options;
 }
@@ -223,7 +225,7 @@ it.each([false, true])(
     expect(host.textContent).not.toContain(i18n.t("graph.emptyPartial"));
     expect(host.textContent).toContain(i18n.t("graph.shown", { nodes: 0, relationships: 0 }));
     expect(document.activeElement).toBe(host.querySelector('svg[aria-label="Test graph scene"]'));
-    expect(searchKnowledge).toHaveBeenCalledOnce();
+    expect(searchKnowledge).toHaveBeenCalledTimes(2);
   }
 );
 
@@ -244,10 +246,10 @@ it.each<[string, GraphReader, ResolvedState]>([
   ["State on the same connection", reader, nextState]
 ])("isolates a changed %s from late progress and results", async (_label, newReader, newState) => {
   const first = pending<KnowledgeSearchResult>();
+  render();
   vi.mocked(searchKnowledge)
     .mockReturnValueOnce(first.promise)
-    .mockResolvedValueOnce(result("n:2", "New object"));
-  render();
+    .mockResolvedValue(result("n:2", "New object"));
   await search("old query");
   const old = requestOptions();
   act(() => {
@@ -272,8 +274,8 @@ it.each<[string, GraphReader, ResolvedState]>([
 
 it("shows finished route data and pending route state before the combined search finishes", async () => {
   const request = pending<KnowledgeSearchResult>();
-  vi.mocked(searchKnowledge).mockReturnValue(request.promise);
   render();
+  vi.mocked(searchKnowledge).mockReturnValue(request.promise);
   await search("example");
   const progress = result("n:1", "Early keyword object");
   progress.routes = [

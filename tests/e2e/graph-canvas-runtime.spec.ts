@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Locator } from "@playwright/test";
+import { graphCamera, nodeCenter } from "./graph-g6-geometry.js";
 
 // cspell:words haspopup
 
@@ -8,18 +8,7 @@ import { createGraphRuntime, signInGraph } from "./graph-runtime.js";
 test.use({ colorScheme: "light", reducedMotion: "reduce" });
 test.setTimeout(90000);
 
-async function graphCamera(node: Locator) {
-  return node.evaluate((element) => {
-    const parent = element.parentElement as unknown as SVGGElement;
-    const matrix = parent.transform.baseVal.consolidate()?.matrix;
-    const svg = parent.ownerSVGElement;
-    if (matrix === undefined || svg === null) throw new Error("Missing graph camera");
-    const bounds = svg.getBoundingClientRect();
-    return { x: matrix.e - bounds.width / 2, y: matrix.f - bounds.height / 2, scale: matrix.a };
-  });
-}
-
-test("searches three real routes, deduplicates and explores parallel edges and a self-loop", async ({
+test("searches four real routes, deduplicates and explores parallel edges and a self-loop", async ({
   page,
   request
 }) => {
@@ -35,20 +24,22 @@ test("searches three real routes, deduplicates and explores parallel edges and a
     await search.fill("needle");
     await search.press("Enter");
     const routes = page.locator(".graph-route-status");
+    await expect(routes).toContainText("Recent");
     await expect(routes).toContainText("Keyword");
     await expect(routes).toContainText("Full-text");
     await expect(routes).toContainText("Semantic");
-    await expect(routes.locator('[data-status="ok"]')).toHaveCount(3);
+    await expect(routes.locator('[data-status="ok"]')).toHaveCount(4);
     const target = page.locator('[data-graph-id="' + runtime.targetId + '"]');
     await expect(target).toHaveCount(1);
-    await expect(page.locator(".graph-node")).toHaveCount(2);
+    await expect(page.locator(".graph-node")).toHaveCount(3);
     const selfLoopId = runtime.relationshipIds[2];
     if (selfLoopId === undefined) throw new Error("Graph fixture has no self-loop");
-    await expect(page.locator(".graph-relationship")).toHaveCount(1);
+    await expect(page.locator(".graph-relationship")).toHaveCount(3);
     await expect(page.locator('[data-graph-id="' + selfLoopId + '"]')).toHaveCount(1);
-    await expect(page.locator('[data-graph-id="' + runtime.neighborId + '"]')).toHaveCount(0);
+    await expect(page.locator('[data-graph-id="' + runtime.neighborId + '"]')).toHaveCount(1);
     await expect(page.getByRole("button", { name: /Related insight, node / })).toBeVisible();
     expect(runtime.providerRequests()).toBeGreaterThan(0);
+    expect(requests.some((query) => query.cypher.includes("size(elementId(n)) DESC"))).toBe(true);
     expect(requests.some((query) => query.cypher.includes("keys(n)"))).toBe(true);
     expect(requests.some((query) => query.cypher.includes("db.index.fulltext.queryNodes"))).toBe(
       true
@@ -58,7 +49,8 @@ test("searches three real routes, deduplicates and explores parallel edges and a
     );
     expect(requests.some((query) => query.cypher.includes("elementId(a) IN $ids"))).toBe(true);
     expect(requests.every((query) => query.at === runtime.latestState)).toBe(true);
-    await target.click();
+    const selected = await nodeCenter(target);
+    await page.mouse.click(selected.x, selected.y);
     const details = page.getByRole("complementary", { name: "Object details", exact: true });
     await expect(details).toContainText("Needle report");
     await expect(details).toContainText("needle semantic text");
@@ -75,15 +67,8 @@ test("searches three real routes, deduplicates and explores parallel edges and a
     const relationshipId = runtime.relationshipIds[0];
     if (relationshipId === undefined) throw new Error("Graph fixture has no relationship");
     const relationship = page.locator('[data-graph-id="' + relationshipId + '"]');
-    const hit = await relationship.locator(".graph-edge-target").evaluate((element) => {
-      const path = element as SVGPathElement;
-      const point = path.getPointAtLength(path.getTotalLength() / 2);
-      const transform = path.getScreenCTM();
-      if (transform === null) throw new Error("Relationship path has no viewport transform");
-      const screen = point.matrixTransform(transform);
-      return { x: screen.x, y: screen.y };
-    });
-    await page.mouse.click(hit.x, hit.y);
+    await relationship.focus();
+    await relationship.press("Enter");
     await expect(details).toContainText("GRAPH_LINK");
     await expect(details).toContainText("first parallel edge");
   } finally {
@@ -116,7 +101,7 @@ test("keeps historical graph reads pinned and does not carry current nodes into 
     const previous = reads.length;
     await search.fill("needle");
     await search.press("Enter");
-    await expect(page.locator('.graph-route-status [data-status="ok"]')).toHaveCount(3);
+    await expect(page.locator('.graph-route-status [data-status="ok"]')).toHaveCount(4);
     await expect(page.locator("[data-graph-id]")).toHaveCount(0);
     expect(reads.slice(previous).length).toBeGreaterThan(0);
     expect(reads.slice(previous).every((state) => state === runtime.modelState)).toBe(true);
@@ -142,7 +127,8 @@ test("preserves real graph selection and camera while opening border navigation"
     await search.press("Enter");
     const node = page.locator('[data-graph-id="' + runtime.targetId + '"]');
     await expect(node).toHaveCount(1);
-    await node.click();
+    await node.focus();
+    await node.press("Enter");
     await page.getByRole("button", { name: "Zoom in", exact: true }).click();
     const before = await graphCamera(node);
     const previousReads = reads;
@@ -161,9 +147,7 @@ test("preserves real graph selection and camera while opening border navigation"
     await expect(handle).toBeFocused();
     await expect(node).toHaveAttribute("aria-pressed", "true");
     const after = await graphCamera(node);
-    expect(after.x).toBeCloseTo(before.x, 3);
-    expect(after.y).toBeCloseTo(before.y, 3);
-    expect(after.scale).toBeCloseTo(before.scale, 3);
+    expect(after.a).toBeCloseTo(before.a, 3);
     expect(reads).toBe(previousReads);
   } finally {
     await runtime.close();

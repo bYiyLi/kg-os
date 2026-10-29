@@ -1,6 +1,7 @@
 import { expect } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
+import { mockEmptyGraphQuery } from "./graph-empty-fixture.js";
 import { readOnlySettingsSnapshot } from "./settings-navigation.js";
 import { mockVersionRoutes, states } from "./version-fixture.js";
 
@@ -23,7 +24,7 @@ function readBody(kind: ReadKind, bootID: string) {
   return readOnlySettingsSnapshot();
 }
 
-async function respond(route: Route, kind: ReadKind, state: InstanceState) {
+async function respondData(route: Route, body: object, state: InstanceState) {
   const headers = route.request().headers();
   if (!state.online) {
     await route.abort("failed");
@@ -50,9 +51,13 @@ async function respond(route: Route, kind: ReadKind, state: InstanceState) {
       status: 200,
       contentType: "application/json",
       headers: { "Cache-Control": "no-store" },
-      body: JSON.stringify(readBody(kind, state.bootID))
+      body: JSON.stringify(body)
     });
   }
+}
+
+async function respond(route: Route, kind: ReadKind, state: InstanceState) {
+  await respondData(route, readBody(kind, state.bootID), state);
 }
 
 export async function mockInstance(page: Page) {
@@ -105,6 +110,7 @@ export async function mockInstance(page: Page) {
       });
     }
   });
+  await mockEmptyGraphQuery(page, (route, body) => respondData(route, body, state));
   await page.route("**/api/v1/web/data/info", async (route) => respond(route, "info", state));
   await page.route("**/api/v1/evolution/overview", async (route) =>
     respond(route, "overview", state)

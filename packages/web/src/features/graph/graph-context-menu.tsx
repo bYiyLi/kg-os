@@ -74,6 +74,18 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
             ?.focus();
       }}
       onOpenChange={(open, details) => {
+        // The native right-button press that opens our controlled menu may also
+        // be reported as an outside press by Base UI Menu (no Menu.Trigger).
+        // Cancel only that right-button dismissal; ordinary outside clicks still close it.
+        if (
+          !open &&
+          details.reason === "outside-press" &&
+          "button" in details.event &&
+          details.event.button === 2
+        ) {
+          details.cancel();
+          return;
+        }
         if (open) restoreFocus.current = true;
         else {
           restoreFocus.current =

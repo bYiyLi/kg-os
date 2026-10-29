@@ -1,8 +1,15 @@
 .knowledge-canvas {
   position: absolute;
-  inset: 0;
+  inset: 0 auto 0 calc(0px - var(--sidebar-width));
+  /* Same screen origin in both sidebar states; the actual card clips it.
+     This keeps G6, search controls and camera fixed while its frame changes. */
+  width: calc(100vw - 26px);
   min-width: 0;
   overflow: hidden;
+}
+
+.app-shell.is-sidebar-collapsed .knowledge-canvas {
+  left: 0;
 }
 
 .graph-interaction-hint {
@@ -41,6 +48,15 @@
   color: var(--color-text);
   box-shadow: var(--graph-panel-shadow);
   font-size: 12px;
+}
+
+/* Keep ephemeral actions usable in the visible card while the full-width
+   G6 scene stays screen-stationary beneath the desktop navigation overlay. */
+@media (min-width: 901px) {
+  .app-shell:not(.is-sidebar-collapsed) .graph-action-notice {
+    left: calc(var(--sidebar-width) + 22px);
+    max-width: min(440px, calc(100% - var(--sidebar-width) - 44px));
+  }
 }
 
 .graph-action-notice [data-slot="button"] {
