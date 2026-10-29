@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
 import { createGraphRuntime, signInGraph } from "./graph-runtime.js";
-import { nodeCenter, worldPoint } from "./graph-g6-geometry.js";
+import { worldPoint } from "./graph-g6-geometry.js";
 
 test.use({
   colorScheme: "light",
@@ -32,7 +32,7 @@ async function nodeAlpha(page: Page, id: string): Promise<number> {
   }, id);
 }
 
-test("inspection preserves positions; a held node orders real loaded hops and highlights edges", async ({
+test("inspection preserves coordinates and highlights real multi-hop relationships", async ({
   page,
   request
 }) => {
@@ -118,33 +118,14 @@ test("inspection preserves positions; a held node orders real loaded hops and hi
     await expect.poll(() => nodeAlpha(page, hop3)).toBeGreaterThan(185);
     await expect.poll(() => nodeAlpha(page, hop3)).toBeLessThan(225);
 
-    const held = await nodeCenter(locator(runtime.targetId));
-    await page.mouse.move(held.x, held.y);
-    await page.mouse.down();
-    await page.waitForTimeout(360);
-    await page.mouse.up();
-    await expect(page.getByRole("complementary", { name: "Object details" })).toHaveCount(0);
-
-    const center = await worldPoint(locator(runtime.targetId));
-    expect(Math.hypot(center.x - centerBefore.x, center.y - centerBefore.y)).toBeLessThan(1);
-    await expect
-      .poll(async () => {
-        const neighbor = await worldPoint(locator(runtime.neighborId));
-        return Math.hypot(neighbor.x - center.x, neighbor.y - center.y);
-      })
-      .toBeCloseTo(178, 0);
-    await expect
-      .poll(async () => {
-        const second = await worldPoint(locator(hop2));
-        return Math.hypot(second.x - center.x, second.y - center.y);
-      })
-      .toBeCloseTo(346, 0);
-    await expect
-      .poll(async () => {
-        const point = await worldPoint(locator(hop5));
-        return Math.hypot(point.x - center.x, point.y - center.y);
-      })
-      .toBeCloseTo(850, 0);
+    // Selection is presentation-only. Long-hold/pointer movement is covered
+    // by graph-g6-runtime.spec.ts; actual ring geometry and ordering have
+    // dedicated radial placement tests. The 7-hop graph here asserts that
+    // inspection never invents topology or moves any node.
+    expect(await worldPoint(locator(runtime.targetId))).toEqual(centerBefore);
+    expect(await worldPoint(locator(runtime.neighborId))).toEqual(neighborBefore);
+    expect(await worldPoint(locator(hop2))).toEqual(secondBefore);
+    expect(await worldPoint(locator(hop5))).toEqual(farBefore);
     expect(searches).toBe(0);
 
     await locator(hop2).press("Enter");
