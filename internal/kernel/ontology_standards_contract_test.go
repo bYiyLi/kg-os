@@ -39,7 +39,7 @@ func TestOntologyStandardsResourceContract(t *testing.T) {
 	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 {
 		t.Fatalf("invalid metadata: %+v", meta)
 	}
-	if !strings.Contains(string(raw), "[Ontology 变更确认模板](references/model-confirmation-template.md)") || !strings.Contains(string(raw), "未经确认") || !strings.Contains(string(raw), "https://github.com/bYiyLi/kgos-ontologies") {
+	if !strings.Contains(string(raw), "[Ontology 变更确认模板](references/model-confirmation-template.md)") || !strings.Contains(string(raw), "未经具体方案确认") || !strings.Contains(string(raw), "https://github.com/bYiyLi/kgos-ontologies") {
 		t.Fatal("model confirmation and official model discovery must be reachable from Skill")
 	}
 	for _, expected := range []string{"[KG OS 本体论方法论](references/ontology-methodology.md)", "[本体建模案例](references/modeling-examples.md)", "## 2. 先确定本体语义", "## 5. 用正反例"} {

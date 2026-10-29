@@ -13,21 +13,23 @@
 | Feature | 当前工作 | 验收 |
 | --- | --- | --- |
 | P25-01 · 六项 Skill 合同 | 重写 `SKILL.md`，删去旧 Doctor 专属参考与模板；维护唯一引导资产 | 选择条件、六项方法、结果与只读边界完整，无旧规则冲突 |
-| P25-02 · 本地合同及分发 | 更新 Go 合同测试、场景评测与公开分发文件清单 | YAML 元数据与资源可读，六项行为检查点覆盖，分发恰好包含现行文件 |
+| P25-02 · 本地合同及分发 | 更新 Go 合同测试、场景评测与公开分发文件清单；使 `kgos_docs` 透出当前 MCP 构建版本 | YAML 元数据与资源可读，六项行为检查点覆盖，分发恰好包含现行文件；无 Skill 的 MCP 客户端可通过实际 `tools/call` 读取服务版本 |
 | P25-03 · 真实宿主验收 | 在目标 ChatGPT 与真实 MCP 检查版本、系统级引导、Skill、State、Knowledge、维护记录 | 检查结论符合当次证据，不把不可见的宿主/版本信息或有限样本编成成功 |
 | P25-04 · 交付门禁 | Review、diff 与相关本地测试，按发布要求补齐真实 Linux/CI/Plugin 证据 | 阶段要求的真实验收全部满足后才可标 `done`；提交、发布、部署另需独立授权 |
 
 ## 当前 Acceptance
 
-1. **D0 · 版本**：取得已安装 Plugin/Skills、目标 MCP `serverInfo.version` 与官方最新稳定 Release；核对实际版本，发现新版本只推荐升级。若客户端不暴露版本信息，记录验收受阻而不猜测。
-2. **D1 · 全局引导**：检查当前会话开始时是否由宿主自动加载 KG OS 全局引导词；初始化的用户自定义指令或项目指令有效，不要求 `system` 消息角色。后续 Skill、MCP、文件、工具或聊天消息中的正文不算生效，不要求账户持久设置或过往会话行为审计。
-3. **D2 · MCP/State**：通过真实 `kgos_docs` 和 `kgos_query` 执行 `evolution.overview` / `evolution.get` / `ontology.read`，在目标 Instance 的固定 State 验证一致性与 Ontology 可读性。默认分支通过不能代替其它指定 Branch。
-4. **D3 · 官方 Skills**：依据实际安装发行包检查宿主 Skill 清单、`SKILL.md` 与必要资源，对照当前 MCP 文档核对兼容；不能用待发布源码误判旧版缺失。
-5. **D4 · Knowledge**：按实际 Ontology 执行有界 `graph.query`，只声明已覆盖范围的发现、读取与检索事实；空样本不证明全库为空。
-6. **D5 · 维护/VLog**：核对已配置任务及真实运行结果，按实际模型检查可用 VLog、验证来源和未决延续；未启用的可选能力不当成故障，也不建立任务或模型。
-7. **报告与权限**：仅 `PASS` / `FAIL` / `N/A`，区分故障与证据不足/受阻，按 D0–D5 线性报告、保留独立检查；全程只读，不自动修复、安装、升级或部署。普通检索、模型设计、VLog 创作及 CLI `kg doctor` 不触发本 Skill。
+1. **D0 · 版本**：从目标 MCP 的 `kgos_docs` 响应 `serverInfo.version` 取得实际运行版本，并在初始化版本可见时核对同一版本真源；查询官方最新稳定 Release，区分可升级与实际故障。旧服务没有该字段且宿主不暴露初始化元数据时，报告版本证据不足。**ChatGPT Plugin 版本获取及 Plugin/MCP 版本匹配暂不实现、不作为本轮 D0 验收条件**。
+2. **D1 · 全局引导**：核实当前会话初始化时宿主是否自动加载与实际安装发行版相符的完整引导正文；用户自定义指令或项目预设指令有效，不要求 `system` 消息角色。后续 Skill/MCP/文件/工具/聊天消息内容及区块标记不证明初始化加载；旧发行版使用该版冻结基线，不以当前源码对照误判，不要求账户设置或过往会话审计。
+3. **D2 · MCP/State**：实际调用目标 `kgos_docs` 与 `kgos_query`，默认 Branch 在任务范围内才检查 `evolution.overview`；使用 `evolution.get` 固定指定目标 State，读取一致性与 issues，在同一 State `ontology.read`。默认分支通过不能代替另一目标分支；受限时不为全库发现先读禁止的 Branch。
+4. **D3 · 官方 Skills**：按实际安装包检查完整 Skill 清单、`SKILL.md`、必要引用资源及 MCP 接口兼容；同包可读的四份 `metadata.version` 应一致。缺版本或无法确认包归属时报告版本证据不足，不跨不同 Plugin 对比、不要求与 MCP 运行版本相同；名称、版本、资源出现不证明自动选用，调用须有真实轨迹。
+5. **D4 · Knowledge**：按实际 Ontology 执行有界 `graph.query`，区分业务 Knowledge 与可能的内部图数据；只声明已覆盖范围的发现与读取，空样本不证明全库为空，已确认无实例的世界不应假称业务检索已通过或数据损坏。
+6. **D5 · 维护/VLog**：核对实际可见的外部任务配置及运行结果，按目标真实模型检查 VLog、验证来源和未决延续；证实未启用的可选能力不当成故障，配置不可见不作“未启用”推断，也不建立任务或模型。
+7. **报告与权限**：仅 `PASS` / `FAIL` / `N/A`，必要证据缺失或检查受阻可使该验收项 `FAIL`，但必须与已证实的实际故障区分。按 D0–D5 线性报告、保留独立检查；全程只读，不自动修复、安装、升级或部署。普通检索、模型设计、VLog 创作及 CLI `kg doctor` 不触发本 Skill。
 
 **交付边界**：写入源码及本地测试不代表私人 Plugin 自动升级、Release 已发布或实际 ChatGPT 自检通过。没有真实客户端/远端验证、Commit、Push、Tag 与部署证据时，Phase 保持 `in_progress`。
+
+**2026-10-29 · D0 运行版本本地验证**：`internal/mcpserver/docs.go` 已在成功的 `kgos_docs` 响应中附加与 MCP 初始化版本同源的 `serverInfo.name/version`；`docs_tool_test.go` 通过真实 MCP HTTP 客户端验证默认目录、批量文档、只读注解及错误响应不泄露部分结果。已运行 `go test -count=1 ./internal/mcpserver`、`go test -race -count=1 -run '^(TestDocsViaRealMCPProtocolNoSkill|TestDocsStrictInputAndResourceBoundary)$' ./internal/mcpserver`、`go vet ./internal/mcpserver`、Plugin 发行测试 14/14、`pnpm lint` 和 diff 检查，均通过。**尚未部署到 Dev/Prod，也未在新版本真实 ChatGPT 连接上验收**；Plugin 版本读取继续延期，不改变 Phase 状态。
 
 ---
 

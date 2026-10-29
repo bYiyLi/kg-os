@@ -68,6 +68,30 @@ const rootOwnedFiles = new Set([
   "plugins/kgos/.app.json.example"
 ]);
 
+// Stamp the distribution copy only. The four canonical SKILL.md files remain
+// without versions; product/Plugin version and the Git release tag own the version.
+export function stampSkillVersion(source, version) {
+  if (
+    !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(
+      version
+    )
+  ) {
+    throw new Error("Invalid Skill package version");
+  }
+  const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(source);
+  if (
+    !frontmatter ||
+    !/^name: [a-z0-9-]+$/m.test(frontmatter[1]) ||
+    !/^description: .+$/m.test(frontmatter[1])
+  ) {
+    throw new Error("Official Skill requires valid name and description frontmatter");
+  }
+  if (/^(?:metadata|version):/m.test(frontmatter[1])) {
+    throw new Error("Official Skill source must not maintain its own version metadata");
+  }
+  return `---\n${frontmatter[1]}\nmetadata:\n  version: "${version}"\n---\n${source.slice(frontmatter[0].length)}`;
+}
+
 function git(directory, ...args) {
   return execFileSync("git", ["-C", directory, ...args], {
     encoding: "utf8",
@@ -242,6 +266,9 @@ export async function render({ output, ref, revision }) {
   if (pluginData.version !== packageData.version) {
     throw new Error("Official Plugin version must match the KG OS product version");
   }
+  if (kind === "tag" && ref !== `refs/tags/v${pluginData.version}`) {
+    throw new Error("Release tag must match the KG OS product and Plugin version");
+  }
   const tracked = new Set(trackedFiles(canonicalTarget));
   const existing = await collectFiles(canonicalTarget);
   for (const path of existing) {
@@ -260,7 +287,10 @@ export async function render({ output, ref, revision }) {
     if (!info.isFile() || info.size > 1024 * 1024) {
       throw new Error(`Invalid public distribution source: ${path}`);
     }
-    const content = await readFile(template);
+    let content = await readFile(template);
+    if (/^plugins\/kgos\/skills\/[^/]+\/SKILL\.md$/.test(path)) {
+      content = Buffer.from(stampSkillVersion(content.toString("utf8"), pluginData.version));
+    }
     const dest = join(canonicalTarget, path);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, content);

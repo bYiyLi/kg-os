@@ -1,6 +1,6 @@
 # VLog 事件中心本体参考
 
-**用途**：在已有模型不足以准确记录系统事件及其关联时，为 `branch/vlog` 提供一套可复用的 KG OS Property Graph Ontology。模型用于系统记录，不是 Kernel 预置的领域 Schema，不会因为安装 Skill 自动创建；使用前必须核对目标 State 的现有 Definition，实际结构变化按 Modeling Skill 展示方案并取得用户确认。
+**用途**：在已有模型不足以准确记录系统事件及其关联时，为 `branch/vlog` 提供一套可复用的 KG OS Property Graph Ontology。模型用于系统记录，不是 Kernel 预置的领域 Schema，不会因为安装 Skill 自动创建；使用前必须核对目标 State 的现有 Definition，实际结构变化遵循 `kgos-ontology-standards` 的具体方案授权规则。
 
 本文件是本包**完整 Definition YAML 的唯一真源**。每个 `yaml` 代码块恰好是一份 KG OS 可编辑 Node / Relationship Definition body，标题是对应的 Object Ref；不把 Markdown 标题、Object metadata 或代码围栏放入 YAML。运行测试从本文件提取这些代码块，不维护第二份模型副本。
 
@@ -308,7 +308,7 @@ constraints: []
 
 ## 4. 实际使用和演进规则
 
-- 以上六个 Node Definition、七个 Relationship Definition 是**一套参考模型**，不代表用户库预置了这些类型，也不应强行迁移已有结构。只在真实目标需要且既有模型不足时，经 Modeling 方案确认后选用必要的 Definition；不能因示例而重复定义已有实体。
+- 以上六个 Node Definition、七个 Relationship Definition 是**一套参考模型**，不代表用户库预置了这些类型，也不应强行迁移已有结构。只在真实目标需要且既有模型不足时，按 `kgos-ontology-standards` 的具体方案授权规则选用必要的 Definition；不能因示例而重复定义已有实体。
 - KG OS 当前 Definition 合同要求至少一个 Property，因此每种 Relationship 提供了一个有业务用途但**非必填**的关系属性。并不要求每条边都填写 `basis`、`scope` 或 `use`，也不把这些属性当作数据库已独立核实的事实。
 - 具体事件类别（如 `security-incident`、`deployment`、`verification`）以 `Concept` 实例表示；用 `HAS_TYPE` 关联 Event。新增类别、记录和对象属于 Knowledge 更新，**无需修改 Ontology**；只有结构语义或约束的真实缺口才演进 Definition。
 - `FOLLOWS` 仅表示有证据的先后，不等于 `CAUSED_BY`；`VERIFIES` 的存在不证明验证通过，结论必须来自验证 Event 自身及证据；`DOCUMENTED_BY` 不代表来源独立或真实。

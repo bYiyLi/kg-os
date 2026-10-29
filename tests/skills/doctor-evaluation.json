@@ -1,5 +1,5 @@
 {
-  "purpose": "Selection and synthetic diagnostic decision cases. Freeze raw tasks and criteria before execution. The executor receives only id/prompt and actual Skill catalog/resources, never doctorSelected or criteria. These cases do not prove native host injection or business tool execution. Historical corrections remain recorded in revisionNote and the phase evidence.",
+  "purpose": "Historical Doctor selection and synthetic decision cases from earlier pre-D118 contracts (including obsolete WARN/UNKNOWN and seven-Skill assumptions). Retain as past evaluation evidence, not current D0–D5 acceptance. The executor receives only raw prompts and actual resources, not criteria. Current cases are in doctor-current-evaluation.json; none of these fixtures prove native host injection or real tool behavior.",
   "cases": [
     {
       "id": "full-readiness",

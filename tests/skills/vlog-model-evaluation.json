@@ -1,5 +1,5 @@
 {
-  "purpose": "Frozen raw tasks and acceptance criteria for the optional single-node VLogEntry recommendation. Model-visible input excludes these criteria; this is not ChatGPT native Skill activation evidence.",
+  "purpose": "Historical frozen cases for the earlier optional single-node VLogEntry model, superseded by D116's optional event-centered reference. Retained for legacy evidence, not the current model recommendation or native Skill activation acceptance; current cases use vlog-event-ontology-evaluation.json.",
   "cases": [
     {
       "id": "existing-simple-model",

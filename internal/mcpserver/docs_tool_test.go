@@ -11,6 +11,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/bYiyLi/kg-os/internal/buildinfo"
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -67,6 +68,9 @@ func TestDocsViaRealMCPProtocolNoSkill(t *testing.T) {
 			if !strings.Contains(string(schema), "paths") || !strings.Contains(string(schema), "additionalProperties") {
 				t.Fatalf("incomplete Docs schema %s", schema)
 			}
+			if !strings.Contains(tool.Description, "serverInfo.version") {
+				t.Fatalf("Docs Tool does not advertise its server version: %s", tool.Description)
+			}
 		}
 		if tool.Name == "kgos_query" || tool.Name == "kgos_mutate" {
 			if !strings.Contains(tool.Description, "kgos_docs") || strings.Contains(tool.Description, "docs.read") {
@@ -90,7 +94,15 @@ func TestDocsViaRealMCPProtocolNoSkill(t *testing.T) {
 		if result.IsError {
 			t.Fatalf("documents error %#v", docToolPayload(t, result))
 		}
-		docs, ok := docToolPayload(t, result)["documents"].([]any)
+		payload := docToolPayload(t, result)
+		info, ok := payload["serverInfo"].(map[string]any)
+		if !ok || info["name"] != "kgos" || info["version"] != buildinfo.Version {
+			t.Fatalf("wrong running MCP server metadata: %#v", payload)
+		}
+		if _, ok := payload["pluginVersion"]; ok {
+			t.Fatal("Docs unexpectedly reports the ChatGPT Plugin version")
+		}
+		docs, ok := payload["documents"].([]any)
 		if !ok {
 			t.Fatalf("missing documents array: %#v", result)
 		}
@@ -144,6 +156,9 @@ func TestDocsViaRealMCPProtocolNoSkill(t *testing.T) {
 		}
 		if _, ok := docToolPayload(t, got)["documents"]; ok {
 			t.Fatal("partial batch leaked in error response")
+		}
+		if _, ok := docToolPayload(t, got)["serverInfo"]; ok {
+			t.Fatal("server metadata leaked in error response")
 		}
 	}
 	for _, old := range []string{"kgos_preview", "state_ancestry", "kgos_read", "kgos_run"} {

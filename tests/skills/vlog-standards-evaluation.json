@@ -1,5 +1,5 @@
 {
-  "purpose": "Frozen raw tasks and separate expected selection/behavior. Execution receives no grading criteria. Manual collection test, not native client activation.",
+  "purpose": "Historical frozen VLog tasks (some pre-D119 authorization assumptions). Retained as past evaluator evidence, not current write-authorization acceptance. Execution receives no grading criteria; manual cases do not prove native client activation. Current VLog checks use vlog-event-ontology-evaluation.json and authorization-boundaries-evaluation.json.",
   "cases": [
     {
       "id": "meaningful-record",

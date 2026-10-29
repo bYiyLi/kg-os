@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"strings"
 
+	"github.com/bYiyLi/kg-os/internal/buildinfo"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -23,6 +24,11 @@ var embeddedDocs embed.FS
 type docPage struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`
+}
+
+type docServerInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
 }
 
 func docsPaths(arguments any) ([]string, error) {
@@ -101,8 +107,12 @@ func readDocuments(ctx context.Context, source fs.FS, paths []string) (json.RawM
 		pages = append(pages, docPage{Path: path, Content: string(content)})
 	}
 	raw, err := json.Marshal(struct {
-		Documents []docPage `json:"documents"`
-	}{Documents: pages})
+		ServerInfo docServerInfo `json:"serverInfo"`
+		Documents  []docPage     `json:"documents"`
+	}{
+		ServerInfo: docServerInfo{Name: "kgos", Version: buildinfo.Version},
+		Documents:  pages,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +130,7 @@ func (s *Server) registerDocs(server *mcp.Server) {
 	server.AddTool(&mcp.Tool{
 		Name:        "kgos_docs",
 		Title:       "Read KG OS documentation",
-		Description: "Read built-in KG OS SDK, Cypher 25 and task guides. Omit paths or pass [] for the task-oriented index; pass an array of 1–32 exact Markdown paths to read multiple full documents in order. Separate from JavaScript; call kgos_query or kgos_mutate to act.",
+		Description: "Read built-in KG OS SDK, Cypher 25 and task guides, plus this running MCP server's build version in serverInfo.version. Omit paths or pass [] for the task-oriented index; pass an array of 1–32 exact Markdown paths to read multiple full documents in order. Separate from JavaScript; call kgos_query or kgos_mutate to act.",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{"paths": map[string]any{

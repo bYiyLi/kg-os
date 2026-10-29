@@ -11,7 +11,7 @@
 ## Design Inputs 与依赖
 
 - [D111](../../design/decisions.md#d111-task-scoped-knowledge-loading) 与 [MCP 初始化加载](../../design/mcp.md#task-scoped-knowledge-loading)：允许范围先于知识读取，复用预览；知识名称与说明质量以 MCP owner 的组件边界为准。
-- [D113](../../design/decisions.md#d113-mandatory-knowledge-behavior) 与 [全局引导/日常职责](../../design/mcp.md#global-ai-guidance-and-daily-responsibility)：每条消息必须实际读取并检索 KG OS、检查维护需求；AI 默认承担日常知识管理，无变化不创建记录。唯一当前正文随 KG OS Tag 版本化；旧的 D111/D112 触发规则属于历史。
+- [D113](../../design/decisions.md#d113-mandatory-knowledge-behavior)、[D119](../../design/decisions.md#d119-recommend-first-authorized-mutation) 与 [全局引导/日常职责](../../design/mcp.md#global-ai-guidance-and-daily-responsibility)：每条消息必须实际读取并检索 KG OS、检查知识变化；未获具体变更授权时先推荐，获准后执行并验证。唯一当前正文随 KG OS Tag 版本化；旧的 D111/D112 读取豁免与 D113 自动写入规则属于历史。
 - [Ontology 增量扩展](../../design/ontology.md#增量扩展保持既有定义)：未修改定义保持一致；Issue 1 是故障证据，不是已确认根因。
 - [Graph 检索与属性边界](../../design/graph.md#检索组合与属性边界)、[Evolution 合并](../../design/evolution.md#evolution-公共调用合同)：保留已有接口、事务和安全映射。
 - [Phase 25](25-kgos-doctor.md)、[Phase 27](27-knowledge-standards-skills.md)、[Phase 28](28-official-skill-roster.md) 继续拥有原诊断、技能和私人安装验收。本阶段只负责新增改进，不重置其状态或冒用旧证据关闭它们。
@@ -24,8 +24,8 @@
 | --- | --- | --- |
 | P32-00 固定复现基线 | 保存Issue 1请求、失败和对照；取得计划值与实际值差异；核对实际源码及底层版本 | A32-01 |
 | P32-01 修复模型扩展 | 根据已确认差异修改所属编译/投影代码；保持旧定义、事务及约束 | A32-01、A32-07 |
-| P32-02 全局引导与日常职责 | 维护唯一六条强制行为 Global AI Guidance 正文、发行 Tag 对照及安装模板；同步 Skill 中每轮检索、默认日常维护和失败反馈规则，保留连接/环境边界 | A32-02、A32-03 |
-| P32-03 知识记录质量与诊断 | 按下表修改分支命名 Skill、提交指南、写入 Skill/MCP 方法指导；补真实持久结果回归及 Doctor 证据判定，保持七项职责 | A32-03、A32-04 |
+| P32-02 全局引导与日常职责 | 维护唯一六条强制行为 Global AI Guidance 正文、发行 Tag 对照及安装模板；同步 Skill 中每轮检索、先推荐后授权及失败反馈规则，保留连接/环境边界 | A32-02、A32-03 |
+| P32-03 知识记录质量与诊断 | 按下表维护 Ontology 的知识世界选择、提交指南及 Knowledge/VLog 写入指引；补真实持久结果回归及 Doctor 证据判定，保持四 Skill 的职责边界 | A32-03、A32-04 |
 | P32-04 使用边界 | 复现搜索组合，补合法示例；测量脚本/Provider耗时；澄清属性及合并限制 | A32-05、A32-06 |
 | P32-06 登录弹窗主题 | 复现用户反馈，检查认证前主题初始化、文档根/Portal 继承和弹窗样式；修复已确认偏差，补主题回归 | A32-09 |
 | P32-05 集成与Review | 源码、生成文档、技能资源一致性；真实场景回归；审查并关闭范围内发现 | A32-07、A32-08、A32-09 |
@@ -38,9 +38,9 @@ P32-02/03 的文档与场景准备不依赖 P32-01 修复完成；涉及运行�
 
 | 交付 | 修改位置 | 验证 |
 | --- | --- | --- |
-| 分支命名要求及正反例 | 分支 Skill 的 `references/origins-and-identity.md` | 名称合法性、用途可读性、用户指定名称与重名场景 |
+| 分支命名要求及正反例 | `kgos-ontology-standards/SKILL.md` 与 `docs/guide/mcp-guides/evolution.md` | 名称合法性、用途可读性、用户指定名称与重名场景 |
 | 提交规范唯一正文 | `docs/guide/mcp-guides/evolution.md` | 简介/改动内容判据、支持 message 与新 Commit 条件、回读/并发边界；为仅 MCP 客户端提供最小命名规则 |
-| 独立写入场景接入 | 分支 Skill 的 `references/versions-and-records.md`；知识 Skill 的 `references/write-verification.md`、本体 Skill 的 `references/evolution.md` 及各入口 | 无分支 Skill 的普通编辑也能找到规范；引用可达，不重复完整规则 |
+| 独立写入场景接入 | `kgos-ontology-standards/SKILL.md`、`kgos-knowledge-standards/SKILL.md`、`kgos-vlog-standards/SKILL.md` 及各自通过 `kgos_docs` 读取的操作指南 | 普通 Knowledge 编辑可直接取得正确规范，不需已退役的分支 Skill；引用可达，不重复完整规则 |
 | MCP 入口和生成资源 | `internal/mcpserver/server.go`、`packages/sdk/src/client.ts` / `types.ts` 的对应文档；运行现有 `scripts/generate-mcp-docs.mjs` | 服务端 Tool 元数据、生成 SDK/Guide 与来源一致；不新增不支持的参数 |
 | 产品呈现与失败路径 | 现有 MCP Preview / Web 定向回归；仅在发现实际缺陷时修复所属实现 | 回读与预览/页面一致，受限读取、并发、未知回执不越界 |
 | 旧记录处置边界 | 在本 Phase 验收证据中记录问题清单及处理建议 | 原引用和历史保留；未获具体授权不得执行整理 |
@@ -69,13 +69,13 @@ P32-02/03 的文档与场景准备不依赖 P32-01 修复完成；涉及运行�
 
 新规则标记、唯一正文、Doctor比较和安装说明一致；旧版本差异清楚，不擅自覆盖用户定制。分别记录保存、宿主可见加载与实际调用行为。仅在文件中发现标签、读取对照资产、不可见宿主指令等场景，不得判定已经加载。
 
-包内资源引用可解析，七Skill清单保持；源模板与私人安装分别核验，未授权安装就保留该项未执行。
+包内资源引用可解析，当前四 Skill 清单保持；源模板与私人安装分别核验，未授权安装就保留该项未执行。
 
-最终正文六条强制行为均须与每轮真实检索、默认日常维护、实际证据和权限边界核对；不以“等义精简”重新加入可跳过读取的条件。canonical INSTALL 的无版本标记完整区块与唯一资产一致，发布渲染后仍一致；历史已发行快照不改写。
+最终正文六条强制行为须与每轮真实检索、先推荐后授权、实际证据和权限边界核对；不以“等义精简”重新加入可跳过读取的条件。canonical INSTALL 的无版本标记完整区块与唯一资产一致，发布渲染后仍一致；历史已发行快照不改写。
 
-对照全局职责与各 Skill 选择边界：每条消息（含问候、闲聊、简单问题）必须实际读取并检索 KG OS，而非仅查 State/模型或复用上轮；每轮检查维护需求，长期有效决定及时保存，无实际变化则不写入。仅提问/未采纳建议不写成事实；当前不查库、不保存或只读禁令及宿主权限继续生效；已知单对象纠错不扩大为全库维护；疑似问题先确认、最小处置；系统记录区分源活动与保存结果。覆盖连接失败、权限限制、指导缺失和未知回执的恢复与如实报告，不为正常知识维护制造逐次审批。
+对照全局职责与各 Skill 选择边界：每条消息（含问候、闲聊、简单问题）必须实际读取并检索 KG OS，而非仅查 State/模型或复用上轮；每轮检查变更需求，有证据且未获授权时先给出具体建议，无实际变化则不写入也不制造建议。明确要求保存某项 Knowledge 可在该授权内直接实施，单纯提出初始化想法不得修改 Ontology 或 Branch；已批准方案的常规实施不额外逐项请示。当前不查库、不保存或只读禁令及宿主权限继续生效；已知单对象纠错不扩大为全库维护；疑似问题先核实、最小建议或获准处置；系统记录区分源活动与保存结果。覆盖连接失败、权限限制、指导缺失和未知回执的恢复与如实报告。
 
-文本审查与合成情境推演分别记录，新增原始用例及判据只作后续独立行为验收输入；本次没有实际模型运行就标记未执行，不把用例存在或哈希通过说成自然任务选用/写入已验证。
+文本审查与合成情境推演分别记录，新增原始用例及判据只作后续独立行为验收输入；至少覆盖未授权建议、明确写入请求、模型变更待确认、VLog 记录与源任务授权区分、超范围变更以及未知回执。没有实际模型运行就标记未执行，不把用例存在或哈希通过说成自然任务选用/写入已验证。
 
 状态情境覆盖：任务确需记录而当前无模型、空世界但当前无使用需求、已有知识和模型充分、可靠事实变化、未决冲突与合理差异、必要模型工作超出授权。分别核对有据缺口、最小必要行动或合理不改、专业规则、结果核实，以及无法自行解决时的具体阻塞请求和独立继续；不以工具、模型或记录的固定数量判成功。Doctor 同时覆盖不同 KG OS Release Tag 的同包引导基线；当前源码只含最终正文，情境假设不充当发行事实。
 
@@ -135,6 +135,15 @@ P32-02/03 的文档与场景准备不依赖 P32-01 修复完成；涉及运行�
 - 主题变化不清空已输入内容、不重新提交登录、不改变认证状态，不让遮罩或 Esc 绕过强制登录。
 
 交付相关主题解析/组件定向测试及真实浏览器回归证据，记录版本、模式、系统配色、实际结果和明暗截图；截图不得包含真实 Token。源码检查或单张截图不替代上述矩阵。未运行的场景保持未验证，不把计划补充写成问题已修复。
+
+## 2026-10-28 D119 授权边界与四 Skill Review 增量
+
+本轮按用户新决定将默认知识变更从“发现后自动写入”改为“自主只读检查与推荐，获具体授权后执行”。完成唯一 Global AI Guidance、canonical INSTALL、Ontology / Knowledge / VLog Skill、Ontology 方法论及对应设计真源的同步；Doctor 保持只读诊断职责。沿用四 Skill 选择边界，不恢复旧 Branch / Retrieval / Maintenance Skill，也不为每次写入增加模型审批。
+
+- **文本 Review**：纠正旧自动写入与 Ontology 确认的适用冲突，并明确用户直接要求的知识修改、获准的批量整理无需逐条重复审批；纯建模讨论与 VLog 的源任务完成不自动获得写权限。修正本阶段已退役的 Branch Skill 路径和七 Skill 表述；不更改原有历史发布/验收记录。
+- **行为评测输入**：[13 个原始任务与冻结判据](../../../tests/skills/authorization-boundaries-evaluation.json) 分离模型输入和审核标准，覆盖必读问候、只读建议、明确写入、批量许可、未知回执、Ontology 方案/授权/超范围、VLog 选用/记录及 Doctor 只读。JSON 结构、Skill 名称和案例唯一性检查通过，**未执行独立模型行为或 ChatGPT 原生自动 Skill 选择测试**。
+- **已执行验证**：`node --test tests/render-kg-releases.node-test.mjs` **14/14 通过**；`go test -count=1 -run '^(TestDoctorSkillResourceContract|TestDoctorGuidanceApprovedBaseline)$' ./internal/mcpserver` 通过；Knowledge 和 VLog 两个 Go 资源合同测试通过，Ontology 的文本和包内引用已检查，但没有独立同名 Go 资源合同测试。 `pnpm lint` 通过（含生成 MCP 文档一致性、ESLint、Prettier、Markdown、拼写、秘密检查等）。另有变更文件 416 个本地 Markdown 链接目标检查、D119 锚点与 `git diff --check` 通过。
+- **未实施与验收边界**：本轮没有修改生产知识、宿主全局配置、已安装私人 Plugin、冻结发行快照；没有 Commit、Push、Release、部署或完整 `pnpm validate`。Source/Skill 文本合同和隔离资源测试不证明宿主已加载新指令，Phase 25/27/28/32 的客户端、生产使用与发布验收仍独立待完成。
 
 ## 先前 P32 实施与验收记录（2026-10-26，v3 优化前）
 

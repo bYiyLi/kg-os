@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { extname, join, posix } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { render } from "../scripts/render-kg-releases.mjs";
+import { render, stampSkillVersion } from "../scripts/render-kg-releases.mjs";
 import {
   renderInstallationGuide,
   renderInstaller,
@@ -172,6 +172,23 @@ test("only whitelisted public files are generated, deterministically", async () 
       JSON.parse(await readFile(join(directory, "plugins/kgos/plugin.json"), "utf8")).version,
       JSON.parse(await readFile(join(root, "package.json"), "utf8")).version
     );
+    const version = JSON.parse(
+      await readFile(join(directory, "plugins/kgos/plugin.json"), "utf8")
+    ).version;
+    for (const skill of [
+      "kgos-doctor",
+      "kgos-knowledge-standards",
+      "kgos-ontology-standards",
+      "kgos-vlog-standards"
+    ]) {
+      const path = `plugins/kgos/skills/${skill}/SKILL.md`;
+      const source = await readFile(join(root, path), "utf8");
+      assert.doesNotMatch(source, /^metadata:\n {2}version:/m);
+      assert.equal(
+        await readFile(join(directory, path), "utf8"),
+        stampSkillVersion(source, version)
+      );
+    }
     assert.deepEqual(manifest, {
       schema: 1,
       repository: "bYiyLi/kg-os",
@@ -197,6 +214,16 @@ test("only whitelisted public files are generated, deterministically", async () 
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("Skill distribution versions support preview tags but never modify canonical sources", async () => {
+  const source = await readFile(join(root, "plugins/kgos/skills/kgos-doctor/SKILL.md"), "utf8");
+  const stamped = stampSkillVersion(source, "0.3.7-preview.1");
+  assert.match(stamped, /metadata:\n {2}version: "0\.3\.7-preview\.1"\n---/);
+  assert.equal(stamped.replace('metadata:\n  version: "0.3.7-preview.1"\n', ""), source);
+  assert.throws(() => stampSkillVersion(stamped, "0.3.8"), /version metadata/);
+  assert.throws(() => stampSkillVersion(source, "v0.3.7"), /version/);
+  assert.throws(() => stampSkillVersion("# Not a Skill\n", "0.3.7"), /frontmatter/);
 });
 
 test("manual installation pages and downloads share self-contained public Markdown sources", async () => {
@@ -614,6 +641,20 @@ test("stable Plugin archive embeds the matching rendered installer and all relea
     );
     manifest.version = "0.3.1";
     await writeFile(join(directory, "plugins/kgos/plugin.json"), JSON.stringify(manifest));
+    // Simulate an earlier release's exported skills alongside the fixture
+    // manifest. The actual tag exporter stamps these without manual edits.
+    for (const skill of [
+      "kgos-doctor",
+      "kgos-knowledge-standards",
+      "kgos-ontology-standards",
+      "kgos-vlog-standards"
+    ]) {
+      const path = `plugins/kgos/skills/${skill}/SKILL.md`;
+      await writeFile(
+        join(directory, path),
+        stampSkillVersion(await readFile(join(root, path), "utf8"), manifest.version)
+      );
+    }
     const workflow = await readFile(join(directory, ".github/workflows/release.yml"), "utf8");
     assert.ok(
       workflow.indexOf("      - name: Render versioned installation") <
@@ -643,6 +684,19 @@ test("stable Plugin archive embeds the matching rendered installer and all relea
       }),
       await readFile(join(output, `kgos-INSTALL-${tag}.md`), "utf8")
     );
+    for (const skill of [
+      "kgos-doctor",
+      "kgos-knowledge-standards",
+      "kgos-ontology-standards",
+      "kgos-vlog-standards"
+    ]) {
+      const path = `skills/${skill}/SKILL.md`;
+      const archived = execFileSync("unzip", ["-p", join(output, `kgos-plugin-${tag}.zip`), path], {
+        encoding: "utf8"
+      });
+      assert.equal(archived, await readFile(join(directory, "plugins/kgos", path), "utf8"));
+      assert.match(archived, /metadata:\n {2}version: "0\.3\.1"\n---/);
+    }
     const guideStep = workflow
       .split(
         "      - name: Render versioned installation guides using the verified image digest\n"

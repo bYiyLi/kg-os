@@ -51,7 +51,7 @@ func TestDoctorSkillResourceContract(t *testing.T) {
 		"D0 · 版本检查", "serverInfo.version", "最新稳定 Release", "推荐升级",
 		"D1 · 全局引导词", "当前会话开始时", "宿主自动加载", "用户自定义指令或项目指令", "不要求 `system` 角色", "不算生效",
 		"D2 · MCP 与 State", "kgos_docs", "kgos_query", "evolution.get", "ontology.read",
-		"D3 · 官方 Skills", "SKILL.md", "接口兼容性",
+		"D3 · 官方 Skills", "SKILL.md", "metadata.version", "接口兼容性",
 		"D4 · Knowledge", "graph.query", "有限结果",
 		"D5 · 持续维护与 VLog", "未启用的可选能力不视为故障",
 		"PASS", "FAIL", "N/A", "证据不足", "检查受阻",
@@ -103,7 +103,7 @@ func TestDoctorGuidanceApprovedBaseline(t *testing.T) {
 		t.Fatal("guidance markers are reversed")
 	}
 	block := body[start:finish+len(end)] + "\n"
-	const approved = "ed41a0d05e590b3e37ebb43804be24a1e71db9a8aea9483d77c31b382bd62bb6"
+	const approved = "964fbcb5d343424808d49488bfeb13c5c1a96a5ef2dfa85d5d0901cb5b0d3f0e"
 	if got := fmt.Sprintf("%x", sha256.Sum256([]byte(block))); got != approved {
 		t.Fatalf("approved guidance text changed: sha256=%s", got)
 	}

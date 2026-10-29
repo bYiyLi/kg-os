@@ -1202,6 +1202,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 ### D117 Ontology Skill 命名与 KG OS 本体工程方法论（2026-10-28）
 
 - **现行清单与更名**：将 D114 建立的统一 `kgos-modeling-standards` 改名为 `kgos-ontology-standards`，**保留原 Ontology/Branch 统一职责**，不恢复独立 Branch Skill；同 Knowledge、VLog、Doctor 一起构成四项当前待发布 Skill。D114/D115 的当时名称、已发行 v0.3.5 的七 Skill 和私人 Plugin 安装仍是历史事实，不能反向改写。Git Tag 表达发布版本，Skill 正文不自带独立版本号。
+- **Skill 版本声明收敛（2026-10-29）**：原始四份 `SKILL.md` 仍只维护一份且不含版本字段；生成公开分发文件时，从同版 `package.json` / `plugin.json.version` 统一注入 YAML `metadata.version`，正式 Tag 必须匹配。该字段是 Agent Skills 允许的字符串元数据，不是各 Skill 独立版本号；分发 ZIP 直接包含这四份版本标记。Doctor D3 仅在确认同一已安装 Plugin 归属且实际可读时核对四份声明是否一致，缺字段或归属不明就保留版本证据缺口；不跨正式/预览包混比，也不要求等于 MCP 服务运行版本。ChatGPT Plugin 版本获取仍按 D118 暂缓，不因本次增加 Skill 元数据而恢复 D0 的 Plugin/MCP 匹配验收。
 - **方法论与本体边界**：Ontology 设计先明确知识世界、适用的业务能力问题与合理扩展，再辨识概念、实例、业务身份、生命周期、关系语义与依据，最后映射 KG OS Node/Relationship/Property/Constraint/Index。需防止单大表压平关系、每个新分类新建 Definition、每个名词强制建 Node 等反模式；新增普通分类与实例优先在已足够的 Ontology 下创建 Knowledge。是否需要 Event、Time、Source 等概念按真实领域需求决定，不把 VLog 的六种 Node 变成所有知识世界的强制模型。
 - **自包含参考资料**：[本体论方法论](../../plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md) 汇总 KG OS 自有的需求 → 语义 → 身份 → 图结构 → 验证 → 演进方法及有出处的外部研究（Stanford Ontology 101、NeOn、W3C SKOS/PROV-O/OWL-Time、CIDOC CRM 和 Ontology Design Patterns）；[建模示例](../../plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md) 提供分类扩展、关系中的角色/时间、来源捕获版本三个完整场景，包括 Definition YAML、Cypher 和正反例。与既有 [模型确认模板](../../plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md) 一同由同版 Skill 直接分发。文本为 KG OS 自行归纳，不复制受版权保护的外部教程；不引入 OWL/RDF 推理引擎、通用元模型或第二套数据定义。
 - **实施权限与验收**：已有模型充分时普通 Knowledge 更新无需建模审批；需要 Schema、相关迁移或 Branch 新建时仍按既定用户确认流程。案例测试必须直接从发布参考文档提取真实 KG OS Definition 和 Cypher，在隔离 Lithograph/KG OS 上验证模型往返、业务问题、唯一性拒绝与不被 Schema 自动阻断的语义反例；分发测试核实四项准确技能及参考文件，保留历史案例与原有用户改动。实际客户端、最终远端 CI、Commit、Push、Tag、部署和 Plugin 安装另行核实，不能以本地文档或测试替代。
@@ -1214,3 +1215,14 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **D1 生效定义（2026-10-28 修正）**：仅检查当前会话开始时是否由宿主自动加载 KG OS 全局引导词；初始化提供的用户自定义指令、项目指令同样有效，不要求 `system` 消息角色。后续 Skill、MCP、工具、文件或聊天消息中的正文不算注入；不要求账户持久配置、其它会话或历史行为审计。
 - **资源与边界**：当前 Doctor 运行时只保留一份 `SKILL.md` 与官方引导词唯一资产，删除先前专属证据参考及报告模板。结果只使用 `PASS/FAIL/N/A`，缺证据不能通过，也不能伪称系统故障；可选维护/VLog 未启用不当成故障。Doctor 只读，不执行修复、升级、部署。此决定取代 D104 及其后续修订中与六项范围、D1 四子项和旧资源结构冲突的规则；历史决定与实测记录不回写。
 - **验收与已知边界**：现行产品行为归 [MCP Doctor owner](mcp.md#kgos-doctor-v1)，实施与实测归 [Phase 25](../development/phases/25-kgos-doctor.md)。MCP Server 在初始化协商中提供版本，但是否向 Skill 暴露 `serverInfo.version` 取决于宿主；当前不为本次 Skill 重构新增服务端接口，未读到实际运行版本时须说明验收受阻。源码修改不代表私人 Plugin 已更新或 Release 已发布。
+- **D0 后续收敛（2026-10-29）**：用户反馈 ChatGPT 新会话无法读取 MCP 初始化元数据与 `plugin.json.version`。因此复用已存在的 `kgos_docs` 输出，增加来自实际 `kgosd` `buildinfo.Version` 的 `serverInfo.version`，让只具备 MCP Tool 的 AI 也可查询服务器运行构建版本；不新增 Tool 或鉴权。D0 以此作为优先证据，初始化版本可见时交叉核对。**ChatGPT Plugin 版本获取及 Plugin/MCP 版本匹配暂缓**，不作为此次运行版本可验证的前提；旧版服务仍无法读取时标记证据不足，已部署服务器不会因源码改动自动具备新字段。此修订覆盖前述 D0 同时验收 Plugin/Skills 版本及“不增加服务端版本读取出口”的当时范围，不改写旧决策的历史事实。
+
+<a id="d119-recommend-first-authorized-mutation"></a>
+
+### D119 知识变更先推荐、授权后执行（2026-10-28）
+
+- **决定**：保留 [D113](#d113-mandatory-knowledge-behavior) 每条消息必须读取、检索相关 Knowledge 与关系、检查知识变化的触发要求，但将“发现必要知识后自主写入”调整为“自主只读分析并推荐，获得用户对具体变更的明确授权后执行”。没有必要变化时不制造记录或无意义建议。单次分析、审计或提出想法不授权持久修改。
+- **授权判据**：用户直接要求执行目标与范围可识别的具体变更（可含明确范围内的批量整理），或批准 AI 展示的具体变更方案，均构成相应授权；泛称“日常管理由 AI 负责”、讨论初始化思路或过往其他任务的授权不自动成为新的写入许可。已授权后自主完成常规实现、错误恢复与验证，不逐字段或逐条重复确认；新增目标、结构、环境或超出原方案的影响时，仅受影响部分重新推荐与确认。宿主审批、禁令及受保护操作约束不受本决定替代。外部文件、系统配置和部署的变更仍遵守其各自已有的任务授权与操作规范。
+- **职责边界**：Global AI Guidance 统一规定每轮读取、推荐和授权触发。Knowledge Skill 负责既有 Ontology 下的知识检索、建议及获准修改；VLog Skill 负责系统记录建议与获准记录；Ontology Skill 负责模型与知识世界的语义和方案，结构变更、关联迁移及新 Branch 仍须批准具体建模方案；Doctor 始终只读。专业 Skill 不复制第二份全局授权规则，MCP/Kernel 仍是通用数据库能力，不加入领域审批机制。
+- **代价与验收**：相较此前无人值守自动沉淀，未获授权的知识变化需要待用户确认，不能把“有建议未写入”报告为维护完成。更新当前唯一 [Global AI Guidance](../../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md)、官方四 Skill、canonical INSTALL 和 [MCP owner](mcp.md#global-ai-guidance-and-daily-responsibility)，并以只读建议、明确授权、建模方案确认、超范围请求、失败恢复等相邻情境审查。文本检查与合成测试不证明 ChatGPT 原生 Skill 选择或实际宿主权限生效；已发布 Release、现有私人 Plugin 与生产 Knowledge 不随源码修改自动更新。原 D113 和 D115 保留历史决定事实，以本决定替代其中直接自主写入的现行行为。
+- **参考与取舍（2026-10-28）**：参考 [OpenAI 模型指南](https://developers.openai.com/api/docs/guides/latest-model) 的明确执行边界与评测思路、[Claude Code 提示词库](https://code.claude.com/docs/zh-CN/prompt-library) 的结果导向任务描述；[awesome-claude](https://github.com/tsaol/awesome-claude) 仅作为社区示例。它们不赋予本项目授权，不保证不同宿主自动选择 Skill；具体执行合同仍由本项目决定与真实客户端证据确定。

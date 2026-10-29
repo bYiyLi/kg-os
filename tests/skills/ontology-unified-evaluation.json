@@ -204,6 +204,66 @@
         "复用已有适用模型，新增仅解决实际需求的语义",
         "未来不确定需求不是预置额外 Schema 的理由"
       ]
+    },
+    {
+      "id": "reuse-plugin-discovery",
+      "prompt": "本轮 KG OS 插件已经获取项目世界的 Branch、Domain 和 Definition，State 已固定。请只读评估如何给现有关系添加有效期，保留其它模型。",
+      "expectedApplies": true,
+      "criteria": [
+        "复用已读取的同一目标 Branch、Domain、Definition 与 State，按需补读相关 Knowledge",
+        "只针对关系有效期和实际数据影响建模，不从头无界扫描所有世界",
+        "提出受影响模型方案，不在只读评审中写入"
+      ]
+    },
+    {
+      "id": "standalone-ontology-context",
+      "prompt": "当前只加载了 Ontology Skill，尚未取得 KG OS 的 Branch、Domain、Definition。请评审项目 P 的现有模型是否足以表达项目决策。",
+      "expectedApplies": true,
+      "criteria": [
+        "通过目标 KG OS 补查真实知识结构和相关 Knowledge，不能根据例子假设模型已存在",
+        "区分 Domain 组织和 Branch 演进，不用同名分支猜测环境",
+        "查询受阻时标注未核实，继续独立的概念分析"
+      ]
+    },
+    {
+      "id": "approved-concrete-model-execution",
+      "prompt": "我已确认上一轮展示的具体项目决策 Ontology 方案和迁移范围。请按已确认清单实施、回读并验证，不做额外模型改动。",
+      "expectedApplies": true,
+      "criteria": [
+        "复用已确认的完整方案，不重复要求批准同一内容",
+        "实施前核对目标 State 和已有数据，不扩大迁移或删除范围",
+        "写后回读实际 Ontology、Knowledge、关系与查询；未证实的结果不报成功"
+      ]
+    },
+    {
+      "id": "branch-name-and-commit-message",
+      "prompt": "用户已批准新建独立的工程经验知识世界并录入已确认模型，要求名称可读；若写入产生新 Commit，请提供能说明世界用途和此次改动的说明。",
+      "expectedApplies": true,
+      "criteria": [
+        "按用途和用户语言选择合法名称，不随机生成不透明 Branch 名称",
+        "按当前 kgos_docs 的 guides/evolution.md 校验名称和支持 message 的调用，未产生 Commit 不编造 Message",
+        "写入后依据实际 State 回读模型、受影响数据和原始 Commit Message"
+      ]
+    },
+    {
+      "id": "no-installed-model-conceptual-design",
+      "prompt": "我还没有创建任何 KG OS 知识世界，也暂时没有可用连接。请只讨论一个只含标题与正文的笔记本体方案，不需要写库。",
+      "expectedApplies": true,
+      "criteria": [
+        "可根据已知需求给出最小概念模型，不因缺现成 State 停止只读设计",
+        "明确未核实目标实例，不冒充实际已安装 Ontology 或执行查询",
+        "不写入、不要求先创建 Branch 或预设额外领域模型"
+      ]
+    },
+    {
+      "id": "direct-concrete-model-authorization",
+      "prompt": "直接在已有 project 分支给 node:Project 增加可选的 summary STRING 属性；现有数据不需迁移，其余 Schema 不变。我已经明确授权执行这个具体变更，请修改并回读。",
+      "expectedApplies": true,
+      "criteria": [
+        "用户直接指定了具体结构、目标和影响并授权，先核对实际 State 和约束后不重复要求同一方案批准",
+        "只变更指定 Definition 的一个可选属性，不重构或创建新 Branch",
+        "按返回 State 回读修改后的 Definition、既有数据和必要查询"
+      ]
     }
   ]
 }

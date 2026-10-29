@@ -25,7 +25,7 @@
 | [decisions.md](design/decisions.md) | D1–D118 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
-当前知识使用合同：[每轮强制知识行为](design/mcp.md#global-ai-guidance-and-daily-responsibility)、[D113](design/decisions.md#d113-mandatory-knowledge-behavior)；此前 [D111](design/decisions.md#d111-task-scoped-knowledge-loading) / [D112](design/decisions.md#d112-global-ai-guidance-and-daily-responsibility) 的按任务选择读取与简单问候豁免已被替代，环境范围与其他有效边界保留。模型扩展与真实客户端验收见 [Phase 32](development/phases/32-knowledge-use-readiness.md)。源码修改、安装与发布分别取证。
+当前知识使用合同：[每轮强制检索及授权后变更](design/mcp.md#global-ai-guidance-and-daily-responsibility)、[D113 强制读取](design/decisions.md#d113-mandatory-knowledge-behavior)、[D119 先推荐后授权](design/decisions.md#d119-recommend-first-authorized-mutation)；此前 [D111](design/decisions.md#d111-task-scoped-knowledge-loading) / [D112](design/decisions.md#d112-global-ai-guidance-and-daily-responsibility) 的按任务选择读取与简单问候豁免已被替代，环境范围与其他有效边界保留。模型扩展与真实客户端验收见 [Phase 32](development/phases/32-knowledge-use-readiness.md)。源码修改、安装与发布分别取证。
 
 ## 从配置到调用
 
