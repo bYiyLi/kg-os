@@ -26,6 +26,7 @@ const officialSkills = [
   "kgos-ontology-standards",
   "kgos-knowledge-standards",
   "kgos-vlog-standards",
+  "kgos-memory-standards",
   "kgos-doctor"
 ];
 const siteFiles = [
@@ -68,7 +69,7 @@ const rootOwnedFiles = new Set([
   "plugins/kgos/.app.json.example"
 ]);
 
-// Stamp the distribution copy only. The four canonical SKILL.md files remain
+// Stamp the distribution copy only. Canonical SKILL.md files remain
 // without versions; product/Plugin version and the Git release tag own the version.
 export function stampSkillVersion(source, version) {
   if (

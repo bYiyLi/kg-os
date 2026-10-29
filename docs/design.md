@@ -15,7 +15,7 @@
 | [object.md](design/object.md) | 公共 aggregate/Knowledge Ref、共享 YAML/JSON、batch read 与统一 Patch |
 | [graph.md](design/graph.md) | Knowledge 数据模型、Graph query / execute、Cypher 与搜索边界 |
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
-| [mcp.md](design/mcp.md) | `kgosd` Go 原生 MCP、五个 AI-facing Tool / `kgos_docs`、Cypher 手册、Plugin/Skill、认证与 ChatGPT UI、[当前四个官方 Skill](design/mcp.md#kgos-official-skills)（Modeling、Knowledge、VLog、Doctor）及旧通用 Skill 源码退役/私人安装迁移边界，以及 VLog 合同；Phase 22 `docs.read` 为历史接口 |
+| [mcp.md](design/mcp.md) | `kgosd` Go 原生 MCP、五个 AI-facing Tool / `kgos_docs`、Cypher 手册、Plugin/Skill、认证与 ChatGPT UI、[当前五个官方 Skill](design/mcp.md#kgos-official-skills)（Ontology、Knowledge、VLog、AIMemory、Doctor）及旧通用 Skill 源码退役/私人安装迁移边界，以及 VLog 和 AIMemory 专业边界；Phase 22 `docs.read` 为历史接口 |
 | [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同、D105 首次初始化错误，以及 Web 持久数据错误方案 |
 | [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、当前 Docker-only 交付、[D108 私有源码与公开 kg-releases 生成/CI](design/decisions.md#d108-private-source-public-releases)、TypeScript SDK、内部 CLI 与历史 npm 分发边界 |
 | [cli.md](design/cli.md) | AI-first CLI command tree、`--root` / `KGOS_ROOT`、分层 help、`doctor/init` setup、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
