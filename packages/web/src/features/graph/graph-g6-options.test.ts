@@ -47,19 +47,21 @@ it("uses the same accent color for all reachable hop edges with the requested pr
   expect(state["selected"]).toMatchObject({ stroke: accent, opacity: 1, lineWidth: 3.4 });
 });
 
-it("gives ranked search nodes their own force radius and new nodes a safe fallback", () => {
-  const moving = forceLayout(false, ["n:1", "n:2"]) as unknown as {
+it("keeps linked nodes close and separate from other nodes instead of dispersing them by search rank", () => {
+  const moving = forceLayout(false) as unknown as {
     animation: boolean;
-    radial: { radius: (node: { id: string }) => number };
+    radial?: unknown;
+    link: { strength: number; distance: number };
+    collide: { radius: number; strength: number };
+    iterations: number;
   };
-  const reduced = forceLayout(true, ["n:1"]) as { animation: boolean };
+  const reduced = forceLayout(true) as { animation: boolean };
   expect(moving.animation).toBe(true);
   expect(reduced.animation).toBe(false);
-  expect(moving.radial.radius({ id: "n:1" })).toBe(80);
-  expect(moving.radial.radius({ id: "n:2" })).toBeGreaterThan(80);
-  expect(moving.radial.radius({ id: "n:missing" })).toBeGreaterThan(
-    moving.radial.radius({ id: "n:2" })
-  );
+  expect(moving.radial).toBeUndefined();
+  expect(moving.link).toMatchObject({ distance: 176, strength: 0.48 });
+  expect(moving.collide).toMatchObject({ radius: 84, strength: 1 });
+  expect(moving.iterations).toBe(120);
 });
 
 it("keeps the fisheye-computed label size for selected nodes with a base-size fallback", () => {

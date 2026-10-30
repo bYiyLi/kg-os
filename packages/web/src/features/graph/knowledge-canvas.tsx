@@ -27,26 +27,33 @@ function readerKey(reader: GraphReader | null) {
 interface CanvasProps {
   reader: GraphReader | null;
   state: ResolvedState | null;
+  domain?: string | null;
+  domainLabel?: string | null;
   blocked: boolean;
 }
 
 // A different connection or immutable State owns a fresh scene and requests.
 export function KnowledgeCanvas(props: CanvasProps) {
-  return <CanvasSession key={readerKey(props.reader) + ":" + String(props.state)} {...props} />;
+  return (
+    <CanvasSession
+      key={readerKey(props.reader) + ":" + String(props.state) + ":" + (props.domain ?? "")}
+      {...props}
+    />
+  );
 }
 
-function CanvasSession({ reader, state, blocked }: CanvasProps) {
+function CanvasSession({ reader, state, domain, domainLabel, blocked }: CanvasProps) {
   const surface = useRef<HTMLDivElement | null>(null);
   const scene = useRef<GraphSceneHandle | null>(null);
   const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set());
-  const explorer = useGraphExplorer(reader, state);
+  const explorer = useGraphExplorer(reader, state, domain ?? undefined);
   const disabled = blocked || reader === null || state === null;
   const actions = useCanvasActions(explorer, surface, scene, disabled);
   // A new connection/State mounts a new session. Load real knowledge without
   // requiring a keyword; React StrictMode may re-run the effect safely.
   useEffect(() => {
     if (reader !== null && state !== null) void explorer.search("");
-  }, [reader, state]);
+  }, [reader, state, domain]);
   return (
     <div className="knowledge-canvas" ref={surface} onKeyDown={actions.keyDown}>
       <GraphScene
@@ -81,6 +88,7 @@ function CanvasSession({ reader, state, blocked }: CanvasProps) {
         routes={explorer.routes}
         failed={explorer.failed}
         state={state}
+        domainLabel={domainLabel ?? null}
       />
       <GraphInteractionFeedback explorer={explorer} />
       <CanvasDetails

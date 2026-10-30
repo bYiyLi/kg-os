@@ -45,7 +45,7 @@ it("places only real newly queried neighbors in a first ring around the existing
   for (const neighbor of ["n:2", "n:3", "n:4"]) {
     const point = placed.get(neighbor);
     expect(point).toBeDefined();
-    expect(Math.hypot((point?.x ?? NaN) - 720, (point?.y ?? NaN) + 310)).toBeCloseTo(168, 4);
+    expect(Math.hypot((point?.x ?? NaN) - 720, (point?.y ?? NaN) + 310)).toBeCloseTo(220, 4);
   }
   expect(previous.size).toBe(1);
 });
@@ -62,9 +62,9 @@ it("uses additional visual rings for a crowded one-hop without inventing extra h
     new Set(["n:1"])
   );
   const radii = [...placed.values()].map((point) => Math.round(Math.hypot(point.x, point.y)));
-  expect(radii.filter((radius) => radius === 168)).toHaveLength(8);
-  expect(radii.filter((radius) => radius === 313)).toHaveLength(12);
-  expect(radii.filter((radius) => radius === 458)).toHaveLength(1);
+  expect(radii.filter((radius) => radius === 220)).toHaveLength(8);
+  expect(radii.filter((radius) => radius === 405)).toHaveLength(12);
+  expect(radii.filter((radius) => radius === 590)).toHaveLength(1);
 });
 
 it("prefers the real expanded origin over another connected visible node", () => {
@@ -76,8 +76,29 @@ it("prefers the real expanded origin over another connected visible node", () =>
   const placed = radialNeighborPositions(graph, previous, new Set(["n:2"]));
   const point = placed.get("n:3");
   expect(point).toBeDefined();
-  expect(Math.hypot((point?.x ?? NaN) - 400, point?.y ?? NaN)).toBeCloseTo(168, 4);
+  expect(Math.hypot((point?.x ?? NaN) - 400, point?.y ?? NaN)).toBeCloseTo(220, 4);
   expect(radialNeighborPositions(graph, new Map(), new Set(["n:2"]))).toEqual(new Map());
+});
+
+it("places newly exposed neighbors without overlapping existing nodes or each other", () => {
+  const graph = data(
+    Array.from({ length: 14 }, (_, index) => index + 1),
+    Array.from({ length: 12 }, (_, index) => link(index + 1, 1, index + 3))
+  );
+  const previous = new Map([
+    ["n:1", { x: 0, y: 0 }],
+    ["n:2", { x: 220, y: 0 }]
+  ]);
+  const placed = radialNeighborPositions(graph, previous, new Set(["n:1"]));
+  expect(placed.size).toBe(12);
+  const points = [...previous.values(), ...placed.values()];
+  for (const [index, a] of points.entries()) {
+    for (const b of points.slice(index + 1)) {
+      expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(168 - 0.001);
+    }
+  }
+  expect(previous.get("n:2")).toEqual({ x: 220, y: 0 });
+  expect(radialNeighborPositions(graph, previous, new Set(["n:1"]))).toEqual(placed);
 });
 
 it("orders all reachable hops around the chosen node without moving pinned or disconnected nodes", () => {

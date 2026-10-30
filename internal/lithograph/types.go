@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	expectedExtension     = "0.3.3"
+	expectedExtension     = "0.3.4"
 	expectedStorageFormat = 3
 	expectedCypherProfile = "CY25-2026.08"
 )
@@ -30,9 +30,10 @@ type Event struct {
 }
 
 type QueryRequest struct {
-	At     string
-	Cypher string
-	Params any
+	At        string
+	Cypher    string
+	Params    any
+	GraphView json.RawMessage
 }
 
 type ExecuteRequest struct {

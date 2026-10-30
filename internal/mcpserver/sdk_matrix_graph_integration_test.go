@@ -12,7 +12,7 @@ import (
 
 func matrixGraphAndHistory(t *testing.T, calls *methodMatrix, origin, branch, mergedState string) {
 	graphResult := calls.run("graph.execute", map[string]string{
-		"branch": branch, "cypher": "CREATE (:SdkMatrixGraph {value:7}) RETURN 7 AS value",
+		"branch": branch, "cypher": "CREATE (:SdkMatrixGraph {value:7}), (:SdkMatrixItem {name:'scoped'}) RETURN 7 AS value",
 	}, true)
 	graphState := property(t, graphResult, "state")
 	rows := array(t, calls.run("graph.query", map[string]any{
@@ -24,6 +24,34 @@ func matrixGraphAndHistory(t *testing.T, calls *methodMatrix, origin, branch, me
 	cells, ok := rows[0].([]any)
 	if !ok || len(cells) != 1 || cells[0] != float64(1) {
 		t.Fatalf("Graph query typed values: %#v", rows)
+	}
+	scoped := array(t, calls.run("graph.query", map[string]any{
+		"at": graphState, "domain": "domain:SdkMatrix",
+		"cypher": "MATCH (n) RETURN count(n) AS count",
+	}, false), "rows")
+	if len(scoped) != 1 || len(scoped[0].([]any)) != 1 || scoped[0].([]any)[0] != float64(1) {
+		t.Fatalf("MCP Domain query did not return the scoped Node: %#v", scoped)
+	}
+	scopedStream := calls.stream("graph.streamQuery", map[string]any{
+		"at": graphState, "domain": "domain:SdkMatrix",
+		"cypher": "MATCH (n) RETURN count(n) AS count",
+	}, false)
+	if len(scopedStream) != 3 || object(t, scopedStream[2])["type"] != "summary" ||
+		object(t, scopedStream[1])["row"].([]any)[0] != float64(1) {
+		t.Fatalf("MCP Domain stream not scoped: %#v", scopedStream)
+	}
+	for _, rawDomain := range []any{nil, 42, "domain:NotPresent"} {
+		code := "INVALID_ARGUMENT"
+		if rawDomain == "domain:NotPresent" {
+			code = "OBJECT_NOT_FOUND"
+		}
+		encoded, _ := json.Marshal(map[string]any{"at": graphState, "domain": rawDomain, "cypher": "MATCH (n) RETURN count(n)"})
+		failed := matrixRawTool(t, calls, "kgos_query", map[string]any{
+			"code": "return await graph.query(" + string(encoded) + ");",
+		})
+		if !failed.IsError || mcpText(t, failed)["code"] != code {
+			t.Fatalf("MCP scope error %v should be %s: %#v", rawDomain, code, mcpText(t, failed))
+		}
 	}
 	events := calls.stream("graph.streamQuery", map[string]string{
 		"at": graphState, "cypher": "UNWIND [1,2] AS n RETURN n",

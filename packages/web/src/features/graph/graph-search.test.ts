@@ -90,6 +90,23 @@ function search(reader: GraphReader, at: ResolvedState, query: string, requestSi
 
 afterEach(() => vi.useRealTimers());
 
+it("scopes real one-hop expansion to the selected Domain", async () => {
+  const api = fixture({
+    neighbors: [[node(1), edge(7), node(2)]]
+  });
+  const graph = await expandKnowledge(api, state, "n:1", {
+    signal: signal(),
+    domain: "domain:Scoped"
+  });
+  expect(graph.relationships).toHaveLength(1);
+  expect(vi.mocked(api.query).mock.calls[0]?.[0]).toEqual({
+    at: state,
+    cypher: neighborQuery,
+    params: { id: "n:1", limit: 26 },
+    domain: "domain:Scoped"
+  });
+});
+
 it("runs all four routes at one immutable State and ranks search matches above recent fallback", async () => {
   const reader = fixture({
     recent: [[node(9)], [node(2)]],
@@ -420,4 +437,25 @@ it("marks an expansion with more than 25 relationships as limited", async () => 
 it("rejects a neighbor response that attaches the selected source to unrelated endpoints", async () => {
   const reader = fixture({ neighbors: [[node(1), edge(1, 2, 3), node(2)]] });
   await expect(expandKnowledge(reader, state, "n:1", signal())).rejects.toThrow();
+});
+
+it("applies Domain to four knowledge routes, but not to index discovery", async () => {
+  const reader = fixture({
+    recent: [[node(3)]],
+    keyword: [[node(2)]],
+    catalogs: { fulltext: ["full_text"], semantic: ["semantic"] },
+    fulltext: [[node(1), 0.9]],
+    semantic: [[node(1), 0.8]]
+  });
+  await searchKnowledge(reader, state, "rule", {
+    signal: signal(),
+    domain: "domain:DevelopmentDelivery"
+  });
+  const calls = vi.mocked(reader.query).mock.calls.map(([request]) => request);
+  const catalogs = calls.filter((call) => call.cypher === indexQuery);
+  const candidates = calls.filter((call) => call.cypher !== indexQuery);
+  expect(catalogs).toHaveLength(2);
+  expect(catalogs.every((call) => call.domain === undefined)).toBe(true);
+  expect(candidates).toHaveLength(4);
+  expect(candidates.every((call) => call.domain === "domain:DevelopmentDelivery")).toBe(true);
 });

@@ -100,6 +100,13 @@ async function startChildExpansion() {
   return request;
 }
 
+function scopedAbortSignal(
+  scope: AbortSignal | { signal: AbortSignal; domain: string } | undefined
+) {
+  if (scope === undefined) return undefined;
+  return "signal" in scope ? scope.signal : scope;
+}
+
 it("keeps an origin visible while its own expansion loads after its parent is collapsed", async () => {
   const request = await startChildExpansion();
   expect(explorer.data.nodes.map((node) => node.id)).toEqual(["n:1", "n:2"]);
@@ -153,7 +160,7 @@ it.each(["collapse", "hide"] as const)(
       explorer[action]("n:2");
       explorer.undoHide();
     });
-    expect(signal?.aborted).toBe(true);
+    expect(scopedAbortSignal(signal)?.aborted).toBe(true);
     expect(explorer.data.nodes.map((node) => node.id)).toEqual(["n:1"]);
     await act(async () => {
       request.resolve(linked("n:2", "n:3", "r:2"));

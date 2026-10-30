@@ -22,7 +22,7 @@ export function radialNeighborPositions(
   }
   for (const [anchor, ids] of groups) {
     const point = previous.get(anchor);
-    if (point !== undefined) placeRings(result, ids, anchor, point);
+    if (point !== undefined) placeRings(ids, anchor, { result, point, previous });
   }
   return result;
 }
@@ -44,25 +44,77 @@ function preferredAnchor(
   })[0];
 }
 
+interface RingContext {
+  result: Map<string, GraphPoint>;
+  point: GraphPoint;
+  previous: ReadonlyMap<string, GraphPoint>;
+}
+
+function ringPositions(
+  count: number,
+  radius: number,
+  phase: number,
+  center: GraphPoint
+): GraphPoint[] {
+  return Array.from({ length: count }, (_, index) => {
+    const theta = phase + (index * 2 * Math.PI) / count;
+    return { x: center.x + radius * Math.cos(theta), y: center.y + radius * Math.sin(theta) };
+  });
+}
+
+function freeSlots(candidate: readonly GraphPoint[], occupied: readonly GraphPoint[]): boolean {
+  return candidate.every(
+    (point, index) =>
+      occupied.every((other) => Math.hypot(point.x - other.x, point.y - other.y) >= 168) &&
+      candidate.every(
+        (other, otherIndex) =>
+          otherIndex === index || Math.hypot(point.x - other.x, point.y - other.y) >= 168
+      )
+  );
+}
+
+function openRing(
+  anchor: string,
+  ring: number,
+  count: number,
+  context: { point: GraphPoint; occupied: readonly GraphPoint[] }
+): GraphPoint[] {
+  const { point, occupied } = context;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const radius = 220 + ring * 185 + attempt * 80;
+    for (let rotation = 0; rotation < 24; rotation++) {
+      const phase =
+        angle(anchor) + (ring % 2) * (Math.PI / (8 + ring * 4)) + (rotation * 2 * Math.PI) / 24;
+      const candidate = ringPositions(count, radius, phase, point);
+      if (freeSlots(candidate, occupied)) return candidate;
+    }
+  }
+  // The search is bounded. A failed fit must not silently drop returned nodes.
+  const rightmost = Math.max(point.x, ...occupied.map((other) => other.x));
+  return Array.from({ length: count }, (_, index) => ({
+    x: rightmost + 220 + index * 190,
+    y: point.y
+  }));
+}
+
 function placeRings(
-  result: Map<string, GraphPoint>,
   ids: readonly string[],
   anchor: string,
-  point: GraphPoint
+  { result, point, previous }: RingContext
 ): void {
   let offset = 0;
   let ring = 0;
   while (offset < ids.length) {
     const capacity = 8 + ring * 4;
     const batch = ids.slice(offset, offset + capacity);
-    const radius = 168 + ring * 145;
-    const phase = angle(anchor) + (ring % 2) * (Math.PI / capacity);
+    // A ring must clear the existing world, not merely distribute its own
+    // nodes. Local expansions must never shove or overlap previously visible
+    // nodes (including manually pinned ones).
+    const occupied = [...previous.values(), ...result.values()];
+    const positions = openRing(anchor, ring, batch.length, { point, occupied });
     for (const [index, id] of batch.entries()) {
-      const theta = phase + (index * 2 * Math.PI) / batch.length;
-      result.set(id, {
-        x: point.x + radius * Math.cos(theta),
-        y: point.y + radius * Math.sin(theta)
-      });
+      const position = positions[index];
+      if (position !== undefined) result.set(id, position);
     }
     offset += batch.length;
     ring++;

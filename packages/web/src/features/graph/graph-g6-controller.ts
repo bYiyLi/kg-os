@@ -281,12 +281,7 @@ export class GraphG6Controller {
     this.reduced = value;
     const graph = this.graph;
     if (graph === null || !this.active(graph)) return;
-    graph.setLayout(
-      forceLayout(
-        value,
-        this.props.data.nodes.map((node) => node.id)
-      )
-    );
+    graph.setLayout(forceLayout(value));
     if (value) graph.stopLayout();
     const activeFocus = this.focusMotion?.activeFocusId ?? null;
     this.focusMotion?.stop();
@@ -338,12 +333,7 @@ export class GraphG6Controller {
           ? new Map([...original].filter(([id]) => retained.has(id)))
           : new Map([...original, ...around]);
         this.focusScales.clear();
-        graph.setLayout(
-          forceLayout(
-            this.reduced || (!restart && original.size > 0),
-            this.props.data.nodes.map((node) => node.id)
-          )
-        );
+        graph.setLayout(forceLayout(this.reduced || (!restart && original.size > 0)));
         graph.setData(
           graphToG6({
             data: this.props.data,

@@ -164,7 +164,7 @@ it("preserves search node ranking while normalizing relationship ordering in top
       relationships: [...original.relationships].reverse()
     })
   );
-  expect(topologyKey(original)).not.toBe(
+  expect(topologyKey(original)).toBe(
     topologyKey({
       ...original,
       nodes: [...original.nodes].reverse()

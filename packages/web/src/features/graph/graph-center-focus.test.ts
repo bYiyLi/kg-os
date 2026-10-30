@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { centerFocusScale, centerFocusStyle, priorityRadius } from "./graph-center-focus.js";
+import { centerFocusScale, centerFocusStyle } from "./graph-center-focus.js";
 
 it("keeps the strongest magnification at the viewport center without pointer input", () => {
   expect(centerFocusScale(200, 150, 400, 300)).toBeCloseTo(1.8);
@@ -20,12 +20,4 @@ it("projects the stronger center scale onto node and label sizes without changin
     labelFontSize: 21.6,
     labelOffsetY: 18
   });
-});
-
-it("uses stable, progressively wider rings for lower ranked knowledge", () => {
-  expect(priorityRadius(0)).toBe(80);
-  expect(priorityRadius(1)).toBeGreaterThan(priorityRadius(0));
-  expect(priorityRadius(20)).toBeGreaterThan(priorityRadius(1));
-  expect(priorityRadius(200)).toBeGreaterThan(priorityRadius(20));
-  expect(priorityRadius(-1)).toBe(priorityRadius(0));
 });

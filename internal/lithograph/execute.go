@@ -32,7 +32,7 @@ func (host *Host) Query(ctx context.Context, request QueryRequest) (QueryResult,
 	if err != nil {
 		return QueryResult{}, fmt.Errorf("resolve query state %q: %w", request.At, err)
 	}
-	result, err := executeRaw(operationCtx, connection, request.Cypher, request.Params, map[string]any{"at": state})
+	result, err := executeRaw(operationCtx, connection, request.Cypher, request.Params, queryExecutionOptions(state, request.GraphView))
 	if err != nil {
 		return QueryResult{}, fmt.Errorf("execute query at %q: %w", state, err)
 	}
@@ -160,7 +160,7 @@ func (host *Host) StreamQuery(
 		connection,
 		request.Cypher,
 		request.Params,
-		map[string]any{"at": state},
+		queryExecutionOptions(state, request.GraphView),
 		func(event Event) error { return consume(state, event) },
 	); err != nil {
 		return "", fmt.Errorf("stream query at %q: %w", state, err)
@@ -373,4 +373,14 @@ func requireAutoCommit(connection *sql.Conn) error {
 		return fmt.Errorf("SQLite connection has an active transaction")
 	}
 	return nil
+}
+
+// Read-only Graph View is opt-in. Existing metadata and unscoped operations
+// execute without visibility constraints.
+func queryExecutionOptions(state string, view json.RawMessage) map[string]any {
+	options := map[string]any{"at": state}
+	if len(view) != 0 {
+		options["graphView"] = view
+	}
+	return options
 }

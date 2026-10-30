@@ -139,12 +139,17 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-function render(currentReader = reader, currentState = state) {
+function render(currentReader = reader, currentState = state, domain?: string) {
   act(() => {
     root.render(
       <TranslationProvider>
         <UiProvider>
-          <KnowledgeCanvas reader={currentReader} state={currentState} blocked={false} />
+          <KnowledgeCanvas
+            reader={currentReader}
+            state={currentState}
+            blocked={false}
+            {...(domain === undefined ? {} : { domain, domainLabel: domain })}
+          />
         </UiProvider>
       </TranslationProvider>
     );
@@ -270,6 +275,34 @@ it.each<[string, GraphReader, ResolvedState]>([
   await search("new query");
   expect(node("n:2").getAttribute(ARIA_LABEL)).toBe("New object");
   expect(host.querySelector(FIRST_SELECTOR)).toBeNull();
+});
+
+it("changing Domain remounts the graph session and rejects late results", async () => {
+  const oldResult = pending<KnowledgeSearchResult>();
+  render(reader, state, "domain:First");
+  vi.mocked(searchKnowledge)
+    .mockReturnValueOnce(oldResult.promise)
+    .mockResolvedValue(result("n:2", "New Domain"));
+  await search("old");
+  const old = requestOptions();
+  expect(old.domain).toBe("domain:First");
+  act(() => {
+    old.onProgress?.(result("n:1", "Old Domain"));
+  });
+  expect(node("n:1")).toBeTruthy();
+  render(reader, state, "domain:Second");
+  expect(old.signal.aborted).toBe(true);
+  expect(field().value).toBe("");
+  await act(async () => {
+    old.onProgress?.(result("n:1", "Late Domain"));
+    oldResult.resolve(result("n:1", "Stale final"));
+    await oldResult.promise;
+  });
+  expect(host.querySelector(FIRST_SELECTOR)).toBeNull();
+  await search("new");
+  expect(requestOptions().domain).toBe("domain:Second");
+  expect(node("n:2").getAttribute(ARIA_LABEL)).toBe("New Domain");
+  expect(host.textContent).toContain("domain:Second");
 });
 
 it("shows finished route data and pending route state before the combined search finishes", async () => {

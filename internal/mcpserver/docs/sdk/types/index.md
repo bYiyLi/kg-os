@@ -30,6 +30,7 @@ Every public type reachable from the 31 MCP SDK methods has a version-pinned def
 - `sdk/types/GraphRowEvent.md`
 - `sdk/types/GraphStreamEvent.md`
 - `sdk/types/GraphSummaryEvent.md`
+- `sdk/types/GraphViewSelector.md`
 - `sdk/types/JsonObject.md`
 - `sdk/types/JsonPrimitive.md`
 - `sdk/types/JsonValue.md`

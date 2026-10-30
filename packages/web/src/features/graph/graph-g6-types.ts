@@ -2,6 +2,11 @@ import type { Ref } from "react";
 
 import type { GraphData } from "./graph-data.js";
 
+export interface GraphPoint {
+  x: number;
+  y: number;
+}
+
 export interface GraphSceneContextTarget {
   id: string | null;
   x: number;

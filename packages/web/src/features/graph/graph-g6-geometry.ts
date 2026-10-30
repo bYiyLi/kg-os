@@ -112,8 +112,8 @@ export function contextPosition(
 
 export function topologyKey(data: GraphData): string {
   return JSON.stringify([
-    // Search ranking is the radial layout input even when topology is unchanged.
-    data.nodes.map((node) => node.id),
+    // Search rank does not alter graph topology or force a destructive reflow.
+    data.nodes.map((node) => node.id).sort(),
     data.relationships.map((edge) => [edge.id, edge.start, edge.end]).sort()
   ]);
 }

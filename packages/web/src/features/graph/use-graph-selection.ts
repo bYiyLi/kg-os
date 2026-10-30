@@ -31,6 +31,7 @@ function useGraphSources() {
 export function useGraphSelection(context: {
   reader: GraphReader | null;
   state: ResolvedState | null;
+  domain?: string | undefined;
   searching: boolean;
 }) {
   const [selected, setSelected] = useState<string | null>(null);

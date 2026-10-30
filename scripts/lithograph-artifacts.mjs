@@ -1,43 +1,43 @@
 import { resolve } from "node:path";
 
-export const LITHOGRAPH_VERSION = "0.3.3";
+export const LITHOGRAPH_VERSION = "0.3.4";
 
 const artifacts = {
   "darwin-arm64": {
     archive: "lithograph-macos-arm64.tar.gz",
     library: "lithograph.dylib",
     providerLibrary: "lithograph-openai-compatible.dylib",
-    sha256: "ba8fd08bd84d3516c9c2e6e8168f507b83de6b8cb6eea2c66cff65760b1ce997"
+    sha256: "fd17fde21d310cce9f889c8416232f9c9bb79aa17d5ead74452e89e349465a60"
   },
   "darwin-x64": {
     archive: "lithograph-macos-x64.tar.gz",
     library: "lithograph.dylib",
     providerLibrary: "lithograph-openai-compatible.dylib",
-    sha256: "507359aaea081fd2bac975a93d977d3e0345eb1c08ef7c04327449e34d05bf9f"
+    sha256: "bf9eefbefa808102e20bfe2cdb3edf8676dd9c08e93f67dfb4f82fe5a7e87d07"
   },
   "linux-arm64": {
     archive: "lithograph-linux-arm64.tar.gz",
     library: "lithograph.so",
     providerLibrary: "lithograph-openai-compatible.so",
-    sha256: "65fe4ac6ce8c481dd6108a67a744da1e66a1c7d3e2091f11bbb7eb7d2e6ccd89"
+    sha256: "12ccb1803f7caa8546a9f36f03c3436e181029244dc58215b96af1ea0880ecab"
   },
   "linux-x64": {
     archive: "lithograph-linux-x64.tar.gz",
     library: "lithograph.so",
     providerLibrary: "lithograph-openai-compatible.so",
-    sha256: "7340c320e9b99c075271dcff5a3177f6997382e6c957dcd62dacdd48516236f5"
+    sha256: "89e12d474703575555c8aabb0098f29019f6a4d050f6c04cafc675b556db8794"
   },
   "win32-arm64": {
     archive: "lithograph-windows-arm64.zip",
     library: "lithograph.dll",
     providerLibrary: "lithograph-openai-compatible.dll",
-    sha256: "b820308d5265ac8673c6ebf4c60efab1dfef4bf39d153c586d63df02a6aeb57c"
+    sha256: "c7d94d158b0179a4598922ca1940c62149bfa76e06cb2a0a71595473cc944bcf"
   },
   "win32-x64": {
     archive: "lithograph-windows-x64.zip",
     library: "lithograph.dll",
     providerLibrary: "lithograph-openai-compatible.dll",
-    sha256: "4bd404168a1e60cc6ae8cf18e888f65b36f14221d90ea106cc709945344baaf1"
+    sha256: "72f12bed10c8915c35b40179e4b651c3f34056e175ddab1db708833ae5eefa72"
   }
 };
 

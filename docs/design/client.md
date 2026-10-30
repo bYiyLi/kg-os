@@ -31,6 +31,8 @@ AI / Agent                  Browser / TS Application / internal CLI
 
 **当前帮助入口是独立 MCP `kgos_docs`**：Phase 20 的 `help(name?)` 和 Phase 22 的 Sandbox `docs.read(path)` 已先后退役；[Phase 23](../development/phases/23-mcp-tool-taxonomy-and-docs.md) 完成了批量自描述文档和五个 AI-facing Tool 的真实验证。历史迁移证据分别保留在 [Phase 20](../development/phases/20-mcp-tool-help.md)、[Phase 22](../development/phases/22-mcp-self-describing-docs.md) 和 Phase 23。`kgos_docs` 是 MCP Tool，不是 `@kgos/sdk` 的 HTTP 方法或可在 JavaScript Sandbox 内调用的对象。
 
+SDK 的只读 Graph query/streamQuery 可以指定可选 domain 或 graphView，MCP AI 在 JavaScript Sandbox 使用完全相同的请求类型，不新增搜索 Tool；范围语义详见 [Graph](graph.md#read-only-graph-view-与-domain-范围lithograph-v034)。
+
 SDK 的 `client.ts` 方法、`types.ts` 公共 Request/Result/类型及 TSDoc 注释是 MCP 方法参考的程序化输入；TypeDoc + 必要的 TypeScript AST 映射在构建时生成完整、可导航的 Markdown 类型参考。**只对照 Go Sandbox 已允许的 15 Read + 16 Write** 方法生成 MCP 可调用目录，示例必须是无需创建 Client/配置 Token 的 JS 函数体；HTTP Client 独有的初始化、`system`、`web` 不混入 MCP 方法清单。Ref 和 Merge 的公共 TypeScript 类型要精确表达 [Evolution](evolution.md) 已冻结的 StateRef、MergeChoice、状态及 resolution 的条件约束，不复制另一套 Go 业务校验。实际虚拟读取、安全、文档和构建验收归 [MCP 文档 owner](mcp.md#mcp-tool-help)。
 
 [Web 工作区数据](web.md#受控-api-与多窗口保存)的 `web.data.info({})` 已作为认证后连接启动信息入口实现，返回 `daemonBootId` 和 `storageStatus`；其余 `web.data / web.cache` 记录、缓存和导出 API 仍待实现。后续 adapter 沿用浏览器 Web Platform 边界和共享错误 envelope，下载使用 Blob，不加入本地文件系统访问、root discovery、Knowledge State 或自动 mutation retry。

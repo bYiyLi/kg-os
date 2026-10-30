@@ -69,9 +69,34 @@ graph execute → 读写连接 → Lithograph
 
 公共 Graph 不注入排除 `__kgos_` 的 Knowledge `graphView`，不在参数、结果或提交前按 Vector / reserved identifier 增加 KG OS 检查。否则仍会限制有效 Cypher，或使底层 Schema / Version Procedure 因固定 Graph View 而无法执行。Object / Ontology 的聚合编辑、内部数据投影和一致性检查仍由各自合同负责，不反向变成 Graph 的执行条件。
 
-公共 Graph 使用 Lithograph 当前锁定的 v0.3.3 SQL execution surface（[D103](decisions.md#d103-lithograph-v033-upgrade)）：非 streaming request 使用 `lithograph()` 完整 envelope，streaming request 使用真正增量的 `lithograph_rows()` `columns -> row* -> summary` event stream。Semantic query、`LOAD CSV`、graph/schema/version mutation 与 transaction subquery 都不因为 streaming adapter 另设 KG OS 限制；`query` / `execute` 只决定只读 / 读写 connection。KG OS 负责认证、request / parameter 解码、连接与执行上下文、结果传输和 cancellation；语句解析、读写判定、procedure 行为、事务与数据库错误由 Lithograph 负责。具体接入证据见 [integration readiness](implementation.md#managed-semantic-integration-readiness)。面向 MCP AI 的 Cypher 使用手册由 [MCP 文档 owner](mcp.md#mcp-tool-help) 维护，但不拥有底层语言语义，也不改变本 Graph 执行边界。
+公共 Graph 使用 Lithograph v0.3.4 SQL execution surface（原 v0.3.3 升级历史见 [D103](decisions.md#d103-lithograph-v033-upgrade)，新增 Graph View OR 范围见本节）：非 streaming request 使用 `lithograph()` 完整 envelope，streaming request 使用真正增量的 `lithograph_rows()` `columns -> row* -> summary` event stream。Semantic query、`LOAD CSV`、graph/schema/version mutation 与 transaction subquery 都不因为 streaming adapter 另设 KG OS 限制；`query` / `execute` 只决定只读 / 读写 connection。KG OS 负责认证、request / parameter 解码、连接与执行上下文、结果传输和 cancellation；语句解析、读写判定、procedure 行为、事务与数据库错误由 Lithograph 负责。具体接入证据见 [integration readiness](implementation.md#managed-semantic-integration-readiness)。面向 MCP AI 的 Cypher 使用手册由 [MCP 文档 owner](mcp.md#mcp-tool-help) 维护，但不拥有底层语言语义，也不改变本 Graph 执行边界。
 
 Lithograph v0.3.2 / v0.3.3 新增的 `readAccess`、`writeAccess` 与 `memoryLimitBytes` 属于底层 SQL execution options。现有 Graph 公共请求没有这些字段，KG OS 本次依赖升级不透传它们、不自动启用执行内存配额，也不把只读入口改为 `readOnlyNoExternalIO`。底层新能力不自动成为 KG OS 公共能力；现有 State / Branch、只读 / 读写和外部 I/O 合同保持不变。
+
+### Read-only Graph View 与 Domain 范围（Lithograph v0.3.4）
+
+公开 graph.query / graph.streamQuery 在原有 at、cypher、params 之外，接受两个互斥的可选字段：
+
+- graphView：直接指定 Lithograph v0.3.4 的 requireAllLabels（AND）、requireAnyLabels（OR）、excludeAnyLabels（NOT）。省略时沿用完整图；只允许这三个字段，类型和错误按底层原合同执行。
+- domain：公共规范 Domain Ref，例如 domain:DevelopmentDelivery。KG OS 在同一已固定的 immutable State 中读取该 Domain，沿 includes 递归收集所有子 Domain 的 Node Definition 识别 Label，形成去重的 requireAnyLabels；自动排除 __kgos_internal。允许共享 Definition、多父级及业务组织 cycle，去重、避免循环；Relationship Definition 不是 Graph View 的 Relationship Type selector。
+- domain 与 graphView 同时提供为 INVALID_ARGUMENT；不存在的 Domain 为 OBJECT_NOT_FOUND；错误格式或非 Domain Ref 为 INVALID_ARGUMENT；State 或 Ontology 不一致/检索失败时保持真实错误，不回退为全局检索。
+- 没有任何 Node Definition 的 Domain 意味着空可见知识子图，必须强制限定为空，不把空 OR 数组传成全图。
+- Scope 影响此 query 中 MATCH、遍历、Full-text、Raw Vector 和 Managed Semantic 的可见元素，在 skip/limit/Top-K 前生效；Schema / Index SHOW 不按 Graph View 限定元数据，Version Procedure 也不属于可见子图。这类元数据读取应省略 Scope，之后仅为知识检索附加 Scope。
+- Domain 只是 Definition 的组织视图，不代表实例拥有领域身份、Tenant 或权限。跨 Domain 复用 Label 的实例自然会被多个领域发现；Graph View 的边由可见端点诱导，若应用需要按声明的 Relationship Definition Type 进一步限定连边，须在它自己的关系查询里显式表达。AI 与 Web 使用同一请求合同，公共 Graph 绝不隐式注入默认 Domain。
+- graph.execute / graph.streamExecute 保持原样，不扩展本次只读 Domain/Graph View 范围，以免为知识检索引入意外受限写入语义。
+
+AI 的示例（已知且有权读取的 Branch 和 Domain，先固定 State）：
+
+```js
+const { state } = await evolution.get({ state: "branch/main" });
+return await graph.query({
+  at: state,
+  domain: "domain:DevelopmentDelivery",
+  cypher: "MATCH (n) RETURN n LIMIT 20"
+});
+```
+
+如需精确 Label 控制，可改为 graphView: { requireAnyLabels: ["Decision", "Rule"] }（并移除 domain）。这不是第二种 Cypher 或新的 Search API；返回值、权限和失败行为仍遵守 Graph 既有合同。
 
 KG OS-managed Full-text 默认使用目标 State 的实际 versioned IndexDefinition 中的 analyzer；全局 `[fulltext].analyzer` 只用于创建或因业务 Schema 变化重建索引。调用方在 Cypher 中显式传入底层 `{analyzer: ...}` 时原样执行，不修改全局配置或已有 IndexDefinition。KG OS 不为此增加解析或重写逻辑。
 
@@ -111,7 +136,9 @@ Relationship 使用 `db.index.semantic.queryRelationships`，返回 `relationshi
 query({
   at: StateRef,
   cypher: string,
-  params?: map
+  params?: map,
+  domain?: DomainRef,
+  graphView?: LabelSelector
 })
 → {
   state: ResolvedState,

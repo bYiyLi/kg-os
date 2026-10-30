@@ -550,6 +550,10 @@ Select the KG OS Plugin in a new conversation and ask for the task you need:
 - “Read the current Ontology and explain the existing models. Do not create models.”
 - “I want to organize the following material in the knowledge base. First propose a plan using the existing models, and wait for my confirmation before writing.”
 
+Select a Domain in the Web sidebar to scope the graph to the node types in that Domain and its descendants. Recent knowledge, keyword, full-text and semantic search, and graph exploration all respect that visibility; select the Branch again to return to the entire graph. An empty Domain has no visible knowledge nodes. Domains organize models; they do not confer instance ownership or access permissions. Shared node definitions can appear in multiple Domains.
+
+For AI access, the existing `graph.query` and `graph.streamQuery` accept optional `domain: "domain:DevelopmentDelivery"` or explicit `graphView: { requireAnyLabels: ["Decision", "Rule"] }` for a Label union. The parameters are mutually exclusive. Read global index metadata without a scope and apply the scope to knowledge queries. Omitting these parameters preserves full-graph behavior; write APIs are unchanged.
+
 For an empty knowledge base, inspect its structure first, then authorize modeling and saving as needed. Installation does not create business models or test content. Upgrade the service and private Plugin separately as described next.
 
 <a id="upgrade"></a>

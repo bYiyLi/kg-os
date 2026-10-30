@@ -59,6 +59,21 @@ it("requests only relationships between the allowed seeds using parameters and t
   expect(graph.limited).toBe(false);
 });
 
+it("passes a Domain scope to the actual seed-connection query", async () => {
+  const api = reader([[node(1), edge(1), node(2)]]);
+  const graph = await connectKnowledge(api, state, ["n:1", "n:2"], {
+    signal: signal(),
+    domain: "domain:Scoped"
+  });
+  expect(graph.relationships).toHaveLength(1);
+  expect(vi.mocked(api.query).mock.calls[0]?.[0]).toEqual({
+    at: state,
+    cypher: connectQuery,
+    params: { ids: ["n:1", "n:2"], limit: 401 },
+    domain: "domain:Scoped"
+  });
+});
+
 it("retains actual parallel relationships and self-loops without treating edges as pairs", async () => {
   const api = reader([
     [node(1), edge(1), node(2)],

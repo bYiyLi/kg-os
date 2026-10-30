@@ -85,6 +85,13 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
+function scopedAbortSignal(
+  scope: AbortSignal | { signal: AbortSignal; domain: string } | undefined
+) {
+  if (scope === undefined) return undefined;
+  return "signal" in scope ? scope.signal : scope;
+}
+
 it("clearing aborts an active search and ignores a transport that resolves late", async () => {
   const request = pending<KnowledgeSearchResult>();
   vi.mocked(searchKnowledge).mockReturnValue(request.promise);
@@ -96,7 +103,7 @@ it("clearing aborts an active search and ignores a transport that resolves late"
   act(() => {
     explorer.clear();
   });
-  expect(signal?.aborted).toBe(true);
+  expect(scopedAbortSignal(signal)?.aborted).toBe(true);
   await act(async () => {
     request.resolve(result(graph("n:1")));
     await request.promise;
@@ -200,7 +207,7 @@ it("a new search aborts late seed connections instead of merging them into the n
     firstLinks.resolve(linked("n:1", "n:2"));
     await firstLinks.promise;
   });
-  expect(signal?.aborted).toBe(true);
+  expect(scopedAbortSignal(signal)?.aborted).toBe(true);
   expect(explorer.data.nodes.map((node) => node.id)).toEqual(["n:3"]);
   expect(explorer.data.relationships).toHaveLength(0);
 });
@@ -219,7 +226,7 @@ it("selection changes preserve independent neighbor loading", async () => {
   act(() => {
     explorer.select(null);
   });
-  expect(signal?.aborted).toBe(false);
+  expect(scopedAbortSignal(signal)?.aborted).toBe(false);
   await act(async () => {
     request.resolve(linked("n:1", "n:2"));
     await request.promise;
@@ -292,7 +299,7 @@ it("deduplicates the same in-flight node and cancels it when toggled again", asy
   act(() => {
     explorer.toggleExpand("n:1");
   });
-  expect(signal?.aborted).toBe(true);
+  expect(scopedAbortSignal(signal)?.aborted).toBe(true);
   await act(async () => {
     first.resolve(linked("n:1", "n:2"));
     await first.promise;
@@ -422,7 +429,7 @@ it("hiding a loading node cancels only its request and undo does not revive late
     explorer.hide("n:1");
   });
   const signal = vi.mocked(expandKnowledge).mock.calls[0]?.[3];
-  expect(signal?.aborted).toBe(true);
+  expect(scopedAbortSignal(signal)?.aborted).toBe(true);
   expect(explorer.data.nodes).toHaveLength(0);
   act(() => {
     explorer.undoHide();
@@ -460,7 +467,7 @@ it("a new search cancels expansions and ignores their late payloads", async () =
     request.resolve(linked("n:1", "n:2"));
     await request.promise;
   });
-  expect(signal?.aborted).toBe(true);
+  expect(scopedAbortSignal(signal)?.aborted).toBe(true);
   expect(explorer.data.nodes.map((node) => node.id)).toEqual(["n:3"]);
   expect(explorer.expanded.size).toBe(0);
 });
@@ -477,7 +484,7 @@ it("unmount aborts an independent expansion and empty searches never read connec
   act(() => {
     root.unmount();
   });
-  expect(signal?.aborted).toBe(true);
+  expect(scopedAbortSignal(signal)?.aborted).toBe(true);
   root = createRoot(document.createElement("div"));
 });
 
@@ -494,6 +501,6 @@ it("blank input starts recent retrieval and unmount aborts outstanding work", as
   act(() => {
     root.unmount();
   });
-  expect(signal?.aborted).toBe(true);
+  expect(scopedAbortSignal(signal)?.aborted).toBe(true);
   root = createRoot(document.createElement("div"));
 });

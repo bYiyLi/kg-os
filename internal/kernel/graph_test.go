@@ -34,6 +34,33 @@ func TestGraphParamsPreserveRawJSONAndRejectNonObjects(t *testing.T) {
 	}
 }
 
+func TestGraphQueryDomainInputFailClosed(t *testing.T) {
+	safe := GraphQueryRequest{At: "branch/main", Cypher: "MATCH (n) RETURN n"}
+	for _, raw := range []string{"null", "17", "false", "{}", "[]", `""`, `"node:Rule"`, `"domain:"`} {
+		req := safe
+		req.Domain = json.RawMessage(raw)
+		if _, err := validateGraphQueryRequest(req); err == nil || AsPublicError(err).Code != CodeInvalidArgument {
+			t.Errorf("domain %s should fail closed: %v", raw, err)
+		}
+	}
+	for _, raw := range []string{"{}", "null"} {
+		req := safe
+		req.Domain = json.RawMessage(`"domain:Example"`)
+		req.GraphView = json.RawMessage(raw)
+		if _, err := validateGraphQueryRequest(req); err == nil || AsPublicError(err).Code != CodeInvalidArgument {
+			t.Errorf("Domain and GraphView %s should be exclusive: %v", raw, err)
+		}
+	}
+	valid := safe
+	valid.Domain = json.RawMessage(`"domain:Example"`)
+	if _, err := validateGraphQueryRequest(valid); err != nil {
+		t.Fatalf("valid Domain rejected: %v", err)
+	}
+	if _, err := validateGraphQueryRequest(safe); err != nil {
+		t.Fatalf("unscoped Graph rejected: %v", err)
+	}
+}
+
 func TestGraphSummaryProjectionAndValidation(t *testing.T) {
 	state := "commit/" + strings.Repeat("a", 64)
 	counters := `{"nodesCreated":1,"propertiesSet":2}`

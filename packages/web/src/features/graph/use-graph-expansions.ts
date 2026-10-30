@@ -22,6 +22,7 @@ export interface GraphNotice {
 interface ExpansionContext {
   reader: GraphReader | null;
   state: ResolvedState | null;
+  domain?: string | undefined;
   searching: boolean;
   getSources: () => GraphSources;
   update: (change: (sources: GraphSources) => GraphSources) => void;
@@ -92,7 +93,11 @@ export function useGraphExpansions(context: ExpansionContext) {
     membership(setFailures, id, false);
     context.onNotice(null);
     try {
-      const addition = await expandKnowledge(reader, state, id, controller.signal);
+      const scope =
+        context.domain === undefined
+          ? controller.signal
+          : { signal: controller.signal, domain: context.domain };
+      const addition = await expandKnowledge(reader, state, id, scope);
       if (controller.signal.aborted || requests.current.get(id) !== controller) return;
       context.update((current) => addExpansion(current, id, addition));
       const accepted = context.getSources().expansions.get(id);

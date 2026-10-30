@@ -1,32 +1,23 @@
 import type { Graph as G6Graph, GraphOptions } from "@antv/g6";
 
-import { priorityRadius } from "./graph-center-focus.js";
 import { attentionTier, edgeAttentionTier, graphAttention } from "./graph-attention.js";
 import { graphPalette, graphToG6 } from "./graph-g6-data.js";
 import type { GraphData } from "./graph-data.js";
 import { EMPTY_IDS, MAX_ZOOM, MIN_ZOOM } from "./graph-g6-geometry.js";
 import type { GraphSceneProps } from "./graph-g6-types.js";
 
-export function forceLayout(
-  reduced: boolean,
-  orderedIDs: readonly string[] = []
-): NonNullable<GraphOptions["layout"]> {
-  const ranks = new Map(orderedIDs.map((id, index) => [id, index]));
+export function forceLayout(reduced: boolean): NonNullable<GraphOptions["layout"]> {
   return {
     type: "d3-force",
     animation: !reduced,
-    iterations: 100,
-    link: { distance: 190, strength: 0.24 },
-    manyBody: { strength: -260 },
-    collide: { radius: 77, strength: 0.98 },
-    alphaDecay: 0.1,
-    center: { strength: 0.04 },
-    radial: {
-      x: 0,
-      y: 0,
-      strength: 0.16,
-      radius: (node) => priorityRadius(ranks.get(String(node["id"])) ?? orderedIDs.length)
-    }
+    iterations: 120,
+    // Stronger actual links keep related nodes nearby. No ranking-based radial
+    // force may pull a linked pair to opposite ends of the canvas.
+    link: { distance: 176, strength: 0.48 },
+    manyBody: { strength: -280 },
+    collide: { radius: 84, strength: 1 },
+    alphaDecay: 0.065,
+    center: { strength: 0.025 }
   };
 }
 
@@ -88,10 +79,7 @@ export function newGraphOptions({
         unreachable: { opacity: 0.1, lineWidth: 1.25, labelOpacity: 0.05 }
       }
     },
-    layout: forceLayout(
-      reduced,
-      props.data.nodes.map((node) => node.id)
-    ),
+    layout: forceLayout(reduced),
     behaviors: [],
     data: graphToG6({
       data: props.data,

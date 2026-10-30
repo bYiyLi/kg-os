@@ -8,12 +8,14 @@ export function GraphSearchStatus({
   data,
   routes,
   failed,
-  state
+  state,
+  domainLabel
 }: {
   data: GraphData;
   routes: SearchRoute[] | null;
   failed: boolean;
   state: ResolvedState | null;
+  domainLabel?: string | null;
 }) {
   const { t } = useTranslation();
   const pending = routes?.some((route) => route.status === "loading") ?? false;
@@ -74,6 +76,7 @@ export function GraphSearchStatus({
               );
             })}
           </div>
+          {typeof domainLabel === "string" && domainLabel !== "" && <small>{domainLabel}</small>}
           {state !== null && <small title={state}>{state.slice(7, 14)}</small>}
         </div>
       )}

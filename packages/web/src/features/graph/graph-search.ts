@@ -44,6 +44,7 @@ export interface KnowledgeSearchResult {
 export interface KnowledgeSearchOptions {
   signal: AbortSignal;
   onProgress?: (result: KnowledgeSearchResult) => void;
+  domain?: string | undefined;
 }
 
 interface RouteResult {
@@ -201,9 +202,14 @@ function routeResult(
   return { route: { kind, status, count: nodes.length, limited }, nodes };
 }
 
-async function keywordRoute(run: RunQuery, state: ResolvedState, query: string) {
+async function keywordRoute(run: RunQuery, state: ResolvedState, query: string, domain?: string) {
   const rows = await run({
-    request: { at: state, cypher: keywordQuery, params: { query, limit: SEARCH_LIMIT + 1 } },
+    request: {
+      at: state,
+      cypher: keywordQuery,
+      params: { query, limit: SEARCH_LIMIT + 1 },
+      ...(domain === undefined ? {} : { domain })
+    },
     columns: ["n"],
     rows: SEARCH_LIMIT + 1
   });
@@ -211,9 +217,18 @@ async function keywordRoute(run: RunQuery, state: ResolvedState, query: string) 
   return routeResult("keyword", nodes, "ok", rows.length > SEARCH_LIMIT);
 }
 
-async function recentRoute(run: RunQuery, state: ResolvedState): Promise<RouteResult> {
+async function recentRoute(
+  run: RunQuery,
+  state: ResolvedState,
+  domain?: string
+): Promise<RouteResult> {
   const rows = await run({
-    request: { at: state, cypher: recentQuery, params: { limit: RECENT_LIMIT + 1 } },
+    request: {
+      at: state,
+      cypher: recentQuery,
+      params: { limit: RECENT_LIMIT + 1 },
+      ...(domain === undefined ? {} : { domain })
+    },
     columns: ["n"],
     rows: RECENT_LIMIT + 1
   });
@@ -279,9 +294,14 @@ function distinctCandidates(items: GraphNode[]): Map<string, GraphNode> {
 
 async function indexedRoute(
   run: RunQuery,
-  input: { state: ResolvedState; query: string; kind: "fulltext" | "semantic" }
+  input: {
+    state: ResolvedState;
+    query: string;
+    kind: "fulltext" | "semantic";
+    domain?: string | undefined;
+  }
 ): Promise<RouteResult> {
-  const { kind, state, query } = input;
+  const { kind, state, query, domain } = input;
   const type = kind === "fulltext" ? "FULLTEXT" : "SEMANTIC";
   const catalog = await run({
     request: { at: state, cypher: indexQuery, params: { type } },
@@ -296,7 +316,8 @@ async function indexedRoute(
         request: {
           at: state,
           cypher: kind === "fulltext" ? fulltextQuery : semanticQuery,
-          params: { index, query, limit: SEARCH_LIMIT + 1 }
+          params: { index, query, limit: SEARCH_LIMIT + 1 },
+          ...(domain === undefined ? {} : { domain })
         },
         columns: ["node", "score"],
         rows: SEARCH_LIMIT + 1
@@ -356,7 +377,7 @@ export async function searchKnowledge(
   query: string,
   options: KnowledgeSearchOptions
 ): Promise<KnowledgeSearchResult> {
-  const { signal, onProgress } = options;
+  const { signal, onProgress, domain } = options;
   signal.throwIfAborted();
   const term = query.trim();
   const run = queryRunner(reader, signal);
@@ -364,10 +385,10 @@ export async function searchKnowledge(
     term === "" ? ["recent"] : ["recent", "keyword", "fulltext", "semantic"];
   const results = kinds.map((kind) => routeResult(kind, [], "loading"));
   const operations: Record<SearchRoute["kind"], () => Promise<RouteResult>> = {
-    recent: () => recentRoute(run, state),
-    keyword: () => keywordRoute(run, state, term),
-    fulltext: () => indexedRoute(run, { state, query: term, kind: "fulltext" }),
-    semantic: () => indexedRoute(run, { state, query: term, kind: "semantic" })
+    recent: () => recentRoute(run, state, domain),
+    keyword: () => keywordRoute(run, state, term, domain),
+    fulltext: () => indexedRoute(run, { state, query: term, kind: "fulltext", domain }),
+    semantic: () => indexedRoute(run, { state, query: term, kind: "semantic", domain })
   };
   await Promise.all(
     kinds.map(async (kind, index) => {
@@ -396,17 +417,29 @@ function validateNeighbor(row: JsonValue[], id: string) {
     invalidResponse();
 }
 
+type ScopedSignal = AbortSignal | { signal: AbortSignal; domain: string };
+
+function resolveSearchScope(scope: ScopedSignal) {
+  return "signal" in scope ? scope : { signal: scope, domain: undefined };
+}
+
 export async function expandKnowledge(
   reader: GraphReader,
   state: ResolvedState,
   id: string,
-  signal: AbortSignal
+  scope: ScopedSignal
 ): Promise<GraphData> {
+  const { signal, domain } = resolveSearchScope(scope);
   if (!/^n:(?:0|[1-9][0-9]{0,19})$/.test(id)) invalidResponse();
   const rows = await timedQuery(
     reader,
     {
-      request: { at: state, cypher: neighborQuery, params: { id, limit: NEIGHBOR_LIMIT + 1 } },
+      request: {
+        at: state,
+        cypher: neighborQuery,
+        params: { id, limit: NEIGHBOR_LIMIT + 1 },
+        ...(domain === undefined ? {} : { domain })
+      },
       columns: ["n", "r", "m"],
       rows: NEIGHBOR_LIMIT + 1
     },
@@ -451,8 +484,9 @@ export async function connectKnowledge(
   reader: GraphReader,
   state: ResolvedState,
   nodeIds: readonly string[],
-  signal: AbortSignal
+  scope: ScopedSignal
 ): Promise<GraphData> {
+  const { signal, domain } = resolveSearchScope(scope);
   signal.throwIfAborted();
   const ids = connectionSeeds(nodeIds);
   if (ids.size === 0) return emptyGraph();
@@ -460,7 +494,12 @@ export async function connectKnowledge(
   const rows = await timedQuery(
     reader,
     {
-      request: { at: state, cypher: connectQuery, params: { ids: [...ids], limit: limit + 1 } },
+      request: {
+        at: state,
+        cypher: connectQuery,
+        params: { ids: [...ids], limit: limit + 1 },
+        ...(domain === undefined ? {} : { domain })
+      },
       columns: ["a", "r", "b"],
       rows: limit + 1
     },

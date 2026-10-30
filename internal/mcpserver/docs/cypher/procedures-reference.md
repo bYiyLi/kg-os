@@ -1,6 +1,6 @@
 # KG OS Cypher 25 — Procedure Signatures
 
-This KG OS MCP reference includes **38 public Lithograph v0.3.3** procedures. `READ` and `WRITE` describe database operation classification; a WRITE does **not** necessarily create a Commit, and a READ can access configured external Providers. Call procedures inside `graph.query/execute`, not as JavaScript globals.
+This KG OS MCP reference includes **38 public Lithograph v0.3.4** procedures. `READ` and `WRITE` describe database operation classification; a WRITE does **not** necessarily create a Commit, and a READ can access configured external Providers. Call procedures inside `graph.query/execute`, not as JavaScript globals.
 
 | Signature                                                                                                                                                  | Mode  | Return columns                                                                |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------- |

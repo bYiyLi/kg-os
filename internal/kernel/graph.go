@@ -14,9 +14,11 @@ import (
 )
 
 type GraphQueryRequest struct {
-	At     string          `json:"at"`
-	Cypher string          `json:"cypher"`
-	Params json.RawMessage `json:"params,omitempty"`
+	At        string          `json:"at"`
+	Cypher    string          `json:"cypher"`
+	Params    json.RawMessage `json:"params,omitempty"`
+	Domain    json.RawMessage `json:"domain,omitempty"`
+	GraphView json.RawMessage `json:"graphView,omitempty"`
 }
 
 type GraphExecuteRequest struct {
@@ -63,10 +65,15 @@ func (service *Service) QueryGraph(ctx context.Context, request GraphQueryReques
 	if err != nil {
 		return GraphQueryResult{}, err
 	}
+	at, graphView, err := service.resolveGraphQueryScope(ctx, request)
+	if err != nil {
+		return GraphQueryResult{}, err
+	}
 	result, err := service.database.Query(ctx, lithograph.QueryRequest{
-		At:     request.At,
-		Cypher: request.Cypher,
-		Params: params,
+		At:        at,
+		Cypher:    request.Cypher,
+		Params:    params,
+		GraphView: graphView,
 	})
 	if err != nil {
 		return GraphQueryResult{}, graphPublicError(err)
@@ -139,11 +146,15 @@ func (service *Service) StreamGraphQuery(
 	if err != nil {
 		return err
 	}
+	at, graphView, err := service.resolveGraphQueryScope(ctx, request)
+	if err != nil {
+		return err
+	}
 	projector := &graphStreamProjector{}
 	var consumerErr error
 	_, err = service.database.StreamQuery(
 		ctx,
-		lithograph.QueryRequest{At: request.At, Cypher: request.Cypher, Params: params},
+		lithograph.QueryRequest{At: at, Cypher: request.Cypher, Params: params, GraphView: graphView},
 		func(state string, event lithograph.Event) error {
 			projected, projectErr := projector.projectQuery(state, event)
 			if projectErr != nil {
@@ -240,6 +251,19 @@ func validateGraphQueryRequest(request GraphQueryRequest) (json.RawMessage, erro
 	}
 	if !utf8.ValidString(request.Cypher) {
 		return nil, publicError(CodeParse, "Graph query Cypher must be valid UTF-8", nil)
+	}
+	if len(request.Domain) != 0 {
+		if len(request.GraphView) != 0 {
+			return nil, publicError(CodeInvalidArgument, "Graph query cannot combine domain and graphView", nil)
+		}
+		var name string
+		if json.Unmarshal(request.Domain, &name) != nil || name == "" {
+			return nil, publicError(CodeInvalidArgument, "Graph query domain must be a non-empty string", nil)
+		}
+		ref, err := ParseOntologyRef(name)
+		if err != nil || ref.Kind != KindDomain {
+			return nil, publicError(CodeInvalidArgument, "Graph query domain must be a canonical domain: Ref", err)
+		}
 	}
 	return validateGraphParams(request.Params)
 }

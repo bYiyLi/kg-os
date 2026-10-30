@@ -220,6 +220,16 @@ export interface PatchResult {
   transitions: RefTransition[];
 }
 
+/** Optional Lithograph v0.3.4 query-local Label visibility; not an access-control boundary. */
+export interface GraphViewSelector {
+  /** Node must have every required Label (AND). */
+  requireAllLabels?: string[];
+  /** Node must have at least one Label from this set (OR). */
+  requireAnyLabels?: string[];
+  /** Node must have none of these Labels (NOT). */
+  excludeAnyLabels?: string[];
+}
+
 /** Execute unchanged Cypher against one immutable State using a read-only connection. */
 export interface GraphQueryRequest {
   /** StateRef to resolve and pin for the entire read. Accepts commit/<id>, branch/<name>, or tag/<name>. */
@@ -228,6 +238,10 @@ export interface GraphQueryRequest {
   cypher: string;
   /** Optional JSON-compatible named Cypher parameters, referenced as $name in the query. */
   params?: JsonObject;
+  /** Select this Domain and all descendants' Node Definitions in the pinned State. Mutually exclusive with graphView. */
+  domain?: string;
+  /** Explicit query-local Label visibility. Mutually exclusive with domain; omitted means complete graph. */
+  graphView?: GraphViewSelector;
 }
 
 /** Execute unchanged Cypher on a Branch through a read/write connection. */

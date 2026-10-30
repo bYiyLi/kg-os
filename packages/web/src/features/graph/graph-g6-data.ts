@@ -2,17 +2,16 @@ import type { GraphData as G6Data } from "@antv/g6";
 
 import { nodeCaption } from "./graph-data.js";
 import type { GraphData, GraphNode, GraphRelationship } from "./graph-data.js";
+import type { GraphPoint } from "./graph-g6-types.js";
 import {
   attentionTier,
   edgeAttentionTier,
   graphAttention,
   readableNodeIds
 } from "./graph-attention.js";
+import { topologySeedPositions } from "./graph-topology-placement.js";
 
-export interface GraphPoint {
-  x: number;
-  y: number;
-}
+export type { GraphPoint } from "./graph-g6-types.js";
 
 export interface GraphPalette {
   node: [string, string, string, string];
@@ -34,34 +33,6 @@ function colorIndex(node: GraphNode): number {
 export function caption(node: GraphNode): string {
   const chars = Array.from(captionSegments.segment(nodeCaption(node)), (item) => item.segment);
   return chars.length > 30 ? chars.slice(0, 29).join("") + "…" : nodeCaption(node);
-}
-
-function angle(id: string): number {
-  let hash = 2166136261;
-  for (const char of id) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-  return ((hash >>> 0) / 4294967296) * Math.PI * 2;
-}
-
-function seed(
-  node: GraphNode,
-  index: number,
-  data: GraphData,
-  previous: ReadonlyMap<string, GraphPoint>
-): GraphPoint {
-  const anchors = data.relationships
-    .filter((edge) => edge.start === node.id || edge.end === node.id)
-    .map((edge) => previous.get(edge.start === node.id ? edge.end : edge.start))
-    .filter(
-      (point): point is GraphPoint =>
-        point !== undefined && Number.isFinite(point.x) && Number.isFinite(point.y)
-    );
-  const radius = anchors.length === 0 ? 62 * Math.sqrt(index + 1) : 105;
-  const theta = anchors.length === 0 ? index * 2.3999632297 : angle(node.id);
-  const center = anchors.reduce(
-    (sum, point) => ({ x: sum.x + point.x / anchors.length, y: sum.y + point.y / anchors.length }),
-    { x: 0, y: 0 }
-  );
-  return { x: center.x + radius * Math.cos(theta), y: center.y + radius * Math.sin(theta) };
 }
 
 export function graphPalette(element: Element): GraphPalette {
@@ -115,14 +86,11 @@ export function graphToG6({
 }: Projection): G6Data {
   const attention = graphAttention(data, selected);
   const labeled = readableNodeIds(data, selected);
+  const positions = topologySeedPositions(data, previous);
   const nodes = data.nodes
     .toSorted((a, b) => a.id.localeCompare(b.id))
-    .map((node, index) => {
-      const known = previous.get(node.id);
-      const point =
-        known !== undefined && Number.isFinite(known.x) && Number.isFinite(known.y)
-          ? known
-          : seed(node, index, data, previous);
+    .map((node) => {
+      const point = positions.get(node.id) ?? { x: 0, y: 0 };
       const fixed = pinned.has(node.id);
       const tier = attention.active ? attentionTier(attention.distances.get(node.id)) : null;
       return {

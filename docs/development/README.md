@@ -153,6 +153,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [28 Official Skills & Legacy kgos Retirement](phases/28-official-skill-roster.md) | `in_progress` | 当前四 Skill，真实 Plugin 安装、客户端验收与发布待完成 | [D115](../design/decisions.md#d115-unified-knowledge-lifecycle-skill)、[四 Skill 清单](../design/mcp.md#kgos-official-skills) |
 | [29 Web shadcn/ui Migration](phases/29-web-shadcn-ui.md) | `in_progress` | 组件迁移已实现，39 项 Web E2E 与本地视觉验收通过；整仓质量门禁及已有开发依赖审计问题见 Phase 29，未执行提交或部署 | [Web UI 体系](../design/web.md#通用-ui-组件体系) |
 | [32 知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md) | `in_progress` | 既有模型修复、Skill/MCP 引导与 Web 定向证据保留；六部分 Global AI Guidance 当前唯一正文按知识持续可用责任优化，状态情境与本地检查见阶段记录；跨连接客户端、恢复全矩阵及最终 CI 仍待完整验收 | [D111](../design/decisions.md#d111-task-scoped-knowledge-loading)、[D112](../design/decisions.md#d112-global-ai-guidance-and-daily-responsibility)、[MCP 日常职责](../design/mcp.md#global-ai-guidance-and-daily-responsibility)、既有 Ontology/Graph/Evolution 合同 |
+| [33 Domain 范围检索与 AI SDK](phases/33-domain-scoped-search.md) | `in_progress` | Lithograph v0.3.4 Graph View OR → Kernel Domain 解析 → SDK/MCP 只读 Scope → Web 四路搜索与探索，严格 Scope 错误/历史与空 Domain；本地/远端验收区分 | [Graph Scope](../design/graph.md#read-only-graph-view-与-domain-范围lithograph-v034)、[Web Domain 搜索](../design/web.md#domain-选择与-graph-view-的-ui-范围) |
 
 独立改进阶段：[Phase 32：知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md)（`in_progress`）。模型扩展、初始化指导、名称/Message 引导、检索与登录主题已取得源码或隔离验证证据；跨环境客户端与整体验收仍待继续，且与Phase 25/27/28原有验收分开。
 

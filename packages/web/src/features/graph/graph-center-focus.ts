@@ -3,11 +3,6 @@
 const NODE_DIAMETER = 32;
 const NODE_LABEL_SIZE = 12;
 
-export function priorityRadius(rank: number): number {
-  // Large search results occupy a navigable graph, never a single crammed screen.
-  return 80 + 52 * Math.sqrt(Math.max(0, rank));
-}
-
 export function centerFocusScale(x: number, y: number, width: number, height: number): number {
   if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return 1;
   const radius = Math.max(140, Math.min(width, height) * 0.48);

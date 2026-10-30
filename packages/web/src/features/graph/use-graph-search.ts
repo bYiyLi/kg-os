@@ -14,6 +14,7 @@ interface SearchTask {
 interface SearchContext {
   reader: GraphReader | null;
   state: ResolvedState | null;
+  domain?: string | undefined;
   setBusy: (busy: boolean) => void;
   setSeeds: (seed: GraphData) => void;
   getSeeds: () => GraphData;
@@ -80,11 +81,15 @@ export function useGraphSearch(context: SearchContext) {
     const { reader, state } = context;
     if (reader === null || state === null || seed.nodes.length === 0) return;
     try {
+      const scope =
+        context.domain === undefined
+          ? active.controller.signal
+          : { signal: active.controller.signal, domain: context.domain };
       const links = await connectKnowledge(
         reader,
         state,
         seed.nodes.map((node) => node.id),
-        active.controller.signal
+        scope
       );
       if (!task.current(active)) return;
       context.setSeeds(mergeGraph(seed, links));
@@ -108,6 +113,7 @@ export function useGraphSearch(context: SearchContext) {
       };
       const result = await searchKnowledge(reader, state, query.trim(), {
         signal: active.controller.signal,
+        domain: context.domain,
         onProgress: publish
       });
       if (!task.current(active)) return;

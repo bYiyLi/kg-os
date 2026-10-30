@@ -108,6 +108,13 @@ function useSidebarLayout(dialogs: ReturnType<typeof useWorkspaceDialogs>) {
   };
 }
 
+function selectedDomainLabel(navigation: ReturnType<typeof useWorldNavigation>): string | null {
+  const selected = navigation.selected;
+  if (selected === null) return null;
+  const node = navigation.tree?.nodes.get(selected.ref);
+  return node?.title ?? node?.name ?? selected.ref;
+}
+
 export function WorkspaceShell({
   children,
   canvasChildren,
@@ -154,6 +161,8 @@ export function WorkspaceShell({
         <KnowledgeCanvas
           reader={graphReader ?? connection?.client.graph ?? null}
           state={history.selectedCommit as ResolvedState | null}
+          domain={navigation.selected?.ref ?? null}
+          domainLabel={selectedDomainLabel(navigation)}
           blocked={
             authenticationRequired ||
             dialogs.settingsOpen ||
