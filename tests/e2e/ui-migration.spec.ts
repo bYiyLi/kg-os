@@ -32,6 +32,23 @@ async function vectorStep(page: Page) {
   await page.locator("#setup-dimensions").fill("1536");
 }
 
+// Playwright may scroll the overflow-hidden setup page to reach controls.
+// Compare footer layout relative to that page, not viewport coordinates.
+async function footerLayoutBox(page: Page) {
+  return page.locator(".setup-footer").evaluate((element) => {
+    const setupPage = element.closest<HTMLElement>(".setup-page");
+    if (setupPage === null) throw new Error("Missing setup page");
+    const footer = element.getBoundingClientRect();
+    const container = setupPage.getBoundingClientRect();
+    return {
+      x: footer.x - container.x + setupPage.scrollLeft,
+      y: footer.y - container.y + setupPage.scrollTop,
+      width: footer.width,
+      height: footer.height
+    };
+  });
+}
+
 test("Toast retains live language/theme, dismisses success, and never shifts the footer", async ({
   page
 }) => {
@@ -46,7 +63,7 @@ test("Toast retains live language/theme, dismisses success, and never shifts the
     await pending;
     await route.fulfill({ json: { ok: true, dimensions: 1536 } });
   });
-  const footer = await page.locator(".setup-footer").boundingBox();
+  const footer = await footerLayoutBox(page);
   await page.getByRole("button", { name: "Test connection", exact: true }).click();
   const toast = page.locator(activeToast);
   await expect(toast).toHaveAttribute("data-type", "loading");
@@ -59,7 +76,7 @@ test("Toast retains live language/theme, dismisses success, and never shifts the
   finish?.();
   await expect(toast).toHaveAttribute("data-type", "success");
   await expect(toast).toContainText("1536");
-  expect(await page.locator(".setup-footer").boundingBox()).toEqual(footer);
+  expect(await footerLayoutBox(page)).toEqual(footer);
   await expect(toast).toHaveCount(0, { timeout: 6000 });
   expect(probes).toBe(1);
   await expect(page.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
