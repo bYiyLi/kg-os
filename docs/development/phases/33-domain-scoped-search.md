@@ -34,3 +34,12 @@
 - **工作区与交付**：仓库仍保留另一并行任务已有的图布局未提交变更（未清理或覆盖）；本次只改 KG OS 仓库与本地开发文档，未修改 Lithograph 源码；**未提交、未推送、未发布、未部署、未执行公开 CI 或正式 Docker 端到端验证**。Phase 33 仍维持 `in_progress`，最终状态以尚未完成的门禁、Review 和后续授权的远端结果为准。
 
 2026-10-31，**v0.3.11 发布前本地复验**：已同步 Go buildinfo、`@kgos/sdk` / CLI / Web 工作区版本、Plugin Manifest、唯一 AI 安装指南和双语安装模板；公开分发生成器从正式源模板成功预渲染，四份官方 Skill 在发布导出时自动标注 `0.3.11`，旧版本快照未改。`pnpm validate` 的 Go 常规测试、全包 `-race` 与原生 Go 语句覆盖率 **90.3%** 已通过；首次 TypeScript 阶段发现 CLI/SDK 两个历史 `0.3.10` 断言，已更新到 `0.3.11`。随后分别复验 `pnpm test:coverage` **81 文件全通过、分支覆盖率 90.05%**，TypeScript 类型检查、全仓 lint、严格类型覆盖率 **99.77%**、重复代码 0、未使用代码、许可证、npm 审计 high 门槛、diff 检查及完整 Playwright **81/81** 均通过。Rust 许可证检查一次因临时命令 PATH 未找到已安装 Cargo 失败，恢复工具链 PATH 后完整通过；**尚未将修正后的所有门禁重新作为单条 `pnpm validate` 执行**，正式 Ubuntu CI 必须独立按同一源码 SHA 执行完整门禁。此处只记录本地证据，不冒充已提交、远端 CI 或正式 Release。
+
+## 发行与后续质量记录（2026-10-31）
+
+- KG OS **v0.3.11** 已使用源码 Commit `d08121978f8e4ceeb315cac88848e4f55e7228bc` 创建并推送私有、公开同名 Tag；[公开 main CI](https://github.com/bYiyLi/kg-releases/actions/runs/41091970913) 2/2 通过。
+- [正式 Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.11) 已发布：Linux amd64 镜像 `ghcr.io/byiyli/kgos:v0.3.11@sha256:9013d25df8f6dea770020addbe5c519e08dc0add219ffa238aa8c32e865e7123`，匿名 GHCR HEAD 200 和 digest 比对通过；三份安装指南 SHA256、Plugin ZIP 内四个官方 Skill、唯一 INSTALL.md 与同版指南逐字节一致。
+- [Tag 级 Release CI](https://github.com/bYiyLi/kg-releases/actions/runs/41094352097/attempts/2) 第一次尝试中完整源码校验失败，Docker 成功；第二次原 SHA 的重跑三个 Job（源代码、Docker、镜像发布）全部成功。首次失败的具体子阶段在公开工作流中已脱敏，不能虚构根因。
+- 此后在同一源码的本地完整 `pnpm validate` 重验中观察到 **2 个间歇性 Playwright 失败**：真实节点点击后详情面板未出现，以及 G6 画布 15 秒内未上报 `data-ready=true`；此前同一组浏览器测试 81/81 通过。Trace 未见 G6 初始化异常，但不足以排除真实 UI 时序问题。应作为下一轮图谱交互可靠性修复，不以一次成功重跑证明该问题已消失。
+- 官方 KGHub 中英文固定手册、AI 指南与最新版目录在本次发行后按正式 Release 下载资源归档，历史版本保留；官网完成情况以实际构建、Git 同步和 Pages 发布结果为准。
+- 本 Phase 保持 `in_progress`：v0.3.11 的正式发行不自动证明真实 ChatGPT 账户已经安装新 Plugin，也不是生产实例部署或服务升级。
