@@ -11,8 +11,11 @@ import type {
 
 import { emptyGraph, mergeGraph, projectGraph } from "./graph-data.js";
 import type { GraphData, GraphNode } from "./graph-data.js";
+import { enrichRelatedKnowledge, validateNeighbor } from "./graph-related.js";
+import { distinctCandidates, rankLists } from "./graph-ranking.js";
 import {
   connectQuery,
+  fulltextBatchQuery,
   fulltextQuery,
   INDEX_LIMIT,
   indexQuery,
@@ -22,6 +25,7 @@ import {
   RECENT_LIMIT,
   recentQuery,
   SEARCH_LIMIT,
+  semanticBatchQuery,
   semanticQuery
 } from "./graph-queries.js";
 
@@ -30,7 +34,7 @@ export interface GraphReader {
 }
 
 export interface SearchRoute {
-  kind: "recent" | "keyword" | "fulltext" | "semantic";
+  kind: "recent" | "keyword" | "fulltext" | "semantic" | "related";
   status: "loading" | "ok" | "unconfigured" | "error";
   count: number;
   limited: boolean;
@@ -255,43 +259,6 @@ function indexNames(rows: JsonValue[][], type: string): string[] {
   return [...names];
 }
 
-// Reciprocal ranks keep unrelated BM25 and semantic score scales apart. Within
-// a route each real index supplies a ranked list; routes then get equal weight.
-function rankLists(lists: GraphNode[][]): GraphNode[] {
-  const scores = new Map<string, number>();
-  const all = lists.flat();
-  const nodes = distinctCandidates(all);
-  for (const list of lists) {
-    const seen = new Set<string>();
-    for (const [index, node] of list.entries()) {
-      if (seen.has(node.id)) continue;
-      seen.add(node.id);
-      scores.set(node.id, (scores.get(node.id) ?? 0) + 1 / (60 + index + 1));
-    }
-  }
-  return [...nodes.values()].sort((left, right) => {
-    const delta = (scores.get(right.id) ?? 0) - (scores.get(left.id) ?? 0);
-    if (delta !== 0) return delta;
-    return left.id < right.id ? -1 : Number(left.id > right.id);
-  });
-}
-
-function distinctCandidates(items: GraphNode[]): Map<string, GraphNode> {
-  const nodes = new Map<string, GraphNode>();
-  for (const node of items) {
-    const previous = nodes.get(node.id);
-    if (previous !== undefined) {
-      // Validate duplicates even beyond the visible graph's 200-node budget.
-      mergeGraph(
-        { nodes: [previous], relationships: [], limited: false },
-        { nodes: [node], relationships: [], limited: false }
-      );
-    }
-    nodes.set(node.id, node);
-  }
-  return nodes;
-}
-
 async function indexedRoute(
   run: RunQuery,
   input: {
@@ -310,32 +277,71 @@ async function indexedRoute(
   });
   const names = indexNames(catalog, type).slice(0, INDEX_LIMIT);
   if (names.length === 0) return routeResult(kind, [], "unconfigured");
-  const outcomes = await Promise.allSettled(
-    names.map(async (index) => {
-      const rows = await run({
-        request: {
-          at: state,
-          cypher: kind === "fulltext" ? fulltextQuery : semanticQuery,
-          params: { index, query, limit: SEARCH_LIMIT + 1 },
-          ...(domain === undefined ? {} : { domain })
-        },
-        columns: ["node", "score"],
-        rows: SEARCH_LIMIT + 1
-      });
+  async function singleIndex(index: string) {
+    const rows = await run({
+      request: {
+        at: state,
+        cypher: kind === "fulltext" ? fulltextQuery : semanticQuery,
+        params: { index, query, limit: SEARCH_LIMIT + 1 },
+        ...(domain === undefined ? {} : { domain })
+      },
+      columns: ["node", "score"],
+      rows: SEARCH_LIMIT + 1
+    });
+    return {
+      nodes: nodesFromRows(rows.slice(0, SEARCH_LIMIT), true),
+      overflow: rows.length > SEARCH_LIMIT
+    };
+  }
+
+  let succeeded: { nodes: GraphNode[]; overflow: boolean }[];
+  let failed = false;
+  try {
+    const rows = await run({
+      request: {
+        at: state,
+        cypher: kind === "fulltext" ? fulltextBatchQuery : semanticBatchQuery,
+        params: { indexes: names, query, limit: SEARCH_LIMIT + 1 },
+        ...(domain === undefined ? {} : { domain })
+      },
+      columns: ["indexName", "node", "score"],
+      rows: names.length * (SEARCH_LIMIT + 1)
+    });
+    const byIndex = new Map(names.map((name) => [name, [] as JsonValue[][]]));
+    for (const row of rows) {
+      const name = row[0];
+      if (typeof name !== "string" || !byIndex.has(name)) invalidResponse();
+      byIndex.get(name)?.push([row[1] as JsonValue, row[2] as JsonValue]);
+    }
+    succeeded = names.map((name) => {
+      const hits = byIndex.get(name);
+      if (hits === undefined || hits.length > SEARCH_LIMIT + 1) invalidResponse();
       return {
-        nodes: nodesFromRows(rows.slice(0, SEARCH_LIMIT), true),
-        overflow: rows.length > SEARCH_LIMIT
+        nodes: nodesFromRows(hits.slice(0, SEARCH_LIMIT), true),
+        overflow: hits.length > SEARCH_LIMIT
       };
-    })
-  );
-  const succeeded = outcomes.filter((outcome) => outcome.status === "fulfilled");
-  const ranked = rankLists(succeeded.map((outcome) => outcome.value.nodes));
-  const failed = succeeded.length !== names.length;
+    });
+  } catch (error) {
+    // A broken individual index must not hide results from the others. This
+    // bounded fallback is used only if the normal one-request batch fails.
+    if (
+      error instanceof Error &&
+      (error.message === "Invalid knowledge search response" ||
+        error.message === "Knowledge search response budget exceeded")
+    )
+      throw error;
+    const outcomes = await Promise.allSettled(names.map(singleIndex));
+    succeeded = outcomes.flatMap((outcome) =>
+      outcome.status === "fulfilled" ? [outcome.value] : []
+    );
+    failed = succeeded.length !== names.length;
+  }
+  const ranked = rankLists(succeeded.map((outcome) => outcome.nodes));
   const limited =
     failed ||
     catalog.length > INDEX_LIMIT ||
     ranked.length > SEARCH_LIMIT ||
-    succeeded.some((outcome) => outcome.value.overflow);
+    succeeded.some((outcome) => outcome.overflow);
   return routeResult(kind, ranked.slice(0, SEARCH_LIMIT), failed ? "error" : "ok", limited);
 }
 
@@ -355,7 +361,8 @@ async function protectRoute(
 }
 
 function combinedResults(results: RouteResult[]): KnowledgeSearchResult {
-  // "Recent" guarantees breadth but must never vote in relevance scoring.
+  // Empty-search browsing uses recent nodes. Keyword searches contain only
+  // actual retrieval candidates; related nodes are added separately.
   const ranked = rankLists(
     results.filter((result) => result.route.kind !== "recent").map((result) => result.nodes)
   );
@@ -381,10 +388,10 @@ export async function searchKnowledge(
   signal.throwIfAborted();
   const term = query.trim();
   const run = queryRunner(reader, signal);
-  const kinds: SearchRoute["kind"][] =
-    term === "" ? ["recent"] : ["recent", "keyword", "fulltext", "semantic"];
+  const kinds: ("recent" | "keyword" | "fulltext" | "semantic")[] =
+    term === "" ? ["recent"] : ["keyword", "fulltext", "semantic"];
   const results = kinds.map((kind) => routeResult(kind, [], "loading"));
-  const operations: Record<SearchRoute["kind"], () => Promise<RouteResult>> = {
+  const operations: Record<(typeof kinds)[number], () => Promise<RouteResult>> = {
     recent: () => recentRoute(run, state, domain),
     keyword: () => keywordRoute(run, state, term, domain),
     fulltext: () => indexedRoute(run, { state, query: term, kind: "fulltext", domain }),
@@ -398,23 +405,37 @@ export async function searchKnowledge(
     })
   );
   signal.throwIfAborted();
-  return combinedResults(results);
-}
-
-function validateNeighbor(row: JsonValue[], id: string) {
-  const [source, relationship, target] = row;
-  if (!tagged(source, "Node") || !tagged(relationship, "Relationship") || !tagged(target, "Node"))
-    invalidResponse();
-  const data = projectGraph([row]);
-  for (const node of data.nodes) assertKnowledgeNode(node);
-  const edge = data.relationships[0];
-  if (source["elementId"] !== id || edge === undefined) invalidResponse();
-  const neighbor = target["elementId"];
-  if (!(
-    (edge.start === id && edge.end === neighbor) ||
-    (edge.end === id && edge.start === neighbor)
-  ))
-    invalidResponse();
+  const candidates = combinedResults(results);
+  if (term === "") return candidates;
+  onProgress?.({
+    ...candidates,
+    routes: [...candidates.routes, { kind: "related", status: "loading", count: 0, limited: false }]
+  });
+  const related = await enrichRelatedKnowledge({
+    run,
+    state,
+    seeds: candidates.data,
+    signal,
+    domain,
+    connect: (ids) =>
+      connectKnowledge(reader, state, ids, domain === undefined ? signal : { signal, domain })
+  });
+  signal.throwIfAborted();
+  const data = mergeGraph(candidates.data, related.data);
+  const enriched: KnowledgeSearchResult = {
+    data: { ...data, limited: data.limited || related.failed },
+    routes: [
+      ...candidates.routes,
+      {
+        kind: "related",
+        status: related.failed ? "error" : "ok",
+        count: data.nodes.length - candidates.data.nodes.length,
+        limited: related.data.limited || related.failed
+      }
+    ]
+  };
+  onProgress?.(enriched);
+  return enriched;
 }
 
 type ScopedSignal = AbortSignal | { signal: AbortSignal; domain: string };

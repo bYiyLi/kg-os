@@ -17,7 +17,7 @@ function addition(ref: string, content: string[]): string {
   ].join("\n");
 }
 
-test("selecting a Domain scopes the real four-route graph search and resets to Branch", async ({
+test("selecting a Domain scopes search and related enrichment and resets to Branch", async ({
   page,
   request
 }) => {
@@ -82,6 +82,8 @@ test("selecting a Domain scopes the real four-route graph search and resets to B
     await search.fill("needle");
     await search.press("Enter");
     await expect(status.locator('[data-status="ok"]')).toHaveCount(4);
+    await expect(status).not.toContainText("Recent");
+    await expect(status).toContainText("Related");
     const candidates = graphReads.filter(
       (item) =>
         item.cypher.includes("queryNodes") ||
@@ -91,6 +93,11 @@ test("selecting a Domain scopes the real four-route graph search and resets to B
     expect(
       candidates
         .filter((item) => item.cypher.includes("queryNodes"))
+        .every((item) => item.domain === "domain:ScopedParent")
+    ).toBe(true);
+    expect(
+      graphReads
+        .filter((item) => item.cypher.includes("UNWIND $seeds"))
         .every((item) => item.domain === "domain:ScopedParent")
     ).toBe(true);
     expect(

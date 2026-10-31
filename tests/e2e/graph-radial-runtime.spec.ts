@@ -10,9 +10,9 @@ test.use({
 });
 test.setTimeout(120_000);
 
-// When a search already shows 200 entries, its actual backend neighbors
-// still have room to appear in the same visible graph, not just in a response.
-test("expands a real off-screen neighbor in a ring without hiding search seeds", async ({
+// Recent browsing may show 200 unconnected entries. Manual expansion still
+// reads a real neighbor without evicting or fabricating any of those entries.
+test("expands a real off-screen neighbor in a ring without hiding 200 recent entries", async ({
   page,
   request
 }) => {
@@ -36,7 +36,23 @@ test("expands a real off-screen neighbor in a ring without hiding search seeds",
       }
     });
     expect(write.ok(), await write.text()).toBe(true);
-    const result = (await write.json()) as { state: string };
+    const connect = await request.post(runtime.endpoint + "/api/v1/graph/execute", {
+      headers: { Authorization: "Bearer " + runtime.token },
+      data: {
+        branch: "main",
+        message: "Add a newest entry connected to an older, off-screen node",
+        cypher:
+          "MATCH (old) WHERE elementId(old)=$neighborId " +
+          "CREATE (focus:GraphDoc {key:'recent-focus',title:'Recent Focus'})-[:LINK]->(old) " +
+          "RETURN elementId(focus) AS id",
+        params: { neighborId: runtime.neighborId }
+      }
+    });
+    expect(connect.ok(), await connect.text()).toBe(true);
+    const result = (await connect.json()) as { state: string; rows: string[][] };
+    const focusId = result.rows[0]?.[0];
+    if (focusId === undefined) throw new Error("Test fixture omitted focus node identity");
+    expect(focusId).toMatch(/^n:/);
     const reads: { at: string; params: { id: string; limit: number } }[] = [];
     page.on("request", (outgoing) => {
       if (!outgoing.url().endsWith("/api/v1/graph/query")) return;
@@ -49,13 +65,10 @@ test("expands a real off-screen neighbor in a ring without hiding search seeds",
     });
 
     await signInGraph(page, runtime);
-    const search = page.getByRole("searchbox", { name: "Search knowledge", exact: true });
-    await search.fill("needle");
-    await search.press("Enter");
-    await expect(page.locator('.graph-route-status [data-status="ok"]')).toHaveCount(4);
+    await expect(page.locator(".graph-route-status")).toContainText("200 recent nodes");
     await expect(page.locator(".graph-node")).toHaveCount(200);
-    await expect(page.locator(".graph-relationship")).toHaveCount(1);
-    const origin = page.locator('[data-node-id="' + runtime.targetId + '"]');
+    await expect(page.locator(".graph-relationship")).toHaveCount(0);
+    const origin = page.locator('[data-node-id="' + focusId + '"]');
     const neighbor = page.locator('[data-node-id="' + runtime.neighborId + '"]');
     await expect(origin).toHaveCount(1);
     await expect(neighbor).toHaveCount(0);
@@ -67,7 +80,7 @@ test("expands a real off-screen neighbor in a ring without hiding search seeds",
     await expect.poll(() => reads.length).toBe(1);
     expect(reads[0]).toMatchObject({
       at: result.state,
-      params: { id: runtime.targetId, limit: 26 }
+      params: { id: focusId, limit: 26 }
     });
     await expect(origin).toHaveAttribute("aria-expanded", "true");
     await expect(neighbor).toHaveCount(1, { timeout: 30_000 });

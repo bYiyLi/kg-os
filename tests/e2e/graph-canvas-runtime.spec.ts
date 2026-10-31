@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { graphCamera, nodeCenter } from "./graph-g6-geometry.js";
+import { graphCamera } from "./graph-g6-geometry.js";
 
 // cspell:words haspopup
 
@@ -8,7 +8,7 @@ import { createGraphRuntime, signInGraph } from "./graph-runtime.js";
 test.use({ colorScheme: "light", reducedMotion: "reduce" });
 test.setTimeout(90000);
 
-test("searches four real routes, deduplicates and explores parallel edges and a self-loop", async ({
+test("searches three real channels, enriches linked nodes, and explores parallel edges", async ({
   page,
   request
 }) => {
@@ -24,10 +24,11 @@ test("searches four real routes, deduplicates and explores parallel edges and a 
     await search.fill("needle");
     await search.press("Enter");
     const routes = page.locator(".graph-route-status");
-    await expect(routes).toContainText("Recent");
+    await expect(routes).not.toContainText("Recent");
     await expect(routes).toContainText("Keyword");
     await expect(routes).toContainText("Full-text");
     await expect(routes).toContainText("Semantic");
+    await expect(routes).toContainText("Related");
     await expect(routes.locator('[data-status="ok"]')).toHaveCount(4);
     const target = page.locator('[data-graph-id="' + runtime.targetId + '"]');
     await expect(target).toHaveCount(1);
@@ -39,7 +40,10 @@ test("searches four real routes, deduplicates and explores parallel edges and a 
     await expect(page.locator('[data-graph-id="' + runtime.neighborId + '"]')).toHaveCount(1);
     await expect(page.getByRole("button", { name: /Related insight, node / })).toBeVisible();
     expect(runtime.providerRequests()).toBeGreaterThan(0);
-    expect(requests.some((query) => query.cypher.includes("size(elementId(n)) DESC"))).toBe(true);
+    expect(
+      requests.filter((query) => query.cypher.includes("size(elementId(n)) DESC"))
+    ).toHaveLength(1);
+    expect(requests.some((query) => query.cypher.includes("UNWIND $seeds"))).toBe(true);
     expect(requests.some((query) => query.cypher.includes("keys(n)"))).toBe(true);
     expect(requests.some((query) => query.cypher.includes("db.index.fulltext.queryNodes"))).toBe(
       true
@@ -49,8 +53,10 @@ test("searches four real routes, deduplicates and explores parallel edges and a 
     );
     expect(requests.some((query) => query.cypher.includes("elementId(a) IN $ids"))).toBe(true);
     expect(requests.every((query) => query.at === runtime.latestState)).toBe(true);
-    const selected = await nodeCenter(target);
-    await page.mouse.click(selected.x, selected.y);
+    // Use the graph's keyboard selection proxy: a moving force-layout node
+    // can shift between measuring its center and dispatching a pointer click.
+    await target.focus();
+    await target.press("Enter");
     const details = page.getByRole("complementary", { name: "Object details", exact: true });
     await expect(details).toContainText("Needle report");
     await expect(details).toContainText("needle semantic text");

@@ -5,7 +5,7 @@ import { createGraphRuntime, signInGraph } from "./graph-runtime.js";
 test.use({ colorScheme: "light", reducedMotion: "reduce" });
 test.setTimeout(90_000);
 
-test("shows recent knowledge automatically, searches with four routes and returns to recent", async ({
+test("browses recent knowledge, searches three channels with related enrichment, and returns to recent", async ({
   page,
   request
 }) => {
@@ -23,22 +23,30 @@ test("shows recent knowledge automatically, searches with four routes and return
     await expect(status.locator("span")).toHaveCount(1);
     await expect(status).toContainText("3 recent nodes");
     await expect(page.locator(".graph-node")).toHaveCount(3);
+    await expect(page.locator(".graph-relationship")).toHaveCount(3);
     expect(reads.some((item) => item.cypher.includes("size(elementId(n)) DESC"))).toBe(true);
     expect(reads.some((item) => item.cypher.includes("db.index.semantic.queryNodes"))).toBe(false);
 
+    const beforeSearch = reads.length;
     const search = page.getByRole("searchbox", { name: "Search knowledge", exact: true });
     await search.fill("needle");
     await search.press("Enter");
     await expect(status.locator('[data-status="ok"]')).toHaveCount(4);
-    await expect(status).toContainText("Recent");
+    await expect(status).not.toContainText("Recent");
     await expect(status).toContainText("Keyword");
     await expect(status).toContainText("Full-text");
     await expect(status).toContainText("Semantic");
+    await expect(status).toContainText("Related");
     await expect(page.locator(".graph-node")).toHaveCount(3);
     expect(reads.every((item) => item.at === runtime.latestState)).toBe(true);
-    expect(
-      reads.filter((item) => item.cypher.includes("size(elementId(n)) DESC")).length
-    ).toBeGreaterThanOrEqual(2);
+    expect(reads.filter((item) => item.cypher.includes("size(elementId(n)) DESC"))).toHaveLength(1);
+    expect(reads.filter((item) => item.cypher.includes("UNWIND $indexes"))).toHaveLength(2);
+    expect(reads.filter((item) => item.cypher.includes("UNWIND $seeds"))).toHaveLength(2);
+    const searchReads = reads.slice(beforeSearch);
+    expect(searchReads).toHaveLength(8);
+    expect(searchReads.every((item) => !item.cypher.includes("size(elementId(n)) DESC"))).toBe(
+      true
+    );
 
     await page.getByRole("button", { name: "Show recent knowledge", exact: true }).click();
     await expect(search).toHaveValue("");

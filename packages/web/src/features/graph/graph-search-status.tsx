@@ -20,13 +20,16 @@ export function GraphSearchStatus({
   const { t } = useTranslation();
   const pending = routes?.some((route) => route.status === "loading") ?? false;
   const partial = routes?.some((route) => route.status === "error") ?? false;
-  const searchRoutes = routes?.filter((route) => route.kind !== "recent") ?? [];
+  const searchRoutes =
+    routes?.filter((route) => route.kind !== "recent" && route.kind !== "related") ?? [];
   const noMatches =
     searchRoutes.length > 0 && !pending && searchRoutes.every((route) => route.count === 0);
   const unsuccessful =
     routes !== null &&
     !pending &&
-    routes.every((route) => route.status !== "ok" && route.count === 0);
+    (searchRoutes.length > 0 ? searchRoutes : routes).every(
+      (route) => route.status !== "ok" && route.count === 0
+    );
   const emptyKnowledge =
     routes?.length === 1 &&
     routes[0]?.kind === "recent" &&
@@ -34,7 +37,6 @@ export function GraphSearchStatus({
     routes[0].count === 0;
   let emptyMessage = "graph.noMatches";
   if (partial) emptyMessage = "graph.emptyPartial";
-  if (data.nodes.length > 0) emptyMessage = "graph.noMatchesRecent";
   return (
     <>
       {(failed || unsuccessful) && (
@@ -65,7 +67,9 @@ export function GraphSearchStatus({
             {routes.map((route) => {
               let description = t("graph.routeStatus." + route.status);
               if (route.status === "ok") {
-                const key = route.kind === "recent" ? "graph.recentCount" : "graph.routeCount";
+                let key = "graph.routeCount";
+                if (route.kind === "recent") key = "graph.recentCount";
+                if (route.kind === "related") key = "graph.relatedCount";
                 description = t(key, { count: route.count });
               }
               return (

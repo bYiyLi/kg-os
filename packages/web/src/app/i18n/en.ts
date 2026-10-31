@@ -310,19 +310,25 @@ export const en = {
     search: "Search knowledge",
     searchPlaceholder: "Search knowledge…",
     searchHint:
-      "Recent knowledge is always loaded. Press Enter to search keywords, full-text and semantics.",
+      "Empty search shows recent knowledge. Press Enter to search keywords, full-text and semantics.",
     searching: "Searching knowledge…",
     clearSearch: "Show recent knowledge",
     cancelSearch: "Cancel search and show recent knowledge",
     searchFailed: "Knowledge search could not be completed. Try searching again.",
     noMatches: "No matching nodes were returned.",
-    noMatchesRecent: "No matching nodes. Showing recent knowledge instead.",
     emptyKnowledge: "This version has no knowledge nodes yet.",
     emptyPartial: "No nodes were returned. Some search sources are unavailable.",
     shown: "Showing {{nodes}} nodes · {{relationships}} relationships",
     routeCount: "{{count}} matches",
+    relatedCount: "{{count}} nodes added",
     recentCount: "{{count}} recent nodes",
-    route: { recent: "Recent", keyword: "Keyword", fulltext: "Full-text", semantic: "Semantic" },
+    route: {
+      recent: "Recent",
+      keyword: "Keyword",
+      fulltext: "Full-text",
+      semantic: "Semantic",
+      related: "Related"
+    },
     routeStatus: {
       loading: "Searching…",
       unconfigured: "No index configured",

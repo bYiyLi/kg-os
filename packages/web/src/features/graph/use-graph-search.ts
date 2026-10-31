@@ -118,7 +118,9 @@ export function useGraphSearch(context: SearchContext) {
       });
       if (!task.current(active)) return;
       publish(result);
-      await linkSeeds(active, result.data);
+      // Keyword searches already enrich and connect in bounded batches.
+      // Recent-only browsing still needs the original one-request linking.
+      if (query.trim() === "") await linkSeeds(active, result.data);
     } catch {
       if (task.current(active)) {
         task.cancel();

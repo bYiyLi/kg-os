@@ -331,7 +331,7 @@ it("shows finished route data and pending route state before the combined search
   expect(host.textContent).not.toContain(i18n.t("graph.routeStatus.loading"));
 });
 
-it("connects the final search seeds without requiring one expansion per result", async () => {
+it("renders connected search results without issuing a redundant relationship query", async () => {
   const found = result("n:1", "First object");
   found.data.nodes.push(...result("n:2", "Second object").data.nodes);
   found.routes = found.routes.map((route) => ({
@@ -342,16 +342,10 @@ it("connects the final search seeds without requiring one expansion per result",
     ...found.data,
     relationships: [{ id: "r:1", start: "n:1", end: "n:2", type: "RELATED", properties: {} }]
   };
-  vi.mocked(searchKnowledge).mockResolvedValue(found);
-  vi.mocked(connectKnowledge).mockResolvedValue(connected);
+  vi.mocked(searchKnowledge).mockResolvedValue({ ...found, data: connected });
   render();
   await search("example");
-  expect(connectKnowledge).toHaveBeenCalledWith(
-    reader,
-    state,
-    ["n:1", "n:2"],
-    expect.any(AbortSignal)
-  );
+  expect(connectKnowledge).not.toHaveBeenCalled();
   expect(host.textContent).toContain(i18n.t("graph.shown", { nodes: 2, relationships: 1 }));
   expect(host.textContent).toContain(i18n.t("graph.gestureHint"));
   expect(expandKnowledge).not.toHaveBeenCalled();

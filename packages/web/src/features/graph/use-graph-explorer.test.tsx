@@ -154,25 +154,25 @@ it("a failed combined search stops late progress and marks pending routes unavai
   expect(connectKnowledge).not.toHaveBeenCalled();
 });
 
-it("joins real relationships between the returned search nodes at the same pinned State", async () => {
-  vi.mocked(connectKnowledge).mockResolvedValue(linked("n:1", "n:2"));
-  await seed(mergeGraph(graph("n:1"), graph("n:2")));
-  expect(connectKnowledge).toHaveBeenCalledWith(
-    reader,
-    state,
-    ["n:1", "n:2"],
-    expect.any(AbortSignal)
-  );
+it("uses real relationships already included with ranked keyword results without another request", async () => {
+  await seed(linked("n:1", "n:2"));
+  expect(connectKnowledge).not.toHaveBeenCalled();
   expect(explorer.data.relationships.map((edge) => edge.id)).toEqual(["r:1"]);
   expect(explorer.linksFailed).toBe(false);
   expect(explorer.busy).toBe(false);
 });
 
-it("keeps matching nodes when seed connections fail and retries only those connections", async () => {
+it("keeps recent browsing nodes when their connection read fails and retries only those connections", async () => {
   vi.mocked(connectKnowledge)
     .mockRejectedValueOnce(new Error("Unavailable"))
     .mockResolvedValueOnce(linked("n:1", "n:2"));
-  await seed(mergeGraph(graph("n:1"), graph("n:2")));
+  vi.mocked(searchKnowledge).mockResolvedValue({
+    data: mergeGraph(graph("n:1"), graph("n:2")),
+    routes: [{ kind: "recent", status: "ok", count: 2, limited: false }]
+  });
+  await act(async () => {
+    await explorer.search("");
+  });
   expect(explorer.linksFailed).toBe(true);
   expect(explorer.failed).toBe(false);
   expect(explorer.data.nodes).toHaveLength(2);
@@ -185,16 +185,19 @@ it("keeps matching nodes when seed connections fail and retries only those conne
   expect(connectKnowledge).toHaveBeenCalledTimes(2);
 });
 
-it("a new search aborts late seed connections instead of merging them into the next scene", async () => {
+it("a new search aborts late recent connections instead of merging them into the next scene", async () => {
   const firstLinks = pending<GraphData>();
   vi.mocked(connectKnowledge)
     .mockReturnValueOnce(firstLinks.promise)
     .mockResolvedValue(emptyGraph());
   vi.mocked(searchKnowledge)
-    .mockResolvedValueOnce(result(graph("n:1")))
+    .mockResolvedValueOnce({
+      data: graph("n:1"),
+      routes: [{ kind: "recent", status: "ok", count: 1, limited: false }]
+    })
     .mockResolvedValueOnce(result(graph("n:3")));
   act(() => {
-    void explorer.search("first");
+    void explorer.search("");
   });
   await act(async () => {
     await Promise.resolve();
