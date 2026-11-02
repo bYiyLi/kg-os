@@ -2,11 +2,45 @@
 
 <!-- cspell:words testdata SKOS CIDOC pypdf Diátaxis Persistant Presential -->
 
-## D121：基础本体资料与质量规范增量（2026-11-02）
+<a id="d122-remote-foundation-navigation"></a>
 
-**状态：`in_progress`**。本增量按 [D121](../../design/decisions.md#d121-bundled-foundations-and-quality-review) 和 [MCP owner](../../design/mcp.md#ontology-standards-authoring) 实施，交付一个 draft PR，经结果 Review 后交用户人工 Review。以下当前增量替代旧记录中关于独立模型库入口及本增量案例/行为验收的安排；历史证据不重写，不据此关闭整个 Phase 27 或 Phase 25/28。
+## D122：基础本体原文引用与渐进加载（2026-11-02）
 
-| 内部步骤 | 交付与依赖 | 当前结果 |
+**状态：`in_progress`**。按用户最新决定和 [D122](../../design/decisions.md#d122-remote-foundation-navigation)，在同一 draft PR #2 将整套原件内置改为固定原文导航。D121 的身份建模、知识质量规范、必要案例、旧业务模型库退出及 VLog 本仓维护继续有效；以下 D121 包体与检查记录标为历史，不作为当前资源合同。
+
+| 范围 | 当前交付与检查边界 |
+| --- | --- |
+| 五套理论导航 | BFO/UFO/DOLCE/SUMO/GFO 按真实原始结构及文件功能说明版本、用途、读取条件、范围与准确固定 URL；最新发现分开，理论/权限缺口保留 |
+| 渐进读取 | 主 Skill 关键路由 → 通用方法 → 所选理论目录/文件 → 必要章节/依赖；依据足够停止，不要求全量五套，不用预设问题穷举封闭路由 |
+| 资料退出 | 删除本 PR 新增的上游原件/全文转换、逐文件目录与清单、专用 hash 检查及 Native 分发/体积例外；沿用原 Markdown 分发合同，Git 历史保留 |
+| 保留内容 | 独立 KG OS 适配、问题驱动建模、条件明确的小案例与 Knowledge 的视角/结构/简洁/准确/必要完整性/独立理解/用途规范；不恢复旧库发现或生成维护 |
+| 结果 Review | 源树/原文读取、固定路径/版本/IRI 对应、许可范围、指令密度/职责、资源/分发及 diff 的静态检查；GitHub 独立 Review 与人工 Review 仍待完成 |
+
+Acceptance：固定原文的定义、公理、指南、案例和依赖可按用途定位；读取失败、GitHub 大文件空内容、格式限制及受限资料有准确处理边界；不把阅读定位写成运行时导入，不重新依赖失效 GFO catalog。文档与分发合同不再声称当前含 553 原件/17 转换。必要案例说明前提、理由和边界，完整上游例按索引读取。无额外 Skill、Kernel/模型语义引擎、生产修改或发布。
+
+本轮已实际读取开发规范助手的 prompt-authoring-spec、skill-authoring-spec 及 context/examples、resource-layering、contract-validation 等相关正文，按必要性、职责、条件路由和信息密度审查；不由文字自洽声称模型行为已实测。
+
+### 当前检查证据
+
+实施基线为 `99812bfd2b648171efbb76d29dc744cded7e615b`；以下为本轮工作树的实际证据，不沿用历史整包检查称本轮通过。交付 head/base 及最终候选归档以同一 draft PR 的实际记录为准。
+
+- **原文/路径**：八个来源固定 Git 树核对 101 处文件/目录链接（96 个不同定位）；GitHub 实际读取关键 README 的 blob 与本地固定树一致。MILO 的 Contents 返回空内容，按固定 blob `5dcace648603db93bf0febb6281b1b9d21a70fc2` 成功读取正文。DOLCE D18、GFO 两版 Part I 及 gUFO 论文版本页已直接核读其版本/范围入口，不据此声称全文语义已审完。
+- **阅读依赖与语义**：只解析 17 份固定本体模块元数据，5 条 import IRI 有固定阅读定位；GFO 全部 11 个现行模块 identifier 与导航一致，失效根 catalog 明确披露。按原 base 修正 Persistant 为 Universal 子类、由 Presential 实例化的适配表述，未运行推理/证明。
+- **资源与保留范围**：Ontology 仅 10 份 Markdown 资源且条件路由可达，四 Skill 清单保持不变。Knowledge 主规范/质量参考、VLog 三份 Markdown、原有建模案例及全局引导与基线逐字节一致；本次未改其语义或执行案例。删除 583 个原件包专用文件，普通分发/大小/格式规则恢复至 PR base。
+- **实际静态检查**：`pnpm lint`、目标 Markdown（117 份）、新增导航及相关 Skill/方法的定向 Prettier/CSpell、本地文档 849 条路径/锚点、五个 Go 元数据/资源合同、两项确定性分发/版本检查及 `git diff --check` 通过。分发检查覆盖四 Skill、实际 Markdown 清单、原文包退出及源码测试排除，不调用知识库或模型。
+- **读取限制**：SUMO 官网与 UFO 2005 博士论文 PDF 本轮浏览返回 403，出版页/固定仓库可读；未绕过、未把不可读当不存在或已读全文，依赖相应正文的结论保持受限。理论未公开/实现子集、出版物权限、目标宿主外部读取/加载及模型行为仍各有边界；静态检查不能证明未来原文持续可用。
+
+未执行查询、案例、行为模型评测、任务模拟、证明器、生产例子、额外模型 API、Docker/Dev 或远程 CI；未进行账户 Plugin 安装、合并、发布或部署。独立 GitHub Review 及用户人工 Review 尚未完成。
+
+<a id="d121基础本体资料与质量规范增量2026-11-02"></a>
+
+## D121 历史方案及检查记录
+
+下节对应此前内置原件方案及其修订，最晚基线为 [`99812bfd2b648171efbb76d29dc744cded7e615b`](https://github.com/bYiyLi/kg-os/tree/99812bfd2b648171efbb76d29dc744cded7e615b)。其中原件数量、路径、清单、命令和候选产物只在该历史版本成立，D122 已删除其当前态资源及专用检查。历史证据保留，不证明远程原文的新导航、当前包体或宿主读取已通过。
+
+**历史实施状态：`in_progress`**。此前增量按 [D121](../../design/decisions.md#d121-bundled-foundations-and-quality-review) 和 [MCP owner](../../design/mcp.md#ontology-standards-authoring) 实施，交付一个 draft PR，经结果 Review 后交用户人工 Review。该历史增量当时替代旧记录中关于独立模型库入口及本增量案例/行为验收的安排；历史证据不重写，不据此关闭整个 Phase 27 或 Phase 25/28。
+
+| 内部步骤 | 交付与依赖 | 当时结果 |
 | --- | --- | --- |
 | 来源与许可 | 五套理论逐项核对；固定版本/Commit，明确原件、公理、实现、指南、案例、依赖及缺口 | 固定清单及取证完成，保留实际理论/许可缺口 |
 | 规范改造 | 语义身份先于字段；知识内容、证据、视角及维护过程分工；四 Skill 边界 | 源码已改，含一手内容方法适配及具体 Review 判据 |
@@ -27,7 +61,7 @@ Acceptance：
 
 Review 检查完整收录范围、原文忠实与可读转换、概念身份/关系成立条件、资源路径与第三方许可、职责/指令冲突、描述密度与视角、旧库迁移及恢复；静态 Review 不证明模型行为改进。
 
-### 本增量的检查与 Review 证据
+### 历史检查与 Review 证据
 
 证据对应本任务工作分支的 D121 改动，基线为 `ac85628985e66860ed28f82a0f5cec9ba4c3d09a`，不是该基线已包含新资料。交付 Commit、head/base 与独立 GitHub Review 结论以实际 draft PR 为准。
 
@@ -39,7 +73,7 @@ Review 检查完整收录范围、原文忠实与可读转换、概念身份/关
 
 恢复与旧库处理见 [维护指南](../../guide/ontology-sources.md)。源码/资料分发检查与未来真实宿主或整阶段门禁分开，不以本增量关闭整个 Phase 27。
 
-### 独立 GitHub Review 修订（Review 仍在进行）
+### 历史 GitHub Review 修订
 
 对 draft PR #2 初版 `6638a1fcc1640c209fbfa241bbc1e7b6f042e6b6` 的三项发现作针对性修正：
 

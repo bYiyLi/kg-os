@@ -7,7 +7,6 @@ const task = process.argv[2];
 const taskCommands = {
   lint: [
     ["check:docs"],
-    ["check:ontology-sources"],
     ["exec", "eslint", ".", "--max-warnings", "0"],
     ["exec", "prettier", "--check", ".", "--ignore-unknown"],
     ["check:imports"],

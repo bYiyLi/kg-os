@@ -1,5 +1,0 @@
-name = "gufoevents"
-defaultTargets = ["GufoEvents"]
-
-[[lean_lib]]
-name = "GufoEvents"

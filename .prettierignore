@@ -7,8 +7,6 @@ playwright-report
 test-results
 .cache
 artifacts
-plugins/kgos/skills/kgos-ontology-standards/references/upstream/**
-plugins/kgos/skills/kgos-ontology-standards/references/readable/**
 pnpm-lock.yaml
 docs/**/*.md
 *.md

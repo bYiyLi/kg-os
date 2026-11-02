@@ -10,7 +10,3 @@
 *.dylib binary
 *.so binary
 *.dll binary
-
-# Preserve immutable ontology source bytes and extracted source formatting.
-plugins/kgos/skills/kgos-ontology-standards/references/upstream/** -text -whitespace
-plugins/kgos/skills/kgos-ontology-standards/references/readable/** -text -whitespace

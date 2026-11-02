@@ -20,7 +20,7 @@ A commercial license may provide alternative terms for proprietary products, ser
 
 Commercial terms are granted only through a separate written agreement. This document does not itself grant a commercial license or modify the AGPL.
 
-Bundled third-party ontology originals and full-text conversions retain their own licenses and attribution requirements; a KG OS commercial license does not replace those terms. The Ontology Skill includes the applicable `references/third-party-notices.md`.
+External ontology materials linked by the Ontology Skill remain subject to their authors’ and publishers’ terms. A KG OS commercial license does not grant rights to copy or redistribute those materials; source and scope notes accompany each theory reference.
 
 For commercial licensing inquiries, contact the project owner through the KG OS GitHub repository.
 
@@ -32,7 +32,7 @@ The software licenses do not grant trademark rights in the KG OS name, logos, or
 
 KG OS 采用双许可模式。
 
-随包第三方本体原件及完整文本转换保留其自身许可和署名要求，KG OS 商业许可不替代这些条款；具体声明随 Ontology Skill 的 `references/third-party-notices.md` 提供。
+Ontology Skill 所引用的外部本体资料仍受原作者/出版方条款约束。KG OS 商业许可不授予其复制或再分发权；各理论参考分别标明来源及适用边界。
 
 ### 开源许可
 

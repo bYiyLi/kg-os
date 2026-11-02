@@ -1,24 +1,58 @@
-# UFO：身份、类型与关系的使用路径
+# UFO：原始资料族与 KG OS 适配
 
-这里的材料分别是作者 FOL 形式化、gUFO 轻量实现和事件扩展；它们不等于完整 UFO-A/B/C。版本、许可和缺口分别见 [形式化目录](../source-index/ufo-formalization.md)、[gUFO 目录](../source-index/gufo.md)、[事件扩展目录](../source-index/gufoevents.md) 及 [论文目录](../source-index/gufo-paper.md)。本文件为独立 KG OS 适配。
+<!-- cspell:words TPTP sortality CLIF João Almeida Giancarlo Guizzardi Tiago Falbo SHACL gufo subkind sortal -->
 
-## 选择与读取
+UFO 参考理论、作者 FOL 形式化、gUFO 轻量实现及 gUFOevents 事件扩展分别导航；它们不能合称完整 UFO-A/B/C。本页是 KG OS 独立适配，原文按 [通用方法](../foundations.md#渐进读取方法) 选读。
 
-- 需要原始类型、身份、刚性、sortality、依赖或 relator 的形式约束时，读取 [作者形式化报告](../upstream/ufo-formalization/formalization.pdf) 的对应节与 `src/axioms/` 的同主题 TPTP 原件；[逐页全文](../readable/ufo-formalization/formalization.pdf.md) 辅助定位。CLIF 和旧版材料另列，不默认合并。
-- 需要实际轻量建模方法时，读完整 [gUFO usage guide](../upstream/gufo/docs/overview.md) 的相关章节和 [gUFO 完整声明/注释](../upstream/gufo/gufo.ttl)。需要区别理论与实现时，读 [gUFO 论文原件](../upstream/gufo-paper/2603.20948v1.pdf) 的对应章节或 [逐页全文](../readable/gufo-paper/2603.20948v1.pdf.md)。
-- gUFO 示例的 HTTPS 导入别名与本地文件的 HTTP ontology identifier 不同；离线读取按 `sources.json` 的 `importAliases` 对应到 `upstream/gufo/gufo.ttl`，不改写原件或依赖在线重定向。需要应用对照时，从 [七例入口](../upstream/gufo/examples/README.md) 选择同类问题：类型、部分、性质、relator、事件、situation、高阶类型；读该例的完整教程和 `ontology.ttl`，不是只看标题。
-- 需要显式表达创建、终止、重分类或性质变化时，再读 [gUFOevents 完整指南](../upstream/gufoevents/docs/overview.md)、[完整声明](../upstream/gufoevents/gufoevents.ttl) 及 [八例说明](../upstream/gufoevents/examples/README.md)。它依赖包内 gUFO 1.0.0；event-sourcing、SHACL、TPTP、Lean 是分开的扩展/检查材料，不因读取而执行。
+## 原参考理论的出版入口
 
-## 决定对象与类型
+[Guizzardi 2005 博士论文出版记录](https://research.utwente.nl/en/publications/ontological-foundations-for-structural-conceptual-models/) 标明结构概念建模的理论、方法、指南与设计模式来源，并给出 [最终出版 PDF](https://research.utwente.nl/files/6042428/thesis_Guizzardi.pdf)。需要原参考理论或其方法依据时，按该版本的目录及相关章节读取；该论文的结构建模范围不代表后来全部 UFO-A/B/C。出版页/下载入口可定位不等于宿主已能读取正文，无法访问时按通用边界报告，不以摘要代替所需原文，也不假定拥有再分发许可。
 
-先确定谁承担同一对象的持续身份，再判断分类是本质性的、可变的、依赖关系的还是跨种类的。依据所选原件区分 kind、subkind、phase、role、category、mixin/roleMixin；不要把这些词直接变成通用固定字段，也不要将所有分类降为任意字符串。
+## 作者 FOL 形式化
 
-例如 Person 与 Employee 可有相同存储字段，但雇员资格依赖任职关系且可失去；这种成员条件与人的持续身份不同。是否用单一 Person Definition 加任职关系、独立 Employment relator，或有明确约束的独立角色表达，应由业务问题、所选理论承诺和 KG OS 实际能力决定；不能因字段相同而直接合并，也不能因名称不同机械拆型。
+固定 Commit `2da0df377b42bb89599ba9dca3a9ef88bf86ccfc`；作者及 [MIT 许可](https://github.com/unibz-core/ufo-formalization/blob/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/LICENSE) 见 [README](https://github.com/unibz-core/ufo-formalization/blob/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/README.md)。内嵌 gUFO 材料仍按其原通知使用。
 
-关系需要区分形式关系与有基础的物质关系、relator 及其参与者。relator 有独立身份/依赖、多个参与者或需关联证明时，不能仅压成无身份的边属性。事件、situation 和在某时适用的分类也不能互当别名。
+| 原始位置                                                                                                                                                                                                                                                                                                                                                           | 文件作用与读取条件                                                                        | 范围                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [formalization.pdf](https://github.com/unibz-core/ufo-formalization/blob/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/formalization.pdf)、[formalization.tex](https://github.com/unibz-core/ufo-formalization/blob/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/formalization.tex)                                                                                         | 原定义/形式化报告，先按目录定位相应概念及公理编号；公式用 PDF 或 LaTeX 源核对             | 报告实际覆盖的理论，不是全部 UFO 社会/意向理论                     |
+| [src/axioms/](https://github.com/unibz-core/ufo-formalization/tree/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/src/axioms)                                                                                                                                                                                                                                            | 按编号主题核对 TPTP 公理：分类、实例化、刚性/sortality、依赖、moment、relator、quality 等 | 遇到未明谓词沿同主题定义及前置模块补读；不只抽一个结论公式         |
+| [src/axioms-clif/](https://github.com/unibz-core/ufo-formalization/tree/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/src/axioms-clif)、[src/axioms-owl/](https://github.com/unibz-core/ufo-formalization/tree/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/src/axioms-owl)                                                                                                 | 需要比较表示或 gUFO 翻译时读                                                              | 是此固定树中的表示/历史实现，不默认为另一个 gUFO 版本的替代        |
+| [src/instances/](https://github.com/unibz-core/ufo-formalization/tree/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/src/instances)、[src/conjectures/](https://github.com/unibz-core/ufo-formalization/tree/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/src/conjectures)                                                                                                   | 需要理解原理论的模型输入或待证命题时对照相应编号主题                                      | 不是现实业务实例或本轮证明证据，不执行求解器                       |
+| [diagrams/](https://github.com/unibz-core/ufo-formalization/tree/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/diagrams)、[model/](https://github.com/unibz-core/ufo-formalization/tree/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/model)、[references.bib](https://github.com/unibz-core/ufo-formalization/blob/2da0df377b42bb89599ba9dca3a9ef88bf86ccfc/references.bib) | 图式、模型源及进一步原始文献定位                                                          | 旧 `ufo_2021`/older 文件不与报告公理自动拼接；外部论文权限逐项确认 |
 
-## KG OS 映射与结果 Review
+## gUFO 轻量实现与使用资料
 
-原类型/实例层次、刚性或高阶分类不会自动成为 KG OS Label 的语义。只对本次需要的对象、类型/分类实例和有据关系选择 Definition/Node/Relationship；按原件承诺明确分类成立条件和持续身份。不能靠多贴 Label 声称数据库已保证 anti-rigidity、sortal identity、existential dependence 或 mediation 的全部公理。
+固定 Commit `fa89632534a72dd0ce82f62051cc52b5417150dd`，gUFO 1.0.0。João Paulo A. Almeida、Giancarlo Guizzardi、Tiago Prince Sales、Ricardo A. Falbo；原 [CC BY 4.0 许可](https://github.com/nemo-ufes/gufo/blob/fa89632534a72dd0ce82f62051cc52b5417150dd/LICENSE)。它取 UFO-A 的子集及极少 UFO-B 支持，不能代替完整参考理论。
 
-分别审查原约束的表达与执行：基本属性类型/必填/业务唯一键可交当前数据库合同，其余跨对象、时间、modal 和高阶条件需要具体查询/应用检查或标为未实现。完整 UFO-C 社会/意向理论不在所收子包范围，需要该部分时报告依赖缺口，不把 gUFO 的局部支持冒充完整理论。
+| 原始位置                                                                                                                                                                                                                        | 文件作用与读取条件                                                                                                           | 范围                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [README](https://github.com/nemo-ufes/gufo/blob/fa89632534a72dd0ce82f62051cc52b5417150dd/README.md)、[gufo.ttl](https://github.com/nemo-ufes/gufo/blob/fa89632534a72dd0ce82f62051cc52b5417150dd/gufo.ttl)                       | 实现选择、完整术语注释和 OWL 声明；核对使用指南背后的实际语义                                                                | 原 ontology identifier 为 HTTP；名称相同不证明全部理论约束已被编码              |
+| [docs/overview.md](https://github.com/nemo-ufes/gufo/blob/fa89632534a72dd0ce82f62051cc52b5417150dd/docs/overview.md)                                                                                                            | 使用指南：§1 使用场景，§2 individuals/部分/性质/modes/事件/situations，§3 类型及高阶类型；按所需章节读                       | 指南结构是导航，不要求每次顺序读完；遇前置概念再补相关节                        |
+| [docs/index.html](https://github.com/nemo-ufes/gufo/blob/fa89632534a72dd0ce82f62051cc52b5417150dd/docs/index.html)                                                                                                              | 指南与术语参考的完整生成文档，需要查注释/图示时使用合适浏览格式                                                              | GitHub 文件页可能只显示 HTML 源；不能假定宿主已渲染                             |
+| [examples/README.md](https://github.com/nemo-ufes/gufo/blob/fa89632534a72dd0ce82f62051cc52b5417150dd/examples/README.md)、[examples/](https://github.com/nemo-ufes/gufo/tree/fa89632534a72dd0ce82f62051cc52b5417150dd/examples) | 七例的正式目录：类型、部分、性质、relator、事件、situation、高阶类型；选择相关例的 `index.html` 教程及 `ontology.ttl` 一起读 | 例 1/7 的 invalid 对照展示 OWL 与 SHACL 覆盖差别；不是所有 KG OS 模型的强制做法 |
+| [examples/common/](https://github.com/nemo-ufes/gufo/tree/fa89632534a72dd0ce82f62051cc52b5417150dd/examples/common)                                                                                                             | 原共用 shapes 及说明；只有依赖其检查规则的结论才补读                                                                         | 上游工具/验证报告不构成 KG OS 运行保证或执行授权                                |
+| [gUFO 论文 v1](https://arxiv.org/abs/2603.20948v1)、[PDF](https://arxiv.org/pdf/2603.20948v1)                                                                                                                                   | 2026-03-21 版本，解释理论与实现取舍；需要比较边界时读相关节和图                                                              | 论文自有许可见版本页，不是完整 UFO-A/B/C 形式化                                 |
+
+## gUFOevents 事件扩展
+
+固定 Commit `b1701ba51521131f7c98565c1c9fa9133de1b92a`，1.0.0；João Paulo A. Almeida、Giancarlo Guizzardi，原 [CC BY 4.0 许可](https://github.com/nemo-ufes/gufoevents/blob/b1701ba51521131f7c98565c1c9fa9133de1b92a/LICENSE)。仅在需要更明确的创建、终止、重分类或变化等事件表达时加载。
+
+| 原始位置                                                                                                                                                                                                                                    | 文件作用与读取条件                                                                                        | 范围与依赖                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [README](https://github.com/nemo-ufes/gufoevents/blob/b1701ba51521131f7c98565c1c9fa9133de1b92a/README.md)、[gufoevents.ttl](https://github.com/nemo-ufes/gufoevents/blob/b1701ba51521131f7c98565c1c9fa9133de1b92a/gufoevents.ttl)           | 扩展目标与完整声明                                                                                        | 导入 `http://purl.org/nemo/gufo#/1.0.0`，阅读定位到上面的固定 `gufo.ttl`       |
+| [docs/overview.md](https://github.com/nemo-ufes/gufoevents/blob/b1701ba51521131f7c98565c1c9fa9133de1b92a/docs/overview.md)                                                                                                                  | §2 事件/achievement，§3 simple achievement，§4 complex achievement，§5 时间/endurant/situation，§6 完整例 | 按所用事件语义选读，再补实际前置概念                                           |
+| [examples/README.md](https://github.com/nemo-ufes/gufoevents/blob/b1701ba51521131f7c98565c1c9fa9133de1b92a/examples/README.md)、[examples/](https://github.com/nemo-ufes/gufoevents/tree/b1701ba51521131f7c98565c1c9fa9133de1b92a/examples) | 八个完整 Turtle 例及其教学依赖，涵盖生命周期、部分/构成变化、relator、转换及事件日志                      | 需前例概念时补读，不将示例全部执行；OWL 已编码约束和未编码条件由原说明分别核对 |
+| [event-sourcing/](https://github.com/nemo-ufes/gufoevents/tree/b1701ba51521131f7c98565c1c9fa9133de1b92a/event-sourcing)                                                                                                                     | 事件日志方案的原 shapes、投影查询及 README，采用该方案时再读                                              | 不自动成为 KG OS 的存储/不可变审计模型                                         |
+| [tptp/](https://github.com/nemo-ufes/gufoevents/tree/b1701ba51521131f7c98565c1c9fa9133de1b92a/tptp)、[lean/](https://github.com/nemo-ufes/gufoevents/tree/b1701ba51521131f7c98565c1c9fa9133de1b92a/lean)                                    | 需要审查原形式化/证明主张时查目录及 README                                                                | 原作者工具与证明材料只作资料，读取不授予运行权限                               |
+
+gUFO 示例的 HTTPS 导入 `https://purl.org/nemo/gufo#` 也可定位到固定 [gufo.ttl](https://github.com/nemo-ufes/gufo/blob/fa89632534a72dd0ce82f62051cc52b5417150dd/gufo.ttl) 阅读；它保留 HTTP ontology identifier。这是 IRI 到原文的阅读对应，不是 KG OS import 配置。
+
+最新发现分别从 [作者形式化仓库](https://github.com/unibz-core/ufo-formalization)、[gUFO 仓库](https://github.com/nemo-ufes/gufo)、[gUFOevents 仓库](https://github.com/nemo-ufes/gufoevents)、[论文版本页](https://arxiv.org/abs/2603.20948) 进入。完整 UFO-C、其他未公开或出版方限制的书籍/论文仍可能缺失；参考目录和出版物链接不等于已读全文或有再分发许可。
+
+## 身份、类型与 KG OS 映射
+
+先确定谁承担持续身份，再判断成员资格是本质性的、可变的、依赖关系的还是跨种类的，按原定义区分 kind、subkind、phase、role、category、mixin 等。它们不是一套可直接套用的数据库字段，也不能统统降为任意字符串。
+
+合成例：Person 与 Employee 字段可以相同，但雇员资格可失去并依赖任职关系，人的身份可以持续。若任务只需任职起止，可用 Person 与任职关联；若雇佣承诺、多个参与者及证据需独立引用，可考虑 Employment relator。选择取决于实际身份需求、理论承诺及 KG OS 能力；不是所有角色都必须建 relator，也不能因字段相同忽略成员条件。
+
+relator、形式/物质关系、参与者、事件和 situation 按所选原文分别分析。原类型/实例层次、刚性、sortal identity、modal 或高阶约束不会因贴 Label 自动执行。Review 将其映射到 Definition/Knowledge/真实边，并分别列明数据库、查询、应用取证及未实现部分，不用 gUFO 子集冒充整个 UFO。

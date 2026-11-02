@@ -1,22 +1,28 @@
-# BFO：选择原件并形成 KG OS 模型
+# BFO：原始结构与 KG OS 适配
 
-固定来源、许可和完整文件表见 [BFO 原件目录](../source-index/bfo-2020.md)。以下是 KG OS 适配，不能替代 BFO 原定义或公理。
+<!-- cspell:words CLIF axiomatization atemporal SPARQL -->
 
-## 选择与读取
+阅读基线：BFO-2020，Commit `bd1fb61c5fa4e358fc9690f0d214b1ac63fae594`。原作者与 [CC BY 4.0 声明](https://github.com/BFO-ontology/BFO-2020/blob/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/README.md) 见固定 README；本页为 KG OS 独立导航与适配，不替代原定义或公理。读取与补读规则见 [通用入口](../foundations.md#渐进读取方法)。
 
-- 确认采用 BFO 2020 的具体版本及 core/atemporal/temporalized profile。先读 [原目录说明](../upstream/bfo-2020/21838-2/README.md) 和 [OWL 说明](../upstream/bfo-2020/21838-2/owl/README.md)，再读取所选完整 [core Turtle](../upstream/bfo-2020/21838-2/owl/bfo-core.ttl) 或 [RDF/XML](../upstream/bfo-2020/21838-2/owl/bfo-core.owl)。同一语义的多种语法不是多个要一起导入的模型。
-- 要判断原始公理、依赖或时间关系时，从 [CLIF 说明](../upstream/bfo-2020/21838-2/common-logic/README.md) 选择相关子理论；不能从 core OWL 推断全部一阶承诺。具体路径均在原件目录的 axiom-or-model 类中。
-- 要选择时间化关系时，读 [时间扩展原始说明](<../upstream/bfo-2020/21838-2/owl/profiles/temporal extensions/README.md>) 及其所选 OWL/CLIF，不默认把扩展或 `contrib` 当核心。
-- 要了解原方法的实际应用，读完整 [案例 PDF](<../upstream/bfo-2020/documentation/user guides/ontology developer guide/Basic Formal Ontology Case Studies.pdf>) 的相关案例；[全文逐页提取](<../readable/bfo-2020/documentation/user guides/ontology developer guide/Basic Formal Ontology Case Studies.pdf.md>) 可辅助定位，图与公式回到原件核对。
+## 固定原文结构
 
-## 身份与关系判断
+| 原始位置                                                                                                                                                                                                                                                                                                                                                                                 | 文件作用与读取条件                                              | 范围与依赖                                                                                            |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [README](https://github.com/BFO-ontology/BFO-2020/blob/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/README.md)、[21838-2/README](https://github.com/BFO-ontology/BFO-2020/blob/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/21838-2/README.md)                                                                                                                                                   | 核对实现层次、版本与逻辑强度；首次采用该基线或变体不明时读      | OWL 是比 CLIF/Prover9 弱的近似，core 不是全部一阶理论                                                 |
+| [owl/README](https://github.com/BFO-ontology/BFO-2020/blob/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/21838-2/owl/README.md)、[bfo-core.ttl](https://github.com/BFO-ontology/BFO-2020/blob/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/21838-2/owl/bfo-core.ttl)                                                                                                                              | 查类、关系、原始定义与注释，以及 OWL 表达的公理                 | 同目录 `.owl`、`.ofn` 是另外语法；按可用格式选择，不作为不同理论合并                                  |
+| [common-logic/README](https://github.com/BFO-ontology/BFO-2020/blob/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/21838-2/common-logic/README.md) 与 [子理论目录](https://github.com/BFO-ontology/BFO-2020/tree/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/21838-2/common-logic)                                                                                                                | 核对身份、依赖、部分、参与、空间/时间等原公理时，按主题文件补读 | 模块共享 universal declaration，相关声明/前提要一并理解；profiles/contributions 和 release notes 分开 |
+| [prover9/](https://github.com/BFO-ontology/BFO-2020/tree/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/21838-2/prover9)、[model/model.cl](https://github.com/BFO-ontology/BFO-2020/blob/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/21838-2/model/model.cl)                                                                                                                                      | 需要另一形式化表示或理解所提供模型时读                          | 是形式材料，不因文件存在就认定本轮证明或 KG OS 推理通过                                               |
+| [documentation/axiomatization-pds/](https://github.com/BFO-ontology/BFO-2020/tree/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/documentation/axiomatization-pds)                                                                                                                                                                                                                             | 按相同子理论阅读公理 PDF，公式排版影响解释时用合适原件格式      | 目录实际拼写为 `axiomatization-pds`；与 CLIF/Prover9 对照，不以文本提取代替公式                       |
+| [Basic Formal Ontology Case Studies.pdf](https://github.com/BFO-ontology/BFO-2020/blob/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/documentation/user%20guides/ontology%20developer%20guide/Basic%20Formal%20Ontology%20Case%20Studies.pdf)                                                                                                                                                 | 需要原方法的应用和设计依据时，按 PDF 目录选相关完整案例         | README 将部分 user guides 标为 planned；此案例文件不证明全套教程已完成                                |
+| [owl/profiles/](https://github.com/BFO-ontology/BFO-2020/tree/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/21838-2/owl/profiles)、[common-logic/profiles/](https://github.com/BFO-ontology/BFO-2020/tree/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/21838-2/common-logic/profiles)、[contrib/](https://github.com/BFO-ontology/BFO-2020/tree/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/contrib) | 确需 temporal、atemporal 或贡献扩展时读其说明及依赖             | 不将实验/贡献扩展默认为 core 承诺；先固定具体 profile                                                 |
+| [documentation/sparql/](https://github.com/BFO-ontology/BFO-2020/tree/bd1fb61c5fa4e358fc9690f0d214b1ac63fae594/documentation/sparql)                                                                                                                                                                                                                                                     | 理解上游质量检查覆盖时查原说明和查询                            | 固定树的实际位置在 documentation；SPARQL 不是 KG OS Cypher，也不授权执行                              |
 
-先判断对象是持续存在的实体还是在时间中展开的发生体，再按原定义核对独立/依赖方式、参与或实现关系。不要把“记录是文本”当作所述业务对象的本体类别；来源载体、载体表达的内容及内容描述的事件要分别识别。角色、功能、性质与承载者不能仅凭同一个名称合并。
+本页按实际固定树组织；原 README 中的层级说明不能取代真实文件位置。最新发现入口：[官方仓库](https://github.com/BFO-ontology/BFO-2020)、[官方 BFO-2020 资料页](https://basic-formal-ontology.org/bfo-2020.html)。后者可能指向不同历史实现，采用前重新确认版本，不从网页标题推断与本基线等价。ISO 正文、商业书籍受各自权限约束；导航不声称获得其全文或再分发许可。
 
-为每个相关判断记录原类/关系标识和依据。例如原件中 role 与 bearer 的依赖及 realization 的不同，可能要求分别表达角色承载与实际发生；只有当前问题确实需要对应事实时才引入结构。对持续体在不同时间的性质或关系，先确定所选 profile 的时间承诺，不把提交时间代替业务时间。
+## 分析与映射
 
-## KG OS 映射与结果 Review
+先按原定义判断持续体与发生体、独立/依赖方式、参与或实现关系。来源载体、载体表达的内容及其描述的事件是不同对象；不能以“保存的是文本”决定其所述对象类别。角色、功能、性质与承载者也不能仅凭名称合并。
 
-持续对象、发生事实或有独立身份的依赖对象映射为相应 Node；参与、承载、实现等按明确业务谓词表达真实边。时间限定能忠实归属于一条关联时可以放关系 Property；若理论承诺需要独立的关系发生、证据或时间身份，再以相应 Node 表达。不能用一条无时间的边声称实现了所有时间量化公理。
+持续对象、发生事实或有独立身份的依赖对象可映射为相应 Node；参与、承载、实现按业务谓词表达真实边。时间条件若忠实归属于一条关联，可用关系 Property；若所承诺语义需要独立关系发生、证据或时间身份，再表达相应 Node。提交时间不代替业务时间，无时间的边不能声称实现所有时间量化公理。
 
-将原公理逐项标为数据库可保证、查询可检查、应用需取证或未实现。KG OS 不因使用 BFO 名称自动执行类互斥、所有时刻约束、传递闭包或 FOL 证明；需要这些承诺时给出实际执行办法或保留缺口。Review 对照原件、类型说明、图、字段和实际数据，特别检查持续身份、角色/过程区分及时间作用域。
+Review 记录实际使用的原类/关系与公理定位，分别说明数据库可保证、查询可检查、应用需取证或未实现的部分。KG OS 不因采用 BFO 名称自动保证互斥、传递闭包、所有时刻约束或 FOL 证明。

@@ -42,17 +42,17 @@
 
 ### 第三步：决定 Definition、Knowledge 与属性的边界
 
-| 问题 | 优先表达 | 何时改变 |
-| --- | --- | --- |
-| 新增一个人、项目、事件实例 | 既有 Node Knowledge | 真实身份/语义无法由既有模型表达 |
-| 新增“部署”“事故”等分类项 | 既有语义充分时用分类 Knowledge 或属性值 | 本质、身份、成员条件、依赖、持续条件或关系合同不同，即使字段相同也可需新 Definition |
-| 一条事实指向另一可复用对象 | 有业务语义的 Graph Relationship | 只是标量描述或无独立端点时保持 Property |
-| 只描述一条关联的角色、有效期间 | Relationship Property（关系有一等身份） | 所选理论或领域要求角色/relator/任职的独立身份、依赖、关系或生命周期时用相应 Node/Definition |
-| 简单已知日期、数值、单位 | 适当类型的 Property | 时间段需独立关联/复用或空间对象有查询身份时再建 Node |
-| 关系端点、约束或检索能力的真实缺口 | 修改/新增 Definition（需确认） | 禁止仅为了使模型“更完整”而提前加 |
-| 新主题需要组织模型 | 按实际用途使用可选 Domain | 独立 State 演进/管理职责才考虑新 Branch（需确认） |
+| 问题                               | 优先表达                                | 何时改变                                                                                    |
+| ---------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 新增一个人、项目、事件实例         | 既有 Node Knowledge                     | 真实身份/语义无法由既有模型表达                                                             |
+| 新增“部署”“事故”等分类项           | 既有语义充分时用分类 Knowledge 或属性值 | 本质、身份、成员条件、依赖、持续条件或关系合同不同，即使字段相同也可需新 Definition         |
+| 一条事实指向另一可复用对象         | 有业务语义的 Graph Relationship         | 只是标量描述或无独立端点时保持 Property                                                     |
+| 只描述一条关联的角色、有效期间     | Relationship Property（关系有一等身份） | 所选理论或领域要求角色/relator/任职的独立身份、依赖、关系或生命周期时用相应 Node/Definition |
+| 简单已知日期、数值、单位           | 适当类型的 Property                     | 时间段需独立关联/复用或空间对象有查询身份时再建 Node                                        |
+| 关系端点、约束或检索能力的真实缺口 | 修改/新增 Definition（需确认）          | 禁止仅为了使模型“更完整”而提前加                                                            |
+| 新主题需要组织模型                 | 按实际用途使用可选 Domain               | 独立 State 演进/管理职责才考虑新 Branch（需确认）                                           |
 
-**避免两个极端**：不把一切压成一个通用 Record/Entity 搭配大量 text、JSON 或 *type* 字符串；也不把每个术语、任务阶段、状态、计数和时间戳都机械拆成 Node。结构由独立身份、关系和实际查询要求驱动。
+**避免两个极端**：不把一切压成一个通用 Record/Entity 搭配大量 text、JSON 或 _type_ 字符串；也不把每个术语、任务阶段、状态、计数和时间戳都机械拆成 Node。结构由独立身份、关系和实际查询要求驱动。
 
 ### Domain：何时组织（仅有关时）
 
@@ -71,19 +71,19 @@ Domain 是可选的 Ontology 导航组织，不是 Knowledge 分类实例或数�
 - 每个 Relationship Definition 要明确**起点、终点、方向、业务谓词与成立条件**。关系的角色、时间、证据用途等属于该关系时使用 Relationship Property；无依据不使用模糊的 `RELATED_TO`。
 - `unique`、`required`、类型及 Index 只承诺当前数据库合同能实际保证的规则；不要把业务推理、跨对象条件、时间覆盖、跨 Branch 引用或证据真实性说成 Schema 已自动强制。
 - 分清 **Schema Definition 名称、数据库 elementId、业务键和关联目标身份**；实际引用或共享对象要核实当前 State。跨 Branch/Instance 的字符串定位不是跨 Snapshot Relationship。
-- 按所选理论与版本核对包内原件和适配；列出每项语义由 Definition、实例/图边、查询还是应用取证承载，及未实现的公理。参考模型、图示和例子不是当前数据库已安装证据。
+- 按所选理论与版本核对固定上游原文和独立适配；列出每项语义由 Definition、实例/图边、查询还是应用取证承载，及未实现的公理。参考模型、图示和例子不是当前数据库已安装证据。
 
 ### 检索需求驱动的 Index 设计
 
 索引是为**已经明确的查询和检索入口**服务的访问能力，不是本体越完整就越应该多建的字段装饰。先对照实际 Ontology 的 Property、Constraint、已有 Index、代表性 Knowledge 和真实查询；只在现有能力不能满足查找/覆盖/性能需求时提出最小的索引变化。对每项候选说明“谁用哪种查询、找什么对象、哪些字段和 Definition 必须被覆盖”，无依据的全字段自动索引应舍弃。
 
-| 需要回答的查询 | 优先检查或考虑 | 不应混淆 |
-| --- | --- | --- |
-| 按稳定业务键精确查找、验证唯一性 | 已有 `key` / `unique` 约束及其 owning Range Index | 不重复建立同目标、同有序字段的独立 Range Index；Index 不替代真实业务身份 |
-| 结构化相等/范围/排序，或字符串的包含条件 | 按实际 Cypher 谓词与引擎能力评估 `range`、`text`；空间条件考虑 `point` | `text` 不是分词全文检索；不要未经执行计划或测量就断言新索引必然加速 |
-| 按自然语言词项、短语或正文查找 | `fulltext`，选有业务意义的 `STRING` 来源字段、目标类型及合适的分词配置 | 不把 TEXT/LIKE、字段名称命中当作真正的全文召回；分词效果取决于已配置 analyzer |
-| 用不同说法寻找相近含义 | KG OS 公共 `type: vector`（底层 Managed Semantic），选择一条能独立承载语义的 `STRING` 来源字段 | 不是 caller-owned Vector Property；当前每索引只支持单来源字段，不自动拼接标题和正文或切块 |
-| 同时需要精确术语和语义近邻 | 各自有必要时组合 Full-text 与 Managed Semantic，并由实际查询层融合候选 | 不要求每个 Definition 都有双索引，不混合不同分数作为概率 |
+| 需要回答的查询                           | 优先检查或考虑                                                                                 | 不应混淆                                                                                  |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 按稳定业务键精确查找、验证唯一性         | 已有 `key` / `unique` 约束及其 owning Range Index                                              | 不重复建立同目标、同有序字段的独立 Range Index；Index 不替代真实业务身份                  |
+| 结构化相等/范围/排序，或字符串的包含条件 | 按实际 Cypher 谓词与引擎能力评估 `range`、`text`；空间条件考虑 `point`                         | `text` 不是分词全文检索；不要未经执行计划或测量就断言新索引必然加速                       |
+| 按自然语言词项、短语或正文查找           | `fulltext`，选有业务意义的 `STRING` 来源字段、目标类型及合适的分词配置                         | 不把 TEXT/LIKE、字段名称命中当作真正的全文召回；分词效果取决于已配置 analyzer             |
+| 用不同说法寻找相近含义                   | KG OS 公共 `type: vector`（底层 Managed Semantic），选择一条能独立承载语义的 `STRING` 来源字段 | 不是 caller-owned Vector Property；当前每索引只支持单来源字段，不自动拼接标题和正文或切块 |
+| 同时需要精确术语和语义近邻               | 各自有必要时组合 Full-text 与 Managed Semantic，并由实际查询层融合候选                         | 不要求每个 Definition 都有双索引，不混合不同分数作为概率                                  |
 
 决定索引前逐项检查：
 
@@ -121,37 +121,37 @@ Domain 是可选的 Ontology 导航组织，不是 Knowledge 分类实例或数�
 
 ## 3. 快速评审：容易产生错误本体的模式
 
-| 症状 | 需要重新回答的问题 |
-| --- | --- |
-| 每增加一个分类都出现一个新 Node Definition | 是新实体结构，还是现有 Concept/Category 的一个实例？ |
-| 所有记录都是一个巨大的 `Entry` | 是否把真实有独立身份与关系的对象压扁了？ |
-| 每个名词都是 Node，每个词都是关系类型 | 哪个对象需要身份、复用、关联或独立生命周期？ |
-| 关系被写成另一对象的字符串 ID | 是否确有目标 Node 且需要图遍历？它是否处于同一 Snapshot？ |
-| 一个状态值同时代表计划、执行、验收 | 是否混淆事件与状态、操作与验证、发生与观察？ |
-| 把人名、标题、URL 当作全局唯一键 | 同名、重命名、来源版本、业务作用域是否已处理？ |
-| 把“后来发生”写成“导致发生” | 哪些有据的关系只能表示先后，哪些有因果证据？ |
-| 为新主题默认新建 Branch | 当前是否真有独立 State 演进或管理职责？ |
-| 只因术语多就为所有字段建全文/语义索引 | 哪个具体查询入口需要哪些字段、目标和召回方式？ |
-| 认为 Index ONLINE 就保证 Web 搜索有效 | 真实搜索入口是否覆盖该类型与字段，Provider 和分词是否实际可用？ |
-| 想移除一个共享索引成员却删掉整条声明 | 是否应调整完整 `targets`，其余 Definition 还需要该索引吗？ |
-| 把语义 Top-K 的结果经 `WHERE` 过滤后视为子集 Top-K | 筛选对象是否可能被全局 `limit` 提前排除？ |
-| 认为语义索引自动切块或截断长文 | 来源字段全文是否超出 Provider 限制，用户需要文档级还是片段级检索？ |
-| 把 Domain 当作命名空间或筛选条件 | 这些条件应由业务键作用域和实际 Cypher 表达吗？ |
-| 只展示 YAML、没有实际查询或实例 | 哪些 Competency Questions 得到了可核实回答？ |
-| 宣称本体自动推断分类、传递或来源真实性 | KG OS 当前是否实际提供相应推理或执行规则？ |
+| 症状                                               | 需要重新回答的问题                                                 |
+| -------------------------------------------------- | ------------------------------------------------------------------ |
+| 每增加一个分类都出现一个新 Node Definition         | 是新实体结构，还是现有 Concept/Category 的一个实例？               |
+| 所有记录都是一个巨大的 `Entry`                     | 是否把真实有独立身份与关系的对象压扁了？                           |
+| 每个名词都是 Node，每个词都是关系类型              | 哪个对象需要身份、复用、关联或独立生命周期？                       |
+| 关系被写成另一对象的字符串 ID                      | 是否确有目标 Node 且需要图遍历？它是否处于同一 Snapshot？          |
+| 一个状态值同时代表计划、执行、验收                 | 是否混淆事件与状态、操作与验证、发生与观察？                       |
+| 把人名、标题、URL 当作全局唯一键                   | 同名、重命名、来源版本、业务作用域是否已处理？                     |
+| 把“后来发生”写成“导致发生”                         | 哪些有据的关系只能表示先后，哪些有因果证据？                       |
+| 为新主题默认新建 Branch                            | 当前是否真有独立 State 演进或管理职责？                            |
+| 只因术语多就为所有字段建全文/语义索引              | 哪个具体查询入口需要哪些字段、目标和召回方式？                     |
+| 认为 Index ONLINE 就保证 Web 搜索有效              | 真实搜索入口是否覆盖该类型与字段，Provider 和分词是否实际可用？    |
+| 想移除一个共享索引成员却删掉整条声明               | 是否应调整完整 `targets`，其余 Definition 还需要该索引吗？         |
+| 把语义 Top-K 的结果经 `WHERE` 过滤后视为子集 Top-K | 筛选对象是否可能被全局 `limit` 提前排除？                          |
+| 认为语义索引自动切块或截断长文                     | 来源字段全文是否超出 Provider 限制，用户需要文档级还是片段级检索？ |
+| 把 Domain 当作命名空间或筛选条件                   | 这些条件应由业务键作用域和实际 Cypher 表达吗？                     |
+| 只展示 YAML、没有实际查询或实例                    | 哪些 Competency Questions 得到了可核实回答？                       |
+| 宣称本体自动推断分类、传递或来源真实性             | KG OS 当前是否实际提供相应推理或执行规则？                         |
 
 ## 4. 外部研究依据与 KG OS 的取舍
 
-以下是本方法的补充背景来源；它们不代替 [五套原件及使用路径](foundations.md)。包内原件以固定版本清单为准；未收录的外部教程、论文或标准不因被引用而获得再分发许可。本文件的 KG OS 适配独立编写。
+以下是本方法的补充背景来源；它们不代替 [五套原文导航及使用路径](foundations.md)。按导航读取固定版本及必要章节，外部教程、论文或标准不因被引用而获得再分发许可。本文件的 KG OS 适配独立编写。
 
-| 资料 | 可借鉴内容 | KG OS 不直接采用的假设 |
-| --- | --- | --- |
-| [Stanford · Ontology Development 101](https://protege.stanford.edu/publications/ontology_development/ontology101-noy-mcguinness.html) | 领域范围、Competency Questions、概念/实例区分、迭代与复用 | 不要求 Protégé、OWL 类层级 |
-| [NeOn Methodology](https://oeg.etsiinf.upm.es/index.php/en/methodologies/59-neon-methodology/index.html) | 从需求出发、复用和重构现有本体、按场景演进 | 不引入额外 Ontology Network 服务 |
-| [W3C · SKOS Primer](https://www.w3.org/TR/skos-primer/) | 分类概念、广义/狭义关系、同义词和作用域说明 | 不默认实现 SKOS/OWL 推理 |
-| [W3C · PROV-O](https://www.w3.org/TR/prov-o/) | 区分实体、活动、责任主体与来源链 | 不把来源关系冒充事实已证实 |
-| [W3C · OWL-Time](https://www.w3.org/TR/owl-time/) | 时点/区间与时间关系、不同精度 | 不强制每个时间戳成为 Node |
-| [CIDOC CRM](https://cidoc-crm.org/) | 事件、参与者、时间、地点的可组合语义模式 | 不要求所有领域都事件中心化 |
-| [Ontology Design Patterns · Time-indexed participation](https://odpa.github.io/patterns-repository/Time_indexed_participation/Time_indexed_participation) | 角色/参与关系的时间语义与独立表达条件 | 不因关系有时间就强制重实体化 |
+| 资料                                                                                                                                                      | 可借鉴内容                                                | KG OS 不直接采用的假设           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------- |
+| [Stanford · Ontology Development 101](https://protege.stanford.edu/publications/ontology_development/ontology101-noy-mcguinness.html)                     | 领域范围、Competency Questions、概念/实例区分、迭代与复用 | 不要求 Protégé、OWL 类层级       |
+| [NeOn Methodology](https://oeg.etsiinf.upm.es/index.php/en/methodologies/59-neon-methodology/index.html)                                                  | 从需求出发、复用和重构现有本体、按场景演进                | 不引入额外 Ontology Network 服务 |
+| [W3C · SKOS Primer](https://www.w3.org/TR/skos-primer/)                                                                                                   | 分类概念、广义/狭义关系、同义词和作用域说明               | 不默认实现 SKOS/OWL 推理         |
+| [W3C · PROV-O](https://www.w3.org/TR/prov-o/)                                                                                                             | 区分实体、活动、责任主体与来源链                          | 不把来源关系冒充事实已证实       |
+| [W3C · OWL-Time](https://www.w3.org/TR/owl-time/)                                                                                                         | 时点/区间与时间关系、不同精度                             | 不强制每个时间戳成为 Node        |
+| [CIDOC CRM](https://cidoc-crm.org/)                                                                                                                       | 事件、参与者、时间、地点的可组合语义模式                  | 不要求所有领域都事件中心化       |
+| [Ontology Design Patterns · Time-indexed participation](https://odpa.github.io/patterns-repository/Time_indexed_participation/Time_indexed_participation) | 角色/参与关系的时间语义与独立表达条件                     | 不因关系有时间就强制重实体化     |
 
 需要具体可执行的 KG OS 示例时，再读取 [建模案例](modeling-examples.md)；该案例文档中的业务前提不可自动当成其它知识世界的事实。

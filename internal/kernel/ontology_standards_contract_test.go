@@ -40,7 +40,7 @@ func TestOntologyStandardsResourceContract(t *testing.T) {
 		t.Fatalf("invalid metadata: %+v", meta)
 	}
 	if !strings.Contains(string(raw), "[Ontology 变更确认模板](references/model-confirmation-template.md)") || !strings.Contains(string(raw), "未经具体方案确认") || !strings.Contains(string(raw), "references/foundations.md") {
-		t.Fatal("model confirmation and bundled foundation sources must be reachable from Skill")
+		t.Fatal("model confirmation and foundation source navigation must be reachable from Skill")
 	}
 	for _, expected := range []string{"[KG OS 本体论方法论](references/ontology-methodology.md)", "[本体建模案例](references/modeling-examples.md)", "## 2. 先确定本体语义", "## 5. 审查语义"} {
 		if !strings.Contains(string(raw), expected) {
@@ -78,15 +78,6 @@ func TestOntologyStandardsResourceContract(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Upstream material and full extractions are source data, not resource
-		// instructions. Their inventory and byte hashes have a separate checker.
-		relative, err := filepath.Rel(root, path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if strings.HasPrefix(filepath.ToSlash(relative), "references/upstream/") || strings.HasPrefix(filepath.ToSlash(relative), "references/readable/") || filepath.Ext(path) != ".md" {
-			continue
-		}
 		for _, link := range links.FindAllStringSubmatch(string(body), -1) {
 			target := strings.SplitN(strings.Trim(link[1], "<>"), "#", 2)[0]
 			if target == "" || strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") {
@@ -112,7 +103,7 @@ func TestOntologyStandardsResourceContract(t *testing.T) {
 		}
 		return nil
 	})
-	if err != nil || count == 0 || len(seen) != count {
-		t.Fatalf("runtime files=%d reachable=%d err=%v; every packaged resource must be routed", count, len(seen), err)
+	if err != nil || count != 10 || len(seen) != count {
+		t.Fatalf("runtime files=%d reachable=%d err=%v; want entrypoint, methods/examples and five-theory navigation", count, len(seen), err)
 	}
 }

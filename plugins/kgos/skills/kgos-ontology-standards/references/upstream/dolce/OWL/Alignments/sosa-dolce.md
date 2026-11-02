@@ -1,1 +1,0 @@
-Available at: <https://github.com/w3c/sdw-sosa-ssn/blob/gh-pages/ssn/rdf/ontology/alignments/sosa-dolce.ttl>

@@ -1,36 +1,35 @@
-# SUMO：从完整上层公理到 KG OS 表达
+# SUMO：原始模块、语言资料与 KG OS 适配
 
-本包的选定范围是完整 SUMO 上层与完整 MILO，不是整个领域/词汇映射仓库。固定版本、不同许可、选定示例及全部排除项见 [SUMO 原件目录](../source-index/sumo.md)。本文件为 KG OS 独立适配。
+固定 Commit `8bb7a9c3ec423f48ea946c3da74c994b8341934d`。SUMO 核心的 IEEE 条款、MILO 的原作者通知及仓库 GPL/署名条款分别见原文件头和 [README.txt](https://github.com/ontologyportal/sumo/blob/8bb7a9c3ec423f48ea946c3da74c994b8341934d/README.txt)；上游未统一指明 GPL 版本，不能改称本项目商业许可或通用 CC。这里是原文索引，不复制整个上层/领域/WordNet 语料。读取规则见 [通用入口](../foundations.md#渐进读取方法)。
 
-## 读取原件
+## 固定原文结构
 
-先读 [原 README](../upstream/sumo/README.txt) 和完整 [Merge.kif](../upstream/sumo/Merge.kif) 中的许可、语言与模块说明。按本次问题定位类/关系的 `documentation`、`instance`、`subclass`、`domain`、`range` 及相关公理，连同其量词和前提阅读，不能只抽出术语表。
+| 原始位置                                                                                                                                                                                                                                                                                                                                                    | 文件作用与读取条件                                                                           | 范围/依赖                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [README.txt](https://github.com/ontologyportal/sumo/blob/8bb7a9c3ec423f48ea946c3da74c994b8341934d/README.txt)                                                                                                                                                                                                                                               | 许可通知、SUO-KIF/WordNet 文件形式、开发目录与官方资料入口                                   | 外部开发工具只作原资料链接，不要求安装                                              |
+| [Merge.kif](https://github.com/ontologyportal/sumo/blob/8bb7a9c3ec423f48ea946c3da74c994b8341934d/Merge.kif)                                                                                                                                                                                                                                                 | 完整上层定义与公理；按术语定位 documentation、instance/subclass、domain/range 及相关量化规则 | 连同否定、量词和前提读，不抽成无约束术语表                                          |
+| [Mid-level-ontology.kif](https://github.com/ontologyportal/sumo/blob/8bb7a9c3ec423f48ea946c3da74c994b8341934d/Mid-level-ontology.kif)                                                                                                                                                                                                                       | 上层不足且需要中层概念时，按模块注释及相关术语补读                                           | MILO 依赖上层 Merge；不能将中层文件当独立完整 SUMO                                  |
+| [tinySUMO.kif](https://github.com/ontologyportal/sumo/blob/8bb7a9c3ec423f48ea946c3da74c994b8341934d/tinySUMO.kif)、[tinyHOL.kif](https://github.com/ontologyportal/sumo/blob/8bb7a9c3ec423f48ea946c3da74c994b8341934d/tinyHOL.kif)、[tinyIntSUMO.kif](https://github.com/ontologyportal/sumo/blob/8bb7a9c3ec423f48ea946c3da74c994b8341934d/tinyIntSUMO.kif) | 小型语言/表达对照，需要理解其演示的结构时读                                                  | 教学/特定逻辑材料，不替代 Merge 全部公理                                            |
+| [仓库根目录](https://github.com/ontologyportal/sumo/tree/8bb7a9c3ec423f48ea946c3da74c994b8341934d)                                                                                                                                                                                                                                                          | 按真实领域文件名和文件头说明选择领域扩展，再追踪其所用核心/中层术语                          | `Geography.kif`、`FinancialOntology.kif` 等只是实际文件示例，不是封闭分类或必读清单 |
+| [Translations/](https://github.com/ontologyportal/sumo/tree/8bb7a9c3ec423f48ea946c3da74c994b8341934d/Translations)、[WordNetMappings/](https://github.com/ontologyportal/sumo/tree/8bb7a9c3ec423f48ea946c3da74c994b8341934d/WordNetMappings)、[mappings/](https://github.com/ontologyportal/sumo/tree/8bb7a9c3ec423f48ea946c3da74c994b8341934d/mappings)    | 需要自然语言表达、词义映射或外部对齐时选相关资源及说明                                       | 词汇映射不自动等于业务对象身份或类成员事实                                          |
+| [SimpleFacts/](https://github.com/ontologyportal/sumo/tree/8bb7a9c3ec423f48ea946c3da74c994b8341934d/SimpleFacts)、[development/](https://github.com/ontologyportal/sumo/tree/8bb7a9c3ec423f48ea946c3da74c994b8341934d/development)                                                                                                                          | 需要事实材料或开发中扩展时查目录及具体文件                                                   | 开发中内容不默认为稳定理论；按其本身前提与来源判断                                  |
+| [tests/tq_notes.txt](https://github.com/ontologyportal/sumo/blob/8bb7a9c3ec423f48ea946c3da74c994b8341934d/tests/tq_notes.txt)、[tests/](https://github.com/ontologyportal/sumo/tree/8bb7a9c3ec423f48ea946c3da74c994b8341934d/tests)                                                                                                                         | 理解上游查询、答案/问题文件形式，或审查某项具体示例时按目录选择                              | 原测试/证明语料只供阅读，不能从存在 expected/proof 输出推断本轮已执行               |
 
-上层不足且需要中层概念时，再读完整 [Mid-level-ontology.kif](../upstream/sumo/Mid-level-ontology.kif) 的相关段落；它依赖已收录的上层核心。`tinySUMO.kif` 只是原始教学对照，不能拿它替代 Merge.kif。需要理解原示例的查询与答案格式时读 [原说明](../upstream/sumo/tests/tq_notes.txt) 及目录列出的结构示例；本包不运行任何示例或证明器。
+最新发现入口：[官方仓库](https://github.com/ontologyportal/sumo)、README 指定的 [SUMO 官网](https://www.ontologyportal.org/)。官网若受访问限制，不能据此认定资料不存在，按通用读取边界报告依赖该网页的结论。索引覆盖原始目录入口，不宣称已核读所有领域、词义映射或证明语料。
 
-本包固定版本的 Merge 和 MILO 均已用 **UTF-8 严格解码并往返核对**，原始字节与上游 Git blob 一致；直接按 UTF-8 读取上述原件即可，没有另行提供 SUMO 可读副本。编码和核对结果记录在 [sources.json](../sources.json) 的对应文件项。这是当前字节的验证结果，不是对作者历史编码方式的推测。
+## 大文件与原文符号
 
-Merge 的第 11 行包含一个原文已有的 U+FFFD（UTF-8 字节 `EF BF BD`，从零起始的 byte offset 418）；MILO 没有 U+FFFD。这个字符已存在于固定上游原件，不是本包或连接器在解码时插入。保留它并披露来源限制，不能改成另一个符号冒充恢复，也不能把整份含非 ASCII 文本的文件按 CP1252/Latin-1 重解码。
+固定 Merge（657,674 bytes）和 MILO（1,194,157 bytes）均能严格 UTF-8 解码并往返到原始 Git 字节。GitHub Contents 对 MILO 可能返回空内容，不能据此认定原文不存在。需要该入口且宿主具有相应能力时，可按固定树的对象定位读取：
 
-有本地 Python 文件读取能力时，在本 Skill 的 `references/` 目录执行以下只读命令；读 MILO 时将参数换成 `upstream/sumo/Mid-level-ontology.kif`。命令严格按 UTF-8 解码、核对往返字节并向标准输出提供原文，不写文件、不运行 KIF：
+| 文件                   | 此 Commit 中的 Git blob SHA                |
+| ---------------------- | ------------------------------------------ |
+| Merge.kif              | `e02fe406b2d038bf19203b3f021a895ec03d22e7` |
+| Mid-level-ontology.kif | `5dcace648603db93bf0febb6281b1b9d21a70fc2` |
 
-```sh
-python3 - upstream/sumo/Merge.kif <<'PY'
-from pathlib import Path
-import sys
-data = Path(sys.argv[1]).read_bytes()
-text = data.decode("utf-8", errors="strict")
-assert text.encode("utf-8") == data
-sys.stdout.buffer.write(data)
-PY
-```
+这些 SHA 用于取原文，不是下载/执行指令，也不保证任一接口支持大文件或分段。若接口仍不可用或超出读取限制，报告受影响的定义/公理，不能改读浮动版本或声称已读全。Merge 第 11 行的一个 U+FFFD 已在固定上游原件中（UTF-8 `EF BF BD`，零起始 byte offset 418），MILO 无此字符；不要猜测替换，或将整份文本按 CP1252/Latin-1 重解码。公理中的变量、符号、数量和否定不能忽略。
 
-只有资源读取接口时按 UTF-8 读取同一原件路径；接口失败应报告具体接口/结果，不能据单个连接器失败推断原件编码错误或整个宿主不支持。不得忽略或替换公理中的符号、变量、数量和否定。
+## 分析与 KG OS 映射
 
-## 分析与映射
+先区分 class、instance、关系及其参数条件，检查关系的 arity、domain/range 与量化范围。`subclass` 与 `instance` 的原语义不能机械等同 KG OS 的 Definition 与 Knowledge；先明确本次要表达哪种对象和分类承诺。
 
-区分类与实例、关系与关系实例、函数与其值；`subclass` 不是任意分类标签，`instance` 也不是同义词边。按原公理判断持续身份、属性/过程、时空限定和关系参数，不能因为词义相近就合并概念。
-
-对每条需采用的规则，先写明变量、量词、前提和结论，再决定采用范围。KG OS 的普通边不表达任意高阶关系、函数语义、模态或量化推理；必要的 n 元事实可由有身份的关系对象加参数边表达，但需说明身份和成立条件。不能把 `=>` 丢掉前提后写成已证实事实，也不能把公理转写为说明文字就称执行完成。
-
-将可执行的属性/唯一键约束交数据库，其余明确采用显式 Knowledge、只读查询、应用规则或未实现状态。用户需要领域本体、WordNet 或其他缺失语料时先指出具体依赖与许可；本包未宣称提供这些内容。核心的 IEEE 许可与扩展 GPL/署名通知分别保留，KG OS 商业许可不覆盖它们。
+多参数关系可按需要重实体化为有身份的事实 Node 加明确参与边；只有确实是某条二元关联的描述时才选关系 Property。不能因减少字段而丢失参数、时间或量词，也不能从相同参数形状推断同一关系语义。SUO-KIF 的规则不会因原样放入正文而被执行；Review 区分实际数据库约束、查询/应用核实以及未实现推论。
