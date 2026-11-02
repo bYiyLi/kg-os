@@ -14,7 +14,7 @@ Scope: Full Merge.kif upper ontology, full Mid-level-ontology.kif bridge, tinySU
 
 - MILO depends on SUMO core Merge.kif, both supplied in full.
 - SigmaKEE/SUO-KIF interpreters and external provers are optional consumers, not provided or run.
-- Legacy source encoding is preserved; readable copies explicitly identify decoding.
+- Merge.kif and Mid-level-ontology.kif are verified strict UTF-8 and roundtrip to their original bytes; read the original files directly. No SUMO readable copies are bundled. Merge already contains one literal U+FFFD in the pinned upstream copyright line; see per-file encoding metadata and the [strict UTF-8 reading instructions](../foundations/sumo.md).
 
 ## Uncovered or distinct material
 

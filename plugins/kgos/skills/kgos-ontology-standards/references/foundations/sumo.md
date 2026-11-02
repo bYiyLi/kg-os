@@ -8,7 +8,24 @@
 
 上层不足且需要中层概念时，再读完整 [Mid-level-ontology.kif](../upstream/sumo/Mid-level-ontology.kif) 的相关段落；它依赖已收录的上层核心。`tinySUMO.kif` 只是原始教学对照，不能拿它替代 Merge.kif。需要理解原示例的查询与答案格式时读 [原说明](../upstream/sumo/tests/tq_notes.txt) 及目录列出的结构示例；本包不运行任何示例或证明器。
 
-原字节保留上游编码；工具不能按 UTF-8 解码时应报告并用明确的原编码读取，不覆盖原件。原件中的符号、变量、数量和否定不能因字符替换而被忽略。
+本包固定版本的 Merge 和 MILO 均已用 **UTF-8 严格解码并往返核对**，原始字节与上游 Git blob 一致；直接按 UTF-8 读取上述原件即可，没有另行提供 SUMO 可读副本。编码和核对结果记录在 [sources.json](../sources.json) 的对应文件项。这是当前字节的验证结果，不是对作者历史编码方式的推测。
+
+Merge 的第 11 行包含一个原文已有的 U+FFFD（UTF-8 字节 `EF BF BD`，从零起始的 byte offset 418）；MILO 没有 U+FFFD。这个字符已存在于固定上游原件，不是本包或连接器在解码时插入。保留它并披露来源限制，不能改成另一个符号冒充恢复，也不能把整份含非 ASCII 文本的文件按 CP1252/Latin-1 重解码。
+
+有本地 Python 文件读取能力时，在本 Skill 的 `references/` 目录执行以下只读命令；读 MILO 时将参数换成 `upstream/sumo/Mid-level-ontology.kif`。命令严格按 UTF-8 解码、核对往返字节并向标准输出提供原文，不写文件、不运行 KIF：
+
+```sh
+python3 - upstream/sumo/Merge.kif <<'PY'
+from pathlib import Path
+import sys
+data = Path(sys.argv[1]).read_bytes()
+text = data.decode("utf-8", errors="strict")
+assert text.encode("utf-8") == data
+sys.stdout.buffer.write(data)
+PY
+```
+
+只有资源读取接口时按 UTF-8 读取同一原件路径；接口失败应报告具体接口/结果，不能据单个连接器失败推断原件编码错误或整个宿主不支持。不得忽略或替换公理中的符号、变量、数量和否定。
 
 ## 分析与映射
 

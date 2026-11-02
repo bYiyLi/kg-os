@@ -66,6 +66,15 @@ async function verifyBytes(root, item) {
     bytes.length === item.bytes && hash(bytes) === item.sha256,
     `Source size/hash mismatch: ${path}`
   );
+  if (item.encoding !== undefined) {
+    requireValue(item.encoding === "utf-8", `Unsupported declared source encoding: ${path}`);
+    const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    requireValue(Buffer.from(text, "utf8").equals(bytes), `UTF-8 roundtrip mismatch: ${path}`);
+    requireValue(
+      text.split("\uFFFD").length - 1 === item.replacementCharacterCount,
+      `Source literal replacement-character count mismatch: ${path}`
+    );
+  }
   if (item.gitBlob) {
     const blob = Buffer.concat([Buffer.from(`blob ${bytes.length}\0`), bytes]);
     requireValue(hash(blob, "sha1") === item.gitBlob, `Git blob mismatch: ${path}`);

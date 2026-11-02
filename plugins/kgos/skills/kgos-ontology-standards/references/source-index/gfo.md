@@ -12,11 +12,12 @@ Scope: Entire pinned modern GFO tree except hosting metadata: gfo.owl revision 2
 
 ## Dependencies
 
-- gfo.owl imports <https://w3id.org/gfo/base>, mapped locally to modules/gfo-base.owl by the supplied catalog.
+- gfo.owl imports <https://w3id.org/gfo/base>; the independent importAliases entry maps it to upstream/gfo/modules/gfo-base.owl, whose ontology identifier matches. The upstream root catalog does not supply this mapping.
 - All situation pattern/example import targets in this tree are retained; modules are selected, not assumed mutually consistent.
 
 ## Uncovered or distinct material
 
+- The pinned root catalog-v001.xml maps <https://w3id.org/gfo/core/> to the absent modules/gfo-core.ttl and contains no base mapping. It is preserved unchanged; current base reads use the explicit independent importAliases entry instead.
 - The upstream README states native FOL working drafts are not publicly available; no full FOL axiomatization is claimed.
 - Historical 2006/2007 Part I reports and older 2006/2008 OWL files are linked, not copied under an assumed license.
 - GFO-light is a separate optional implementation and not substituted for GFO.

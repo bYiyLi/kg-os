@@ -6,6 +6,8 @@
 
 先读完整 [原 README](../upstream/gfo/README.md) 的使用、模块和理论可用范围，再按 [gfo.owl](../upstream/gfo/gfo.owl) 的导入与 [base 原件](../upstream/gfo/modules/gfo-base.owl) 读取本次相关定义/公理。根模型 revision 为 2024-11-18，base 和 situation 文件各自的版本也应保留，不能从根日期推断每份文件都同版。
 
+离线读取 base 使用 [sources.json](../sources.json) 的独立 `importAliases`：`https://w3id.org/gfo/base` 对应 `upstream/gfo/modules/gfo-base.owl`，该文件的 ontology identifier 与导入 IRI 一致。不要依赖原始根 `catalog-v001.xml`：它只把 `https://w3id.org/gfo/core/` 指向该版本不存在的 `modules/gfo-core.ttl`，没有提供 base 映射。原 catalog 保持原样；这条失效历史记录不自动改指 base，也不表示用户应采用另一个理论模块。
+
 需要情境、对象在某时刻的表达或关系重实体化时，从目录的 axiom-or-model 类选择 `modules/situation/` 的实际变体，再选 example-and-support 中配套实例。原 [案例 catalog](../upstream/gfo/modules/situation/examples/catalog-v001.xml) 给出导入 IRI 到本地文件的对应；这些文件均已保留。不能默认所有可选模式同时兼容。
 
 ## 身份与映射

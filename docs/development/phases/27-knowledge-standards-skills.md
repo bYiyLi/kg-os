@@ -39,6 +39,16 @@ Review 检查完整收录范围、原文忠实与可读转换、概念身份/关
 
 恢复与旧库处理见 [维护指南](../../guide/ontology-sources.md)。源码/资料分发检查与未来真实宿主或整阶段门禁分开，不以本增量关闭整个 Phase 27。
 
+### 独立 GitHub Review 修订（Review 仍在进行）
+
+对 draft PR #2 初版 `6638a1fcc1640c209fbfa241bbc1e7b6f042e6b6` 的三项发现作针对性修正：
+
+- **内容 Review 路由**：`quality-audit.md` 入口对齐主 Skill 第 3/4 节。第 3 节只加载相关内容判据与方法依据，不触发全量盘点/覆盖报告；第 4 节审计才使用相应完整审计方法，仍按实际范围执行。
+- **SUMO 编码与不存在的副本**：删除“readable copies”声明。Merge（657,674 bytes）与 MILO（1,194,157 bytes）均严格 UTF-8 解码/往返成功，且与固定上游 blob 一致；新增逐文件编码与 U+FFFD 计数校验。Merge 第 11 行的单个 U+FFFD 已存在于上游（零起始 byte offset 418），未擅自恢复或替换。文档给出的只读 Python 读取命令对两份原件均实际核对输出字节/hash，不运行 KIF。
+- **GFO 失效 catalog**：删除“原 catalog 提供 base 映射”的错误说明，保留原 catalog，并记录其 `core/` → 不存在 `modules/gfo-core.ttl` 的问题。在独立 `importAliases` 明确 base → `modules/gfo-base.owl`，核对目标 ontology identifier；复查 54 条本体导入无未解析目标，18 条原 catalog 路由中 17 条文件存在，仅保留这一已披露的上游失效项。
+
+553 份原件与 17 份 PDF 提取内容保持原 hash。修订仅做取证、文本和确定性资源/分发检查，不执行案例或模型试验；整体独立 Review 及用户人工 Review 尚未完成。
+
 ## D115/D116/D117 历史实施基线（2026-10-28）
 
 **状态：`in_progress`**。原 Ontology/Branch 已合并为 `kgos-ontology-standards`；Knowledge/Retrieval/Maintenance 合并为唯一 `kgos-knowledge-standards`；VLog 保持独立。三个规范加 `kgos-doctor`，当前源码目标共 **四个官方 Skill**。已发行 v0.3.5 七 Skill、用户私人 Plugin 和当前部署不受本次本地修改影响。

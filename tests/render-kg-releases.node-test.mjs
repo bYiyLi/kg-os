@@ -247,7 +247,7 @@ test("only whitelisted public files are generated, deterministically", async () 
   }
 });
 
-test("ontology source integrity rejects modified and undeclared originals", async () => {
+test("ontology source integrity rejects modified, undeclared or inconsistent metadata", async () => {
   const directory = await mkdtemp(join(tmpdir(), "ontology-integrity-"));
   const reference = join(directory, ontologyReferenceRoot);
   try {
@@ -264,6 +264,16 @@ test("ontology source integrity rejects modified and undeclared originals", asyn
     );
     await rm(join(reference, "upstream/sumo/undeclared.txt"));
     assert.equal((await validateOntologySources({ root: directory })).originals, 553);
+    const manifestPath = join(reference, "sources.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    manifest.files.find(
+      (item) => item.path === "upstream/sumo/Merge.kif"
+    ).replacementCharacterCount = 0;
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    await assert.rejects(
+      validateOntologySources({ root: directory }),
+      /literal replacement-character count mismatch/
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
