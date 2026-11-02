@@ -1,8 +1,111 @@
 # Phase 27：KG OS 官方知识规范 Skill 体系
 
-<!-- cspell:words testdata SKOS CIDOC -->
+<!-- cspell:words testdata SKOS CIDOC pypdf Diátaxis Persistant Presential -->
 
-## 当前方案（D115/D116/D117，2026-10-28）
+<a id="d122-remote-foundation-navigation"></a>
+
+## D122：基础本体原文引用与渐进加载（2026-11-02）
+
+**状态：`in_progress`**。按用户最新决定和 [D122](../../design/decisions.md#d122-remote-foundation-navigation)，在同一 draft PR #2 将整套原件内置改为固定原文导航。D121 的身份建模、知识质量规范、必要案例、旧业务模型库退出及 VLog 本仓维护继续有效；以下 D121 包体与检查记录标为历史，不作为当前资源合同。
+
+| 范围 | 当前交付与检查边界 |
+| --- | --- |
+| 五套理论导航 | BFO/UFO/DOLCE/SUMO/GFO 按真实原始结构及文件功能说明版本、用途、读取条件、范围与准确固定 URL；最新发现分开，理论/权限缺口保留 |
+| 渐进读取 | 主 Skill 关键路由 → 通用方法 → 所选理论目录/文件 → 必要章节/依赖；依据足够停止，不要求全量五套，不用预设问题穷举封闭路由 |
+| 资料退出 | 删除本 PR 新增的上游原件/全文转换、逐文件目录与清单、专用 hash 检查及 Native 分发/体积例外；沿用原 Markdown 分发合同，Git 历史保留 |
+| 保留内容 | 独立 KG OS 适配、问题驱动建模、条件明确的小案例与 Knowledge 的视角/结构/简洁/准确/必要完整性/独立理解/用途规范；不恢复旧库发现或生成维护 |
+| 结果 Review | 源树/原文读取、固定路径/版本/IRI 对应、许可范围、指令密度/职责、资源/分发及 diff 的静态检查；GitHub 独立 Review 与人工 Review 仍待完成 |
+
+Acceptance：固定原文的定义、公理、指南、案例和依赖可按用途定位；读取失败、GitHub 大文件空内容、格式限制及受限资料有准确处理边界；不把阅读定位写成运行时导入，不重新依赖失效 GFO catalog。文档与分发合同不再声称当前含 553 原件/17 转换。必要案例说明前提、理由和边界，完整上游例按索引读取。无额外 Skill、Kernel/模型语义引擎、生产修改或发布。
+
+本轮已实际读取开发规范助手的 prompt-authoring-spec、skill-authoring-spec 及 context/examples、resource-layering、contract-validation 等相关正文，按必要性、职责、条件路由和信息密度审查；不由文字自洽声称模型行为已实测。
+
+### 当前检查证据
+
+D122 资料调整的实施基线为 `99812bfd2b648171efbb76d29dc744cded7e615b`，以下证据截至 `4705a64c8ab56e88c908a95639ea4495c514507e`，不沿用历史整包检查称该增量通过。其后 Knowledge 编写与 Review 的最小增量单列于下；交付 head/base 及最终候选归档以同一 draft PR 的实际记录为准。
+
+- **原文/路径**：八个来源固定 Git 树核对 101 处文件/目录链接（96 个不同定位）；GitHub 实际读取关键 README 的 blob 与本地固定树一致。MILO 的 Contents 返回空内容，按固定 blob `5dcace648603db93bf0febb6281b1b9d21a70fc2` 成功读取正文。DOLCE D18、GFO 两版 Part I 及 gUFO 论文版本页已直接核读其版本/范围入口，不据此声称全文语义已审完。
+- **阅读依赖与语义**：只解析 17 份固定本体模块元数据，5 条 import IRI 有固定阅读定位；GFO 全部 11 个现行模块 identifier 与导航一致，失效根 catalog 明确披露。按原 base 修正 Persistant 为 Universal 子类、由 Presential 实例化的适配表述，未运行推理/证明。
+- **资源与保留范围**：Ontology 仅 10 份 Markdown 资源且条件路由可达，四 Skill 清单保持不变。Knowledge 主规范/质量参考、VLog 三份 Markdown、原有建模案例及全局引导与基线逐字节一致；本次未改其语义或执行案例。删除 583 个原件包专用文件，普通分发/大小/格式规则恢复至 PR base。
+- **实际静态检查**：`pnpm lint`、目标 Markdown（117 份）、新增导航及相关 Skill/方法的定向 Prettier/CSpell、本地文档 849 条路径/锚点、五个 Go 元数据/资源合同、两项确定性分发/版本检查及 `git diff --check` 通过。分发检查覆盖四 Skill、实际 Markdown 清单、原文包退出及源码测试排除，不调用知识库或模型。GitHub 补丁回读后，将 UFO/GFO 中读取案例/求解器的措辞收敛为“读取不授予执行权限”，避免把本轮禁测要求写成长期禁止，宿主仍按实际用户授权决定是否执行。
+- **读取限制**：SUMO 官网与 UFO 2005 博士论文 PDF 本轮浏览返回 403，出版页/固定仓库可读；未绕过、未把不可读当不存在或已读全文，依赖相应正文的结论保持受限。理论未公开/实现子集、出版物权限、目标宿主外部读取/加载及模型行为仍各有边界；静态检查不能证明未来原文持续可用。
+
+未执行查询、案例、行为模型评测、任务模拟、证明器、生产例子、额外模型 API、Docker/Dev 或远程 CI；未进行账户 Plugin 安装、合并、发布或部署。独立 GitHub Review 及用户人工 Review 尚未完成。
+
+### Knowledge 编写与 Review 规范整合（2026-11-02）
+
+用户批准在 `4705a64c8ab56e88c908a95639ea4495c514507e` 上作最小增量，沿用现有两份 Knowledge 资源，不新增 Skill、文件、评分或流程。description 明确资料提炼、编写及不保存的草案；编写与 Review 共用对象/用途/视角及同一内容判据，具体发现定位到位置、缺陷、依据和最小修正。经验分离观察、原因解释和可迁移结论；建议落到适用条件下的判断/动作或例子；精简按理解、查证、判断、行动是否损失必要信息裁决。证据不足定位具体主张/步骤/数值/关系及可表达强度，独立合格部分和有归属的未知/观点不被整条阻断。
+
+指定 GitHub Docs、GitLab、KCS Content Health Indicators、固定 ACE/Mem0/GraphRAG 原文已核读，采用与不照搬边界融入原有依据表；动态 main/master 只标实际观察日。仅替换两组原有合成文字对照，未执行它们；不迁入外部完整提示词、详细推理输出、ADD-only、固定字数/发现数/评分或自动写入。同步 MCP owner 与既有资源检查的章节名，原本体原文导航、VLog、全局引导及案例文件保持不变。
+
+本轮通过：两份运行时 Markdown 的定向 Prettier、四份文档的 CSpell、MarkdownLint（108 份）、本 PR 作者文档的 848 条本地路径/锚点、gofmt 与 `git diff --check`；`TestKnowledgeSkillResourceContract` 只验证元数据、资源和静态材料，分发白名单/版本注入两项确定性检查通过。当前 diff 仅五个既有文件；Ontology/VLog/Doctor 下 17 个源码与静态资料文件逐字节等于 `4705a64`，没有新增文件。按规范复核正文的职责、条件路由、七项增量与两组示例的证据边界，原文引用不成为每次全读依赖，动态来源未冒称固定版本。
+
+不以描述缺少选择信号推断模型已实际漏选，不声明新模型行为或知识效果已验证。未运行案例、行为模型测试、任务模拟或额外模型 API，未发布、合并、安装或修改知识库；推送后由父线程对本轮五文件另作独立 GitHub Review，此前 `4705a64` 的导航 Review 不覆盖本增量。
+
+### Knowledge 过程归属与规则分层修订（2026-11-02）
+
+独立 GitHub Review 在 `d5684b2094899b73037db7d37c30f2a1634bb250` 发现两项未解决问题：主文按维护词语排除了合法方法步骤，参考仅为维护事件保留例外；主文与参考重复拥有通用质量判据、精简标准和内容 Review 结论。因此上一节的本地文字 Review 不构成本增量已经通过独立审核的证据，原先无缺陷判断不能沿用。
+
+本轮将过程归属统一为“描述对象、读者用途及信息作用”：保留对象自身的迁移、审批和维护方法所需步骤，移出与对象/用途无关的本条入库历史，不按改名、键、批准、提交等词判断。合成对照同时覆盖无关保存经过、真正的迁移方法、维护事件以及真实文档草案/版本；不默认添加草案版本，不把未核验改成对象未完成。主文第 1/2/5/6 节的授权、身份读取、并发、回读、未知结果恢复与职责边界保持原文。
+
+通用内容判据、精简标准和四类内容 Review 结果归主文第 3 节；第 4 节只提供维护/审计入口与条件路由。参考删除重复质量维度表、通用内容合同及结论定义，保留条件化取证、审计发现/覆盖/报告、合成对照和既有外部依据；独立打开参考先回链主文。参考读取不自动触发全库盘点、使用测试或全读外部来源。本体引用导航、VLog 维护真源和其他 Skill 不在本轮改动范围。
+
+本轮通过两份运行时 Markdown 的定向 Prettier、四份文档的 CSpell、MarkdownLint（108 份）、本 PR 作者文档的 850 条本地路径/锚点与 `git diff --check`；`TestKnowledgeSkillResourceContract` 的元数据/资源/静态材料检查及两项确定性分发白名单/版本注入检查通过。四个既有文件发生变更，没有新增文件；Knowledge 元数据和第 1/2/5/6 节、外部来源表及尾注与 `d5684b2` 逐字节一致，Ontology/VLog/Doctor 的 17 个源码/静态资料文件也逐字节一致。已有 YAML/Cypher/JSON 示例代码块未变且未执行。仅按共同判据作文字结果 Review，不跑案例、模型行为、使用测试、证明器、额外模型 API 或整套 `validate`/pre-commit 案例门禁；未修改门禁定义。提交/推送及 PR head 以实际交付记录为准。上述检查不能证明宿主或模型的实际遵循效果；独立 GitHub 复审和用户人工 Review 待完成。
+
+<a id="d121基础本体资料与质量规范增量2026-11-02"></a>
+
+## D121 历史方案及检查记录
+
+下节对应此前内置原件方案及其修订，最晚基线为 [`99812bfd2b648171efbb76d29dc744cded7e615b`](https://github.com/bYiyLi/kg-os/tree/99812bfd2b648171efbb76d29dc744cded7e615b)。其中原件数量、路径、清单、命令和候选产物只在该历史版本成立，D122 已删除其当前态资源及专用检查。历史证据保留，不证明远程原文的新导航、当前包体或宿主读取已通过。
+
+**历史实施状态：`in_progress`**。此前增量按 [D121](../../design/decisions.md#d121-bundled-foundations-and-quality-review) 和 [MCP owner](../../design/mcp.md#ontology-standards-authoring) 实施，交付一个 draft PR，经结果 Review 后交用户人工 Review。该历史增量当时替代旧记录中关于独立模型库入口及本增量案例/行为验收的安排；历史证据不重写，不据此关闭整个 Phase 27 或 Phase 25/28。
+
+| 内部步骤 | 交付与依赖 | 当时结果 |
+| --- | --- | --- |
+| 来源与许可 | 五套理论逐项核对；固定版本/Commit，明确原件、公理、实现、指南、案例、依赖及缺口 | 固定清单及取证完成，保留实际理论/许可缺口 |
+| 规范改造 | 语义身份先于字段；知识内容、证据、视角及维护过程分工；四 Skill 边界 | 源码已改，含一手内容方法适配及具体 Review 判据 |
+| 原件与适配打包 | 原文及逐文件清单，独立 KG OS 适配、条件路由与确定性分发检查 | 553 原件、17 份完整提取；本地分发检查已通过，实际宿主未验证 |
+| 旧库退出 | 停止运行时发现/同步，包内可选静态案例、来源与恢复说明 | 当前源码完成；旧远端仓库及用户安装未改 |
+| 结果 Review 与交付 | 全 diff、许可/忠实度/语义/资源/迁移 Review，修正后复审；Commit/Push/draft PR | 本地结果 Review 与确定性检查收尾；独立 GitHub/人工 Review 待完成 |
+
+Acceptance：
+
+- BFO、UFO、DOLCE、SUMO、GFO 全部有实际来源核查与范围声明，原件和 hash 可核对；子集、空目录、外部版权资料或非公开公理不能冒充完整理论。
+- 选择理论后可从版本、承诺语义走到 KG OS 图表达及执行边界；主 Skill 不全量加载资料，不强制特定理论、固定领域 Schema 或领域 Skill。
+- 规范与示例标题不把分类实例、角色 Property 等局部选择写成普遍定律；相同字段但身份/成员资格不同的对象有明确判断路径。
+- Knowledge 正文能区分对象内容与维护过程，保留会改变使用判断的条件和必要经历；不将来源观点变成无归属事实。
+- 内容 Review 同时覆盖用途、视角、结构、简洁、准确、必要完整性、独立理解和使用价值；每项有检查对象/可观察缺陷/依据/修正及结果边界，支持合格/需修订/证据待核/无新增价值。KCS、Google、Diátaxis、Microsoft 一手方法须有实际适配与不照搬范围，并给合成 Claim/Procedure/Case 对照，不复制私有数据或强制通用模板。
+- 包内依赖/路径/格式/许可及公开分发完整性通过确定性检查；读取已写结果、检查新增文件和 `git diff --check`。真实宿主不可观察的格式/体积/加载/行为标记未验证。
+- 本增量采用**结果 Review**，不跑案例、模型评测、任务模拟、生产示例或额外模型 API；`pnpm validate`/pre-commit 中含案例执行的整套入口不在本次运行。保留既有门禁定义，报告实际未运行项，不通过禁用门禁制造全绿。无 Kernel/运行时变更，不要求此资料增量执行 Docker/Dev 写入。
+- 分支提交推送并开 draft PR，记录 head/base 和检查结果，供独立 GitHub Review 及用户人工 Review；不自动合并、发布、部署或更新账户 Plugin。
+
+Review 检查完整收录范围、原文忠实与可读转换、概念身份/关系成立条件、资源路径与第三方许可、职责/指令冲突、描述密度与视角、旧库迁移及恢复；静态 Review 不证明模型行为改进。
+
+### 历史检查与 Review 证据
+
+证据对应本任务工作分支的 D121 改动，基线为 `ac85628985e66860ed28f82a0f5cec9ba4c3d09a`，不是该基线已包含新资料。交付 Commit、head/base 与独立 GitHub Review 结论以实际 draft PR 为准。
+
+- **来源完整性**：`node scripts/check-ontology-sources.mjs --upstream-root /tmp` 核对 10 个来源包、553 份原件（17,244,963 bytes）、17 份全文转换及 8 个固定 Git 树；收录与 1,094 个排除项完整对应，无未知原件。版本、逐文件 hash/blob、许可、用途、依赖与缺口在随包 `sources.json`/目录中。
+- **转换与语法**：用 pypdf 6.13.2 重新提取 17 份 PDF 的全部 113 页，逐页文本、页序及字符数与副本一致；不据此认证图/公式排版忠实。41 份 XML/JSON 解析通过；56 份 Turtle 解析通过。进一步 RDF 解析为 89 份通过、2 份历史 DOLCE Archive（2.2/2.3）失败，已保留原字节并在清单/适配明确说明，不冒充现行可载入模型。导入检查定位 54 条边；gUFO HTTPS 别名以显式本地对应处理，未修改原件或执行推理。
+- **资源与分发**：五个定向 Go 元数据/资源合同检查通过，涵盖 Ontology、Knowledge、VLog、Doctor 和未改引导词基线；没有执行案例/数据库业务测试。公开导出白名单、570 份原件/转换逐字节相同、篡改与未登记文件拒绝、版本注入三项确定性分发检查通过。原四 Skill、源码测试目录排除及第三方通知保留。
+- **文本 Review**：已核对新规范与来源、权限、职责及资源路径；修正分类/角色案例标题的普遍化、相同字段掩盖身份区别、GFO Persistant/Presential 层次、DOLCE SIMPLE 与 D18 及技术重实体化的差别。Knowledge 判据将多主体主张、聊天指代、维护历史错放、冗余与必要限定分别处理；外部内容方法只有适配、无整页转载或私有案例。
+- **限制**：完整 UFO-C、GFO 未公开 FOL、DOLCE D18 外部报告、BFO ISO/商业书籍及 SUMO 未选领域/词汇语料未冒称收齐。未执行案例、行为评测、模型 API、真实宿主安装/加载、Docker/Dev、整套 `pnpm validate`/`check:quick` 或远端 CI；没有生产库/账户 Plugin 修改。模型指令和静态 Review 不证明稳定行为收益。
+
+恢复与旧库处理见 [维护指南](../../guide/ontology-sources.md)。源码/资料分发检查与未来真实宿主或整阶段门禁分开，不以本增量关闭整个 Phase 27。
+
+### 历史 GitHub Review 修订
+
+对 draft PR #2 初版 `6638a1fcc1640c209fbfa241bbc1e7b6f042e6b6` 的三项发现作针对性修正：
+
+- **内容 Review 路由**：`quality-audit.md` 入口对齐主 Skill 第 3/4 节。第 3 节只加载相关内容判据与方法依据，不触发全量盘点/覆盖报告；第 4 节审计才使用相应完整审计方法，仍按实际范围执行。
+- **SUMO 编码与不存在的副本**：删除“readable copies”声明。Merge（657,674 bytes）与 MILO（1,194,157 bytes）均严格 UTF-8 解码/往返成功，且与固定上游 blob 一致；新增逐文件编码与 U+FFFD 计数校验。Merge 第 11 行的单个 U+FFFD 已存在于上游（零起始 byte offset 418），未擅自恢复或替换。文档给出的只读 Python 读取命令对两份原件均实际核对输出字节/hash，不运行 KIF。
+- **GFO 失效 catalog**：删除“原 catalog 提供 base 映射”的错误说明，保留原 catalog，并记录其 `core/` → 不存在 `modules/gfo-core.ttl` 的问题。在独立 `importAliases` 明确 base → `modules/gfo-base.owl`，核对目标 ontology identifier；复查 54 条本体导入无未解析目标，18 条原 catalog 路由中 17 条文件存在，仅保留这一已披露的上游失效项。
+
+553 份原件与 17 份 PDF 提取内容保持原 hash。修订仅做取证、文本和确定性资源/分发检查，不执行案例或模型试验；整体独立 Review 及用户人工 Review 尚未完成。
+
+**后续逐文件 Review（基线 `9e325fea3e25220a34b573844e3e9ac18c9e029c`）**：纠正 VLog `references/cypher.md` 的旧快照维护说明：旧 Commit 仅作历史溯源，当前查询直接在本仓库维护；合成资料在源码中与 `references/` 同级的 `tests/`，不随 Plugin 分发，静态检查与运行验证归 KG OS 当前开发及分发 CI 流程。与主 Skill、D121、实际目录、隔离测试读取路径及分发排除规则对照一致；仅该段改变，六个 Cypher 代码块及 Q1 之后全部内容与基线逐字节一致。两份修订文档的 Prettier、MarkdownLint、CSpell、本地链接与 `git diff --check` 通过。本次未执行查询、案例、行为测试、证明器或远程 CI，整体 Review 继续进行。
+
+## D115/D116/D117 历史实施基线（2026-10-28）
 
 **状态：`in_progress`**。原 Ontology/Branch 已合并为 `kgos-ontology-standards`；Knowledge/Retrieval/Maintenance 合并为唯一 `kgos-knowledge-standards`；VLog 保持独立。三个规范加 `kgos-doctor`，当前源码目标共 **四个官方 Skill**。已发行 v0.3.5 七 Skill、用户私人 Plugin 和当前部署不受本次本地修改影响。
 

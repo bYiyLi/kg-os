@@ -35,7 +35,9 @@ KG OS 的 `kgosd`、Kernel、Lithograph Host 和原生 MCP 使用 Go；浏览器
 
 **当前实现**：KG OS 已采用 Go `kgosd` 单进程承载 Web、API 和五个 AI-facing MCP Tool（另有 app-only 工作区 Tool），并通过 `kgos_docs` 为 AI 提供 SDK/Cypher/操作指南。底层 Ontology、Knowledge/Graph、Evolution、认证和原生扩展能力的实现及验收，按[开发计划](docs/development/README.md)和各 Phase 文件核实。
 
-**当前交付**：新版本只面向 Linux amd64 Docker。当前源码的官方 Plugin 包含四个 Skill：Ontology 统一本体建模与知识世界选择（内含方法论和可执行案例），Knowledge 统一检索、写入和维护，另有 VLog、Doctor；先前 v0.3.5 的七 Skill 结构保留在其历史发布中。用户的私人 Plugin 不随源码更新自动升级。私有 `kg-os` 维护源码，公开 [`kg-releases`](https://github.com/bYiyLi/kg-releases) 按发布版本分发运行时、Plugin、对应官方 Skill 和唯一安装手册；是否已经正式发行取决于实际 Release、许可门禁及 CI 结果。
+**当前交付**：新版本只面向 Linux amd64 Docker。当前源码的官方 Plugin 包含四个 Skill：Ontology 统一本体建模与知识世界选择（内含方法论、有条件案例及基础本体原文导航），Knowledge 统一检索、写入和维护，另有 VLog、Doctor；先前 v0.3.5 的七 Skill 结构保留在其历史发布中。用户的私人 Plugin 不随源码更新自动升级。私有 `kg-os` 维护源码，公开 [`kg-releases`](https://github.com/bYiyLi/kg-releases) 按发布版本分发运行时、Plugin、对应官方 Skill 和唯一安装手册；是否已经正式发行取决于实际 Release、许可门禁及 CI 结果。
+
+当前源码的 Ontology Skill 提供 BFO、UFO、DOLCE、SUMO、GFO 的固定原文索引、渐进读取指引及独立 KG OS 适配，不内置整套上游原件或 PDF 提取副本。索引按官方资料结构和文件功能说明用途、读取条件、范围与版本；由用户选择理论或自定义模型，子集不冒称完整理论。原文地址、许可及未覆盖部分见 [资料入口](plugins/kgos/skills/kgos-ontology-standards/references/foundations.md)，外部读取能力与可用性须按实际宿主核实。不再以独立官方业务模型仓库作为发现/同步入口；源码改造不修改现有模型或账户 Plugin。
 
 **历史版本**：最后一组 npm / 六平台原生发行版本为 `v0.2.1`；相关提交、CI、发布及恢复证据由 [Phase 00–13 历史验收](docs/development/README.md)和对应阶段文件保存，不在产品 README 复制第二套阶段日志。新镜像的进度不能从历史 npm Release 推断。
 
@@ -55,6 +57,8 @@ KG OS 采用双许可模式：
 - **Commercial License**：无法或不希望按 AGPL 使用 KG OS 的组织，可以申请独立商业许可；商业条款仅通过单独书面协议授予，详见 [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)。
 
 软件许可不自动授予对 **KG OS** 名称、Logo 或其它项目标识的商标权，也不得暗示未经授权的官方背书、合作或认可。
+
+本体导航所引用的外部原文保留原作者/出版方的许可与权限；KG OS 商业许可不授予其复制或再分发权。各理论参考分别标明来源及适用边界。
 
 当前欢迎通过 GitHub Issues 提交 bug、设计反馈和其它讨论。为保留 AGPL + Commercial License 双许可能力，在 contributor licensing policy 正式建立前暂不接受外部代码或文档 Pull Request，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 

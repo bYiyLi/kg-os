@@ -1,5 +1,7 @@
 # Phase 28：官方 Skill 清单收敛与通用 Skill 退役
 
+**D122 同步（2026-11-02）**：四 Skill 清单不变。当前 Ontology 提供五套理论固定原文导航、渐进读取与 KG OS 适配，Doctor D6 改为所选理论来源与适配检查，旧官方模型库发现/同步入口退役。此资料/规范增量按 [Phase 27 D122](27-knowledge-standards-skills.md#d122-remote-foundation-navigation) 做结果 Review 和确定性分发检查，不运行案例或行为评测；本 Phase 的真实宿主安装、发行与旧历史门禁仍未因此完成。旧版与用户定制不自动迁移。
+
 ## 当前目标与状态（D115/D117，2026-10-28）
 
 **状态：`in_progress`**。当前待发布源码目标为 **四个官方 Skill：Ontology、Knowledge、VLog 与 Doctor**。原 Ontology/Branch 统一职责现由 `kgos-ontology-standards` 承担，D114 的临时名称 Modeling 已于 D117 更名；原 Knowledge/Retrieval/Maintenance 合并为 Knowledge。不恢复旧通用 `kgos`。
@@ -15,7 +17,7 @@
 
 - **A28-01 · 源码与公开打包清单**：这四个且仅四个 Skill 目录出现在当前源码、打包白名单、插件清单检查与 Doctor 发现目标；被合并的旧目录不作为新候选重复导出。
 - **A28-01a · 同包 Skill 版本**：四份源码 `SKILL.md` 不维护版本号；公开导出从当前产品/Plugin 统一版本注入字符串 `metadata.version`，正式 Tag 必须同版，最终 ZIP 保留四份一致的版本，参考文件不改写。旧安装或宿主不可见时 Doctor 报告证据不足，而不是假设同版。
-- **A28-02 · Ontology 合同**：Skill 与 `references/` 中的方法论、三组完整建模示例和简版模型确认模板均可发现，概念/实例、分类/Definition、身份与图关系决策受实际问题驱动；模型与关系查询通过真实实例验证。未获具体方案确认不得修改 Ontology、迁移或创建 Branch。无改动模型复用须说明依据，纯只读设计无需实施确认；普通 Knowledge 写入不被阻断。兼顾 VLog 独立归属及官方模型库不可用的回退。
+- **A28-02 · Ontology 合同**：Skill、方法论、有条件的建模示例、确认模板及 D122 五套原文导航/适配均可达；概念/实例、身份/成员资格/依赖与图关系决策受实际问题驱动。按原始结构/文件功能提供固定原文地址、用途、读取条件及范围；不内置整套原件/转换副本。客户端外部读取及模型实际使用另行取证。未获具体方案确认不得修改 Ontology、迁移或创建 Branch。无改动模型复用说明依据，纯只读设计无需实施确认；普通 Knowledge 写入不被阻断。保留 VLog 独立归属，不依赖旧官方模型库。
 - **A28-02a · VLog 自包含模型**：Plugin 中 VLog Skill 的 `SKILL.md`、`references/ontology.md`、`references/cypher.md` 三项均可读取并对应同版源码，包含完整 Definition YAML 与可验证业务查询；源码的 `tests/` 只用于隔离测试，不进入公开包。用户库已有合适模型时不强制安装或覆盖参考本体。
 - **A28-03 · 旧版本与迁移**：已发布 v0.3.5 保留原七 Skill 和对应安装资料；用户私人 Plugin 不自动更新，须按其已获授权的独立安装/迁移流程操作，保留用户定制和原有连接。
 - **A28-04 · 真实客户端与发行**：最终还需新四 Skill 的实际安装/发现、MCP-only 可用性、只读与经授权知识写入/模型修改行为、修订后的发布物/安装手册及发布 CI 证据；未执行则不得标记完成。

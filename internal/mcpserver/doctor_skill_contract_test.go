@@ -55,11 +55,9 @@ func TestDoctorSkillResourceContract(t *testing.T) {
 		"D3 · 官方 Skills", "SKILL.md", "metadata.version", "接口兼容性",
 		"D4 · Knowledge", "graph.query", "有限结果",
 		"D5 · 持续维护与 VLog", "未启用的可选能力不视为故障",
-		"D6 · 官方 Ontology 检查", "kgos-ontologies", "models/", "ontology.md",
-		"Tag", "Commit", "main", "已确认采用", "结构相似", "已定制",
-		"未发现采用证据", "无法判断", "兼容差异", "实际缺口",
-		"升级候选", "Knowledge/查询影响", "最多推荐 3 个",
-		"已有等价结构", "不影响 D0–D5", "检查时间",
+		"D6 · 本体来源与适配检查", "references/foundations.md", "采用证据",
+		"自定义本体是有效选择", "成员资格", "依赖/持续条件",
+		"实际执行责任", "目标 State", "不影响 D0–D5",
 		"不改模型", "kgos-ontology-standards",
 		"PASS", "FAIL", "N/A", "证据不足", "检查受阻",
 		"不修改知识库", "不执行修复、升级或部署",
@@ -73,6 +71,12 @@ func TestDoctorSkillResourceContract(t *testing.T) {
 	for _, match := range links.FindAllStringSubmatch(body, -1) {
 		target := strings.SplitN(match[1], "#", 2)[0]
 		path := filepath.Clean(filepath.Join(root, target))
+		if target == "../kgos-ontology-standards/references/foundations.md" {
+			if _, err := os.ReadFile(path); err != nil {
+				t.Fatal(err)
+			}
+			continue // Explicit same-Plugin dependency; not a Doctor-owned resource.
+		}
 		if !strings.HasPrefix(path, root+string(os.PathSeparator)) {
 			t.Fatalf("required resource escapes Doctor: %s", match[1])
 		}
@@ -116,7 +120,8 @@ func TestDoctorGuidanceApprovedBaseline(t *testing.T) {
 	}
 }
 
-func TestDoctorOfficialOntologyEvaluationCoverage(t *testing.T) {
+// D120 material is retained as historical evidence, not current D121 acceptance.
+func TestDoctorHistoricalD120EvaluationMaterial(t *testing.T) {
 	raw, err := os.ReadFile("../../tests/skills/doctor-current-evaluation.json")
 	if err != nil {
 		t.Fatal(err)

@@ -20,6 +20,8 @@ A commercial license may provide alternative terms for proprietary products, ser
 
 Commercial terms are granted only through a separate written agreement. This document does not itself grant a commercial license or modify the AGPL.
 
+External ontology materials linked by the Ontology Skill remain subject to their authors’ and publishers’ terms. A KG OS commercial license does not grant rights to copy or redistribute those materials; source and scope notes accompany each theory reference.
+
 For commercial licensing inquiries, contact the project owner through the KG OS GitHub repository.
 
 ### Trademarks
@@ -29,6 +31,8 @@ The software licenses do not grant trademark rights in the KG OS name, logos, or
 ## 简体中文
 
 KG OS 采用双许可模式。
+
+Ontology Skill 所引用的外部本体资料仍受原作者/出版方条款约束。KG OS 商业许可不授予其复制或再分发权；各理论参考分别标明来源及适用边界。
 
 ### 开源许可
 

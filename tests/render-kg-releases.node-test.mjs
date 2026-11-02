@@ -43,8 +43,14 @@ test("only whitelisted public files are generated, deterministically", async () 
         "plugins/kgos/skills/kgos-ontology-standards/SKILL.md",
         "plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md",
         "plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md"
-      ]
+        "plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md",
+        "plugins/kgos/skills/kgos-ontology-standards/references/foundations.md",
+        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/bfo.md",
+        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/ufo.md",
+        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/dolce.md",
+        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/sumo.md",
+        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/gfo.md"
+      ].sort()
     );
     assert.deepEqual(
       first.files

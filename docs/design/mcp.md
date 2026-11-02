@@ -675,9 +675,9 @@ flowchart TD
 
 ### 当前官方 Skill 清单（D115/D117）
 
-**当前 KG OS 官方 Plugin 保留四个 Skill**：`kgos-ontology-standards`、`kgos-knowledge-standards`、`kgos-vlog-standards`、`kgos-doctor`。领域专属的 AIMemory Skill 不纳入此清单，使用方采用对应领域本体时按需独立安装。原 Ontology/Branch 的统一职责由 Ontology Skill 承担（原临时名称 Modeling 已按 D117 改名）；原 Knowledge/Retrieval/Maintenance 已统一为 Knowledge。已发行 v0.3.5 的七 Skill 属于历史真实资产，当前源码、发布版本和私人 Plugin 的安装状态必须分别核对。
+**当前 KG OS 官方 Plugin 保留四个 Skill**：`kgos-ontology-standards`、`kgos-knowledge-standards`、`kgos-vlog-standards`、`kgos-doctor`。原 Ontology/Branch 的统一职责由 Ontology Skill 承担（原临时名称 Modeling 已按 D117 改名）；原 Knowledge/Retrieval/Maintenance 已统一为 Knowledge。不新增基础本体或 AIMemory 独立官方 Skill。已发行 v0.3.5 的七 Skill 属于历史真实资产，当前源码、发布版本和私人 Plugin 的安装状态必须分别核对。
 
-KG OS 官方 Plugin 从私有 `plugins/kgos/` 导出自身四个 Skill 及对应资源；`kgos-ontologies` 是独立可选的领域模型及专属 Skill 发布来源，不是 Plugin 的运行时依赖。**四份官方 `SKILL.md` 不存独立版本号**；发行时以已校验的 `package.json` / `plugin.json.version`（正式 Tag 必须同版）为唯一来源，仅向官方 Plugin 分发副本注入相同字符串 `metadata.version`。旧 Tag、现有用户私人 Plugin 和独立领域 Skill 不回写；安装/可见/实际使用状态分别验收。
+KG OS 官方 Plugin 从私有 `plugins/kgos/` 导出自身四个 Skill 及对应资源。基础本体固定原文导航、渐进读取方法和独立 KG OS 适配随 Ontology Skill 提供；停止将 `kgos-ontologies` 作为独立官方模型产品线、发现或同步入口，历史固定版本仍可溯源。**四份官方 `SKILL.md` 不存独立版本号**；发行时以已校验的 `package.json` / `plugin.json.version`（正式 Tag 必须同版）为唯一来源，仅向官方 Plugin 分发副本注入相同字符串 `metadata.version`。旧 Tag、现有用户私人 Plugin 和独立领域 Skill 不回写；安装/可见/实际使用状态分别验收。
 
 <a id="kgos-standards-skill-suite"></a>
 
@@ -698,29 +698,31 @@ VLog 独立归属保持不变，Domain 只组织 Ontology；Branch 是完整版�
 <a id="branch-standards-authoring"></a>
 <a id="modeling-standards-authoring"></a>
 
-#### Ontology 规范与官方模型库
+#### Ontology 规范与基础本体原文导航
 
-规范正文：[kgos-ontology-standards](../../plugins/kgos/skills/kgos-ontology-standards/SKILL.md)；按需参考：[KG OS 本体工程方法论](../../plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md)、[四组可执行建模案例](../../plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md)；确认单：[简版模板](../../plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md)。AI 先确定实际业务问题、稳定概念、身份与关系语义，再映射 KG OS Definition，并以正反例、Cypher 和合理分类扩展验收。类别变化优先在 Knowledge 中表达，不为每个业务名词新增 Definition；不将 VLog 事件本体当作所有领域的固定上层模型。技术合同仍以本实例的 `kgos_docs` 为准。
+规范正文：[kgos-ontology-standards](../../plugins/kgos/skills/kgos-ontology-standards/SKILL.md)；按需参考：[KG OS 本体工程方法论](../../plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md)、[有条件的建模案例](../../plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md)、[基础本体原文导航与渐进读取](../../plugins/kgos/skills/kgos-ontology-standards/references/foundations.md)；确认单：[简版模板](../../plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md)。AI 从业务问题分析对象的身份、成员资格、本质、依赖与持续条件，再决定 Definition、关系和 Knowledge 的边界。字段相同不证明语义相同；不同名称也不证明需要不同 Definition。最小扩展以语义正确为前提，不为减少改动保留错误结构。技术合同仍以本实例的 `kgos_docs` 为准。
 
-官方可复用模型库已公开于 <https://github.com/bYiyLi/kgos-ontologies>，首版 `v0.1.0` 提供 VLog 事件参考模型。模型 Definition 与查询的唯一可维护真源位于公开仓库的 `models/vlog/`；KG OS VLog Skill 保留从该 Tag 对应不可变 Commit 生成的离线快照及原测试资料，使用 `node scripts/sync-vlog-ontology.mjs ../kgos-ontologies v0.1.0` 同步、加 `--check` 只读核对，不手工修改两份模型。此仓库的 CI 执行静态检查，真实 KG OS/Lithograph 隔离验收由本项目相应测试负责。模型库不可访问或没有适用模型时不停止独立设计；官方模型只作为适配依据，不在 Kernel 中预置，也不默认整套导入。Ontology Skill 包含入口、方法论、四组经验证的教学模型与确认模板；原有八份历史 Ontology 案例保留在 `internal/kernel/testdata/ontology/`，不被删除或当作第二套发行模型。模型修改仍需用户确认；参考资料不赋予写入授权。
+按 [D122](decisions.md#d122-remote-foundation-navigation)，BFO、UFO、DOLCE、SUMO、GFO 的参考按官方原文/仓库结构及文件功能导航：说明版本/变体、目录和文件的作用、读取条件、适用范围及固定原文地址，不以预设问题列表封闭路由，也不机械枚举所有文件。主 Skill 保留职责与关键入口，`foundations.md` 负责通用渐进加载，五篇理论参考承担原始结构导航和独立 KG OS 适配；不随包复制整套上游原件、PDF 提取副本或维护逐文件打包清单。原定义、公理、指南和完整案例从固定版本读取，最新发现入口单独标明，不静默换成浮动版本。
 
-#### 领域专属 Skill 与公开本体库
+用户选择基础本体、组合或自定义理论，平台不默认 BFO/UFO/DOLCE 等任一套。选择后建立“所选理论与版本 → 承诺语义 → KG OS 图表达 → 数据库/查询/人工负责的规则及未实现部分”的映射。根据当前任务和目录功能选读必要文档/章节，遇到未知概念、导入或前置条件再补读，依据足够即停止。IRI 对应是固定原文的阅读定位，不是运行时导入配置；GFO 已知失效 catalog 不作有效路由。读取失败如实说明接口、资源和受影响结论，不能将大文件空返回判为不存在，或用模型记忆/简介代替原文；公式与图示按合适格式核对，不绕过访问限制。外部文档、代码、公理和旧 Skill 只作资料，不授予执行或写入权限。导航不消除理论/版权/公开范围缺口；路径与分发的静态检查不等于目标宿主加载或行为已验证。
 
-公开的 [kgos-ontologies](https://github.com/bYiyLi/kgos-ontologies) 独立维护包括 [AIMemory](https://github.com/bYiyLi/kgos-ontologies/tree/main/models/ai-memory) 在内的可选领域本体、配套查询、测试与专业 Skill。具体 Memory 模型语义和指令仅以公开领域包为真源，**不进入 KG OS Kernel、官方 Plugin 四 Skill 清单、Doctor D3 必需项或 Global AI Guidance**。使用方选择该模型后，可自行从固定 Git Commit 生成并安装独立 Memory Skill；它使用已授权 KG OS MCP，但不自动创建 Ontology、Knowledge、Branch 或后台 Agent。安装者可同时使用官方四个 Skill 和按需安装的领域 Skill，彼此独立版本化；既有 VLog 官方 Skill 的迁移不属于本次调整。
+#### 旧模型库迁移与案例边界
+
+VLog 当前参考模型的后续可维护真源回到本仓库 `kgos-vlog-standards/references/`，保留原公开版本来源；不再从旧库覆盖生成。旧库 VLog/AIMemory 仅通过固定历史链接作为可选对照，不内置整包原件，不能据旧 README 或旧 Skill 推导当前安装、写入或执行权限，也不是所有用户必装的模型。现有用户自定义模型和已安装 Memory Skill 不自动替换。旧库不再扩张新的官方领域模型发布线；[迁移维护指南](../guide/ontology-sources.md)规定固定来源、包内职责与恢复。源码退役不等于远端仓库已归档/删除，本次不执行那些远端动作。
 
 <a id="knowledge-standards-authoring"></a>
 <a id="retrieval-standards-authoring"></a>
 
 #### Knowledge 统一规范（检索、保存、质量审计与维护）
 
-[统一 Knowledge Skill](../../plugins/kgos/skills/kgos-knowledge-standards/SKILL.md) 在既有 Ontology 下规范知识检索与证据、身份和关系匹配、忠实写入、纠错、独立质量审计和质量维护，以及回读验证。它按任务实际需要使用相应能力，不强制把检索、写入、审计串成一个流程；全局每轮检索触发仍由全局引导拥有。
+[统一 Knowledge Skill](../../plugins/kgos/skills/kgos-knowledge-standards/SKILL.md) 在既有 Ontology 下规范资料提炼、知识编写（含不保存的草案）、检索与证据、身份和关系匹配、忠实写入、纠错、独立质量审计和质量维护，以及回读验证。编写与 Review 使用同一用途和内容判据，来源与因果结论限定到具体主张及其证据范围；不以格式合规代替技术真实性。它按任务实际需要使用相应能力，不强制把编写、检索、写入、审计串成一个流程；全局每轮检索触发仍由全局引导拥有。
 
-创建与更新前核对现有知识和业务身份，区分用户陈述、来源主张、真实观察和 AI 推断；保留否定、时间、适用范围和不确定性。检索只用实际模型/索引/State，不能将搜索候选、分页截断、Top-K 未命中当成事实或全量证据。独立质量审计支持单条、指定范围及全知识世界只读盘点，按真实性、完整性、身份一致性、时效性、关系追溯和实际检索复用来判断；核对事实来源支持的具体主张，并以真实业务问题验收重要知识。全量声明必须有实际枚举覆盖，不得以空字段率、Schema 一致性或通用分数替代内容质量。维护须区分已证实错误、合理差异与未决争议，只在授权范围内做最小修正，不制造重复记录、不误删正确历史或附加通用质量 Schema。
+创建与更新前核对现有知识和业务身份，区分领域事实、来源观点、实际经历、经验结论和方法；保留否定、时间、适用范围和不确定性。正文围绕对象和读者用途表达必要事实、方法及判断条件。对象自身的业务过程、迁移/审批/维护方法和事件可以包含必要的改名、身份键、批准、提交、保留及核验步骤；仅与对象和用途无关的本条提炼、保存、修订经过移出正文，确需留痕时使用已有且获准的维护记录。归属按信息作用判断，不按词语、字段名或记录者身份排除。类型说明负责概念与成员边界，知识正文负责具体内容，来源与适用条件负责追溯。真实文档的草案状态和版本忠实表达，不由证据待核或入库流程默认生成。限制只保留会改变使用判断的部分，不以固定字数、免责声明数量或全改成客观口吻代替质量。检索只用实际模型/索引/State，不能将搜索候选、分页截断、Top-K 未命中当成事实或全量证据。独立质量审计支持单条、指定范围及全知识世界只读盘点，按真实性、完整性、身份一致性、时效性、关系追溯和实际可用性判断。全量声明必须有实际枚举覆盖；维护区分已证实错误、合理差异与未决争议，只在授权范围最小修正，不附加通用质量 Schema。
 
 质量审核进一步区分“来源可定位、来源支持具体主张、实际效果独立验证”，不会将正式决策证据误当生产运行验收；报告分别说明结构覆盖、已核对原文的语义深度和实际业务问题验收范围，不以一次全量节点枚举宣称所有事实正确。对会影响实际决策的证据缺口优先深入核查，按授权范围最小化披露原文、路径和敏感信息。事件复盘的失败尝试与独立验证仍由 VLog Skill 拥有，通用知识质量判据可协作复用；Doctor 只诊断就绪性，Ontology 只处理确定的模型结构缺口。
 
 Knowledge 自己不改变 Ontology/Branch：真实表达缺口交由 `kgos-ontology-standards` 提出具体建模方案，模型变更未经相应授权不得改动；普通 Knowledge 写入与有据维护不因合并新增逐次批准。数据库操作与并发/错误合同均通过当前 `kgos_docs` 获取。
-运行时 Skill 包含 `SKILL.md`，以及仅在独立审计/复杂使用验收时加载的 [质量审计方法](../../plugins/kgos/skills/kgos-knowledge-standards/references/quality-audit.md)。原实例案例、检索查询与维护案例保留在 `internal/kernel/testdata/knowledge/` 作为隔离验证材料，不作为随 Plugin 安装的指导。行为评测输入位于 `tests/skills/knowledge-unified-evaluation.json`，正反证据案例与按需只读模型评测入口位于 `tests/skills/`；模型测试不能代替 ChatGPT 私人 Plugin 的原生自动选用、MCP 工具链和生产写入验收。实际模型行为与客户端验收分别取证，具体见 [Phase 27](../development/phases/27-knowledge-standards-skills.md)。
+运行时 Skill 仍只有两份资源：`SKILL.md` 第 3 节统一拥有通用内容判据、精简标准与内容 Review 结果，第 4 节负责条件路由；[质量审计参考](../../plugins/kgos/skills/kgos-knowledge-standards/references/quality-audit.md) 拥有取证方法、审计覆盖/报告、必要合成对照与方法来源。普通内容 Review 使用主文，只在有具体取证、表达歧义或依据核对需求时补读相应参考；独立审计按实际范围读取审计章节。参考独立打开时回链主文，不重复维护同一规则，也不把来源表变成全读依赖。原实例案例、检索查询与维护案例保留在 `internal/kernel/testdata/knowledge/` 作为隔离验证材料，不作为随 Plugin 安装的指导。行为评测输入位于 `tests/skills/knowledge-unified-evaluation.json`，正反证据案例与按需只读模型评测入口位于 `tests/skills/`；模型测试不能代替 ChatGPT 私人 Plugin 的原生自动选用、MCP 工具链和生产写入验收。实际模型行为与客户端验收分别取证，具体见 [Phase 27](../development/phases/27-knowledge-standards-skills.md)。
 
 <a id="vlog-standards-authoring"></a>
 
@@ -746,7 +748,7 @@ Skill 入口只拥有 VLog 的记录准入、事件身份、证据与延续规�
 
 ### KG OS Doctor：AI 使用环境自检
 
-`kgos-doctor` 是用户按需触发的**只读诊断 Skill**，不接管 CLI `kg doctor`、安装、修复、升级或知识维护。全面自检检查 D0–D6；定向自检仅执行指定项和必要前置；D6 是独立的非阻断性官方模型发现/对比检查。
+`kgos-doctor` 是用户按需触发的**只读诊断 Skill**，不接管 CLI `kg doctor`、安装、修复、升级或知识维护。全面自检检查 D0–D6；定向自检仅执行指定项和必要前置；D6 按 D121 改为所选本体来源与适配的非阻断检查，不再依赖独立模型库发现。
 
 | 项目 | 实际检查 |
 | --- | --- |
@@ -756,9 +758,9 @@ Skill 入口只拥有 VLog 的记录准入、事件身份、证据与延续规�
 | **D3 · 官方 Skills** | 核对实际安装包中的官方 Skill、引用资源及 MCP 接口；同包四份可读 `SKILL.md` 的 `metadata.version` 应声明一致，旧版缺字段或宿主不可读时标注版本不可验证，不跨 Plugin 比较，也不与 MCP 运行版本强制相同。版本声明与资源可读不代表 Skill 自动选用，调用行为另看真实轨迹 |
 | **D4 · Knowledge** | 在目标 State 按实际 Ontology 用有界 `graph.query` 验证业务 Knowledge 的发现与读取，不以内部节点计数或有限样本推断全库；已证实无业务实例不当作损坏或已完成实例检索 |
 | **D5 · 持续维护与 VLog** | 核对可见外部维护任务的配置与真实运行证据，通过实际 VLog 的 State、Ontology 和 Knowledge 检查维护、验证及未决问题；已确认未启用的可选能力不当作故障，配置不可见不能推断未启用 |
-| **D6 · 官方 Ontology 检查** | 只在已获授权的目标 Branch/State 读取 Ontology；从公开 `bYiyLi/kgos-ontologies` 实时发现模型，以不可变 Commit 固定比较版本并按需读取 Definition。优先用采用来源识别模型，没有来源时仅作结构/语义相似判断；对比 Node、Relationship、Constraint、Index、Domain 和实际使用需求。确认采用版本、后续官方版本和有意义变化后才建议升级；另按具体需求最多推荐 3 个可选模型，已有等价模型优先复用。不可访问、证据不足均不影响 D0–D5；不自动引入模型或领域 Skill |
+| **D6 · 本体来源与适配** | 在获准 Branch/固定 State 核对实际模型及采用理论/版本的证据；按同包 Ontology Skill 入口读取固定上游原文、依赖和映射，检查身份、成员资格、依赖/持续条件、关系及实际执行责任。自定义理论是有效选择；无采用依据不猜测，资源不可读或范围不足如实报告，不影响 D0–D5，不发现/安装新官方领域模型 |
 
-**证据与报告**：只在明确授权和可观察范围内检查，多个 Instance 分开结论，不以本地源码、历史对话或单个工具名代替实际验证。每项只报告 `PASS`（实际验证通过）、`FAIL`（明确区分真实问题与必要证据缺失/受阻）或 `N/A`（有证据确认不适用），明确范围、证据与必要建议。无法读取初始化指令或自动 Skill 选用轨迹时保留证据缺口，不认定已经成功加载、自动触发或确实未安装。D6 未发现升级或未采用官方模型并非故障；官方访问失败仅报告 D6 受阻，不推断 KG OS 损坏。发现新版只推荐升级，不自动操作；缺版本元数据不推测最新或当前运行版本。按 D0–D6 线性输出，受阻时继续独立检查。
+**证据与报告**：只在明确授权和可观察范围内检查，多个 Instance 分开结论，不以本地源码、历史对话或单个工具名代替实际验证。每项只报告 `PASS`（实际验证通过）、`FAIL`（明确区分真实问题与必要证据缺失/受阻）或 `N/A`（有证据确认不适用），明确范围、证据与必要建议。无法读取初始化指令或自动 Skill 选用轨迹时保留证据缺口，不认定已经成功加载、自动触发或确实未安装。D6 未采用基础理论或选择自定义本体并非故障；必要原件/采用依据不足仅报告 D6 受阻，不推断 KG OS 损坏。发现新版只推荐升级，不自动操作；缺版本元数据不推测最新或当前运行版本。按 D0–D6 线性输出，受阻时继续独立检查。
 
 **系统级 VLog 归属**：`branch/vlog` 是可选的普通 Branch，而非 Kernel/Lithograph 内置日志空间、独立数据库或固定 Schema。它可以记录高价值事件、来源、验证和后续处理，实际数据结构由调用方 Ontology 定义；版本来自已有 Evolution State。Doctor 只根据目标实际模型及可核实运行/来源判断，不能仅因存在 Branch 或记录自述成功就断言维护或独立验证成功。调度属于外部宿主，不随 KG OS 自动提供；仓库 `docs/vlog/` 是开发记录，不是运行时 VLog。
 

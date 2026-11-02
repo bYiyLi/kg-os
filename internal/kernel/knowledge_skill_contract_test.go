@@ -57,7 +57,7 @@ func TestKnowledgeSkillResourceContract(t *testing.T) {
 	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 {
 		t.Fatalf("invalid declared metadata: %+v", meta)
 	}
-	for _, expected := range []string{"## 2. 检索与理解", "## 3. 创建与更新 Knowledge", "## 4. 维护与审计知识质量", "## 5. 执行与核实", "独立质量审计", "references/quality-audit.md", "kgos-ontology-standards", "kgos_docs"} {
+	for _, expected := range []string{"## 2. 检索与理解", "## 3. 提炼、编写与更新 Knowledge", "## 4. 维护与审计知识质量", "## 5. 执行与核实", "独立质量审计", "references/quality-audit.md", "kgos-ontology-standards", "kgos_docs"} {
 		if !strings.Contains(string(body), expected) {
 			t.Fatalf("unified Knowledge Skill lacks %q", expected)
 		}

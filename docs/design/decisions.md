@@ -1,6 +1,6 @@
 # 架构决策记录
 
-<!-- cspell:words Buildx SKOS CIDOC -->
+<!-- cspell:words Buildx SKOS CIDOC CLIF TPTP Diátaxis -->
 
 本文件记录 KG OS 架构决策的**决定、依据、备选、取舍与被替换基线**。具体运行行为仍由对应职责设计文件拥有；本文件不建立第二份操作合同。
 
@@ -1126,7 +1126,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **版本与完成规则**：官网显示最新稳定版与适用版本，命令固定版本/digest；更新纳入正式发行收尾，不随开发版本提前变化。每个正式发布版本在 KGHub 保留完整双语手册与同版 INSTALL 快照，固定版本页面和下载绑定同版镜像/Plugin，网站提供历史版本与保留版本的语言切换；最新入口是明确发布目录指定版本的别名，未知版本不回退。候选技术修改仅进入可编辑双语模板与 canonical INSTALL，网站只读已归档快照；新版本不覆盖历史正文。本轮补齐 v0.3.0 网站文档但不改写既有 Tag/Release。此决定取代此前仅保留 Release 下载、不提供网站版本选择器的方案。服务升级先核对兼容说明，停止写入和服务、私有完整备份后按原挂载替换镜像并验收；镜像回退与数据恢复分别处理。完整安装逐项报告可观察的实际证据，不把隐藏指令来源或自动 Skill 轨迹作为不可完成的硬门槛，不把已确认缺失当作不可观测；Doctor 只覆盖安装相关 D1–D3，用户可明确选择 MCP-only。规则归 [MCP 私人安装](mcp.md#官方-skill-与私人-plugin)，官网呈现归 [Client 官网](client.md#公开产品官网astro--github-pages)。
 - **Plugin/Skill 同步**：只公开 `plugins/kgos/plugin.json`、不含用户凭证的 `.app.json.example` 和七个目标 Skill 的所有必要 Markdown 资源，同时公开适用许可文本。Plugin Manifest 版本须与 KG OS 产品包版本相同。历史过渡通用 `skills/kgos` 不进入公开候选包（后续已从私有源码删除）；旧私人 Plugin 不自动更新或移除，真实七 Skill/Doctor 客户端验收仍按 Phase 25/27/28 独立完成，不能以文件导出代替。
 - **发布**：普通 Private `main` Push 只同步公开候选内容，公开 CI 执行测试；获得独立授权的 Private `v*` Tag 对应公开同名版本，正式 Release 除 Docker 外必须提供包含一份 `INSTALL.md`、Plugin Manifest、无凭证配置样例、七个 Skill 与许可的归档；后续 Release 另附同版双语用户安装 Markdown。AGPL 与商业双授权的二进制发布合规前置和 `KGOS_BINARY_DISTRIBUTION_APPROVED` 门禁继续有效；不把尚未发行的 GHCR Tag 当作用户可安装镜像。
-- **验证归属**：渲染白名单、拒绝秘密/额外 Skill、单安装文档、产品版本一致性及归档完整性属于当前发布链可验证合同，维护于 [Client](client.md#私有源码与公开分发仓库)、[MCP Plugin](mcp.md#最终官方-skill-清单与通用-skill-退役d107目标方案) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。不为这些文件建立第二套技术或设计真源。
+- **验证归属**：渲染白名单、拒绝秘密/额外 Skill、单安装文档、产品版本一致性及归档完整性属于当前发布链可验证合同，维护于 [Client](client.md#私有源码与公开分发仓库)、[MCP Plugin](mcp.md#kgos-official-skills) 和 [Phase 30](../development/phases/30-private-source-public-releases.md)。不为这些文件建立第二套技术或设计真源。
 
 <a id="d110-token-first-setup"></a>
 
@@ -1231,7 +1231,35 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D120 Doctor 官方本体发现与适用性检查（2026-10-29）
 
+**后续调整**：独立官方模型库发现、升级入口由 [D121](#d121-bundled-foundations-and-quality-review) 替换为所选理论与随包资料的来源/适配核对；下述是原决定的历史依据。
+
 - **决定**：在 [D118](#d118-kgos-doctor-six-checks) 的六项只读诊断后新增非阻断 D6：发现官方 `bYiyLi/kgos-ontologies` 模型，比较授权目标世界的 Ontology，报告有证据的升级候选及可能适用的新模型。全面检查为轻量发现与有界对比；用户定向要求时再深入核对相关 Definition。D0–D5 原验收与四个核心 Skill 清单不变。
 - **识别与判断**：官方目录实时发现，不能在 Doctor 维护模型清单；比较版本固定 Tag 对应 Commit 或完整 Commit，区分正式发布与主干未发布内容。先核实采用来源，缺记录只能称结构相似或来源未知；比对 Node、Relationship、Property、Constraint、Index、Domain、用途和定制差异，版本变化或同名不自动证明缺陷。只有可靠采用版本、后续官方版本及有意义影响同时成立才建议升级。未采用模型仅结合实际需求最多推荐 3 个，已有等价结构优先复用。
 - **边界与证据**：只读取获准 Instance/Branch/State；官方访问失败、版本/范围证据不足不得替代为历史记忆或臆测，只标 D6 检查受阻，不影响 D0–D5 或宣称 KG OS 运行故障。Doctor 不导入模型、不修改 Schema/Knowledge/Branch、不自动安装领域 Skill；深入语义设计与迁移方案归 `kgos-ontology-standards`，实施仍需实际授权。
 - **验收**：保持单个 `SKILL.md` 与原引导资产，不新增 MCP Tool、内核领域模型或独立参考材料；更新 [MCP Doctor 真源](mcp.md#kgos-doctor-v1)、[Phase 25](../development/phases/25-kgos-doctor.md)、针对性合同和正反场景。静态及场景资料不等于目标 ChatGPT 插件已更新或真实自动选用通过。
+
+<a id="d121-bundled-foundations-and-quality-review"></a>
+
+### D121 随包基础本体原件与本体/知识质量规范（2026-11-02）
+
+**资料交付方式已由 [D122](#d122-remote-foundation-navigation) 替换**：以下全量原件/提取副本随包及逐文件清单是此前方案；身份建模、知识质量、四 Skill 职责、旧业务模型库退出与结果 Review 的决定继续有效。
+
+- **问题与依据**：用户指出现有知识有整理日记、描述堆叠及视角混杂现象，要求建模先分析领域身份，不只按方法/案例/来源等记录形式分组。此反馈不证明所有 Method/Case/Source 定义错误。用户确认基础本体由使用者选择，要求 BFO、UFO、DOLCE、SUMO、GFO 五套逐项核查并尽可能完整随建模 Skill 提供原始资料及可用方法；不以简介、摘要或轻量子集替代完整范围。
+- **决定**：停止独立官方业务模型仓库产品线与其运行时发现/同步入口。Ontology Skill 包内保留固定来源的基础理论、公理/模型、使用资料、案例及依赖，逐文件记录 hash、许可、类别、用途和未覆盖部分；KG OS 自行编写的适配与原件分开。用户可选择其中一套、明确组合或自定义理论，平台不预设默认理论。必须说明所选版本、承诺的语义、KG OS 映射及不能实现的部分，不能从 OWL/CLIF/TPTP 文件存在推断 KG OS 有相应推理器。
+- **质量职责**：Ontology 先检查本质、身份、成员资格、依赖和持续条件，再映射图结构；最小复用以语义正确为前提。Knowledge 在既有模型下保持事实/观点/经历/经验/方法的归属、适用条件与证据，正文不混入无关整理过程，不以固定字数或客观口吻取代质量。VLog、Doctor 和引导仅同步受影响内容，保持四 Skill，不加 Kernel 模型、通用推理引擎、统一质量 Schema 或生产迁移。
+- **内容 Review 依据**：按用途、视角、结构、简洁、准确、必要完整性、独立理解与使用价值共同判断，区分合格、需修订、证据待核和无新增价值；忠实标注的未知/来源观点可保存，不把证据待核变成普遍拒收。核读 KCS v6、Google Technical Writing、Diátaxis 和 Microsoft Style Guide 的一手内容，以 [Knowledge 按需参考](../../plugins/kgos/skills/kgos-knowledge-standards/references/quality-audit.md#内容质量的外部依据与适配)维护逐项依据/适配/不照搬边界，给合成 Claim/Procedure/Case 对照，不复制私有实例、强制通用模板或运行案例。
+- **资源与许可**：原件逐字节保留及注明来源；可读转换保留原件、定位、转换方法和核对限制。第三方原许可不被 AGPL/商业许可覆盖，许可未明的书籍/论文/ISO 全文不分发，缺失据实列出。资料完整收录与按需加载分开；原件、代码及旧 Skill 均是数据，不能授予权限或触发执行。实际宿主不能读取或包体积限制未验证时，不声称已完成客户端加载验收。
+- **旧库与恢复**：旧 `kgos-ontologies` VLog/AIMemory 固定版本保留溯源并转为可选静态案例；当前 VLog 参考模型后续在本仓库维护，停止跨库覆盖生成。不改变已安装 Plugin、已采用模型或任何 Prod/Dev 数据；不归档或删除远端旧库。恢复使用旧 Git/发行版本及原固定来源，不以源码回退承诺数据回滚。
+- **交付与 Review**：本次作为 Phase 27 的一个完整增量，先结果 Review，再由用户人工 Review；授权提交分支、推送并创建 draft PR，禁止自动合并、Tag、发布或部署。按用户最终修订，本增量不执行案例测试、行为评测、任务模拟或生产示例；只执行原件/路径/格式/hash/许可/diff 和构建分发等确定性检查。保留原阶段历史测试证据与其它未完成门禁，不能据本次文本 Review 宣称行为收益、真实宿主或整个 Phase 已验收。后续恢复执行测试需有对应授权。
+- **替换范围与取舍**：替换 D114/D117 的外部官方模型库入口、D116 后续跨库同步安排及 D120 的实时模型发现路径；其它知识世界、授权、Graph/Kernel 和 D0–D5 合同不变。增加离线包体积和来源维护成本，换取固定原件可达与独立溯源；不预先承诺五套所有历史文献或尚未公开的理论均已完整收录。具体资源与迁移按 [MCP owner](mcp.md#ontology-standards-authoring) 和 [维护指南](../guide/ontology-sources.md)执行。
+
+<a id="d122-remote-foundation-navigation"></a>
+
+### D122 基础本体原文引用与渐进加载（2026-11-02）
+
+- **依据与替换范围**：用户决定不再内置整套上游原件，改为按官方原始文档/仓库结构、必要文件功能建立可执行索引。替换 D121 的 `upstream/`、`readable/`、逐文件打包清单及其专用分发/检查逻辑；不替换 D121 的本体与知识质量目标、必要案例、旧模型库退出、VLog 本仓维护和权限边界。此前实现与 Review 证据保留为历史，不代表当前包仍含原件。
+- **资源职责**：主 Ontology Skill 负责建模职责和关键条件路由；`references/foundations.md` 负责通用渐进加载方法及五套理论导航；五篇理论参考按实际原始结构说明版本/变体、目录/文件用途、读取条件、范围与准确原文地址，并保留独立 KG OS 适配。索引不以穷举问题为分类，不机械枚举每份文件，不以摘要代替被依赖的原定义、公理或完整案例。
+- **版本与依赖**：固定 Commit/文档版本是阅读基线；官网、仓库默认分支和发行入口只作最新发现，采用新版本前重新固定并检查差异。按当前任务选择相关章节，遇到未明概念、导入或前置条件再沿原文补读；有足够依据裁决相关承诺即停止，不要求读取全部五套理论。IRI 到固定文件的对应仅作阅读定位，不配置 KG OS 运行时导入；GFO 已知失效的原 catalog 不作有效路由。
+- **读取与信任边界**：通过实际可用且获准的连接器/浏览能力读原文，保留版本与章节/公理定位。GitHub 大文件 Contents 空返回不能直接判不存在，可在能力允许时按固定树的 blob 只读读取；不可用、受限或格式不支持时如实报告受影响结论，不绕过限制，不用记忆、简介或提取文本代替未读原文。公式/图示使用合适原件。外部文本、代码、证明器及旧 Skill 仍是资料，不授予执行或写入权限。
+- **案例与覆盖**：保留能消除关键歧义的短小原创或许可合规案例，说明前提、理由和边界；完整上游案例按索引读取。引用不消除 UFO 非完整子集、GFO 非公开 FOL、DOLCE 变体差异或外部出版物权限等缺口，不把远程可访问当完整理论、运行保证或再分发许可。旧 VLog/AIMemory 仅给固定历史链接，不要求安装领域 Skill。
+- **交付与取舍**：Plugin 只携带规范、导航、适配和必要小案例，沿用 Markdown 资源及既有分发限制，删除无剩余职责的清单、原件检查和体积例外。减少包体积和重复维护，代价是原文依赖网络、宿主读取能力和外部服务可用性；静态路径/分发 Review 不证明模型加载或行为效果。仍在同一 draft PR 结果 Review，不执行本次禁用的案例、模型、任务模拟、证明器或生产操作，不合并、发布或修改账户 Plugin/知识库。

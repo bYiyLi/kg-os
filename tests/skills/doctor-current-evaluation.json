@@ -406,5 +406,6 @@
       "doctorSelected": false,
       "criteria": ["这属于 kgos-ontology-standards 建模任务", "不误触发 Doctor D6"]
     }
-  ]
+  ],
+  "d6Baseline": "Historical D120 official-model discovery scenarios retained for provenance; replaced by D121 source/adaptation Review, not current acceptance or executed in this increment."
 }

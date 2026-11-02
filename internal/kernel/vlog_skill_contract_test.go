@@ -84,7 +84,11 @@ func TestVLogSkillResourceContract(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, link := range links.FindAllStringSubmatch(string(body), -1) {
-			next := filepath.Clean(filepath.Join(filepath.Dir(path), strings.SplitN(link[1], "#", 2)[0]))
+			target := strings.SplitN(link[1], "#", 2)[0]
+			if target == "" || strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") {
+				continue
+			}
+			next := filepath.Clean(filepath.Join(filepath.Dir(path), target))
 			if !strings.HasPrefix(next, root+string(os.PathSeparator)) {
 				t.Fatalf("external runtime resource: %s", next)
 			}
