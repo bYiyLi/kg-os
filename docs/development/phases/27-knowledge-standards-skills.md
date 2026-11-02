@@ -49,6 +49,8 @@ Review 检查完整收录范围、原文忠实与可读转换、概念身份/关
 
 553 份原件与 17 份 PDF 提取内容保持原 hash。修订仅做取证、文本和确定性资源/分发检查，不执行案例或模型试验；整体独立 Review 及用户人工 Review 尚未完成。
 
+**后续逐文件 Review（基线 `9e325fea3e25220a34b573844e3e9ac18c9e029c`）**：纠正 VLog `references/cypher.md` 的旧快照维护说明：旧 Commit 仅作历史溯源，当前查询直接在本仓库维护；合成资料在源码中与 `references/` 同级的 `tests/`，不随 Plugin 分发，静态检查与运行验证归 KG OS 当前开发及分发 CI 流程。与主 Skill、D121、实际目录、隔离测试读取路径及分发排除规则对照一致；仅该段改变，六个 Cypher 代码块及 Q1 之后全部内容与基线逐字节一致。两份修订文档的 Prettier、MarkdownLint、CSpell、本地链接与 `git diff --check` 通过。本次未执行查询、案例、行为测试、证明器或远程 CI，整体 Review 继续进行。
+
 ## D115/D116/D117 历史实施基线（2026-10-28）
 
 **状态：`in_progress`**。原 Ontology/Branch 已合并为 `kgos-ontology-standards`；Knowledge/Retrieval/Maintenance 合并为唯一 `kgos-knowledge-standards`；VLog 保持独立。三个规范加 `kgos-doctor`，当前源码目标共 **四个官方 Skill**。已发行 v0.3.5 七 Skill、用户私人 Plugin 和当前部署不受本次本地修改影响。
