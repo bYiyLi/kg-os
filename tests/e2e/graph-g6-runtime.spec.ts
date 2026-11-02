@@ -146,7 +146,8 @@ test("G6 drag moves the node with elastic neighbor response and no automatic pin
     const dropped = await nodeCenter(target);
     await page.mouse.move(dropped.x, dropped.y);
     await page.mouse.down();
-    await page.mouse.move(dropped.x + 36, dropped.y + 25, { steps: 6 });
+    // Match the first drag's duration so G6 can recognize the repeated gesture.
+    await page.mouse.move(dropped.x + 36, dropped.y + 25, { steps: 16 });
     await page.mouse.up();
     await expect
       .poll(async () => {
