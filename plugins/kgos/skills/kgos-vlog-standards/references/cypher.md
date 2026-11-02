@@ -1,4 +1,4 @@
-<!-- GENERATED SNAPSHOT from https://github.com/bYiyLi/kgos-ontologies/blob/88c54f2f7517dfa0e464f9344c2116c7501ddf3f/models/vlog/cypher.md ; do not edit this copy manually. -->
+<!-- Historical source: https://github.com/bYiyLi/kgos-ontologies/blob/88c54f2f7517dfa0e464f9344c2116c7501ddf3f/models/vlog/cypher.md . Current editable owner: this Skill reference (D121). -->
 
 # VLog 常见业务查询
 

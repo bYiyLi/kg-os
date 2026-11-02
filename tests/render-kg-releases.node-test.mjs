@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join, posix } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { render, stampSkillVersion } from "../scripts/render-kg-releases.mjs";
+import {
+  ontologyReferenceRoot,
+  validateOntologySources
+} from "../scripts/check-ontology-sources.mjs";
 import {
   renderInstallationGuide,
   renderInstaller,
@@ -29,6 +33,10 @@ test("only whitelisted public files are generated, deterministically", async () 
   try {
     execFileSync("git", ["init", "-q", "-b", "main"], { cwd: directory });
     const first = await render({ output: directory, revision, ref: "refs/heads/main" });
+    const bundled = await validateOntologySources();
+    const ontologyManifest = JSON.parse(
+      await readFile(join(root, ontologyReferenceRoot, "sources.json"), "utf8")
+    );
     const manifest = JSON.parse(await readFile(join(directory, "source.json"), "utf8"));
     assert.ok(first.files.length > 50);
     assert.deepEqual(
@@ -43,9 +51,25 @@ test("only whitelisted public files are generated, deterministically", async () 
         "plugins/kgos/skills/kgos-ontology-standards/SKILL.md",
         "plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md",
         "plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md"
-      ]
+        "plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md",
+        ...["foundations.md", "third-party-notices.md"].map(
+          (file) => `${ontologyReferenceRoot}/${file}`
+        ),
+        ...["bfo", "ufo", "dolce", "sumo", "gfo"].map(
+          (file) => `${ontologyReferenceRoot}/foundations/${file}.md`
+        ),
+        ...ontologyManifest.sources.map(
+          (source) => `${ontologyReferenceRoot}/source-index/${source.id}.md`
+        ),
+        ...bundled.paths
+      ].sort()
     );
+    for (const item of [...ontologyManifest.files, ...ontologyManifest.derived]) {
+      const path = join(ontologyReferenceRoot, item.path);
+      const bytes = await readFile(join(directory, path));
+      assert.equal(createHash("sha256").update(bytes).digest("hex"), item.sha256);
+      assert.deepEqual(bytes, await readFile(join(root, path)), `Exact source bytes: ${path}`);
+    }
     assert.deepEqual(
       first.files
         .filter((path) => path.startsWith("plugins/kgos/skills/kgos-knowledge-standards/"))
@@ -218,6 +242,28 @@ test("only whitelisted public files are generated, deterministically", async () 
       await readFile(join(directory, ".github/workflows/pages.yml"), "utf8"),
       /path: site\/dist/
     );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("ontology source integrity rejects modified and undeclared originals", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ontology-integrity-"));
+  const reference = join(directory, ontologyReferenceRoot);
+  try {
+    await cp(join(root, ontologyReferenceRoot), reference, { recursive: true });
+    const path = join(reference, "upstream/sumo/Merge.kif");
+    const original = await readFile(path);
+    await writeFile(path, Buffer.concat([original, Buffer.from("\n")]));
+    await assert.rejects(validateOntologySources({ root: directory }), /size\/hash mismatch/);
+    await writeFile(path, original);
+    await writeFile(join(reference, "upstream/sumo/undeclared.txt"), "unreviewed");
+    await assert.rejects(
+      validateOntologySources({ root: directory }),
+      /Undeclared or missing upstream/
+    );
+    await rm(join(reference, "upstream/sumo/undeclared.txt"));
+    assert.equal((await validateOntologySources({ root: directory })).originals, 553);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

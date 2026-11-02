@@ -1,0 +1,317 @@
+
+op(500,infix,"==>").
+set(prolog_style_variables).
+
+assign(max_megs, 2000).  %%to set for lareger model.
+
+formulas(sos).
+
+(all X (type(X) | individual(X) <-> thing(X))) # label(ax_taxonomy) # label(axiom).
+-(exists X (type(X) & individual(X))) # label(ax_taxonomy_001) # label(axiom).
+
+%Taxonomy of individuals
+
+
+(all X (concreteIndividual(X) | abstractIndividual(X) <-> individual(X))) # label(ax_taxonomy_002) # label(axiom).
+(all X (perdurant(X) | endurant(X) <-> concreteIndividual(X))) # label(ax_taxonomy_003) # label(axiom).
+(all X (quale(X) | set(X) -> abstractIndividual(X))) # label(ax_taxonomy_004) # label(axiom).
+(all X (object(X) | collective(X) | quantity(X) <-> substantial(X))) # label(ax_taxonomy_005) # label(axiom).
+(all X (substantial(X) | moment(X) <-> endurant(X))) # label(ax_taxonomy_006) # label(axiom).
+(all X (intrinsicMoment(X) | relator(X) <-> moment(X))) # label(ax_taxonomy_007) # label(axiom).
+(all X (quality(X) | mode(X) <-> intrinsicMoment(X))) # label(ax_taxonomy_008) # label(axiom).
+(all X (externallyDependentMode(X) | disposition(X) <-> mode(X))) # label(ax_taxonomy_009) # label(axiom).
+(all X (quaIndividual(X) <-> externallyDependentMode(X))) # label(ax_taxonomy_010) # label(axiom).
+(all X (qualityStructure(X) <-> set(X))) # label(ax_taxonomy_011) # label(axiom).
+(all X (qualityDimension(X) | qualitySpace(X) <-> qualityStructure(X))) # label(ax_taxonomy_012) # label(axiom).
+(all X (world(X) -> qualityStructure(X))) # label(ax_taxonomy_013) # label(axiom).
+
+%Disjointness axioms
+
+-(exists X (concreteIndividual(X) & abstractIndividual(X))) # label(ax_taxonomy_014) # label(axiom).
+-(exists X (perdurant(X) & endurant(X))) # label(ax_taxonomy_015) # label(axiom).
+-(exists X (substantial(X) & moment(X))) # label(ax_taxonomy_016) # label(axiom).
+-(exists X (quale(X) & set(X))) # label(ax_taxonomy_017) # label(axiom).
+-(exists X (object(X) & collective(X))) # label(ax_taxonomy_018) # label(axiom).
+-(exists X (collective(X) & quantity(X))) # label(ax_taxonomy_019) # label(axiom).
+-(exists X (object(X) & quantity(X))) # label(ax_taxonomy_020) # label(axiom).
+-(exists X (intrinsicMoment(X) & relator(X))) # label(ax_taxonomy_021) # label(axiom).
+-(exists X (quality(X) & mode(X))) # label(ax_taxonomy_022) # label(axiom).
+-(exists X (externallyDependentMode(X) & disposition(X))) # label(ax_taxonomy_023) # label(axiom).
+-(exists X (qualityDimension(X) & qualitySpace(X))) # label(ax_taxonomy_024) # label(axiom).
+
+%Taxonomy of Types
+
+(all X ((perdurantType(X) | endurantType(X)) -> type(X))) # label(ax_taxonomy_025) # label(axiom).
+(all X (substantialType(X) | momentType(X) <-> endurantType(X))) # label(ax_taxonomy_026) # label(axiom).
+(all X (objectType(X) | collectiveType(X) | quantityType(X) <-> substantialType(X))) # label(ax_taxonomy_027) # label(axiom).
+(all X (intrinsicMomentType(X) | relatorType(X) <-> momentType(X))) # label(ax_taxonomy_028) # label(axiom).
+(all X (qualityType(X) | modeType(X) <-> intrinsicMomentType(X))) # label(ax_taxonomy_029) # label(axiom).
+
+%Disjointness axioms:
+
+-(exists X (perdurantType(X) & endurantType(X))) # label(ax_taxonomy_036) # label(axiom).
+-(exists X (substantialType(X) & momentType(X))) # label(ax_taxonomy_037) # label(axiom).
+-(exists X (objectType(X) & collectiveType(X))) # label(ax_taxonomy_038) # label(axiom).
+-(exists X (objectType(X) & quantityType(X))) # label(ax_taxonomy_039) # label(axiom).
+-(exists X (collectiveType(X) & quantityType(X))) # label(ax_taxonomy_040) # label(axiom).
+-(exists X (intrinsicMomentType(X) & relatorType(X))) # label(ax_taxonomy_042) # label(axiom).
+-(exists X (qualityType(X) & modeType(X))) # label(ax_taxonomy_043) # label(axiom).
+
+%Taxonomy according to meta property (sortal etc.)
+
+(all X (sortal(X) | nonSortal(X) <-> endurantType(X))) # label(ax_taxonomy_030) # label(axiom).
+(all X (rigidSortal(X) | antiRigidSortal(X) <-> sortal(X))) # label(ax_taxonomy_031) # label(axiom).
+(all X (kind(X) | subkind(X) <-> rigidSortal(X))) # label(ax_taxonomy_032) # label(axiom).
+(all X (phase(X) | role(X) <-> antiRigidSortal(X))) # label(ax_taxonomy_033) # label(axiom).
+(all X (category(X) | antiRigidNonSortal(X) | mixin(X) <-> nonSortal(X))) # label(ax_taxonomy_034) # label(axiom).
+(all X (phaseMixin(X) | roleMixin(X) <-> antiRigidNonSortal(X))) # label(ax_taxonomy_035) # label(axiom).
+
+%Disjointness axioms
+
+-(exists X (sortal(X) & nonSortal(X))) # label(ax_taxonomy_041) # label(axiom).
+-(exists X (rigidSortal(X) & antiRigidSortal(X))) # label(ax_taxonomy) # label(axiom).
+-(exists X (kind(X) & subKind(X))) # label(ax_taxonomy) # label(axiom).
+-(exists X (phase(X) & role(X))) # label(ax_taxonomy) # label(axiom).
+-(exists X (category(X) & antiRigidNonSortal(X))) # label(ax_taxonomy) # label(axiom).
+-(exists X (category(X) & mixin(X))) # label(ax_taxonomy) # label(axiom).
+-(exists X (antiRigidNonSortal(X) & mixin(X))) # label(ax_taxonomy) # label(axiom).
+
+-(exists X (phaseMixin(X) & roleMixin(X))) # label(ax_taxonomy) # label(axiom).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Definition of iof, types, and individuals
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+(all X (type(X) <-> (exists W exists Y (world(W) & iof(Y,X,W))))) # label(ax_dtypea1) # label(axiom).
+
+(all X (individual(X) <-> (all W (world(W) -> -(exists Y (iof(Y,X,W))))))) # label(ax_dindividual_a2) # label(axiom).
+
+(all X all Y all W (iof(X,Y,W) -> ((individual(X) | type(X)) & type(Y) & world(W)))) # label(ax_multilevel_a3) # label(axiom).
+
+(-(exists X exists Y exists Z exists W (type(X) & iof(X,Y,W) & iof(Y,Z,W)))) # label(ax_twolevels_a4) # label(axiom).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Specialisation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+(all T1 all T2 (specializes(T1,T2) <-> type(T1) & type(T2) & (all W (world(W) -> (all E (iof(E,T1,W) -> iof(E,T2,W))))))) # label(ax_dspecialization_a5) # label(axiom).
+(all T1 all T2 (strictlySpecializes(T1,T2) <-> specializes(T1,T2) & -specializes(T2,T1))) # label(ax_dspecialization_strict_d1) # label(axiom).
+(all T1 all T2 all X all W (iof(X,T1,W) & iof(X,T2,W) & -specializes(T1,T2) & -specializes(T2,T1) -> (exists T3 (specializes(T1,T3) & specializes(T2,T3) & iof(X,T3,W))) | (exists T3 (specializes(T3,T1) & specializes(T3,T2) & iof(X,T3,W))))) # label(ax_nondisjointSameTaxonomy_a6) # label(axiom).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Definition of rigidity
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+(all T (rigid(T) <-> endurantType(T) & (all X ((exists W (world(W) & iof(X,T,W))) -> (all W2 (world(W2) -> iof(X,T,W2))))))) # label(ax_drigid_a7) # label(axiom).
+
+(all T (antiRigid(T) <-> endurantType(T) & (all X ((exists W (world(W) & iof(X,T,W))) -> (exists W2 (world(W2) & -(iof(X,T,W2)))))))) # label(ax_dantirigid_a8) # label(axiom).
+
+(all T (semiRigid(T) <-> endurantType(T) & -antiRigid(T) & -rigid(T))) # label(ax_semirigid_a9) # label(axiom).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Definition of Sortality
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+(all X (endurant(X) -> (exists K (kind(K) & (all W (world(W) -> iof(X,K,W))))))) # label(axiom_a10_revised).
+
+(all X all K all W ((kind(K) & endurant(X) & iof(X,K,W)) -> -(exists Z exists W2 (kind(Z) & (Z!=K) & iof(X,Z,W2)))))  # label(axiom_a11).
+
+(all T (sortal(T) <-> (endurantType(T) & (exists K (kind(K) & (all X all W (world(W) -> (iof(X,T,W) -> iof(X,K,W))))))))) # label(ax_dsortal_a12) # label(axiom).
+
+(all T (nonSortal(T) <-> (endurantType(T) & -sortal(T)))) # label(ax_dnonsortal_a13) # label(axiom).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Definitions of rigidSortals etc
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+(all T (rigidSortal(T) <-> rigid(T) & sortal(T))) # label(ax_drigidSortal_a18_1) # label(axiom).
+
+(all T (antiRigidSortal(T) <-> antiRigid(T) & sortal(T))) # label(ax_dantirigidSortal_a18_2) # label(axiom).
+
+(all T (antiRigidNonSortal(T) <-> antiRigid(T) & nonSortal(T))) # label(ax_dantirigidSortal_a18_2) # label(axiom).
+
+(all T (semiRigidNonSortal(T) <-> semiRigid(T) & nonSortal(T))) # label(ax_dsemirigidSortal_a18_3) # label(axiom).
+
+
+
+
+(all T (category(T) <-> rigid(T) & nonSortal(T))) # label(ax_dcategory_19) # label(axiom).
+
+(all T (mixin(T) <-> semiRigidNonSortal(T))) # label(ax_dmixin_a20) # label(axiom).
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Taxonomy of tyoes according to the nature of their instances.%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+(all T (endurantType(T) <-> (type(T) & (all X all W (iof(X,T,W) -> endurant(X)))))) #  label(ax_a36).
+
+(all T (substantialType(T) <-> (type(T) & (all X all W (iof(X,T,W) -> substantial(X))))))  #  label(ax_a36).
+
+(all T (momentType(T) <-> (type(T) & (all X all W (iof(X,T,W) -> moment(X))))))  #  label(ax_a36).
+
+(all T (relatorType(T) <-> (type(T) & (all X all W (iof(X,T,W) -> relator(X))))))  #  label(ax_a36).
+
+(all T (modeType(T) <-> (type(T) & (all X all W (iof(X,T,W) -> mode(X))))))  #  label(ax_a36).
+
+(all T (qualityType(T) <-> (type(T) & (all X all W (iof(X,T,W) -> quality(X))))))  #  label(ax_a36).
+
+%Taxonomy of kindSubkindDisjoint to the nature of their instances.%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+(all T (substantialKind(T) <-> (substantialType(T) & kind(T))))  #  label(ax_a37).
+
+(all T (relatorKind(T) <-> (relatorType(T) & kind(T))))  #  label(ax_a37).
+
+(all T (modeKind(T) <-> (modeType(T) & kind(T))))  #  label(ax_a37).
+
+(all T (qualityKind(T) <-> (qualityType(T) & kind(T))))  #  label(ax_a37).
+
+
+%%%%
+
+(all X (endurant(X) -> (exists W exists K ((substantialKind(K)|relatorKind(K)|modeKind(K)|qualityKind(K)) & iof(X,K,W))))) # label(ax_a38).
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Mereology
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+(all X all Y (part(X,Y) -> (concreteIndividual(X) & concreteIndividual(Y)))) # label(ax_argument_restriction).
+(all X (concreteIndividual(X) -> part(X,X))) # label(parthood_reflexivity).
+(all X all Y ((part(X,Y) & part(Y,X)) -> ((X)=(Y)))) # label(parthood_antysymmetry).
+(all X all Y all Z((part(X,Y) & part(Y,Z)) -> part(X,Z))) # label(parthood_transitivity).
+(all X all Y (properPart(X,Y) <-> (part(X,Y) & -(part(Y,X))))) # label(proper_part_definition_Dd14).
+(all X all Y (overlap(X,Y) <-> (exists Z (part(Z,X) & part(Z,Y))))) # label(overlap_definition_Dd15).
+(all X all Y ((concreteIndividual(Y) & concreteIndividual(X) & -part(Y,X)) -> (exists Z (part(Z,Y) & -overlap(Z,X))))) # label(supplementation).
+(all X all Y all Z (sum(Z,X,Y) <-> (concreteIndividual(Z) & (all W (overlap(W,Z) <-> (overlap(W,X) | overlap(W,Y))))))) # label(binary_sum_definition).
+
+%Check how much fusion and existence of sum is needed.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Components
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%Function as relations, "x function as y"
+
+(all X all Y (function(X,Y) -> (endurant(X) & type(Y)))) # label(function).
+
+%Generic functional independence
+
+(all X1 all Y1 all W (gfd(X1,Y1,W) <-> ((all X (iof(X,X1,W) & function(X,X1)))
+                -> (exists Y (-(Y=X) & iof(Y,Y1,W) & function(Y,Y1)))))) # label(def_gfd).
+
+%Individual functional independence
+
+(all X all X1 all Y all Y1 all W (ifd(X,X1,Y,Y1,W) <-> (gfd(X1,Y1,W) & iof(X,X1,W) & iof(Y,Y1,W) &
+                                                    (function(X,X1) -> function(Y,Y1))))) # label(def_ifd).
+
+
+
+%Component of
+
+(all X all X1 all Y all Y1 all W (componentOf(X,X1,Y,Y1,W) <->
+                                    (properPart(X,Y) & ifd(X,X1,Y,Y1,W)))) # label(def_component_of).
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Constitution
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+(all X all Y all W (constitutedBy(X,Y,W) -> ((endurant(X) <-> endurant(Y)) & (perdurant(X) <-> perdurant(Y)) & world(W)))) # label(def_constituted_by_ax58).
+
+
+(all X all Y all X1 all Y1 all W ((constitutedBy(X,Y,W) & iof(X,X1,W) & iof(Y,Y1,W) & kind(X1) & kind(Y1)
+            -> -(X1=Y1)))) # label(def_constituted_by_ax59).
+
+%Generic constutional dependence (GCD).
+
+(all X1 all Y1 (gcd(X1,Y1) <-> (type(X1) & type(Y2) & (all X all W (iof(X,X1,W) ->
+                        (exists Y (iof(Y,Y1,W) & constitutedBy(X,Y,W)))))))) # label(def_gcd_ax60).
+
+%Constitution
+
+(all X all X1 all Y all Y1 all W (constitution(X,X1,Y,Y1,W) <->
+                      (iof(X,X1,W) & iof(Y,Y1,W) & gcd(X1,Y1) & constitutedBy(X,Y,W)))) # label(def_gcd_ax61).
+
+
+(all X all Y all W ((perdurant(X) & constitutedBy(X,Y,W)) ->
+                                            (all W1 (exists(X,W1) -> constitutedBy(X,Y,W1))))) # label(def_constituted_ax62).
+
+
+(all X all Y all W (constitutedBy(X,Y,W) -> -(constitutedBy(Y,X,W)))) # label(def_constituted_ax63).
+
+
+%Ok with not many instances.
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Instances
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Taxonomy of types 1.
+
+(perdurantType(pt1)).
+(objectType(ot1)).
+%(collectiveType(ct1)).
+%(quantityType(qnt1)).
+%(relatorType(rt1)).
+%(qualityType(qlt1)).
+%(modeType(mot1)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Taxonomy of types 2
+
+(kind(k1)).
+(subKind(sk1)).
+%(phase(phase1)).
+%(role(role1)).
+%(category(cat1)).
+%(phaseMixin(pm1)).
+%(roleMixin(rmi1)).
+%(mixin(mix1)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Taxnomy of individuals
+
+
+(perdurant(p1)).
+(object(o1)).
+(collective(c1)).
+%(quantity(quan1)).
+%(relator(r1)).
+%(quality(qual1)).
+%(quaIndividual(qi1)).
+%(disposition(d1)).
+%(qualityDimension(qd1)).
+%(qualitySpace(qs1)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+end_of_list.
+

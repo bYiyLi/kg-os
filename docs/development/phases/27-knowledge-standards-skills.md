@@ -1,8 +1,45 @@
 # Phase 27：KG OS 官方知识规范 Skill 体系
 
-<!-- cspell:words testdata SKOS CIDOC -->
+<!-- cspell:words testdata SKOS CIDOC pypdf Diátaxis Persistant Presential -->
 
-## 当前方案（D115/D116/D117，2026-10-28）
+## D121：基础本体资料与质量规范增量（2026-11-02）
+
+**状态：`in_progress`**。本增量按 [D121](../../design/decisions.md#d121-bundled-foundations-and-quality-review) 和 [MCP owner](../../design/mcp.md#ontology-standards-authoring) 实施，交付一个 draft PR，经结果 Review 后交用户人工 Review。以下当前增量替代旧记录中关于独立模型库入口及本增量案例/行为验收的安排；历史证据不重写，不据此关闭整个 Phase 27 或 Phase 25/28。
+
+| 内部步骤 | 交付与依赖 | 当前结果 |
+| --- | --- | --- |
+| 来源与许可 | 五套理论逐项核对；固定版本/Commit，明确原件、公理、实现、指南、案例、依赖及缺口 | 固定清单及取证完成，保留实际理论/许可缺口 |
+| 规范改造 | 语义身份先于字段；知识内容、证据、视角及维护过程分工；四 Skill 边界 | 源码已改，含一手内容方法适配及具体 Review 判据 |
+| 原件与适配打包 | 原文及逐文件清单，独立 KG OS 适配、条件路由与确定性分发检查 | 553 原件、17 份完整提取；本地分发检查已通过，实际宿主未验证 |
+| 旧库退出 | 停止运行时发现/同步，包内可选静态案例、来源与恢复说明 | 当前源码完成；旧远端仓库及用户安装未改 |
+| 结果 Review 与交付 | 全 diff、许可/忠实度/语义/资源/迁移 Review，修正后复审；Commit/Push/draft PR | 本地结果 Review 与确定性检查收尾；独立 GitHub/人工 Review 待完成 |
+
+Acceptance：
+
+- BFO、UFO、DOLCE、SUMO、GFO 全部有实际来源核查与范围声明，原件和 hash 可核对；子集、空目录、外部版权资料或非公开公理不能冒充完整理论。
+- 选择理论后可从版本、承诺语义走到 KG OS 图表达及执行边界；主 Skill 不全量加载资料，不强制特定理论、固定领域 Schema 或领域 Skill。
+- 规范与示例标题不把分类实例、角色 Property 等局部选择写成普遍定律；相同字段但身份/成员资格不同的对象有明确判断路径。
+- Knowledge 正文能区分对象内容与维护过程，保留会改变使用判断的条件和必要经历；不将来源观点变成无归属事实。
+- 内容 Review 同时覆盖用途、视角、结构、简洁、准确、必要完整性、独立理解和使用价值；每项有检查对象/可观察缺陷/依据/修正及结果边界，支持合格/需修订/证据待核/无新增价值。KCS、Google、Diátaxis、Microsoft 一手方法须有实际适配与不照搬范围，并给合成 Claim/Procedure/Case 对照，不复制私有数据或强制通用模板。
+- 包内依赖/路径/格式/许可及公开分发完整性通过确定性检查；读取已写结果、检查新增文件和 `git diff --check`。真实宿主不可观察的格式/体积/加载/行为标记未验证。
+- 本增量采用**结果 Review**，不跑案例、模型评测、任务模拟、生产示例或额外模型 API；`pnpm validate`/pre-commit 中含案例执行的整套入口不在本次运行。保留既有门禁定义，报告实际未运行项，不通过禁用门禁制造全绿。无 Kernel/运行时变更，不要求此资料增量执行 Docker/Dev 写入。
+- 分支提交推送并开 draft PR，记录 head/base 和检查结果，供独立 GitHub Review 及用户人工 Review；不自动合并、发布、部署或更新账户 Plugin。
+
+Review 检查完整收录范围、原文忠实与可读转换、概念身份/关系成立条件、资源路径与第三方许可、职责/指令冲突、描述密度与视角、旧库迁移及恢复；静态 Review 不证明模型行为改进。
+
+### 本增量的检查与 Review 证据
+
+证据对应本任务工作分支的 D121 改动，基线为 `ac85628985e66860ed28f82a0f5cec9ba4c3d09a`，不是该基线已包含新资料。交付 Commit、head/base 与独立 GitHub Review 结论以实际 draft PR 为准。
+
+- **来源完整性**：`node scripts/check-ontology-sources.mjs --upstream-root /tmp` 核对 10 个来源包、553 份原件（17,244,963 bytes）、17 份全文转换及 8 个固定 Git 树；收录与 1,094 个排除项完整对应，无未知原件。版本、逐文件 hash/blob、许可、用途、依赖与缺口在随包 `sources.json`/目录中。
+- **转换与语法**：用 pypdf 6.13.2 重新提取 17 份 PDF 的全部 113 页，逐页文本、页序及字符数与副本一致；不据此认证图/公式排版忠实。41 份 XML/JSON 解析通过；56 份 Turtle 解析通过。进一步 RDF 解析为 89 份通过、2 份历史 DOLCE Archive（2.2/2.3）失败，已保留原字节并在清单/适配明确说明，不冒充现行可载入模型。导入检查定位 54 条边；gUFO HTTPS 别名以显式本地对应处理，未修改原件或执行推理。
+- **资源与分发**：五个定向 Go 元数据/资源合同检查通过，涵盖 Ontology、Knowledge、VLog、Doctor 和未改引导词基线；没有执行案例/数据库业务测试。公开导出白名单、570 份原件/转换逐字节相同、篡改与未登记文件拒绝、版本注入三项确定性分发检查通过。原四 Skill、源码测试目录排除及第三方通知保留。
+- **文本 Review**：已核对新规范与来源、权限、职责及资源路径；修正分类/角色案例标题的普遍化、相同字段掩盖身份区别、GFO Persistant/Presential 层次、DOLCE SIMPLE 与 D18 及技术重实体化的差别。Knowledge 判据将多主体主张、聊天指代、维护历史错放、冗余与必要限定分别处理；外部内容方法只有适配、无整页转载或私有案例。
+- **限制**：完整 UFO-C、GFO 未公开 FOL、DOLCE D18 外部报告、BFO ISO/商业书籍及 SUMO 未选领域/词汇语料未冒称收齐。未执行案例、行为评测、模型 API、真实宿主安装/加载、Docker/Dev、整套 `pnpm validate`/`check:quick` 或远端 CI；没有生产库/账户 Plugin 修改。模型指令和静态 Review 不证明稳定行为收益。
+
+恢复与旧库处理见 [维护指南](../../guide/ontology-sources.md)。源码/资料分发检查与未来真实宿主或整阶段门禁分开，不以本增量关闭整个 Phase 27。
+
+## D115/D116/D117 历史实施基线（2026-10-28）
 
 **状态：`in_progress`**。原 Ontology/Branch 已合并为 `kgos-ontology-standards`；Knowledge/Retrieval/Maintenance 合并为唯一 `kgos-knowledge-standards`；VLog 保持独立。三个规范加 `kgos-doctor`，当前源码目标共 **四个官方 Skill**。已发行 v0.3.5 七 Skill、用户私人 Plugin 和当前部署不受本次本地修改影响。
 

@@ -32,6 +32,7 @@ VLog 是系统活动的专业知识记录，不是调用流水账、固定工作
 - 用户只要求报告源任务、诊断或讨论时，不自动写 VLog；未获记录授权时，只读核对候选事件及证据，说明推荐保存的事件、目标范围和依据。源任务完成或发现新经验本身不构成记录授权。
 - 先比对相关记录与实际事件身份；有新事件或独立执行时按既有模型保存，有同一事件进展/补充验证时延续相应记录，原记载错误时纠正，不把纠错当作发生过一次业务变化。
 - 同一事件的重复投递且没有新信息时复用已有记录；不同日期真正发生的独立巡检或尝试，即使结果相同也不能按摘要去重。来源冲突而无法裁决时保留归属与未决，不能按最新文本、单一回执或相似度选定结论。
+- 事件记录可以保留理解执行/结果所必需的经过；从中提炼可复用经验时，写清情境、依据、结论与适用条件，不让“本轮/本次”依赖聊天，也不把改名、保存批准等记录维护过程当成方法限制。
 - 具体 Knowledge 增删改、身份/关系匹配、并发及恢复遵循 `kgos-knowledge-standards` 和当前 `kgos_docs`；本 Skill 不复制第二套 API、事务或 Cypher 手册。
 
 ## 5. 核实与交付
@@ -43,10 +44,8 @@ VLog 是系统活动的专业知识记录，不是调用流水账、固定工作
 ## 参考资源
 
 - [ontology.md](references/ontology.md)：六类通用概念、关系语义、完整 KG OS Definition YAML、复用与演进规则。
-- [cypher.md](references/cypher.md)：按业务问题组织的参数化 Cypher，需核对目标真实模型与 State；本包测试直接执行这些查询。
+- [cypher.md](references/cypher.md)：按业务问题组织的参数化 Cypher，需核对目标真实模型、State 与本次授权；读取参考不授权执行案例。
 
-<!-- KGOS_VLOG_MODEL_SNAPSHOT_START -->
-本 Skill 所带 VLog 本体与查询是官方公开模型库 v0.1.0 的离线固定快照，源版本：https://github.com/bYiyLi/kgos-ontologies/tree/88c54f2f7517dfa0e464f9344c2116c7501ddf3f/models/vlog 。Definition 及查询的可维护真源在公开仓库；升级时运行同步脚本，不得在 Skill 内独立编辑。模型仍然可选，不因安装自动建库。
-<!-- KGOS_VLOG_MODEL_SNAPSHOT_END -->
+本体与查询的历史来源为公开模型库 [v0.1.0 对应固定 Commit](https://github.com/bYiyLi/kgos-ontologies/tree/88c54f2f7517dfa0e464f9344c2116c7501ddf3f/models/vlog)。后续可维护真源在本 Skill 的 `references/`，不再从旧仓库覆盖同步；旧固定原件仅作溯源。模型仍可选，不因安装自动建库，也不自动迁移既有实例。
 
 Skill 的模型和查询是可复用参考，不是所有知识世界的强制 Ontology。不存在的新模型依 `kgos-ontology-standards` 的实际授权和确认流程实施；当前数据库签名只以 `kgos_docs` 为准。

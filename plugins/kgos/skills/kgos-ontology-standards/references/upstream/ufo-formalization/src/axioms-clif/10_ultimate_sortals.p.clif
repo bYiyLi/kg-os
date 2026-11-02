@@ -1,0 +1,36 @@
+(cl-text  ax_objectKindDefinition_a45
+(forall (t)
+	(iff (objectKind t)
+		(and (objectType t) (kind t)))
+	)
+)
+(cl-text  ax_collectiveKindDefinition_a45
+(forall (t)
+	(iff (collectiveKind t)
+		(and (collectiveType t) (kind t)))
+	)
+)
+(cl-text  ax_quantityKindDefinition_a45
+(forall (t)
+	(iff (quantityKind t)
+		(and (quantityType t) (kind t)))
+	)
+)
+(cl-text  ax_modeKindDefinition_a45
+(forall (t)
+	(iff (modeKind t)
+		(and (modeType t) (kind t)))
+	)
+)
+(cl-text  ax_qualityKindDefinition_a45
+(forall (t)
+	(iff (qualityKind t)
+		(and (qualityType t) (kind t)))
+	)
+)
+(cl-text  ax_relatorKindDefinition_a45
+(forall (t)
+	(iff (relatorKind t)
+		(and (relatorType t) (kind t)))
+	)
+)

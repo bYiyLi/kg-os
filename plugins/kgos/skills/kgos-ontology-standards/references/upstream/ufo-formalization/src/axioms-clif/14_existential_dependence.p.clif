@@ -1,0 +1,22 @@
+(cl-text  ax_exists_a64
+(forall (x w)
+	(if (exists x w)
+		(and (thing x) (world w)))
+	)
+)
+(cl-text  ax_existentiallyDependsOn_a65
+(forall (x y)
+	(iff (existentiallyDependsOn x y)
+		(forall (w)
+			(if (exists x w)
+				(exists y w))
+			)
+		)
+	)
+)
+(cl-text  ax_existentiallyIndependentOf_a66
+(forall (x y)
+	(iff (existentiallyIndependentOf x y)
+		(and (not (existentiallyDependsOn x y)) (not (existentiallyDependsOn y x))))
+	)
+)

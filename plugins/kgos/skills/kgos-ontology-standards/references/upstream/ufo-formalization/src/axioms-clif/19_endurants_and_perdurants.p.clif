@@ -1,0 +1,23 @@
+(cl-comment '%%%%%%%%%%%%%% Endurants and Perdurants %%%%%%%%%%%%%%%%')
+(cl-text  ax_manifestsInvolvedThings_a104
+(forall (e p)
+	(if (manifests e p)
+		(and (endurant e) (perdurant p)))
+	)
+)
+(cl-text  ax_lifeOfInvolvedThings_a105
+(forall (e p)
+	(if (lifeOf p e)
+		(and (endurant e) (forall (p2)
+			(iff (overlap p2 p)
+				(and (perdurant p2) (manifests e p2)))
+			)
+		))
+	)
+)
+(cl-text  ax_meetsInvolvedThings_a106
+(forall (p1 p2)
+	(if (meets p1 p2)
+		(and (perdurant p1) (perdurant p2)))
+	)
+)

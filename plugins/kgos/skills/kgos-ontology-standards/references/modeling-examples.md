@@ -2,13 +2,15 @@
 
 本文件包含四个**合成业务场景**，用于从实际问题出发判断概念、身份、关系、分类及检索覆盖，并用 KG OS 公共 Definition YAML 与 Cypher 表达。各案例彼此独立，属于教学与隔离测试数据，不是生产事实、通用强制 Schema 或可跨案例一次导入的完整 Ontology。
 
-使用顺序：先说明要回答什么问题及为什么如此建模，再读取相应 `### node:` / `### relationship:` 下完整 `yaml` 代码块；实际操作依据当前 `kgos_docs`、目标 State 和授权执行。仓库的真实 Lithograph 测试从**本文件原文**创建 Definition、写入合成数据、查询和验证反例，不复制第二份 YAML。
+使用顺序：先核对本例业务前提和要回答的问题，再读取相应 `### node:` / `### relationship:` 下完整 `yaml` 代码块。以下是静态参考，不授权执行；要求结果 Review 时只核对模型、查询与已有证据。既有 Lithograph 测试保留其从本文件取原文的机制和历史证据，本次资料改造不运行案例测试。
 
-## 案例 A：分类是 Knowledge，不是每种类别一个 Definition
+## 案例 A：成员语义相同、仅分类值变化的观察
 
 **能力问题**：哪些观察属于“安全事件”？以后增加新的观察类别，是否需要迁移数据库 Schema？
 
 **语义决策**：`Observation` 是一次有身份的观察事实，`ObservationCategory` 是可持续扩展的分类 Knowledge，`CLASSIFIED_AS` 表达具体分类关系。分类本身的名称不决定另一种 Node Definition。每条观察可选择适当分类，分类关系本身不证明观察已独立验证。
+
+**适用条件与对照**：本例新增的只是同一观察身份/成员条件下的分类值。如果新概念有不同本质、身份、依赖或持续条件，即使字段相同也需重新判断 Definition；不能据本例断言所有分类都只能是 Knowledge。
 
 ### node:Observation
 
@@ -122,11 +124,13 @@ MATCH (o:Observation {observationKey:'O4'}) RETURN o.summary AS reported
 {"columns":["reported"],"rows":[["Claimed resolved without verification"]]}
 ```
 
-## 案例 B：角色与有效期间属于关系，而不是人的永久属性
+## 案例 B：只描述任职关联的角色与有效期间
 
 **能力问题**：两个人同名，谁在某一天任职？同一个人先离职后复职，能否保留两段关联？
 
 **语义决策**：`Person`、`Organization` 是可独立识别的对象；`MEMBER_OF` 是可拥有 Property 的一等 Relationship，角色与期间属于**每次任职关系**，不属于 Person 的永久 Property。是否需另建 Membership Node 取决于独立审批、参与者或进一步证据关联需求；本案例没有这类要求。
+
+**适用条件与对照**：本例只需表达二元任职关联及其角色值/期间，没有承诺独立角色实例或 relator 的身份。若所选理论或领域将任职、角色承载或关系基础视为有独立身份/依赖的对象，应按该语义另行映射；不能从本例推出“角色一律只是关系属性”。
 
 ### node:Person
 

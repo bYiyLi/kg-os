@@ -1,0 +1,44 @@
+(cl-text  ax_endurantType_taxonomy_nature
+(forall (x)
+	(iff (or (substantialType x) (momentType x))
+		(endurantType x))
+	)
+)
+(cl-text  ax_endurantType_partition_nature
+(not (exists (x)
+	(and (substantialType x) (momentType x)))
+)
+)
+(cl-text  ax_substantialType_taxonomy
+(forall (x)
+	(iff (or (objectType x) (collectiveType x) (quantityType x))
+		(substantialType x))
+	)
+)
+(cl-text  ax_substantialType_partition
+(not (exists (x)
+	(or (and (objectType x) (collectiveType x)) (and (objectType x) (quantityType x)) (and (collectiveType x) (quantityType x))))
+)
+)
+(cl-text  ax_momentType_taxonomy
+(forall (x)
+	(iff (or (intrinsicMomentType x) (relatorType x))
+		(momentType x))
+	)
+)
+(cl-text  ax_momentType_partition
+(not (exists (x)
+	(and (intrinsicMomentType x) (relatorType x)))
+)
+)
+(cl-text  ax_intrinsicMomentType_taxonomy
+(forall (x)
+	(iff (or (qualityType x) (modeType x))
+		(intrinsicMomentType x))
+	)
+)
+(cl-text  ax_intrinsicMomentType_partition
+(not (exists (x)
+	(and (qualityType x) (modeType x)))
+)
+)

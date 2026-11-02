@@ -4,6 +4,7 @@ import { lstat, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { installationSnapshotFiles } from "./render-release-installation.mjs";
+import { validateOntologySources } from "./check-ontology-sources.mjs";
 
 const sourceRoot = fileURLToPath(new URL("../", import.meta.url));
 const publicRepository = "bYiyLi/kg-releases";
@@ -155,6 +156,7 @@ async function collectFiles(root, prefix = "") {
 
 async function publicFiles() {
   const paths = [...generatedFiles];
+  const bundled = new Set((await validateOntologySources()).paths);
   for (const skill of officialSkills) {
     const directory = `plugins/kgos/skills/${skill}`;
     // The author's model tests are not assistant-facing Skill resources.
@@ -165,7 +167,7 @@ async function publicFiles() {
       throw new Error(`Missing official Skill entrypoint: ${directory}`);
     }
     for (const file of files) {
-      if (!file.endsWith(".md")) {
+      if (!file.endsWith(".md") && !bundled.has(file)) {
         throw new Error(`Unexpected file in official Skill resources: ${file}`);
       }
     }
@@ -270,6 +272,7 @@ export async function render({ output, ref, revision }) {
     throw new Error("Release tag must match the KG OS product and Plugin version");
   }
   const tracked = new Set(trackedFiles(canonicalTarget));
+  const bundled = new Set((await validateOntologySources()).paths);
   const existing = await collectFiles(canonicalTarget);
   for (const path of existing) {
     if (!expected.has(path) && !tracked.has(path)) {
@@ -284,7 +287,8 @@ export async function render({ output, ref, revision }) {
   for (const path of files) {
     const template = join(sourceRoot, sourceFile(path));
     const info = await lstat(template);
-    if (!info.isFile() || info.size > 1024 * 1024) {
+    const sizeLimit = bundled.has(path) ? 16 * 1024 * 1024 : 1024 * 1024;
+    if (!info.isFile() || info.size > sizeLimit) {
       throw new Error(`Invalid public distribution source: ${path}`);
     }
     let content = await readFile(template);

@@ -1,0 +1,62 @@
+(cl-text  ax_endurant_taxonomy
+(forall (x)
+	(iff (or (substantial x) (moment x))
+		(endurant x))
+	)
+)
+(cl-text  ax_endurant_partition
+(not (exists (x)
+	(and (substantial x) (moment x)))
+)
+)
+(cl-text  ax_substantial_taxonomy
+(forall (x)
+	(iff (or (object x) (collective x) (quantity x))
+		(substantial x))
+	)
+)
+(cl-text  ax_substantial_partition
+(not (exists (x)
+	(or (and (object x) (collective x)) (and (object x) (quantity x)) (and (collective x) (quantity x))))
+)
+)
+(cl-text  ax_moment_taxonomy
+(forall (x)
+	(iff (or (intrinsicMoment x) (relator x))
+		(moment x))
+	)
+)
+(cl-text  ax_moment_partition
+(not (exists (x)
+	(and (intrinsicMoment x) (relator x)))
+)
+)
+(cl-text  ax_intrinsicMoment_taxonomy
+(forall (x)
+	(iff (or (quality x) (mode x))
+		(intrinsicMoment x))
+	)
+)
+(cl-text  ax_intrinsicMoment_partition
+(not (exists (x)
+	(and (quality x) (mode x)))
+)
+)
+(cl-text  ax_mode_taxonomy_disposition
+(forall (x)
+	(if (disposition x)
+		(mode x))
+	)
+)
+(cl-text  ax_mode_taxonomy_externallyDependentMode
+(forall (x)
+	(if (externallyDependentMode x)
+		(mode x))
+	)
+)
+(cl-text  ax_externallyDependentMode_taxonomy_quaIndividual
+(forall (x)
+	(if (quaIndividual x)
+		(externallyDependentMode x))
+	)
+)

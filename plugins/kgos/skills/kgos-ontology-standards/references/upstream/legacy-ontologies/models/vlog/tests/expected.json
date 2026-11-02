@@ -1,0 +1,78 @@
+{
+  "purpose": "Isolated tests for the exact Cypher blocks in cypher.md. All data is synthetic.",
+  "cases": [
+    {
+      "id": "by-type",
+      "query": "Q1",
+      "params": {
+        "conceptKey": "repair"
+      },
+      "columns": ["eventKey", "summary", "outcome"],
+      "rows": [
+        ["run-01", "First recovery attempt", "failed"],
+        ["run-02", "Second recovery attempt", "succeeded"]
+      ]
+    },
+    {
+      "id": "new-category-without-schema",
+      "query": "Q1",
+      "params": {
+        "conceptKey": "security-incident"
+      },
+      "columns": ["eventKey", "summary", "outcome"],
+      "rows": [["security-01", "New type added as Knowledge", "unknown"]]
+    },
+    {
+      "id": "by-entity",
+      "query": "Q2",
+      "params": {
+        "entityKey": "kgos-dev"
+      },
+      "columns": ["eventKey", "role"],
+      "rows": [
+        ["incident-01", "affected"],
+        ["run-01", "target"],
+        ["run-02", "target"],
+        ["security-01", "affected"],
+        ["verify-02", "target"]
+      ]
+    },
+    {
+      "id": "later-attempt",
+      "query": "Q3",
+      "params": {
+        "eventKey": "run-01"
+      },
+      "columns": ["eventKey", "outcome"],
+      "rows": [["run-02", "succeeded"]]
+    },
+    {
+      "id": "verification-failed",
+      "query": "Q4",
+      "params": {
+        "eventKey": "run-02"
+      },
+      "columns": ["verificationKey", "outcome"],
+      "rows": [["verify-02", "failed"]]
+    },
+    {
+      "id": "source-provenance",
+      "query": "Q5",
+      "params": {
+        "eventKey": "verify-02"
+      },
+      "columns": ["sourceKey", "locator", "sourceBranch"],
+      "rows": [["check-02", "fixture:check-02", "source"]]
+    },
+    {
+      "id": "physical-place-and-window",
+      "query": "Q6",
+      "params": {
+        "placeKey": "lab-a",
+        "timeKey": "window-01"
+      },
+      "columns": ["eventKey", "timeKey"],
+      "rows": [["run-02", "window-01"]]
+    }
+  ]
+}

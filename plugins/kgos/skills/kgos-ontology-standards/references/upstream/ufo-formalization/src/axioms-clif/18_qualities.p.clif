@@ -1,0 +1,17 @@
+(cl-comment '%%%%%%%%%% Qualities and Quality Structures %%%%%%%%%%%%')
+(cl-text  ax_dQualityStructure_d10
+(forall (qs)
+	(iff (qualityStructure qs)
+		(exists (qt)
+			(and (qualityType qt) (associatedWith qs qt)))
+		)
+	)
+)
+(cl-text  ax_dQualityStructure_d10
+(forall (qs)
+	(iff (qualityStructure qs)
+		(exists (qt)
+			(and (qualityType qt) (associatedWith qs qt)))
+		)
+	)
+)

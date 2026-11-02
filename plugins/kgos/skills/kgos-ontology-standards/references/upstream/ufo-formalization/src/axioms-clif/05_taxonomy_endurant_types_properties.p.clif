@@ -1,0 +1,78 @@
+(cl-text  ax_endurantType_taxonomy_properties
+(forall (x)
+	(iff (or (sortal x) (nonSortal x))
+		(endurantType x))
+	)
+)
+(cl-text  ax_endurantType_partition_properties
+(not (exists (x)
+	(and (sortal x) (nonSortal x)))
+)
+)
+(cl-text  ax_sortal_taxonomy
+(forall (x)
+	(iff (or (rigidSortal x) (antiRigidSortal x))
+		(sortal x))
+	)
+)
+(cl-text  ax_sortal_partition
+(not (exists (x)
+	(and (rigidSortal x) (antiRigidSortal x)))
+)
+)
+(cl-text  ax_rigidSortal_taxonomy
+(forall (x)
+	(iff (or (kind x) (subkind x))
+		(rigidSortal x))
+	)
+)
+(cl-text  ax_rigidSortal_partition
+(not (exists (x)
+	(and (kind x) (subkind x)))
+)
+)
+(cl-text  ax_antiRigidSortal_taxonomy
+(forall (x)
+	(iff (or (phase x) (role x))
+		(antiRigidSortal x))
+	)
+)
+(cl-text  ax_antiRigidSortal_partition
+(not (exists (x)
+	(and (phase x) (role x)))
+)
+)
+(cl-text  ax_nonSortal_taxonomy
+(forall (x)
+	(iff (or (rigidNonSortal x) (semiRigidNonSortal x) (antiRigidNonSortal x))
+		(nonSortal x))
+	)
+)
+(cl-text  ax_nonSortal_partition
+(not (exists (x)
+	(or (and (rigidNonSortal x) (semiRigidNonSortal x)) (and (rigidNonSortal x) (antiRigidNonSortal x)) (and (semiRigidNonSortal x) (antiRigidNonSortal x))))
+)
+)
+(cl-text  ax_rigidNonSortal_taxonomy
+(forall (x)
+	(iff (rigidNonSortal x)
+		(category x))
+	)
+)
+(cl-text  ax_semiRigidNonSortal_taxonomy
+(forall (x)
+	(iff (semiRigidNonSortal x)
+		(mixin x))
+	)
+)
+(cl-text  ax_antiRigidNonSortal_taxonomy
+(forall (x)
+	(iff (or (phaseMixin x) (roleMixin x))
+		(antiRigidNonSortal x))
+	)
+)
+(cl-text  ax_antiRigidNonSortal_partition
+(not (exists (x)
+	(and (phaseMixin x) (roleMixin x)))
+)
+)

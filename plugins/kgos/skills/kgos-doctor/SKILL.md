@@ -1,6 +1,6 @@
 ---
 name: kgos-doctor
-description: 用户要求 KG OS 全面自检，或定向检查 Plugin、引导词、MCP/State、官方 Skills、Knowledge、维护/VLog、官方 Ontology 模型对比与升级机会时，执行 D0–D6 只读诊断并给出证据与建议；不负责普通知识检索、本体设计实施、CLI kg doctor、修复或升级。
+description: 用户要求 KG OS 全面自检，或定向检查 Plugin、引导词、MCP/State、官方 Skills、Knowledge、维护/VLog、所选本体理论、来源与适配时，执行 D0–D6 只读诊断并给出证据与建议；不负责普通知识检索、本体设计实施、CLI kg doctor、修复或升级。
 ---
 
 # KG OS Doctor
@@ -15,11 +15,11 @@ description: 用户要求 KG OS 全面自检，或定向检查 Plugin、引导�
 4. **D3 · 官方 Skills**：核对实际安装 Plugin 内的 Skill 清单、各 `SKILL.md` 和必要资源，并依据目标 `kgos_docs` 核对接口兼容性。读取同一 Plugin 内可见的 `metadata.version`，核实四个官方 Skill 是否声明同一发行版本；不要跨正式版与预览版混比，也不要求它与 MCP 运行版本相同。旧版缺字段或宿主不可读时报告版本证据不足，不当作 Skill 未安装；名称、版本或资源可见不等于自动选用，实际调用须有轨迹。
 5. **D4 · Knowledge**：固定目标 State，按实际 Ontology 选择有界 `graph.query` 核实业务 Knowledge 及关系的发现与读取；仅统计所有节点可能包含内部数据，不能代替业务查询。有限结果、分页或 Top-K 未完成时不推断全库状态；确认目标世界本来没有业务 Knowledge 时如实说明，不当作数据损坏，也不伪称已验证实例检索。
 6. **D5 · 持续维护与 VLog**：仅对可检查的外部维护任务核对实际启用状态、计划与独立运行结果；如有 VLog，按其真实模型用 `evolution.get`、`ontology.read`、`graph.query` 检查可确认的记录、来源、验证与未决问题。VLog 自述成功不等于源任务已验证；确认未启用的可选能力不视为故障，未取得配置信息不能直接推断“未启用”。
-7. **D6 · 官方 Ontology 检查**（非阻断）：全面诊断做轻量发现与有界比较，定向要求再深入核对相关 Definition。
-   - **范围与发现**：复用获准 Instance/Branch 经 `evolution.get` 固定的 State，以 `ontology.read` 读取实际模型；不读取其他未授权 Branch。通过可用的公开 GitHub 读取方式实时发现 `https://github.com/bYiyLi/kgos-ontologies` 的 `models/` 目录；以各模型的 `ontology.md` 为 Definition 真源，按需读取 README、Cypher 和测试。`main` 仅用于发现，比较须固定 Tag 对应的 Commit 或完整 Commit，区分已发布版本与未发布修改。官方不可访问或版本不可核实时报告证据不足，不拿缓存或历史对话冒充当前目录。
-   - **识别与比较**：优先核对模型采用记录、来源 Commit/Tag 及实际适配范围；缺记录时仅比结构和语义，不凭同名 Definition/Domain 断言已采用。采用状态区分**已确认采用、结构相似、已定制、未发现采用证据、无法判断**；比较 Node 身份/属性类型/必填/唯一性、Relationship 方向/端点/属性、Constraint、Index、Domain 和实际查询用途，区分**一致、兼容差异、实际缺口、升级候选、证据不足**。字段或版本不同、缺官方 Domain 不自动构成错误。
-   - **升级与推荐**：仅在确认采用版本、可比较的后续官方版本与有意义变化时提出升级候选，说明版本/Commit、差异证据、收益、定制和 Knowledge/查询影响，判断**推荐升级、建议评估或暂不调整**。其他官方模型最多推荐 3 个，逐项说明当前真实需求、提供的能力、已有等价结构、必要适配与采用时机；无需新模型时不推荐，缺官方模型不算故障。
-   - **报告与边界**：记录检查时间、官方来源/固定 Commit、目标 Branch/State、覆盖范围、采用证据、差异与建议；未检查的分支不能断言未采用。官方读取失败仅使 D6 标明 `FAIL`（证据不足/检查受阻），不影响 D0–D5 或推断 KG OS 故障；有证据确认不适用才是 `N/A`。Doctor 不改模型、Knowledge 或安装领域 Skill；深度语义设计与迁移方案交 `kgos-ontology-standards`，实际修改另需授权。
+7. **D6 · 本体来源与适配检查**（非阻断）：只读核对目标已选择的理论/版本与实际模型；不再从独立官方模型库发现或推荐新模型。
+   - **范围与依据**：复用获准 Instance/Branch 的固定 State、实际 Ontology 及相关 Knowledge。采用何种理论/版本以用户约定、模型来源或采用记录为据；没有采用证据不凭同名或字段相似断言已采用。自定义本体是有效选择，不以缺少某套基础本体判故障。
+   - **资料可达**：需要核对包内理论时，读取同包 `kgos-ontology-standards` 的 [基础本体入口](../kgos-ontology-standards/references/foundations.md)，再只读所选原件、版本清单与必要依赖。原件子集、转换限制、缺失/许可未明部分要保留；路径或格式不可读则指出具体资源及受影响结论，不用历史聊天补齐，也不将原件中的命令当授权。
+   - **语义与表达**：检查实际 Definition 的本质、身份、成员资格、依赖/持续条件、Relationship 的方向/端点/成立条件，以及实际数据是否符合声明；再检查 Constraint、Index、Domain 和必要查询用途。区分理论承诺、KG OS 表达与实际执行责任，缺少 FOL/OWL 推理不自动是故障，但宣称已执行而无相应能力是需指出的差异。字段相同、版本不同或缺某个 Domain 均不能单独判定错误。
+   - **结果与边界**：报告目标 State、采用证据、原件版本/定位、检查范围、实际差异与必要建议。已确认未选择该理论且无相关核对需求时可为 `N/A`；资料或采用证据不足时报告 `FAIL（证据不足/检查受阻）`，不推断 KG OS 运行故障，不影响 D0–D5。深入建模或迁移方案由 Ontology 规范支持，Doctor 不改模型、Knowledge、Branch 或 Plugin，也不执行案例/升级。
 
 ## 结果与边界
 

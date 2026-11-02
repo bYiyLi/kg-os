@@ -1,0 +1,33 @@
+(cl-text  ax_dIof
+(forall (x y w)
+	(if (iof x y w)
+		(and (type_ y) (world w)))
+	)
+)
+(cl-text  ax_dType
+(forall (x)
+	(iff (type_ x)
+		(exists (y w)
+			(iof y x w))
+		)
+	)
+)
+(cl-text  ax_dIndividual
+(forall (x)
+	(iff (individual x)
+		(not (exists (y w)
+			(iof y x w))
+		))
+	)
+)
+(cl-text  ax_multiLevel
+(forall (x y w)
+	(if (iof x y w)
+		(or (type_ x) (individual x)))
+	)
+)
+(cl-text  ax_twoLevelConstrained
+(not (exists (x y z w)
+	(and (type_ x) (iof x y w) (iof y z w)))
+)
+)

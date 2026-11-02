@@ -1,0 +1,44 @@
+(cl-text  ax_thing_taxonomy
+(forall (x)
+	(iff (or (type_ x) (individual x))
+		(thing x))
+	)
+)
+(cl-text  ax_thing_partition
+(not (exists (x)
+	(and (type_ x) (individual x)))
+)
+)
+(cl-text  ax_individual_taxonomy
+(forall (x)
+	(iff (or (concreteIndividual x) (abstractIndividual x))
+		(individual x))
+	)
+)
+(cl-text  ax_individual_partition
+(not (exists (x)
+	(and (concreteIndividual x) (abstractIndividual x)))
+)
+)
+(cl-text  ax_concreteIndividual_taxonomy
+(forall (x)
+	(iff (or (endurant x) (perdurant x))
+		(concreteIndividual x))
+	)
+)
+(cl-text  ax_concreteIndividual_partition
+(not (exists (x)
+	(and (endurant x) (perdurant x)))
+)
+)
+(cl-text  ax_type_taxonomy
+(forall (x)
+	(if (or (endurantType x) (perdurantType x))
+		(type_ x))
+	)
+)
+(cl-text  ax_type_partition
+(not (exists (x)
+	(and (endurantType x) (perdurantType x)))
+)
+)

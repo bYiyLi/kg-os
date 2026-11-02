@@ -26,6 +26,7 @@
     "check:licenses:rust": "node scripts/check-rust-licenses.mjs",
     "check:licenses:npm": "node scripts/check-npm-licenses.mjs",
     "check:markdown": "markdownlint-cli2 --config config/quality/markdownlint-cli2.yaml",
+    "check:ontology-sources": "node scripts/check-ontology-sources.mjs",
     "check:repo": "sherif --fail-on-warnings",
     "check:security": "pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org && pnpm audit --audit-level high --registry=https://registry.npmjs.org",
     "check:secrets": "node scripts/check-secrets.mjs",

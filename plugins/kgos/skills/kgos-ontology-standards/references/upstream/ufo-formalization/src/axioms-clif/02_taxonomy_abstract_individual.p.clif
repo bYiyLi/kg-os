@@ -1,0 +1,40 @@
+(cl-text  ax_abstractIndividual_taxonomy_quale
+(forall (x)
+	(if (quale x)
+		(abstractIndividual x))
+	)
+)
+(cl-text  ax_abstractIndividual_taxonomy_set
+(forall (x)
+	(if (set_ x)
+		(abstractIndividual x))
+	)
+)
+(cl-text  ax_abstractIndividual_taxonomy_world
+(forall (x)
+	(if (world x)
+		(abstractIndividual x))
+	)
+)
+(cl-text  ax_abstractIndividual_pairwiseDisjoint
+(not (exists (x)
+	(or (and (quale x) (set_ x)) (and (quale x) (world x)) (and (set_ x) (world x))))
+)
+)
+(cl-text  ax_set_taxonomy_qualityStructure
+(forall (x)
+	(if (qualityStructure x)
+		(set_ x))
+	)
+)
+(cl-text  ax_qualityStructure_taxonomy
+(forall (x)
+	(iff (or (qualityDimension x) (qualitySpace x))
+		(qualityStructure x))
+	)
+)
+(cl-text  ax_qualityStructure_partition
+(not (exists (x)
+	(and (qualityDimension x) (qualitySpace x)))
+)
+)
