@@ -33,16 +33,44 @@ async function api(path, method = "GET", data) {
   check(response.ok, "GITHUB_API_FAILED");
   return response.status === 204 ? null : response.json();
 }
-async function downloadAsset(asset, tag, draft = false) {
+export async function findRelease(tag) {
+  const matches = [];
+  for (let page = 1; page <= 20; page++) {
+    // The tag endpoint returns published releases only. Authenticated listing
+    // includes drafts; scan all pages before selecting to reject duplicates.
+    const releases = await api(`/repos/${repository}/releases?per_page=100&page=${page}`);
+    check(Array.isArray(releases), "RELEASE_LOOKUP_INVALID");
+    matches.push(...releases.filter((release) => release?.tag_name === tag));
+    check(matches.length <= 1, "RELEASE_TAG_AMBIGUOUS");
+    if (releases.length < 100) return matches[0] ?? null;
+  }
+  throw new Error("RELEASE_LOOKUP_LIMIT_EXCEEDED");
+}
+export async function readRelease(id, tag) {
+  check(Number.isSafeInteger(id) && id > 0, "RELEASE_ID_INVALID");
+  const release = await api(`/repos/${repository}/releases/${id}`);
   check(
-    asset.browser_download_url ===
-      `https://github.com/${repository}/releases/download/${tag}/${asset.name}`,
+    release?.id === id &&
+      release.tag_name === tag &&
+      typeof release.draft === "boolean" &&
+      Array.isArray(release.assets),
+    "RELEASE_IDENTITY_MISMATCH"
+  );
+  return release;
+}
+async function downloadAsset(asset, tag, draft = false) {
+  const apiUrl = `https://api.github.com/repos/${repository}/releases/assets/${asset.id}`;
+  check(
+    Number.isSafeInteger(asset.id) &&
+      asset.id > 0 &&
+      (draft
+        ? asset.url === apiUrl
+        : asset.browser_download_url ===
+          `https://github.com/${repository}/releases/download/${tag}/${asset.name}`),
     "ASSET_URL_INVALID"
   );
   const response = await fetch(
-    draft
-      ? `https://api.github.com/repos/${repository}/releases/assets/${asset.id}`
-      : asset.browser_download_url,
+    draft ? apiUrl : asset.browser_download_url,
     draft
       ? {
           headers: {
@@ -150,7 +178,7 @@ async function releaseTarget(root) {
 export async function findCandidate(root, source, output) {
   await mkdir(output, { recursive: true });
   const { tag, manifest } = await releaseTarget(root);
-  const release = await api(`/repos/${repository}/releases/tags/${tag}`);
+  const release = await findRelease(tag);
   let requiredAttempt;
   if (release) {
     const provenance = release.assets.find((asset) => asset.name === `kgos-provenance-${tag}.json`);
@@ -253,7 +281,7 @@ export async function promote(root, source, directory, runPath) {
   const provenanceName = `kgos-provenance-${tag}.json`;
   await writeFile(join(directory, provenanceName), bytes);
   const body = `Linux amd64 image: ${imageRepository}:${tag}\n\nVerified digest: ${imageRepository}@${candidate.image.digest}\n\nPrivate source commit SHA: ${candidate.revision}\n\nCandidate CI: https://github.com/${repository}/actions/runs/${candidate.runId}/attempts/${candidate.attempt}\n\nCandidate SHA256: ${sha256(bytes)}\n\nThe Plugin and guides are the exact candidate assets. The public Tag belongs to this distribution repository.\n`;
-  let release = await api(`/repos/${repository}/releases/tags/${tag}`);
+  let release = await findRelease(tag);
   if (release) {
     releasePlan(release, candidate, sha256(bytes));
     await verifyAssets(release, candidate, bytes);
@@ -295,7 +323,7 @@ export async function promote(root, source, directory, runPath) {
   const missing = await verifyAssets(release, candidate, bytes);
   for (const name of missing)
     command("gh", ["release", "upload", tag, join(directory, name), "--repo", repository]);
-  release = await api(`/repos/${repository}/releases/tags/${tag}`);
+  release = await readRelease(release.id, tag);
   check((await verifyAssets(release, candidate, bytes)).length === 0, "RELEASE_ASSETS_INCOMPLETE");
   if (release.draft)
     await api(`/repos/${repository}/releases/${release.id}`, "PATCH", {

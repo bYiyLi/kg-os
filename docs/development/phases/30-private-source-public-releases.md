@@ -113,3 +113,13 @@
 主分支 [Sync 41586367665](https://github.com/bYiyLi/kg-os/actions/runs/41586367665) 在公开仓库推送 `.github/workflows/ci.yml` 时被 GitHub 拒绝，原文为 OAuth App 缺少 workflow scope。公开 main 仍为 `627bfa5dc2f48683b6cdf10980888dd017f945a1`，manifest 仍指向旧源码 `306908a75e0b38e1edd601026f0aa287829bf0d6` 和 v0.3.13；新候选 CI 尚未触发。公库现有可写 Deploy Key 元数据已只读核实，未读取私钥、扩大权限或重配凭据；未断言 runner 具体认证来源已经定位，未用其他凭据或预先写入工作流绕过拒绝。版本准备先留本地，待正规同步写入权限/身份修复后再推进相应已授权动作。
 
 按用户清理意图核对 PR #2 已合并、其 head `737827d182f4301e95e3994d9ce0f84b401354d4` 属 main 祖先、无打开 PR 或 worktree 依赖，并核对 GitHub 关闭 PR 的正常分支恢复机制后，删除旧远端 `feat/ontology-source-pack-review`。当前功能分支保留到验证完成；公库仅 main。没有永久删除镜像、资产、Release、Tag 或仓库。
+
+## 2026-11-03 v0.3.15 草稿恢复修复与发布
+
+用户批准保留 v0.3.14，修复后发布 v0.3.15。此前在明确例外授权下，Mac 仅初始化两份与私库逐字节一致的公开工作流（公开提交 `c3d45e1ae3196cb611227441b3de15149fd6e511`），没有推送私库历史、改凭据或旧 Tag；随后 [Sync 41593193024](https://github.com/bYiyLi/kg-os/actions/runs/41593193024) 成功，96 个公开文件与白名单生成结果一致。本次例外不代表同步身份永久获得 workflow scope。
+
+[候选 CI 41593236941](https://github.com/bYiyLi/kg-releases/actions/runs/41593236941) 的完整 17 阶段 Validate、Docker/OCI 回载 Smoke 与不可变 artifact 上传下载通过；前端覆盖率 94.37% / 90.08% / 95.33% / 96.99%。Tag v0.3.14 固定源码 `a484038751f2c268d21ca9759e6632a1bd456eb7`。跨 Run 下载同一 artifact 的摘要核验成功，但 [Release 41596986439](https://github.com/bYiyLi/kg-releases/actions/runs/41596986439) 在草稿资产回读失败；一次受控续跑又失败。实际保留草稿 `432390817`（六份资产）、`432395044`（空）及镜像 `sha256:5f72142ea38ef65c977eeccd1d29530ef8595ecaf2359f0947d5192842d977a0`，未删除、发布草稿或改写 Tag。
+
+根因是错误地用仅返回已发布 Release 的 by-tag API 发现/回读草稿，造成 404 误判及重复创建。修复为按权限分页发现所有同 Tag Release，发现重复立即拒绝；上传后按确定的 Release ID 回读并核验身份。真实草稿的 browser URL 使用 `untagged-…`，草稿资产改为校验并使用限定仓库的资产 ID API，正式资产仍核对同版公开 URL。回归覆盖草稿、已发布、缺失、跨页重复、权限拒绝及 ID/Tag 不匹配，原有来源、摘要、资产冲突和质量门禁保留。
+
+Mac 曾额外下载完整候选用于重复复核；这不是发布合同必需，用户指出后已停止（退出 130），未恢复。完整 OCI 与跨 Run artifact 验真留在 GitHub；Mac 只读核对小型资产、provenance 和匿名 Registry 元数据，不运行 Docker。v0.3.15 的真实候选、推广与官网归档按后续实际结果记录，不用 v0.3.14 的成功候选代替新源码验收。

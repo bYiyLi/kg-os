@@ -15,7 +15,12 @@ import {
   websiteOnly
 } from "../distribution/scripts/release-candidate.mjs";
 import { safeReport, safeToolFailure } from "../distribution/scripts/ci-report.mjs";
-import { findCandidate, verifyAssets } from "../distribution/scripts/release-delivery.mjs";
+import {
+  findCandidate,
+  findRelease,
+  readRelease,
+  verifyAssets
+} from "../distribution/scripts/release-delivery.mjs";
 import { render } from "../scripts/render-kg-releases.mjs";
 
 const source = fileURLToPath(new URL("../", import.meta.url));
@@ -153,6 +158,7 @@ test("partial release recovery verifies existing bytes and treats missing assets
   };
   const asset = {
     id: 1,
+    url: "https://api.github.com/repos/bYiyLi/kg-releases/releases/assets/1",
     name: "kgos-plugin-v0.3.13.zip",
     size: 8,
     browser_download_url:
@@ -164,7 +170,16 @@ test("partial release recovery verifies existing bytes and treats missing assets
     return new Response("original");
   });
   const missing = await verifyAssets(
-    { assets: [asset], draft: true },
+    {
+      assets: [
+        {
+          ...asset,
+          browser_download_url:
+            "https://github.com/bYiyLi/kg-releases/releases/download/untagged-draft/kgos-plugin-v0.3.13.zip"
+        }
+      ],
+      draft: true
+    },
     candidate,
     Buffer.from("provenance")
   );
@@ -175,11 +190,66 @@ test("partial release recovery verifies existing bytes and treats missing assets
   await verifyAssets({ assets: [asset], draft: false }, candidate, Buffer.from("provenance"));
   assert.equal(requests[1].url, asset.browser_download_url);
   assert.deepEqual(requests[1].options, {});
+  await assert.rejects(
+    () =>
+      verifyAssets(
+        { assets: [{ ...asset, url: "https://example.invalid/asset" }], draft: true },
+        candidate,
+        Buffer.from("provenance")
+      ),
+    /ASSET_URL_INVALID/
+  );
   context.mock.method(globalThis, "fetch", async () => new Response("modified"));
   await assert.rejects(
     () => verifyAssets({ assets: [asset], draft: false }, candidate, Buffer.from("provenance")),
     /ASSET_CONFLICT/
   );
+});
+
+test("release discovery includes drafts and rejects duplicate tags across pages", async (context) => {
+  const tag = "v0.3.15";
+  const draft = { id: 42, tag_name: tag, draft: true, assets: [] };
+  let pages = [[draft]];
+  const requests = [];
+  context.mock.method(globalThis, "fetch", async (url) => {
+    requests.push(String(url));
+    const page = Number(new URL(url).searchParams.get("page"));
+    return Response.json(pages[page - 1]);
+  });
+  assert.deepEqual(await findRelease(tag), draft);
+  assert.ok(requests.every((url) => !url.includes("/tags/")));
+  pages = [[{ ...draft, draft: false }]];
+  assert.equal((await findRelease(tag)).draft, false);
+  pages = [[]];
+  assert.equal(await findRelease(tag), null);
+  pages = [[draft, { ...draft, id: 43 }]];
+  await assert.rejects(() => findRelease(tag), /RELEASE_TAG_AMBIGUOUS/);
+  const unrelated = Array.from({ length: 99 }, (_, i) => ({ id: i + 100, tag_name: `other-${i}` }));
+  pages = [[...unrelated, draft], [{ ...draft, id: 43 }]];
+  await assert.rejects(() => findRelease(tag), /RELEASE_TAG_AMBIGUOUS/);
+  pages = [[...unrelated, { id: 200, tag_name: "other" }], [draft]];
+  assert.deepEqual(await findRelease(tag), draft);
+  context.mock.method(globalThis, "fetch", async () => new Response("", { status: 403 }));
+  await assert.rejects(() => findRelease(tag), /GITHUB_API_FAILED/);
+});
+
+test("draft asset refresh uses its exact release ID without a published tag lookup", async (context) => {
+  const tag = "v0.3.15";
+  let release = { id: 42, tag_name: tag, draft: true, assets: [{ id: 10 }] };
+  const requests = [];
+  context.mock.method(globalThis, "fetch", async (url) => {
+    requests.push(String(url));
+    return String(url).endsWith("/releases/42")
+      ? Response.json(release)
+      : new Response("", { status: 404 });
+  });
+  assert.deepEqual(await readRelease(42, tag), release);
+  assert.deepEqual(requests, ["https://api.github.com/repos/bYiyLi/kg-releases/releases/42"]);
+  release = { ...release, id: 43 };
+  await assert.rejects(() => readRelease(42, tag), /IDENTITY_MISMATCH/);
+  release = { ...release, id: 42, tag_name: "v0.0.0" };
+  await assert.rejects(() => readRelease(42, tag), /IDENTITY_MISMATCH/);
+  await assert.rejects(() => readRelease(0, tag), /ID_INVALID/);
 });
 
 test("website-only routing cannot hide product, dependency, workflow or Skill changes", () => {
@@ -278,8 +348,7 @@ test("candidate verifies real archive, Plugin, source locks, workflow ancestry a
     context.mock.method(globalThis, "fetch", async (url) => {
       requests.push(String(url));
       if (forbidden) return Response.json({ message: "PRIVATE_PAYLOAD" }, { status: 403 });
-      if (String(url).includes("/releases/tags/"))
-        return release ? Response.json(release) : new Response("", { status: 404 });
+      if (String(url).includes("/releases?")) return Response.json(release ? [release] : []);
       if (String(url).includes("/attempts/")) return Response.json(run);
       if (String(url).includes("/artifacts?"))
         return Response.json({
@@ -305,6 +374,8 @@ test("candidate verifies real archive, Plugin, source locks, workflow ancestry a
     await assert.rejects(() => findCandidate(root, source, lookup), /MISSING_OR_EXPIRED/);
     expired = false;
     release = {
+      id: 42,
+      tag_name: `v${version}`,
       draft: true,
       assets: [{ name: `kgos-plugin-v${version}.zip` }],
       body: `Candidate SHA256: ${sha256(await readFile(join(output, "candidate.json")))}\nCandidate CI: https://github.com/bYiyLi/kg-releases/actions/runs/123/attempts/1`
