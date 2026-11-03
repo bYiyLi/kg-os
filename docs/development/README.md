@@ -223,7 +223,7 @@ Go Engineering Foundation
        Phase 28: Official Four Skills & Legacy kgos Retirement [in_progress; D115]
          (MCP docs coverage → Phase 25/27 real Skill acceptance →
           four-Skill Plugin packaging → generic Skill retirement → client validation)
-       Phase 30: Private Source & Generated Public kg-releases [done; D108]
+       Phase 30: Private Source & Generated Public kg-releases [in_progress; D123 candidate promotion; historical D108 baseline done]
          (private source → allowlisted public generation/sync → source-pinned public CI →
           public Docker Release → remote verification → retire legacy private CI)
 ```
