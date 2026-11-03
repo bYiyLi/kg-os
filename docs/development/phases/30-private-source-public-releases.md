@@ -123,3 +123,11 @@
 根因是错误地用仅返回已发布 Release 的 by-tag API 发现/回读草稿，造成 404 误判及重复创建。修复为按权限分页发现所有同 Tag Release，发现重复立即拒绝；上传后按确定的 Release ID 回读并核验身份。真实草稿的 browser URL 使用 `untagged-…`，草稿资产改为校验并使用限定仓库的资产 ID API，正式资产仍核对同版公开 URL。回归覆盖草稿、已发布、缺失、跨页重复、权限拒绝及 ID/Tag 不匹配，原有来源、摘要、资产冲突和质量门禁保留。
 
 Mac 曾额外下载完整候选用于重复复核；这不是发布合同必需，用户指出后已停止（退出 130），未恢复。完整 OCI 与跨 Run artifact 验真留在 GitHub；Mac 只读核对小型资产、provenance 和匿名 Registry 元数据，不运行 Docker。v0.3.15 的真实候选、推广与官网归档按后续实际结果记录，不用 v0.3.14 的成功候选代替新源码验收。
+
+### v0.3.15 真实发布与官网归档证据
+
+修复提交 `63f9164bddc6928e4959a50d5ef41017a97fd697` 的标准 Mac build、22 项分发回归及正常提交检查（含 811 单测）通过。[候选 CI 41600474762](https://github.com/bYiyLi/kg-releases/actions/runs/41600474762) 完整 Validate 17 阶段、Linux amd64 构建/OCI 回载 Smoke 及 artifact 往返验真通过，覆盖率仍为 94.37% / 90.08% / 95.33% / 96.99%；artifact ID `13215302238`、摘要 `sha256:d2b1757a9a435284781b3b0556ad4448d5b154de5df7c6aef50b2edc222bd0d2`。仅 GitHub 下载完整候选，Mac 未做整包重复下载。
+
+获准的私有 v0.3.15 Tag 对象 `8d202a4d8b902cb88e6e0c3f6123b50df6d7ad3d` 固定上述源码，公开 Tag 为 `143a2ec532da642c1e969d8ab0267f0efff772aa`。[Release 41602993185](https://github.com/bYiyLi/kg-releases/actions/runs/41602993185) 首次成功，实际跨 Run 获取原 artifact、保留 digest 推广、Linux 匿名拉取和草稿按 ID 回读/发布通过，没有第二次完整 Validate 或构建。正式[六份资产](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.15)全部下载并按 provenance、三手册校验和及完整 Plugin 文件集核验，ZIP 根 INSTALL 与 AI 资产逐字节相同，四 Skill 及引用资源完整。匿名 Registry manifest/config 另行读取确认 Linux amd64、revision 与原候选一致，digest 为 `sha256:daca8a577617cfd9a60e171c099532a80f829c4ca5d945c43f92826b7125d919`。这些是系统/分发证据，不证明模型知识效果。
+
+归档三份已验真手册的原始字节到 v0.3.15，更新 catalog.latest 与中英文 README 同版入口，保留所有历史快照；v0.3.13/v0.3.14 不入稳定目录，旧 Tag、v0.3.14 两草稿和镜像未改。22 项归档/分发检查、源码站与独立生成站的 Astro check/build 均通过。此归档提交只应走 website scope 和独立 Pages；实际远程 Run、固定/最新网页、下载及版本/语言切换在同步后独立核验，以交付回执记录，不预称尚未执行的 Pages 已成功。生产服务、已安装 Plugin、知识库和凭据未改。
