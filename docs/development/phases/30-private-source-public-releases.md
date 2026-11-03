@@ -10,14 +10,16 @@
 
 ## 当前状态
 
-`done`（2026-10-22）。私有源码 → 自动生成的公开分发仓库 → 双 Job CI → 正式 Linux amd64 Docker/GHCR → Plugin ZIP/GitHub Release 的端到端分发链已通过实际验收。公开版本为 **v0.3.0**，固定私有源 SHA `cbae2b9db4022b96bc4847fcd352ac1e674e5be6`。官网由 Phase 31 独立验收，真实用户 Agent 的环境权限、登录和客户端连接仍须在各自安装环境进行检查，不视为本阶段自动化测试已覆盖。
+`in_progress`（2026-11-03，D123 候选推广增量）。新实现需通过本地合同检查、实际公开 Linux 候选/交接及独立 Review，尚未发行新版。以下首发验收为历史基线。
+
+历史基线 `done`（2026-10-22）。私有源码 → 自动生成的公开分发仓库 → 双 Job CI → 正式 Linux amd64 Docker/GHCR → Plugin ZIP/GitHub Release 的端到端分发链已通过实际验收。公开版本为 **v0.3.0**，固定私有源 SHA `cbae2b9db4022b96bc4847fcd352ac1e674e5be6`。官网由 Phase 31 独立验收，真实用户 Agent 的环境权限、登录和客户端连接仍须在各自安装环境进行检查，不视为本阶段自动化测试已覆盖。
 
 ## Scope
 
 1. **仓库分离**：现有 `bYiyLi/kg-os` 变为 Private，创建公开 `bYiyLi/kg-releases`；保留本地和远端源代码历史、旧公开 Fork 事实、原工作树中无关未提交修改；Lithograph 不变。
-2. **单一真源**：KG OS 的 `distribution/` 保存公开主页和 CI/CD 模板，`plugins/kgos/INSTALL.md` 是唯一安装指南真源；`scripts/render-kg-releases.mjs` 按受限白名单复制根安装指南、Plugin Manifest、无凭证配置样例、七个 Skill 与 Markdown 参考资源、许可证及私有确切 SHA/ref 的 `source.json`。公开仓库不能独立编辑，也不复制完整应用源码、仓库历史、Secret、私有日志或本地状态；历史通用 `kgos` 已按 [Phase 28](28-official-skill-roster.md) 从私有源码清理，不作为第八项公开。
+2. **单一真源**：KG OS 的 `distribution/` 保存公开主页和 CI/CD 模板，`plugins/kgos/INSTALL.md` 是唯一安装指南真源；`scripts/render-kg-releases.mjs` 按受限白名单复制根安装指南、Plugin Manifest、无凭证配置样例、当前四个官方 Skill 与 Markdown 参考资源、许可证及私有确切 SHA/ref 的 `source.json`。公开仓库不能独立编辑，也不复制完整应用源码、仓库历史、Secret、私有日志或本地状态；历史通用 `kgos` 已按 [Phase 28](28-official-skill-roster.md) 从私有源码清理，不进入当前公开包。
 3. **自动同步**：私有 `main` 与获授权 `v*` Tag Push 启动源仓库的最小 Sync 工作流；两个不同 Deploy Key 分别授予源→公开写权限与公开 CI→源只读权限。重复推送/Tag 重跑保持幂等，不强推公开 Tag。
-4. **公开完整 CI/CD**：公开 `main` Push 自动执行源代码质量、单安装指南/Plugin/Skill 完整性验证与 Linux amd64 Docker 隔离 Smoke；公开 Tag 触发 Release，先通过同一完整 CI，再对精确 Tag 源码构建/Smoke、推送 GHCR、验证匿名拉取和 digest，最后随 GitHub Release 提供版本一致的 Plugin ZIP（包含唯一安装指南与全部七 Skill）。普通 Push 不发布镜像/正式 Plugin Release。
+4. **公开完整 CI/CD**：按 D123 对候选执行完整质量、分发及 Linux amd64 OCI 回载 Smoke，封存并下载核验同一候选；Tag 只核验和推广原产物。普通 Push 不推送 GHCR，只有许可门禁已满足时可上传不含源码的受控候选二进制。Plugin 当前四 Skill，与三份手册、校验和及 provenance 一起追溯。
 5. **安全和合规**：明确公开日志、fork、历史 AGPL 与双授权边界；正式二进制发布由公共仓库 `KGOS_BINARY_DISTRIBUTION_APPROVED` 门禁控制，在授权未解决前不能声明可发布。按用户最新决定，私有 GitHub Actions 只允许同步，不保留并行 CI/Release；公开失败由公开 CI/CD 处理。
 
 ## Acceptance
@@ -85,3 +87,21 @@
 发布前本地完整 Validate 首次在图谱拖拽 E2E 停止（80/81）：第二次拖动后未观察到目标位移。同项定向复查重现，等待位置稳定的试改未解决，已撤回；根因尚未确认，不将运行波动假设写成事实。此前安装、类型/lint、构建、Go 检查/race、Go 覆盖率 90.3%、漏洞检查及前端 811 项测试均通过，但完整 Validate 未通过，后续许可/依赖安全步骤尚未由该次运行执行。保留失败证据并用同一源码的正式 Linux CI 进一步核对，不修改图谱业务、放宽断言或跳过发布门禁。
 
 后续隔离复现确认 `90f38737ab7cc6f1ff9a4d4f492c0bd88868b3ab` 在同一 Mac 也失败。事件取证两次均命中可拖动节点，但第二次没有拖拽开始事件；固定 G6 5.1.1 的 Canvas 配置要求在移动事件中同时超过 100ms 与 10px。补测浏览器原生事件时间后，原 6 步手势的末次移动为按下后 83.7ms、松手为 101.7ms；移动事件未越过时间门槛，不能用松手时刻替代识别条件。将该手势改为与第一次相同的 16 步后，隔离原断言连续 3/3 通过；不调整运行时、门槛、位移/邻居/固定/关系断言。该本地失败由无效测试输入造成，不据此宣称业务已修复。仓库原断言下完整 E2E 已通过 81/81；类型检查、ESLint、Prettier 和 diff 检查通过。初次完整 Validate 中止后的许可、安全和 diff 步骤已另外成功执行，安全门禁没有 high 级问题（仍报告 3 low、8 moderate）；不把分段结果冒称完整命令通过。准备提交 `c499c47818f42b2af7dd223899d7e211572436fb` 的公开 CI [41454994976](https://github.com/bYiyLi/kg-releases/actions/runs/41454994976) 为 Docker success、Validate failure；公开日志仅披露 Validate 失败，不能声称与本地同因已证实。修复提交仍须通过新的完整正式 CI，随后精确 Tag 的发布门禁另行验收。
+
+## 2026-11-03 v0.3.13 固定源码诊断
+
+- **来源与前置门禁**：修复提交 `306908a75e0b38e1edd601026f0aa287829bf0d6` 的 Mac 完整 `pnpm validate` 通过；[公开 main CI 41459029156](https://github.com/bYiyLi/kg-releases/actions/runs/41459029156) 的 Validate 和 Linux amd64 Docker 集成均成功。私有 annotated `v0.3.13` 对象为 `5db410f16d45ff16327118fb1497b501c7c52593`，解引用为该源码；公开 Tag 为 `627bfa5dc2f48683b6cdf10980888dd017f945a1`，其 `source.json` 同时固定该 revision 与 `refs/tags/v0.3.13`。没有移动 Tag。
+- **保留失败事实**：[正式 Release 41461293545](https://github.com/bYiyLi/kg-releases/actions/runs/41461293545) 的三次 Validate 均在第 10/17 阶段 `test:coverage` 失败，摘要均为 84 个文件、811 个用例通过；三次 Docker 成功、Publish 跳过。第三次为 2026-11-03 02:39 UTC 根据下述已通过对照发起的一次完整正式重跑，Validate Job 为 `125692218654`。公开日志、Job 注解及该次完整日志归档均只保留受控错误与退出码 1；原 Runner 的具体异常和覆盖率明细没有持久化，不能把单测通过或私有对照成功当作旧失败原因已经解释。不继续盲目重跑正式发布。
+- **一次私有诊断例外**：获准仅在专用临时分支运行 Ubuntu 私有 Actions，固定检查 `306908a75e0b38e1edd601026f0aa287829bf0d6`，复用正式 Node/pnpm/Go/Rust 工具链和完整 Validate 次序，不使用发布密钥。[私有完整诊断 41562921506](https://github.com/bYiyLi/kg-os/actions/runs/41562921506) 于 02:18:43 UTC 成功：Go 覆盖率 90.3%，前端 811/811，E2E 81/81，全部 Validate 门禁通过。前端分支覆盖为 3518/3905（90.08%）；77 个含未覆盖分支的文件与 Mac 明细完全一致。
+- **有界差异复查**：[私有覆盖率对照 41566411448](https://github.com/bYiyLi/kg-os/actions/runs/41566411448) 在同一源码、Node v24.15.0、实际 2 CPU Runner 上完成四次检查：默认配置、3 个测试 worker / 4 路覆盖率处理，以及两次为子进程设置原发布 Tag、Workflow、仓库和提交上下文字段的同并发对照。四次均为 811/811、3518/3905；未改阈值、断言或测试集，也没有复现旧失败。该对照不是对公开 Runner 硬件和完整运行环境的复制，不证明原错误由并发导致。
+- **I/O 与检出结构对照**：[私有执行对照 41569715567](https://github.com/bYiyLi/kg-os/actions/runs/41569715567) 只复查前端覆盖率，分别使用正式输出重定向，以及固定公开 Tag 检出目录下的固定私有源码。两次均使用 3 个测试 worker、4 路覆盖率处理和发布 Tag 子进程上下文，实际退出码均为 0，811/811、3518/3905。该结果排除了这两个单独对照中的稳定失败，不能代替原公开 Runner 的错误证据，也不证明完整准备过程的组合必然通过。
+- **完整组合对照**：[私有完整执行对照 41571767321](https://github.com/bYiyLi/kg-os/actions/runs/41571767321) 固定相同公开 Tag 与私有 revision，逐项复用正式检出、工具链、安装和完整 Validate shell，保留原日志重定向；仅移除私库内无需使用的私有源码 Deploy Key，并显式设置 3 个 Vitest worker。Job 于 03:42:22 UTC 成功结束，耗时 20 分 18 秒：完整 Validate 通过，Go 90.3%、811/811、E2E 81/81，前端覆盖率 94.37% statements / 90.08% branches / 95.33% functions / 96.99% lines，分支仍为 3518/3905。实际私有 Runner 为 2 CPU，覆盖率处理仍采用该 Runner 默认值，因此不声称物理资源或全部 GitHub 上下文完全相同。该完整组合也未复现公开失败，不将新成功记录解释为旧错误已修复。
+- **隔离与交付边界**：详细日志仅保留在私有 Actions 和本机受限临时文件。临时分支及其 workflow 未合入 main；在完整组合取证后再次清理远端与本地临时分支，四次诊断提交的恢复补丁保留。私有 main 仍只维护同步 workflow。没有修改源码、测试断言或质量阈值，没有移动 Tag；未取得 v0.3.13 镜像、Release 资产或官网归档的通过证据，稳定官网仍为 v0.3.12。旧失败根因仍为未知；继续处理需要取得真实公开 Runner 的受控失败信息，不能以重复私有成功或无依据的第四次正式重跑代替诊断。
+
+## 2026-11-03 候选产物推广改造
+
+- **授权与顺序**：用户要求停止旧版本反复诊断，先优化再发布新版本。旧诊断 Run 均已完成，无新增公开诊断或旧 Release 重跑；v0.3.13 私公 Tag 不移动。使用隔离 `feat/release-candidate-reuse` 工作树，原工作区未提交诊断证据保留。
+- **本增量范围**：D123、Client、维护指南与候选 CI/Release 模板；源与公开导出工具、OCI/候选/恢复合同、允许清单安全错误及回归检查。不改应用业务、覆盖率/安全门槛、生产、Dev 数据、已安装 Plugin 或持久凭证。
+- **验收合同**：证明完整 Validate 只在候选执行，镜像只构建一次，OCI 全内容及平台/标签、真实导出/回载 Smoke、保留摘要复制、Plugin/三手册字节一致、不可变 artifact 上传下载、来源/锁/工作流/工具/Run/attempt 核验；拒绝篡改、异平台/多 manifest、错误来源或失败候选。验证已完成发布只读复验、部分发布仅补缺失且不覆盖异内容，以及 artifact 过期/Registry 状态未知的阻塞路径。官网归档必须走受限差异专项，不跳过产品变化。
+- **当前实现与证据**：候选、推广、摘要工具和模板已实现。Mac 正常 native/Web build、20 项分发/候选专项、Go/type/lint/811 单测的 `pnpm check:quick`、ESLint、actionlint 1.7.12 和拼写检查通过。新工作树初次 quick 因尚未生成嵌入 Web 而有两项 Setup 404；执行标准 build 后通过，未改业务或断言。提交钩子与最终 diff/格式检查按实际结果在 MR 汇报，真实 Run 仍待核。本地合成 OCI/HTTP/Run 用于确定性合同回归，不冒充 Docker/Registry 或跨 GitHub artifact 的实际运行。新工作流尚未激活，实际 Linux/Artifact/GHCR 门禁仍待验证；尚未创建新版本 Tag。
+- **外部配置限制**：GitHub 管理接口此前报告 403，本轮不换接口/认证路径或修改协作者/Key。仅协作者交互限制的 Issue/评论范围及到期机制已核官方文档；真实设置仍未完成，不以工作流过滤外部 PR 冒充平台禁止创建 PR。

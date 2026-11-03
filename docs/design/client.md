@@ -103,12 +103,26 @@ Linux amd64 Docker / OCI (one official runtime artifact)
 按 [D108](decisions.md#d108-private-source-public-releases) 和 [D109](decisions.md#d109-single-public-distribution-and-installer)，`bYiyLi/kg-os` 是唯一私有开发真源，`bYiyLi/kg-releases` 统一提供自动生成的 Docker 镜像/Release 入口、Plugin、七个目标 Skill、AI 私人 Plugin 安装指南、用户安装教程和公开 CI/CD，不复制私有程序源码或 Git 历史。所有内容均只在私有 KG OS 开发：
 
 1. `kg-os/main` Push 由 `.github/workflows/sync-kg-releases.yml` 检查确切来源 revision，调用 `scripts/render-kg-releases.mjs` 输出 `distribution/` 中的白名单内容和 `source.json`，使用仅授权公开仓库的可写 Deploy Key 推送 `kg-releases/main`；公开 CI 自动对 `source.json` 固定的私有 revision 执行 Validate 与 Linux amd64 Docker 隔离 Smoke。
-2. 经授权创建并 Push 的私有 `v<version>` Tag 生成匹配的公开 Tag；公开 Release 先通过完整 CI，再针对该 Tag 的确切私有 SHA 构建、隔离 Smoke、核对 GHCR 平台/revision/digest/匿名拉取并创建公开 GitHub Release。一般 `main` Push 不发布镜像。
+2. 经授权创建并 Push 的私有 `v<version>` Tag 生成匹配的公开 Tag；按 [D123](decisions.md#d123-verified-candidate-promotion) 和下述候选合同，公开 Release 推广同一来源已验收的 OCI、Plugin 和手册，不重复完整 CI、构建或 Smoke。一般 `main` Push 不推送 GHCR；受许可门禁保护的二进制候选只封存在 Actions artifact。
 3. 公开 runner 只能通过单独的私有源码**只读** Deploy Key 读取，不能把源码、完整历史、测试报告或缓存发布到公开仓库；Public PR 不触发含该密钥的工作流。镜像正式公开前仍须满足源代码许可义务或具备合法替代授权；公开仓库设置 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 才允许二进制发布。
 4. `plugins/kgos/INSTALL.md` 是**唯一 AI 私人 Plugin 安装指南**，导出为公开根目录唯一 `INSTALL.md`；官网对应语言 Markdown 唯一维护部署、初始化、HTTPS、ChatGPT 基础应用接入与验收、升级与恢复，由网页和同源下载共用。INSTALL 只接续已有应用，负责新建版本化私人 Plugin、迁移定制、安装、引导词与自检，不复制用户操作正文。不保留 `distribution/INSTALL.md` 或 Plugin 内第二份安装真源。公开白名单只包含 Manifest、无凭证模板、七个官方 Skill 的完整 Markdown、站点与许可，不包含真实 `.app.json`、Token 或数据库。
 5. 正式 Release 的镜像与官方 Plugin 归档对应同一产品 Tag；归档包含唯一 INSTALL、七个官方 Skill 和许可。后续 Release 同时保存双语安装 Markdown 供对应版本使用；现有 v0.3.0 Tag 不改写。官网适用版本独立于开发包版本，更新前核对真实最新稳定 Release、digest 与匹配 Plugin，不把候选版提前写成最新稳定版。官网每个正式版本保留双语完整手册与 INSTALL 快照，提供历史版本切换；不改写既有 Tag。
 
 该架构正在 [Phase 30](../development/phases/30-private-source-public-releases.md) 验收。私有仓库只保留有限的自动同步工作流，不再运行源码 Validate、Docker 或 Release；全部远端质量门禁归 `kg-releases`，公开 CI 是否通过必须以其真实 Run 为准。生成器、工作流及一次性仓库/密钥配置的唯一维护说明见 [`docs/guide/distribution-maintenance.md`](../guide/distribution-maintenance.md)。
+
+<a id="verified-release-candidate"></a>
+
+### 已验收候选与发布推广
+
+[D123](decisions.md#d123-verified-candidate-promotion) 更新 D108 的执行顺序，平台仍仅 Linux amd64。公开 CI 从受控 `main` 的 `source.json` 检出确切私有 revision、核对私有 main 祖先；无任意源码输入的手动完整验收仅允许所有者在公开 main 且来源 manifest 为 main 时发起；Tag manifest 使用原候选 Run 重验。PR 不触发持有私有只读 Key 的工作流。Tag 同步造成的 main Push 只验证来源并标明 Tag 路由，不再次构建候选。
+
+1. **一次验收与构建**：完整 Validate 和分发合同通过后，Docker Job 按源 Dockerfile 解析并固定四个基础镜像 digest，构建一次。导出单平台 OCI archive，检查 manifest/config/layer 内容摘要、revision/version 标签，验证保留摘要的 OCI 复制，再删除本机镜像并从 archive 回载；检查 config ID、平台和 rootfs diff IDs 后执行完整隔离 Smoke。Plugin、三份稳定版手册与校验文件使用此 OCI manifest digest 一次生成；预发布沿用仅 Plugin 的手册策略。
+2. **封存与真实交接**：许可变量为 true 才上传候选二进制，普通 main 不登录或推送 GHCR。不可变 artifact 名含私有 SHA、Run ID 和 attempt，保留七天。只含 `image.oci.tar`、`candidate.json` 和对应发行资产，无源码、测试报告、日志、Secret 或缓存；上传后从该 artifact ID 下载，核验平台、所有文件与 OCI 摘要，成功 Run 才能用于发布。候选清单保留依赖锁/Dockerfile hash、公开发行输入/工作流 hash、工具版本、基础镜像 digest、OCI/config/layer/diff IDs 和资产 hash；不把一个 SHA 或一个绿色 Job 当作完整验收。
+3. **来源匹配**：Release 独立核对私有 Tag、版本及 main 祖先。只接受同库 `ci.yml`、公开 main 的成功 Run/attempt；该 Run 的公开 commit 必须为发行 Tag 祖先，其 source manifest 固定同一私有 SHA 且来自 main。独立从该公开 commit 读取发行输入并与 Tag 当前输入及候选 hash 对比，检查依赖、工具记录、平台和所有候选字节。Artifact 下载以精确 ID 和 GitHub digest 严格校验，不按名称猜测。缺失、过期、外仓、非 main、失败、异工作流、异 attempt、变更依赖或变更产物均拒绝。
+4. **推广与恢复**：不调用 Validate、Docker build、Smoke 或 Plugin 打包。使用 `skopeo copy --preserve-digests` 推送 OCI；已有镜像 Tag 必须完全同 digest 才可复用，网络/鉴权未知不当作不存在。匿名核对 registry manifest/config/layers，再实际匿名 Docker pull，验证平台、config ID、rootfs、revision/version。先创建 draft Release，核验并补齐原字节资产后发布；新增同版 provenance JSON，稳定版共六个资产。已有异内容资产、镜像或 Release 说明不覆盖；完整已发布结果只验真，原候选过期也不偷偷重建。部分发布丢失原候选时保持阻塞，按维护指南恢复原件或另行决定版本。
+5. **轻量归档与安全输出**：只在私有差异全部属于版本快照/catalog、公开 README 与关联阶段证据且确含安装归档时走网站专项；产品、Skill、依赖、工具链、模板或工作流变化一律完整候选 CI。所有原始质量/构建日志及第三方 Step Summary 均留临时 Runner；公开只输出阶段、退出码、覆盖率数值、固定工具名和允许清单类别，未知明确为 unknown，不转发自由文本、测试名、源码片段、路径或 Secret。不存在用简化输出跳过失败门禁的路径。
+
+实际构建、跨 artifact 交接及 Registry 发布仍须各自的执行证据；本合同不代表尚未运行的 Linux/Registry 流程已验收。仓库来源、许可与公开内容白名单继续由 D108/D109 约束；旧不可变 Tag 保留原工作流。操作、失效恢复、公开贡献限制与回退见[分发维护](../guide/distribution-maintenance.md)。
 
 ### 公开产品官网（Astro / GitHub Pages）
 
