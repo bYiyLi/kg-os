@@ -14,7 +14,7 @@ describe("KG OS SDK", () => {
   it("exports package metadata and JSON types", () => {
     const value: JsonValue = { product: PRODUCT_NAME, version: KGOS_VERSION };
 
-    expect(value).toEqual({ product: "KG OS", version: "0.3.13" });
+    expect(value).toEqual({ product: "KG OS", version: "0.3.14" });
   });
 
   it("maps JSON requests through the authenticated public API", async () => {

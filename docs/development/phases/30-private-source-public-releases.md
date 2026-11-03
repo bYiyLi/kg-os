@@ -105,3 +105,11 @@
 - **验收合同**：证明完整 Validate 只在候选执行，镜像只构建一次，OCI 全内容及平台/标签、真实导出/回载 Smoke、保留摘要复制、Plugin/三手册字节一致、不可变 artifact 上传下载、来源/锁/工作流/工具/Run/attempt 核验；拒绝篡改、异平台/多 manifest、错误来源或失败候选。验证已完成发布只读复验、部分发布仅补缺失且不覆盖异内容，以及 artifact 过期/Registry 状态未知的阻塞路径。官网归档必须走受限差异专项，不跳过产品变化。
 - **当前实现与证据**：候选、推广、摘要工具和模板已实现。Mac 正常 native/Web build、20 项分发/候选专项、Go/type/lint/811 单测的 `pnpm check:quick`、ESLint、actionlint 1.7.12 和拼写检查通过。新工作树初次 quick 因尚未生成嵌入 Web 而有两项 Setup 404；执行标准 build 后通过，未改业务或断言。提交钩子与最终 diff/格式检查按实际结果在 MR 汇报，真实 Run 仍待核。本地合成 OCI/HTTP/Run 用于确定性合同回归，不冒充 Docker/Registry 或跨 GitHub artifact 的实际运行。新工作流尚未激活，实际 Linux/Artifact/GHCR 门禁仍待验证；尚未创建新版本 Tag。
 - **外部配置限制**：GitHub 管理接口此前报告 403，本轮不换接口/认证路径或修改协作者/Key。仅协作者交互限制的 Issue/评论范围及到期机制已核官方文档；真实设置仍未完成，不以工作流过滤外部 PR 冒充平台禁止创建 PR。
+
+## 2026-11-03 v0.3.14 主分支发布准备
+
+用户取消临时合成试验，改为合入 main 后以正常新版发行验证 D123。PR #3 已经正常合并为 `94d177f02c25f132157a27d98037a676aa2e915d`，未提交 GitHub APPROVE 评审或绕过门禁；没有创建临时试验分支、Run、镜像、Tag 或草稿 Release。原 `v0.3.13` 私公 Tag 保持不变。用户确认下一版为 `v0.3.14`，私公同名 Tag 均未占用；产品/SDK/CLI/Web/Go/Plugin 与当前 AI 模板按补丁版本统一，历史快照和官网 latest 仍为 v0.3.12。运行时接口、数据、初始化、认证和升级合同相对 v0.3.13 准备未改变；新增 provenance 资产及候选推广流程由本阶段核验，不要求用户升级已安装服务或 Plugin。
+
+主分支 [Sync 41586367665](https://github.com/bYiyLi/kg-os/actions/runs/41586367665) 在公开仓库推送 `.github/workflows/ci.yml` 时被 GitHub 拒绝，原文为 OAuth App 缺少 workflow scope。公开 main 仍为 `627bfa5dc2f48683b6cdf10980888dd017f945a1`，manifest 仍指向旧源码 `306908a75e0b38e1edd601026f0aa287829bf0d6` 和 v0.3.13；新候选 CI 尚未触发。公库现有可写 Deploy Key 元数据已只读核实，未读取私钥、扩大权限或重配凭据；未断言 runner 具体认证来源已经定位，未用其他凭据或预先写入工作流绕过拒绝。版本准备先留本地，待正规同步写入权限/身份修复后再推进相应已授权动作。
+
+按用户清理意图核对 PR #2 已合并、其 head `737827d182f4301e95e3994d9ce0f84b401354d4` 属 main 祖先、无打开 PR 或 worktree 依赖，并核对 GitHub 关闭 PR 的正常分支恢复机制后，删除旧远端 `feat/ontology-source-pack-review`。当前功能分支保留到验证完成；公库仅 main。没有永久删除镜像、资产、Release、Tag 或仓库。
