@@ -1,4 +1,3 @@
-// The KG OS Go MCP tool wraps JSON-compatible sandbox returns in { result }.
 // Host-provided content is untrusted even after an authorized tool call.
 export class McpReadError extends Error {
   constructor(readonly code: string | null) {
@@ -6,64 +5,54 @@ export class McpReadError extends Error {
   }
 }
 
-function mcpFailureCode(text: string): string | null {
-  let value: unknown;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function resultEnvelope(call: Record<string, unknown>): unknown {
+  if (call["structuredContent"] !== undefined) return call["structuredContent"];
+  const content = call["content"];
+  if (!Array.isArray(content)) throw new Error("MCP result has no content");
+  const item: unknown = content.find(
+    (entry: unknown) => isRecord(entry) && entry["type"] === "text"
+  );
+  if (!isRecord(item) || typeof item["text"] !== "string") {
+    throw new Error("MCP result has no text");
+  }
+  const envelope: unknown = JSON.parse(item["text"]);
+  return envelope;
+}
+
+function frameworkFailureCode(call: Record<string, unknown>): string | null {
   try {
-    value = JSON.parse(text);
+    const envelope = resultEnvelope(call);
+    return isRecord(envelope) && typeof envelope["code"] === "string" && envelope["code"] !== "ok"
+      ? envelope["code"]
+      : null;
   } catch {
     return null;
   }
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    Array.isArray(value) ||
-    !("code" in value) ||
-    typeof value.code !== "string"
-  ) {
-    return null;
-  }
-  return value.code;
 }
 
 export function readMcpResult(result: unknown): unknown {
-  if (typeof result !== "object" || result === null || Array.isArray(result)) {
-    throw new Error("Invalid MCP result");
-  }
-  const call = result as Record<string, unknown>;
-  const content = call["content"];
-  if (!Array.isArray(content)) {
-    if (call["isError"] === true) throw new McpReadError(null);
-    throw new Error("MCP result has no content");
-  }
-  const item: unknown = content.find(
-    (entry: unknown) =>
-      typeof entry === "object" &&
-      entry !== null &&
-      (entry as Record<string, unknown>)["type"] === "text"
-  );
-  if (call["isError"] === true) {
-    const errorText =
-      typeof item === "object" && item !== null && "text" in item && typeof item.text === "string"
-        ? item.text
-        : "";
-    throw new McpReadError(mcpFailureCode(errorText));
-  }
-  if (
-    typeof item !== "object" ||
-    item === null ||
-    !("text" in item) ||
-    typeof item.text !== "string"
-  ) {
-    throw new Error("MCP result has no text");
-  }
-  const envelope: unknown = JSON.parse(item.text);
-  if (
-    typeof envelope !== "object" ||
-    envelope === null ||
-    Array.isArray(envelope) ||
-    !("result" in envelope)
-  ) {
+  if (!isRecord(result)) throw new Error("Invalid MCP result");
+  if (result["isError"] === true) throw new McpReadError(frameworkFailureCode(result));
+  const envelope = resultEnvelope(result);
+  if (!isRecord(envelope) || typeof envelope["code"] !== "string" || envelope["code"] === "") {
     throw new Error("Invalid MCP envelope");
   }
-  return envelope.result;
+  if (envelope["code"] !== "ok") {
+    if (
+      typeof envelope["message"] !== "string" ||
+      envelope["message"] === "" ||
+      typeof envelope["retryable"] !== "boolean"
+    ) {
+      throw new Error("Invalid MCP failure envelope");
+    }
+    throw new McpReadError(envelope["code"]);
+  }
+  if (!Object.hasOwn(envelope, "data") || envelope["data"] === undefined) {
+    throw new Error("Invalid MCP success envelope");
+  }
+  return envelope["data"];
 }

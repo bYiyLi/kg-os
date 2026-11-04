@@ -5,15 +5,19 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
+	"github.com/bYiyLi/kg-os/internal/mcpoauth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -61,6 +65,8 @@ type oauthFixture struct {
 	client    *http.Client
 	metadata  *oauthFakeTransport
 	challenge string
+	store     *mcpoauth.Store
+	storePath string
 }
 
 func newOAuthFixture(t *testing.T) *oauthFixture {
@@ -78,9 +84,20 @@ func newOAuthFixture(t *testing.T) *oauthFixture {
 	t.Cleanup(f.server.Close)
 	hash := sha256.Sum256([]byte(oauthTestVerifier))
 	f.challenge = base64.RawURLEncoding.EncodeToString(hash[:])
+	storeRoot := t.TempDir()
+	if err := os.Chmod(storeRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	f.storePath = filepath.Join(storeRoot, "mcp-oauth.db")
+	store, err := mcpoauth.Open(f.storePath, fmt.Sprintf("%x", sha256.Sum256([]byte(oauthTestAdmin))), f.server.URL, f.server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.store = store
+	t.Cleanup(func() { _ = f.store.Close() })
 	service, err := New(&kernel.Service{}, Options{
 		Token: oauthTestAdmin, OAuthIssuer: f.server.URL,
-		OAuthClient: &http.Client{Transport: mock}, Path: "/mcp",
+		OAuthClient: &http.Client{Transport: mock}, Path: "/mcp", OAuthStore: store,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -275,11 +292,6 @@ func TestGoOAuthAuthorizationAndRefresh(t *testing.T) {
 	if newGrant["refresh_token"] == refresh || !fixture.service.authorized("Bearer "+newGrant["access_token"].(string)) {
 		t.Fatal("refresh did not rotate")
 	}
-	reused := rotate(refresh)
-	if reused.StatusCode != 400 {
-		t.Fatalf("refresh reused: %d", reused.StatusCode)
-	}
-	reused.Body.Close()
 	// OAuth sees five AI-facing tools and the app-only UI entrypoint.
 	client := mcp.NewClient(&mcp.Implementation{Name: "oauth-integration-test", Version: "1"}, nil)
 	session, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{
@@ -303,7 +315,15 @@ func TestGoOAuthAuthorizationAndRefresh(t *testing.T) {
 			t.Fatalf("missing authenticated tool: %s", name)
 		}
 	}
-	t.Logf("OAuth authorization, 4 business tools + UI, refresh rotation and replay protection verified")
+	reused := rotate(refresh)
+	if reused.StatusCode != http.StatusBadRequest {
+		t.Fatalf("refresh reused: %d", reused.StatusCode)
+	}
+	reused.Body.Close()
+	if fixture.service.authorized("Bearer " + newGrant["access_token"].(string)) {
+		t.Fatal("public refresh replay did not revoke the token family")
+	}
+	t.Logf("OAuth authorization, five AI tools + UI, refresh rotation and replay protection verified")
 }
 
 func TestGoOAuthRejectsUntrustedAndWrongGrants(t *testing.T) {
@@ -366,15 +386,13 @@ func TestGoOAuthRejectsUntrustedAndWrongGrants(t *testing.T) {
 	}
 	wrong.Body.Close()
 	replay := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL)
-	if replay.StatusCode != 400 {
-		t.Fatalf("bad verifier did not consume code: %d", replay.StatusCode)
+	if replay.StatusCode != http.StatusOK {
+		t.Fatalf("invalid verifier consumed the valid code: %d", replay.StatusCode)
 	}
 	replay.Body.Close()
 	// Incorrect client metadata must not be trusted; unknown callback is rejected.
 	f.metadata.body = []byte(`{"client_id":"https://attacker.example","redirect_uris":["https://chatgpt.com/callback"],"token_endpoint_auth_methods_supported":["none"]}`)
-	f.broker.mu.Lock()
-	f.broker.documents = make(map[string]cachedOAuthDocument)
-	f.broker.mu.Unlock()
+	f.resetClientAuth()
 	_, untrusted := f.begin(nil)
 	if untrusted.StatusCode != 400 {
 		t.Fatalf("spoofed CIMD accepted: %d", untrusted.StatusCode)
@@ -390,41 +408,107 @@ func TestGoOAuthExpiryAndRestart(t *testing.T) {
 	page.Body.Close()
 	f.broker.now = func() time.Time { return base.Add(ticketLifetime + time.Millisecond) }
 	expired := f.approve(ticket, oauthTestAdmin, f.server.URL)
-	if expired.StatusCode != 410 {
+	if expired.StatusCode != http.StatusGone {
 		t.Fatalf("expired ticket accepted: %d", expired.StatusCode)
 	}
 	expired.Body.Close()
 	f.broker.now = func() time.Time { return base }
-	grantRedirect := f.code()
-	location, _ := url.Parse(grantRedirect.Header.Get("Location"))
-	grantRedirect.Body.Close()
-	response := f.exchange(location.Query().Get("code"), oauthTestVerifier, oauthTestClient, f.server.URL)
-	if response.StatusCode != 200 {
-		t.Fatalf("grant: %d", response.StatusCode)
+	grant := f.grant(nil)
+	access := grant["access_token"].(string)
+	refresh := grant["refresh_token"].(string)
+	if grant["expires_in"] != float64(86340) {
+		t.Fatalf("missing early refresh hint: %#v", grant)
 	}
-	result := parseOAuthJSON(t, response)
-	access := result["access_token"].(string)
-	refresh := result["refresh_token"].(string)
-	f.broker.now = func() time.Time { return base.Add(accessLifetime + time.Second) }
-	if f.service.authorized("Bearer " + access) {
-		t.Fatal("expired access token accepted")
+	if err := f.store.Close(); err != nil {
+		t.Fatal(err)
 	}
-	rotated := f.postForm("/oauth/token", url.Values{"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL}, "refresh_token": {refresh}}, "")
-	if rotated.StatusCode != 200 {
-		t.Fatalf("refresh expired too early: %d", rotated.StatusCode)
+	reopened, err := mcpoauth.Open(f.storePath, fmt.Sprintf("%x", sha256.Sum256([]byte(oauthTestAdmin))), f.server.URL, f.server.URL)
+	if err != nil {
+		t.Fatal(err)
 	}
-	rotated.Body.Close()
-	f.broker.now = func() time.Time { return base.Add(refreshLifetime + time.Second) }
-	old := f.postForm("/oauth/token", url.Values{"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL}, "refresh_token": {refresh}}, "")
-	if old.StatusCode != 400 {
-		t.Fatalf("old refresh accepted: %d", old.StatusCode)
-	}
-	old.Body.Close()
+	f.store = reopened
+	f.broker.store = reopened
 	restarted, err := newOAuthBroker(f.server.URL, "/mcp", oauthTestAdmin, &http.Client{Transport: f.metadata})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := restarted.principal(access); ok {
-		t.Fatal("pre-restart access token accepted")
+	restarted.store = reopened
+	restarted.now = func() time.Time { return base }
+	if _, ok := restarted.principal(access); !ok {
+		t.Fatal("persisted access token lost on broker restart")
 	}
+	f.broker.now = func() time.Time { return base.Add(accessLifetime + time.Second) }
+	if f.service.authorized("Bearer " + access) {
+		t.Fatal("expired access token accepted")
+	}
+	response := f.postForm("/oauth/token", url.Values{
+		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL}, "refresh_token": {refresh},
+	}, "")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("persisted refresh rejected: %d", response.StatusCode)
+	}
+	rotated := parseOAuthJSON(t, response)
+	// Active refresh extends the idle deadline, so the first authorization's
+	// 30-day anniversary is not itself an expiry.
+	f.broker.now = func() time.Time { return base.Add(refreshLifetime + 30*time.Minute) }
+	response = f.postForm("/oauth/token", url.Values{
+		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL}, "refresh_token": {rotated["refresh_token"].(string)},
+	}, "")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("active rolling refresh expired at original anniversary: %d", response.StatusCode)
+	}
+	latest := parseOAuthJSON(t, response)
+	f.broker.now = func() time.Time { return base.Add(2*refreshLifetime + time.Hour) }
+	response = f.postForm("/oauth/token", url.Values{
+		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL}, "refresh_token": {latest["refresh_token"].(string)},
+	}, "")
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("idle-expired refresh accepted: %d", response.StatusCode)
+	}
+	response.Body.Close()
+}
+
+func (f *oauthFixture) resetClientAuth() {
+	f.broker.clientAuth = newOAuthClientAuthenticator(f.broker.client, func() time.Time { return f.broker.now() })
+}
+
+func (f *oauthFixture) grant(modify url.Values) map[string]any {
+	f.t.Helper()
+	ticket, start := f.begin(modify)
+	if start.StatusCode != http.StatusSeeOther || ticket == "" {
+		f.t.Fatalf("authorize: %d", start.StatusCode)
+	}
+	start.Body.Close()
+	approved := f.approve(ticket, oauthTestAdmin, f.server.URL)
+	if approved.StatusCode != http.StatusOK {
+		f.t.Fatalf("approve: %d", approved.StatusCode)
+	}
+	callback, err := url.Parse(parseOAuthJSON(f.t, approved)["redirect_url"].(string))
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	exchanged := f.exchange(callback.Query().Get("code"), oauthTestVerifier, oauthTestClient, f.server.URL)
+	if exchanged.StatusCode != http.StatusOK {
+		f.t.Fatalf("exchange: %d", exchanged.StatusCode)
+	}
+	return parseOAuthJSON(f.t, exchanged)
+}
+
+func oauthTestHash(value string) string { return fmt.Sprintf("%x", sha256.Sum256([]byte(value))) }
+
+func (f *oauthFixture) seedPair(label string, now time.Time) (string, string) {
+	f.t.Helper()
+	codeHash := oauthTestHash("code:" + label)
+	binding := mcpoauth.Binding{FamilyID: oauthTestHash("family:" + label), ClientID: oauthTestClient, Issuer: f.server.URL, Resource: f.server.URL, Scope: oauthScope, AuthMethod: "none"}
+	code := mcpoauth.Code{Hash: codeHash, Binding: binding, RedirectURI: oauthTestRedirect, Challenge: f.challenge, ExpiresAt: now.Add(codeLifetime)}
+	if err := f.store.PutCode(context.Background(), code, now); err != nil {
+		f.t.Fatal(err)
+	}
+	access := oauthTestHash("access:" + label)[:43]
+	refresh := oauthTestHash("refresh:" + label)[:43]
+	tokens := mcpoauth.Tokens{AccessHash: oauthTestHash(access), RefreshHash: oauthTestHash(refresh), AccessExpiresAt: now.Add(accessLifetime), RefreshExpiresAt: now.Add(refreshLifetime), AuthMethod: "none"}
+	if _, err := f.store.ExchangeCode(context.Background(), codeHash, oauthTestClient, oauthTestRedirect, f.server.URL, f.challenge, tokens, now); err != nil {
+		f.t.Fatal(err)
+	}
+	return access, refresh
 }

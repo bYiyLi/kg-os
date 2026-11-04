@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -64,12 +63,10 @@ func TestOAuthRejectsInvalidMetadataAndCapacity(t *testing.T) {
 	for index, test := range cases {
 		f.metadata.body = test.body
 		f.metadata.status = test.status
-		f.broker.mu.Lock()
-		f.broker.documents = make(map[string]cachedOAuthDocument)
-		f.broker.mu.Unlock()
+		f.resetClientAuth()
 		_, res := f.begin(nil)
-		if res.StatusCode == 200 {
-			t.Errorf("untrusted metadata case %d accepted", index)
+		if res.StatusCode == http.StatusSeeOther || res.StatusCode == http.StatusOK {
+			t.Errorf("untrusted metadata case %d accepted: %d", index, res.StatusCode)
 		}
 		res.Body.Close()
 	}
@@ -87,23 +84,13 @@ func TestOAuthRejectsInvalidMetadataAndCapacity(t *testing.T) {
 		t.Fatal("valid trusted CIMD cache not reused")
 	}
 	f.broker.mu.Lock()
-	f.broker.metadataRequests = 8
-	f.broker.documents = map[string]cachedOAuthDocument{}
-	f.broker.mu.Unlock()
-	_, blocked := f.begin(nil)
-	if blocked.StatusCode != 429 {
-		t.Errorf("metadata concurrency budget: %d", blocked.StatusCode)
-	}
-	blocked.Body.Close()
-	f.broker.mu.Lock()
-	f.broker.metadataRequests = 0
 	for i := 0; i < maxPendingOAuth; i++ {
-		f.broker.codes[oauthHash(fmt.Sprint("synthetic-", i))] = oauthAuthorization{expires: time.Now().Add(time.Hour)}
+		f.broker.tickets[oauthHash(fmt.Sprint("synthetic-", i))] = oauthAuthorization{expires: time.Now().Add(time.Hour)}
 	}
 	f.broker.mu.Unlock()
 	_, capped := f.begin(nil)
-	if capped.StatusCode != 429 {
-		t.Errorf("code authorization budget: %d", capped.StatusCode)
+	if capped.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("pending authorization budget: %d", capped.StatusCode)
 	}
 	capped.Body.Close()
 }
@@ -256,8 +243,8 @@ func TestOAuthRejectsForgedTokenGrantsAndRotation(t *testing.T) {
 			t.Errorf("accepted invalid OAuth Token grant: %v", variant)
 		}
 		res.Body.Close()
-		// Wrong client/redirect/verifier consumes the one-time code by design.
-		// Obtain a new one before testing each further malformed request.
+		// Each invalid request must fail without weakening the valid code binding.
+		// Use a fresh code so variants remain independent.
 		created = f.code()
 		redirect, _ = url.Parse(created.Header.Get("Location"))
 		created.Body.Close()
@@ -311,7 +298,7 @@ func TestOAuthRejectsForgedTokenGrantsAndRotation(t *testing.T) {
 	expired.Body.Close()
 }
 
-func TestOAuthBoundedTokenStorageAndResourceMetadata(t *testing.T) {
+func TestOAuthMetadataResponsesPreventCredentialCaching(t *testing.T) {
 	f := newOAuthFixture(t)
 	for _, path := range []string{"/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp",
 		"/.well-known/oauth-authorization-server"} {
@@ -326,20 +313,5 @@ func TestOAuthBoundedTokenStorageAndResourceMetadata(t *testing.T) {
 			t.Fatal("bad JSON metadata")
 		}
 		res.Body.Close()
-	}
-	f.broker.mu.Lock()
-	until := time.Now().Add(time.Hour)
-	for i := 0; i < maxOAuthTokens; i++ {
-		key := oauthHash(strconv.Itoa(i))
-		grant := oauthGrant{clientID: oauthTestClient, issuer: f.broker.issuer, resource: f.broker.resource,
-			scope: oauthScope, expires: until}
-		f.broker.access[key] = grant
-		f.broker.refresh[key] = grant
-	}
-	_, err := f.broker.issueGrantLocked(oauthGrant{clientID: oauthTestClient, issuer: f.broker.issuer,
-		resource: f.broker.resource, scope: oauthScope})
-	f.broker.mu.Unlock()
-	if err == nil {
-		t.Fatal("issued more than bounded token storage")
 	}
 }

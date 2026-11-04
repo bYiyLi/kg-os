@@ -101,6 +101,7 @@ func readyHandler(runtime *runtimehost.Runtime, settings command.DaemonSettings,
 	var extra []daemon.ExtraRoute
 	mcpService, err := mcpserver.New(runtime.Kernel, mcpserver.Options{
 		Token: runtime.Credential.Token, Path: mcpSettings.Path, OAuthIssuer: issuer,
+		OAuthStore: runtime.OAuthStore, OAuthStoreError: runtime.OAuthStoreError,
 		MaxConcurrency:  mcpSettings.MaxConcurrency,
 		RequestTimeout:  time.Duration(mcpSettings.RequestTimeoutMS) * time.Millisecond,
 		MaxRequestBytes: int64(mcpSettings.MaxRequestBytes),

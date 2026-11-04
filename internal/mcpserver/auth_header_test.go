@@ -1,17 +1,31 @@
 package mcpserver
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
+	"github.com/bYiyLi/kg-os/internal/mcpoauth"
 )
 
 func TestMCPAndOAuthBearerAuthenticationSchemeIsCaseInsensitive(t *testing.T) {
 	const token = "Case-Sensitive-Test-Token"
-	server, err := New(&kernel.Service{}, Options{Token: token, OAuthIssuer: "https://kgos.example"})
+	root := t.TempDir()
+	if err := os.Chmod(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store, err := mcpoauth.Open(filepath.Join(root, "mcp-oauth.db"), fmt.Sprintf("%x", sha256.Sum256([]byte(token))), "https://kgos.example", "https://kgos.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	server, err := New(&kernel.Service{}, Options{Token: token, OAuthIssuer: "https://kgos.example", OAuthStore: store})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,22 +78,9 @@ func TestMCPAndOAuthBearerAuthenticationSchemeIsCaseInsensitive(t *testing.T) {
 }
 
 func TestMCPOAuthAccessTokenAcceptsCaseInsensitiveSchemeWithoutWebPrivilege(t *testing.T) {
-	server, err := New(&kernel.Service{}, Options{Token: "instance-test-token", OAuthIssuer: "https://kgos.example"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	server.oauth.mu.Lock()
-	grant, err := server.oauth.issueGrantLocked(oauthGrant{
-		clientID: oauthTestClient, issuer: server.oauth.issuer, resource: server.oauth.resource, scope: oauthScope,
-	})
-	server.oauth.mu.Unlock()
-	if err != nil {
-		t.Fatal(err)
-	}
-	token, ok := grant["access_token"].(string)
-	if !ok {
-		t.Fatal("OAuth grant omitted its access token")
-	}
+	f := newOAuthFixture(t)
+	server := f.service
+	token := f.grant(nil)["access_token"].(string)
 	for _, scheme := range []string{"Bearer ", "bearer ", "bEaReR   "} {
 		request := httptest.NewRequest(http.MethodGet, "http://127.0.0.1/mcp", nil)
 		request.Header.Set("Authorization", scheme+token)

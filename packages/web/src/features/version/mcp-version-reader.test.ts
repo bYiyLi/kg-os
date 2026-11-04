@@ -5,7 +5,11 @@ import { loadVersions, stateRef } from "./version-data.js";
 import { createMcpVersionReader } from "./mcp-version-reader.js";
 
 function success(result: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify({ result }) }] };
+  const envelope = { code: "ok", data: result };
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(envelope) }],
+    structuredContent: envelope
+  };
 }
 
 const main = stateRef("a".repeat(64));
@@ -92,8 +96,10 @@ it("serializes opaque cursor and untrusted StateRef safely without code executio
 it("rejects errors returned as MCP content without treating them as host loss", async () => {
   const { callServerTool, reader, onTransportFailure } = fixture();
   callServerTool.mockResolvedValueOnce({
-    isError: true,
-    content: [{ type: "text", text: '{"code":"NOT_FOUND","message":"unavailable"}' }]
+    isError: false,
+    content: [
+      { type: "text", text: '{"code":"NOT_FOUND","message":"unavailable","retryable":false}' }
+    ]
   });
   await expect(reader.branch.list()).rejects.toThrow("MCP read failed");
   expect(onTransportFailure).not.toHaveBeenCalled();
@@ -109,8 +115,10 @@ it.each(["AUTHENTICATION_FAILED", "PERMISSION_DENIED"])(
   async (code) => {
     const { callServerTool, reader, onTransportFailure } = fixture();
     callServerTool.mockResolvedValueOnce({
-      isError: true,
-      content: [{ type: "text", text: JSON.stringify({ code, message: "access denied" }) }]
+      isError: false,
+      content: [
+        { type: "text", text: JSON.stringify({ code, message: "access denied", retryable: false }) }
+      ]
     });
     await expect(reader.branch.list()).rejects.toThrow("MCP read failed");
     expect(onTransportFailure).toHaveBeenCalledExactlyOnceWith();
@@ -209,9 +217,12 @@ it.each(["ontology", "object"] as const)(
   async (method) => {
     const { reader, callServerTool, onTransportFailure } = fixture();
     callServerTool.mockResolvedValueOnce({
-      isError: true,
+      isError: false,
       content: [
-        { type: "text", text: JSON.stringify({ code: "PERMISSION_DENIED", message: "revoked" }) }
+        {
+          type: "text",
+          text: JSON.stringify({ code: "PERMISSION_DENIED", message: "revoked", retryable: false })
+        }
       ]
     });
     const pending =
@@ -226,9 +237,12 @@ it.each(["ontology", "object"] as const)(
 it("preserves Domain resource failures locally and does not call the Bridge after cancellation", async () => {
   const { reader, callServerTool, onTransportFailure } = fixture();
   callServerTool.mockResolvedValueOnce({
-    isError: true,
+    isError: false,
     content: [
-      { type: "text", text: JSON.stringify({ code: "RESOURCE_ERROR", message: "too large" }) }
+      {
+        type: "text",
+        text: JSON.stringify({ code: "RESOURCE_ERROR", message: "too large", retryable: false })
+      }
     ]
   });
   await expect(reader.object.read({ at: main, refs: ["domain:People"] })).rejects.toThrow(

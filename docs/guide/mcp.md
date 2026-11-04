@@ -73,9 +73,11 @@ Ontology 预览的 `viewRevision` 属于进程内有界缓存；过期后返回 
 
 ## 4. ChatGPT OAuth 与私人 Plugin
 
-用户自行准备可从 ChatGPT 访问的 HTTPS 入口，例如 `https://kgos.example.com/mcp`，在 `.kgos/config.toml` 中配置 `[server].public_origin = "https://kgos.example.com"`，随后重启 KG OS，而**不是**完整的 `/mcp` URL。代理必须同时公开同源 Web `/` 与静态资源、Web 登录 API、`/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/request`、`/oauth/decision`、`/oauth/token`。
+用户自行准备可从 ChatGPT 访问的 HTTPS 入口，例如 `https://kgos.example.com/mcp`，在 `.kgos/config.toml` 中配置 `[server].public_origin = "https://kgos.example.com"`，随后重启 KG OS，而**不是**完整的 `/mcp` URL。代理必须同时公开同源 Web `/` 与静态资源、Web 登录 API、`/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/request`、`/oauth/decision`、`/oauth/token`、`/oauth/revoke`。
 
-ChatGPT 连接使用受限 CIMD 客户端与 OAuth Authorization Code + PKCE S256。Go 校验后将浏览器跳转到**现有 KG OS Web**；已登录直接显示连接授权弹窗，未登录先执行 Web 原有登录，随后明确允许或拒绝。OAuth Code/Access/Refresh 由 Go 管理，对用户透明。当前 Web 的跨页面登录状态尚由另一开发任务负责，不能借此声称无重复登录已验收。请求 5 分钟有效，重启后 OAuth 凭证失效；不能绕过认证。
+ChatGPT 连接使用受限 CIMD 客户端与 OAuth Authorization Code + PKCE S256。Go 校验后将浏览器跳转到**现有 KG OS Web**；已登录直接显示连接授权弹窗，未登录先执行 Web 原有登录，随后明确允许或拒绝。OAuth Code/Access/Refresh 由 Go 管理，对用户透明。Web 登录沿用已有持久 Session。待授权请求 5 分钟有效；已批准 OAuth 授权保存于独立认证库，普通重启保留。新签发 Access Token 硬有效期为 24 小时，向客户端报告 `expires_in=86340`（23 小时 59 分钟）以提前刷新；已签发 Token 保留原到期时间。Refresh 每次成功使用滚动续期 30 天；连续 30 天未刷新、撤销或根凭证变更才需重新授权。首次升级旧内存版本需重新连接一次；签名刷新响应丢失且立即重启仍可能需重连，不能绕过认证。
+
+在 macOS/Linux 上，OAuth 存储要求实例 `.kgos` 目录权限为 `0700`，`mcp-oauth.db` 文件为 `0600`。手工预建目录后应核对权限；权限不符合、存储损坏或不可用时 OAuth 返回 503，根 Bearer MCP、API 和 Web 仍保持各自能力。由实例所有者修复目录/文件权限后重启恢复；不要删除认证库来处理此错误。
 
 官方 [私人 Plugin AI 安装手册](../../plugins/kgos/INSTALL.md)说明 ChatGPT 连接、五个 AI-facing Tool 验证和私人 Plugin 安装。**旧 Phase 15 的实际 OAuth 成功不能代表新 Go MCP 已通过真实 ChatGPT 验收**。官方模板不携带用户 Token、Root 或动态 Connection ID。
 
@@ -88,4 +90,4 @@ pnpm install --frozen-lockfile --ignore-scripts
 pnpm test:docker:unified
 ```
 
-该命令**只在 OpenClaw/CI Linux 主机运行**，临时创建并清理隔离测试镜像与 Volume；验证非 root / 无 Node、初始化、Web/API/MCP、五个 AI-facing Tool、31/31 方法以及重启持久化。不要对长期 Dev Instance 执行写入测试。实际环境运行见 [OpenClaw Dev Runbook](dev-environment.md)，完成证据归 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)。CI、测试脚本和本指南存在不代表当前镜像已经正式发布。
+该命令**只在 OpenClaw/CI Linux 主机运行**，临时创建并清理隔离测试镜像与 Volume；验证非 root / 无 Node、初始化、Web/API/MCP、五个 AI-facing Tool 与 workspace、31/31 方法、数据重启持久化及 OAuth 重启续用、刷新和撤销。不要对长期 Dev Instance 执行写入测试。实际环境运行见 [OpenClaw Dev Runbook](dev-environment.md)，当前健壮性证据归 [Phase 34](../development/phases/34-mcp-resilience.md)，历史基线归 [Phase 16](../development/phases/16-kgosd-unified-mcp.md)。CI、测试脚本和本指南存在不代表当前镜像已经正式发布。

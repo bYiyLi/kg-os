@@ -48,16 +48,8 @@ func (m *methodMatrix) script(method string, arg any, write, stream bool) any {
 	if err != nil {
 		m.t.Fatalf("%s call: %v", method, err)
 	}
-	if reply == nil || reply.IsError {
-		m.t.Fatalf("%s returned MCP error: %#v", method, mcpText(m.t, reply))
-	}
-	content := mcpText(m.t, reply)
 	m.methods[method] = true
-	value, ok := content["result"]
-	if !ok {
-		m.t.Fatalf("%s missing JSON result: %#v", method, content)
-	}
-	return value
+	return toolData(m.t, reply)
 }
 
 func (m *methodMatrix) run(method string, arg any, write bool) map[string]any {

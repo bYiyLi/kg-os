@@ -251,7 +251,11 @@ for (const width of [375, 1100]) {
             const codes = JSON.parse(document.body.dataset["toolCodes"] ?? "[]") as string[];
             document.body.dataset["toolCodes"] = JSON.stringify([...codes, code]);
             const value = readVersionTool(code);
-            result = { content: [{ type: "text", text: JSON.stringify({ result: value }) }] };
+            const envelope = { code: "ok", data: value };
+            result = {
+              content: [{ type: "text", text: JSON.stringify(envelope) }],
+              structuredContent: envelope
+            };
           }
           frame.contentWindow?.postMessage({ jsonrpc: "2.0", id: message.id, result }, "*");
         });

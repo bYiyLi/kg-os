@@ -6,6 +6,8 @@ import { dirname, resolve } from "node:path";
 
 import { runCapture } from "./process.mjs";
 import { verifyMcpSdkMatrix } from "./mcp-sdk-matrix.mjs";
+import { prepareOAuthRestart, verifyOAuthRestart } from "./mcp-oauth-docker-smoke.mjs";
+import { readMcpToolData as toolValue, readMcpToolEnvelope } from "./mcp-tool-result.mjs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
@@ -25,7 +27,7 @@ const ownsImage = suppliedImage === undefined;
 const image = suppliedImage ?? "kgos-unified-smoke-" + identifier;
 const volume = "kgos-unified-test-" + identifier;
 let token;
-// This fixture issuer only tests discovery, not an actual ChatGPT login.
+// This fixture tests discovery and synthetic approvals, not an actual ChatGPT login.
 const oauthIssuer = "https://kgos-smoke.example.invalid";
 
 const config = [
@@ -58,12 +60,6 @@ const failures = [];
 
 async function docker(...args) {
   return (await runCapture("docker", args, { cwd: root })).stdout.trim();
-}
-
-function toolValue(response) {
-  assert.notEqual(response?.isError, true, "MCP tool returned an error");
-  assert.equal(response?.content?.[0]?.type, "text");
-  return JSON.parse(response.content[0].text);
 }
 
 async function assertImage() {
@@ -108,7 +104,7 @@ async function initializeVolume() {
   }
   await docker("volume", "create", ...options, volume);
   volumeCreated = true;
-  await docker(
+  const privateDirectoryMode = await docker(
     "run",
     "--rm",
     "--platform",
@@ -119,10 +115,11 @@ async function initializeVolume() {
     "/bin/sh",
     image,
     "-ec",
-    "mkdir -p /workspace/.kgos && cat > /workspace/.kgos/config.toml <<'KGOS_CONFIG'\n" +
+    "mkdir -p -m 700 /workspace/.kgos && cat > /workspace/.kgos/config.toml <<'KGOS_CONFIG'\n" +
       config +
-      "KGOS_CONFIG\n"
+      "KGOS_CONFIG\nstat -c '%a' /workspace/.kgos\n"
   );
+  assert.equal(privateDirectoryMode, "700", "OAuth fixture directory must be private");
   await docker(
     "run",
     "--rm",
@@ -225,6 +222,9 @@ async function connect(base) {
     { type: "global" },
     { type: "thread" }
   ]);
+  assert.deepEqual(toolValue(await mcpClient.callTool({ name: "kgos_workspace", arguments: {} })), {
+    view: "workspace"
+  });
   const resources = (await mcpClient.listResources()).resources;
   assert.equal(
     resources.find((resource) => resource.uri === workspaceURI)?.mimeType,
@@ -251,7 +251,14 @@ async function verifyHTTP(base) {
     denied.headers.get("www-authenticate") ?? "",
     /Bearer resource_metadata="https:\/\/kgos-smoke\.example\.invalid\/\.well-known\/oauth-protected-resource\/mcp"/
   );
+  assert.doesNotMatch(denied.headers.get("www-authenticate") ?? "", /invalid_token/);
   await denied.body?.cancel();
+  const invalidToken = await fetch(base + "/mcp", {
+    headers: { Authorization: "Bearer invalid-oauth-access-token" }
+  });
+  assert.equal(invalidToken.status, 401);
+  assert.match(invalidToken.headers.get("www-authenticate") ?? "", /error="invalid_token"/);
+  await invalidToken.body?.cancel();
   for (const method of ["GET", "HEAD", "OPTIONS", "POST", "DELETE"]) {
     const foreign = await fetch(base + "/mcp", {
       method,
@@ -279,6 +286,7 @@ async function verifyHTTP(base) {
   const protectedResource = await pathMetadata.json();
   assert.equal(protectedResource.resource, oauthIssuer);
   assert.deepEqual(protectedResource.authorization_servers, [oauthIssuer]);
+  assert.ok(protectedResource.scopes_supported?.includes("offline_access"));
   const rootMetadata = await fetch(base + "/.well-known/oauth-protected-resource");
   assert.equal(rootMetadata.status, 200);
   assert.deepEqual(await rootMetadata.json(), protectedResource);
@@ -288,9 +296,16 @@ async function verifyHTTP(base) {
   assert.equal(authorizationServer.issuer, oauthIssuer);
   assert.equal(authorizationServer.authorization_endpoint, oauthIssuer + "/oauth/authorize");
   assert.equal(authorizationServer.token_endpoint, oauthIssuer + "/oauth/token");
+  assert.equal(authorizationServer.revocation_endpoint, oauthIssuer + "/oauth/revoke");
+  assert.ok(authorizationServer.scopes_supported?.includes("offline_access"));
+  assert.ok(authorizationServer.token_endpoint_auth_methods_supported?.includes("none"));
+  assert.ok(authorizationServer.token_endpoint_auth_methods_supported?.includes("private_key_jwt"));
   const tokenEndpoint = await fetch(base + "/oauth/token");
   assert.equal(tokenEndpoint.status, 405, "OAuth endpoint missing from shared listener");
   await tokenEndpoint.body?.cancel();
+  const revokeEndpoint = await fetch(base + "/oauth/revoke");
+  assert.equal(revokeEndpoint.status, 405, "OAuth revoke endpoint missing from shared listener");
+  await revokeEndpoint.body?.cancel();
 
   const request = (bearer) =>
     fetch(base + "/api/v1/evolution/overview", {
@@ -375,6 +390,11 @@ try {
   await initializeVolume();
   const endpoint = await start();
   await verifyHTTP(endpoint);
+  const oauthSession = await prepareOAuthRestart({
+    base: endpoint,
+    rootToken: token,
+    issuer: oauthIssuer
+  });
   await connect(endpoint);
   const rootDoc = toolValue(
     await mcpClient.callTool({
@@ -433,10 +453,9 @@ try {
     { paths: [], unexpected: true }
   ]) {
     const rejected = await mcpClient.callTool({ name: "kgos_docs", arguments: args });
-    assert.equal(rejected.isError, true, "Invalid document batch must fail");
-    const error = JSON.parse(rejected.content[0].text);
+    const error = readMcpToolEnvelope(rejected);
     assert.equal(error.code, "INVALID_ARGUMENT");
-    assert.equal(error.documents, undefined, "Partial documents escaped from rejected batch");
+    assert.equal(error.data, undefined, "Partial documents escaped from rejected batch");
   }
   const refused = await mcpClient.callTool({
     name: "kgos_query",
@@ -444,15 +463,14 @@ try {
       code: 'return await evolution.branch.create({name:"forbidden",from:"branch/main"})'
     }
   });
-  assert.equal(refused.isError, true, "Help did not preserve the read-only sandbox");
+  assert.equal(readMcpToolEnvelope(refused).code, "PERMISSION_DENIED");
   for (const code of [
     "const value=[1];value.extra=2;return value",
     "Number.isFinite=()=>true;return NaN",
     'const error=new Error("local script");error.code="STATE_NOT_FOUND";throw error'
   ]) {
     const rejected = await mcpClient.callTool({ name: "kgos_query", arguments: { code } });
-    assert.equal(rejected.isError, true, "Invalid script result must fail across MCP HTTP");
-    assert.equal(JSON.parse(rejected.content[0].text).code, "SCRIPT_ERROR");
+    assert.equal(readMcpToolEnvelope(rejected).code, "SCRIPT_ERROR");
   }
   const intact = toolValue(
     await mcpClient.callTool({
@@ -462,7 +480,7 @@ try {
       }
     })
   );
-  assert.deepEqual(intact.result, { kept: 1 }, "Guest iterator must not alter MCP result values");
+  assert.deepEqual(intact, { kept: 1 }, "Guest iterator must not alter MCP result values");
   const preview = toolValue(
     await mcpClient.callTool({ name: "kgos_ontology_overview", arguments: { limit: 100 } })
   );
@@ -476,7 +494,7 @@ try {
       }
     })
   );
-  assert.equal(created.result.name, "unified-persist");
+  assert.equal(created.name, "unified-persist");
   // Docker preserves stdout and stderr as separate streams; kgosd startup
   // locators use stdout while structured diagnostics go to stderr.
   const collectedLogs = await runCapture("docker", ["logs", container], { cwd: root });
@@ -486,14 +504,21 @@ try {
   assert.doesNotMatch(logs, /unified-persist/, "Log leaked an object name");
   assert.doesNotMatch(logs, /"token"/, "Log leaked a credential field");
   await stop();
-  await connect(await start());
+  const restartedEndpoint = await start();
+  await connect(restartedEndpoint);
+  await verifyOAuthRestart({
+    base: restartedEndpoint,
+    rootToken: token,
+    issuer: oauthIssuer,
+    session: oauthSession
+  });
   const saved = toolValue(
     await mcpClient.callTool({
       name: "kgos_query",
       arguments: { code: "return (await evolution.branch.list()).items.map(x=>x.name)" }
     })
   );
-  assert.ok(saved.result.includes("unified-persist"), "Docker volume lost committed data");
+  assert.ok(saved.includes("unified-persist"), "Docker volume lost committed data");
 } catch (error) {
   failures.push(error);
 } finally {
@@ -519,5 +544,5 @@ if (failures.length === 1) throw failures[0];
 if (failures.length > 1)
   throw new AggregateError(failures, "Unified Docker smoke or cleanup failed");
 process.stdout.write(
-  "Unified Docker: non-root, Node-free, one kgosd, Web/API/MCP, 31/31 SDK, restart and cleanup passed\n"
+  "Unified Docker: non-root, Node-free, one kgosd, Web/API/MCP, 31/31 SDK, OAuth restart/refresh/revoke, persistence and cleanup passed\n"
 );

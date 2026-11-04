@@ -45,7 +45,7 @@ Dev 多阶段构建生成 Web 静态资源和当前 Go `kgosd`（CGO + SQLite FT
 
 运行中的容器以非 root UID 1000 访问旧 Workspace，**不更改现有数据所有权**；正式镜像仍默认 UID 10001。统一 Go listener 在容器内监听 3777，宿主仍发布 `0.0.0.0:3777`；公开入口同时包含 Web、API 和 MCP，但它们保留独立认证。Dev 宿主的直接 HTTP 无传输加密，只用于可信受控网络；ChatGPT 通过原 HTTPS 代理访问。
 
-Dev Compose 已配置 `KGOS_MCP_OAUTH_ISSUER=${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}`，由同一个 `kgosd` 直接提供Web 集成 OAuth。HTTPS 代理必须原样转发 `/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/token`、`/oauth/request`、`/oauth/decision` 以及同源 Web `/`、静态资源和 Web 登录入口，并保留 Authorization 等必要 Header。Go OAuth 的 CIMD 文档验证使用受控出站 HTTP 客户端；保留宿主现有 `HTTP_PROXY` / `HTTPS_PROXY` 配置，不依赖 Node.js 网络代理。
+Dev Compose 已配置 `KGOS_MCP_OAUTH_ISSUER=${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}`，由同一个 `kgosd` 直接提供Web 集成 OAuth。HTTPS 代理必须原样转发 `/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/token`、`/oauth/revoke`、`/oauth/request`、`/oauth/decision` 以及同源 Web `/`、静态资源和 Web 登录入口，并保留 Authorization 等必要 Header。Go OAuth 的 CIMD 文档验证使用受控出站 HTTP 客户端；保留宿主现有 `HTTP_PROXY` / `HTTPS_PROXY` 配置，不依赖 Node.js 网络代理。
 
 ## 2. 统一管理入口
 
@@ -100,7 +100,7 @@ docker compose --env-file /data/apps/KgosDev/config/compose.env -f compose.dev.y
 
 ### 备份与恢复边界
 
-`pnpm dev:mcp backup` 可在线运行，`deploy` 在更新前也会自动执行。用 Python 标准 `sqlite3.Connection.backup` 复制 `kgos.db`，并包含 `config.toml`、`auth.json`、`initialized.json` 和 `extensions/`；省略可重建缓存、日志与运行中 `kgosd.lock`。所有备份位于 root 私有目录并保留原文件，**不会自动清理旧备份**；定期检查磁盘使用量，删除备份需要另行明确执行。任何恢复须停止 Dev MCP/daemon，验证备份对应 Instance 与数据完整性后再进行，**没有默认自动还原**。
+`pnpm dev:mcp backup` 可在线运行，`deploy` 在更新前也会自动执行。用 Python 标准 `sqlite3.Connection.backup` 复制 `kgos.db` 和已存在的 `mcp-oauth.db`，并包含 `config.toml`、`auth.json`、`initialized.json` 和 `extensions/`；省略可重建缓存、日志与运行中 `kgosd.lock`。所有备份位于 root 私有目录并保留原文件，**不会自动清理旧备份**；定期检查磁盘使用量，删除备份需要另行明确执行。任何恢复须停止 Dev MCP/daemon，验证备份对应 Instance 与数据完整性后再进行，**没有默认自动还原**。
 
 ## 4. 常见排障与验收
 

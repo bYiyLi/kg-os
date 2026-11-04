@@ -5,29 +5,35 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/bYiyLi/kg-os/internal/mcpoauth"
 	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 const (
-	oauthScope             = "kgos:access"
-	ticketLifetime         = 5 * time.Minute
-	codeLifetime           = time.Minute
-	accessLifetime         = time.Hour
-	refreshLifetime        = 30 * 24 * time.Hour
-	clientCacheLifetime    = 5 * time.Minute
-	maxPendingOAuth        = 128
-	maxOAuthTokens         = 256
-	maxClientDocumentBytes = 16384
+	oauthScope                = "kgos:access"
+	oauthOfflineScope         = "offline_access"
+	ticketLifetime            = 5 * time.Minute
+	codeLifetime              = time.Minute
+	accessLifetime            = 24 * time.Hour
+	accessRefreshHint         = accessLifetime - time.Minute
+	refreshLifetime           = 30 * 24 * time.Hour
+	clientCacheLifetime       = 5 * time.Minute
+	maxPendingOAuth           = 128
+	maxOAuthTokens            = 256
+	maxClientDocumentBytes    = 16384
+	oauthRefreshRetryLifetime = 30 * time.Second
+	maxOAuthRefreshRetries    = 1024
 )
 
 var (
@@ -38,21 +44,32 @@ var (
 )
 
 type oauthAuthorization struct {
-	clientID, redirectURI, resource, state, challenge string
-	expires                                           time.Time
-}
-type oauthGrant struct {
-	clientID, issuer, resource, scope string
-	expires                           time.Time
-}
-type cachedOAuthDocument struct {
-	redirects []string
-	expires   time.Time
+	clientID, redirectURI, resource, state, challenge, scope string
+	expires                                                  time.Time
 }
 
-// oauthBroker is process-local. Every restart invalidates codes and issued
-// credentials. Authorization uses the existing Instance identity.
-// Only hashes of bearer credentials are stored.
+type oauthTokenPair struct {
+	AccessToken  string
+	RefreshToken string
+	Scope        string
+}
+
+func (p oauthTokenPair) response() map[string]any {
+	return map[string]any{
+		"access_token": p.AccessToken, "token_type": "Bearer",
+		"expires_in": int(accessRefreshHint / time.Second), "refresh_token": p.RefreshToken, "scope": p.Scope,
+	}
+}
+
+type oauthRefreshRetry struct {
+	clientID, resource, requestedScope string
+	pair                               oauthTokenPair
+	binding                            mcpoauth.Binding
+	expires                            time.Time
+}
+
+// Only pending browser decisions and short retry responses are process-local.
+// Issued credentials and their rotation/revocation authority live in Store.
 type oauthBroker struct {
 	issuer, resource, path string
 	instanceDigest         [32]byte
@@ -60,11 +77,11 @@ type oauthBroker struct {
 	now                    func() time.Time
 	mu                     sync.Mutex
 	tickets                map[[32]byte]oauthAuthorization
-	codes                  map[[32]byte]oauthAuthorization
-	access                 map[[32]byte]oauthGrant
-	refresh                map[[32]byte]oauthGrant
-	documents              map[string]cachedOAuthDocument
-	metadataRequests       int
+	clientAuth             *oauthClientAuthenticator
+	store                  *mcpoauth.Store
+	storeErr               error
+	tokenMu                sync.Mutex
+	retries                map[[32]byte]oauthRefreshRetry
 }
 
 func newOAuthBroker(issuer, path, instanceToken string, client *http.Client) (*oauthBroker, error) {
@@ -74,7 +91,6 @@ func newOAuthBroker(issuer, path, instanceToken string, client *http.Client) (*o
 		(parsed.Scheme != "https" && !(parsed.Scheme == "http" && (parsed.Hostname() == "localhost" || parsed.Hostname() == "127.0.0.1" || parsed.Hostname() == "::1"))) {
 		return nil, errors.New("OAuth issuer must be a public HTTPS origin (loopback HTTP is permitted)")
 	}
-	// Reject suspicious literal URLs rather than normalizing away ambiguity.
 	normalized := parsed.Scheme + "://" + parsed.Host
 	if issuer != normalized && issuer != normalized+"/" {
 		return nil, errors.New("OAuth issuer must be an origin")
@@ -87,15 +103,14 @@ func newOAuthBroker(issuer, path, instanceToken string, client *http.Client) (*o
 		copyClient.Timeout = 5 * time.Second
 	}
 	copyClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &oauthBroker{
+	o := &oauthBroker{
 		issuer: normalized, resource: normalized, path: path, instanceDigest: sha256.Sum256([]byte(instanceToken)),
-		client: &copyClient, now: time.Now,
-		tickets: make(map[[32]byte]oauthAuthorization), codes: make(map[[32]byte]oauthAuthorization),
-		access: make(map[[32]byte]oauthGrant), refresh: make(map[[32]byte]oauthGrant),
-		documents: make(map[string]cachedOAuthDocument),
-	}, nil
+		client: &copyClient, now: time.Now, tickets: make(map[[32]byte]oauthAuthorization),
+		retries: make(map[[32]byte]oauthRefreshRetry),
+	}
+	o.clientAuth = newOAuthClientAuthenticator(o.client, func() time.Time { return o.now() })
+	return o, nil
 }
-
 func randomOAuthSecret() (string, error) {
 	var raw [32]byte
 	if _, err := rand.Read(raw[:]); err != nil {
@@ -103,7 +118,8 @@ func randomOAuthSecret() (string, error) {
 	}
 	return base64.RawURLEncoding.EncodeToString(raw[:]), nil
 }
-func oauthHash(s string) [32]byte { return sha256.Sum256([]byte(s)) }
+func oauthHash(s string) [32]byte     { return sha256.Sum256([]byte(s)) }
+func oauthHashString(s string) string { sum := oauthHash(s); return hex.EncodeToString(sum[:]) }
 func onlyOAuthValue(values url.Values, key string) string {
 	entries := values[key]
 	if len(entries) != 1 {
@@ -127,7 +143,6 @@ func oauthHeaders(w http.ResponseWriter) {
 func oauthFailure(w http.ResponseWriter, status int, kind string) {
 	oauthJSON(w, status, map[string]string{"error": kind})
 }
-
 func (o *oauthBroker) pruneLocked() {
 	now := o.now()
 	for key, value := range o.tickets {
@@ -135,143 +150,96 @@ func (o *oauthBroker) pruneLocked() {
 			delete(o.tickets, key)
 		}
 	}
-	for key, value := range o.codes {
-		if !value.expires.After(now) {
-			delete(o.codes, key)
-		}
-	}
-	for key, value := range o.access {
-		if !value.expires.After(now) {
-			delete(o.access, key)
-		}
-	}
-	for key, value := range o.refresh {
-		if !value.expires.After(now) {
-			delete(o.refresh, key)
-		}
-	}
-	for key, value := range o.documents {
-		if !value.expires.After(now) {
-			delete(o.documents, key)
-		}
-	}
 }
-
+func (o *oauthBroker) available() error {
+	if o.storeErr != nil {
+		return o.storeErr
+	}
+	if o.store == nil {
+		return errors.New("OAuth credential store is unavailable")
+	}
+	return nil
+}
+func (o *oauthBroker) authorize(ctx context.Context, token string) (string, error) {
+	if len(token) != 43 || !oauthSecretPattern.MatchString(token) {
+		return "", mcpoauth.ErrInvalid
+	}
+	if err := o.available(); err != nil {
+		return "", err
+	}
+	binding, err := o.store.ResolveAccess(ctx, oauthHashString(token), o.now())
+	if err != nil {
+		return "", err
+	}
+	scope, ok := normalizeOAuthScope(binding.Scope)
+	if !ok || scope != binding.Scope || binding.Issuer != o.issuer || binding.Resource != o.resource {
+		return "", mcpoauth.ErrInvalid
+	}
+	return fmt.Sprintf("%x", o.instanceDigest), nil
+}
 func (o *oauthBroker) principal(token string) (string, bool) {
-	if len(token) < 43 || len(token) > 512 || !oauthVerifierPattern.MatchString(token) {
-		return "", false
-	}
-	hash := oauthHash(token)
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	o.pruneLocked()
-	grant, ok := o.access[hash]
-	if !ok || grant.issuer != o.issuer || grant.resource != o.resource || grant.scope != oauthScope || !grant.expires.After(o.now()) {
-		return "", false
-	}
-	// A grant represents the same Instance identity, but is valid for MCP only.
-	return fmt.Sprintf("%x", o.instanceDigest), true
+	principal, err := o.authorize(context.Background(), token)
+	return principal, err == nil
 }
-
+func normalizeOAuthScope(value string) (string, bool) {
+	if value == "" {
+		return oauthScope, true
+	}
+	fields := strings.Fields(value)
+	base, offline := false, false
+	for _, field := range fields {
+		switch field {
+		case oauthScope:
+			base = true
+		case oauthOfflineScope:
+			offline = true
+		default:
+			return "", false
+		}
+	}
+	if !base {
+		return "", false
+	}
+	if offline {
+		return oauthScope + " " + oauthOfflineScope, true
+	}
+	return oauthScope, true
+}
 func validOAuthClientID(raw string) bool {
 	parsed, err := url.Parse(raw)
 	return err == nil && parsed.Scheme == "https" && parsed.Host == "chatgpt.com" && parsed.User == nil &&
-		parsed.Opaque == "" && parsed.RawQuery == "" && parsed.Fragment == "" &&
-		oauthClientPathPattern.MatchString(parsed.Path) && parsed.String() == raw
+		parsed.Opaque == "" && parsed.RawQuery == "" && !parsed.ForceQuery && parsed.Fragment == "" && parsed.RawPath == "" && oauthClientPathPattern.MatchString(parsed.Path) && parsed.String() == raw
 }
 func validOAuthRedirect(raw string) bool {
 	if len(raw) == 0 || len(raw) > 2048 {
 		return false
 	}
 	parsed, err := url.Parse(raw)
-	return err == nil && parsed.Scheme == "https" && parsed.Host == "chatgpt.com" &&
-		parsed.User == nil && parsed.Fragment == "" && parsed.Opaque == "" && parsed.String() == raw
+	return err == nil && parsed.Scheme == "https" && parsed.Host == "chatgpt.com" && parsed.User == nil &&
+		parsed.Fragment == "" && parsed.Opaque == "" && parsed.String() == raw
 }
-
-// redirectsFor downloads only a fixed, HTTPS ChatGPT Client ID Metadata URL.
-// The cap applies to declared and actual bytes, and redirects are never followed.
 func (o *oauthBroker) redirectsFor(ctx context.Context, clientID string) ([]string, error) {
-	if !validOAuthClientID(clientID) {
-		return nil, errors.New("invalid_client")
-	}
-	o.mu.Lock()
-	o.pruneLocked()
-	if cached, ok := o.documents[clientID]; ok {
-		result := append([]string(nil), cached.redirects...)
-		o.mu.Unlock()
-		return result, nil
-	}
-	if o.metadataRequests >= 8 || len(o.documents) >= maxPendingOAuth {
-		o.mu.Unlock()
-		return nil, errors.New("temporarily_unavailable")
-	}
-	o.metadataRequests++
-	o.mu.Unlock()
-	defer func() { o.mu.Lock(); o.metadataRequests--; o.mu.Unlock() }()
-	metadataCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(metadataCtx, http.MethodGet, clientID, nil)
+	document, err := o.clientAuth.Client(ctx, clientID, false)
 	if err != nil {
-		return nil, errors.New("invalid_client")
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	response, err := o.client.Do(req)
-	if err != nil {
-		return nil, errors.New("invalid_client")
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK || response.ContentLength > maxClientDocumentBytes {
-		return nil, errors.New("invalid_client")
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, maxClientDocumentBytes+1))
-	if err != nil || len(data) > maxClientDocumentBytes {
-		return nil, errors.New("invalid_client")
-	}
-	var document struct {
-		ClientID              string   `json:"client_id"`
-		RedirectURIs          []string `json:"redirect_uris"`
-		AuthenticationMethod  string   `json:"token_endpoint_auth_method"`
-		AuthenticationMethods []string `json:"token_endpoint_auth_methods_supported"`
-	}
-	if err := json.Unmarshal(data, &document); err != nil {
-		return nil, errors.New("invalid_client")
-	}
-	supported := document.AuthenticationMethod == "none"
-	for _, method := range document.AuthenticationMethods {
-		if method == "none" {
-			supported = true
-		}
-	}
-	if document.ClientID != clientID || len(document.RedirectURIs) == 0 || len(document.RedirectURIs) > 128 || !supported {
-		return nil, errors.New("invalid_client")
-	}
-	for _, redirect := range document.RedirectURIs {
-		if !validOAuthRedirect(redirect) {
-			return nil, errors.New("invalid_client")
-		}
-	}
-	o.mu.Lock()
-	o.pruneLocked()
-	if len(o.documents) < maxPendingOAuth {
-		o.documents[clientID] = cachedOAuthDocument{redirects: append([]string(nil), document.RedirectURIs...), expires: o.now().Add(clientCacheLifetime)}
-	}
-	o.mu.Unlock()
-	return document.RedirectURIs, nil
+	return append([]string(nil), document.RedirectURIs...), nil
 }
-
 func (o *oauthBroker) resourceMetadataPath() string {
 	return "/.well-known/oauth-protected-resource" + o.path
 }
 func (o *oauthBroker) resourceMetadataURL() string { return o.issuer + o.resourceMetadataPath() }
 func (o *oauthBroker) routes() map[string]http.Handler {
-	paths := []string{"/.well-known/oauth-protected-resource", o.resourceMetadataPath(),
-		"/.well-known/oauth-authorization-server", "/oauth/authorize", "/oauth/request",
-		"/oauth/decision", "/oauth/token"}
+	paths := []string{"/.well-known/oauth-protected-resource", o.resourceMetadataPath(), "/.well-known/oauth-authorization-server",
+		"/oauth/authorize", "/oauth/request", "/oauth/decision", "/oauth/token", "/oauth/revoke"}
 	routes := make(map[string]http.Handler, len(paths))
 	for _, path := range paths {
-		if path == "/oauth/token" {
+		switch path {
+		case "/oauth/token":
 			routes[path] = observability.SecurityHTTP("oauth.token.exchange", o.serveHTTP)
-		} else {
+		case "/oauth/revoke":
+			routes[path] = observability.SecurityHTTP("oauth.token.revoke", o.serveHTTP)
+		default:
 			routes[path] = http.HandlerFunc(o.serveHTTP)
 		}
 	}
@@ -284,47 +252,61 @@ func (o *oauthBroker) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			oauthFailure(w, 405, "invalid_request")
 			return
 		}
-		oauthJSON(w, 200, map[string]any{"resource": o.resource, "authorization_servers": []string{o.issuer}, "scopes_supported": []string{oauthScope}})
+		oauthJSON(w, 200, map[string]any{"resource": o.resource, "authorization_servers": []string{o.issuer}, "scopes_supported": []string{oauthScope, oauthOfflineScope}})
 	case "/.well-known/oauth-authorization-server":
 		if r.Method != http.MethodGet {
 			oauthFailure(w, 405, "invalid_request")
 			return
 		}
 		oauthJSON(w, 200, map[string]any{
-			"issuer": o.issuer, "authorization_endpoint": o.issuer + "/oauth/authorize",
-			"token_endpoint": o.issuer + "/oauth/token", "response_types_supported": []string{"code"},
-			"grant_types_supported":                          []string{"authorization_code", "refresh_token"},
-			"code_challenge_methods_supported":               []string{"S256"},
-			"token_endpoint_auth_methods_supported":          []string{"none"},
-			"client_id_metadata_document_supported":          true,
-			"authorization_response_iss_parameter_supported": true,
-			"scopes_supported":                               []string{oauthScope},
+			"issuer": o.issuer, "authorization_endpoint": o.issuer + "/oauth/authorize", "token_endpoint": o.issuer + "/oauth/token",
+			"revocation_endpoint": o.issuer + "/oauth/revoke", "response_types_supported": []string{"code"},
+			"grant_types_supported": []string{"authorization_code", "refresh_token"}, "code_challenge_methods_supported": []string{"S256"},
+			"token_endpoint_auth_methods_supported":            []string{"none", "private_key_jwt"},
+			"revocation_endpoint_auth_methods_supported":       []string{"none", "private_key_jwt"},
+			"token_endpoint_auth_signing_alg_values_supported": []string{"RS256"},
+			"client_id_metadata_document_supported":            true, "authorization_response_iss_parameter_supported": true,
+			"scopes_supported": []string{oauthScope, oauthOfflineScope},
 		})
-	case "/oauth/authorize":
-		if r.Method == http.MethodGet {
-			o.beginAuthorization(w, r)
+	default:
+		if err := o.available(); err != nil {
+			if r.URL.Path == "/oauth/token" || r.URL.Path == "/oauth/revoke" {
+				oauthServerFailure(w, r, "store_unavailable")
+			} else {
+				oauthFailure(w, 503, "temporarily_unavailable")
+			}
+			return
+		}
+		switch r.URL.Path {
+		case "/oauth/authorize":
+			if r.Method == http.MethodGet {
+				o.beginAuthorization(w, r)
+				return
+			}
+		case "/oauth/request":
+			if r.Method == http.MethodGet {
+				o.authorizationDetails(w, r)
+				return
+			}
+		case "/oauth/decision":
+			if r.Method == http.MethodPost {
+				o.finishAuthorization(w, r)
+				return
+			}
+		case "/oauth/token":
+			if r.Method == http.MethodPost {
+				o.issueToken(w, r)
+				return
+			}
+		case "/oauth/revoke":
+			if r.Method == http.MethodPost {
+				o.revokeToken(w, r)
+				return
+			}
+		default:
+			http.NotFound(w, r)
 			return
 		}
 		oauthFailure(w, 405, "invalid_request")
-	case "/oauth/request":
-		if r.Method != http.MethodGet {
-			oauthFailure(w, 405, "invalid_request")
-			return
-		}
-		o.authorizationDetails(w, r)
-	case "/oauth/decision":
-		if r.Method != http.MethodPost {
-			oauthFailure(w, 405, "invalid_request")
-			return
-		}
-		o.finishAuthorization(w, r)
-	case "/oauth/token":
-		if r.Method != http.MethodPost {
-			oauthFailure(w, 405, "invalid_request")
-			return
-		}
-		o.issueToken(w, r)
-	default:
-		http.NotFound(w, r)
 	}
 }

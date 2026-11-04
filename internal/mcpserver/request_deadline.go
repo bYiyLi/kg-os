@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const mcpResponseWriteGrace = 2 * time.Second
+
 // Bound network I/O as well as Kernel work. Cancelling a request context does
 // not interrupt a peer that leaves its body unfinished or stops reading a reply.
 // net/http resets these deadlines when the response finishes; clearing them in
@@ -14,5 +16,6 @@ func boundMCPRequestIO(response http.ResponseWriter, deadline time.Time) {
 	// A real net/http connection supports both deadlines, including through our
 	// observability writer's Unwrap. In-memory test recorders have no network I/O.
 	_ = controller.SetReadDeadline(deadline)
-	_ = controller.SetWriteDeadline(deadline)
+	// Leave bounded time to deliver the failure after the execution budget ends.
+	_ = controller.SetWriteDeadline(deadline.Add(mcpResponseWriteGrace))
 }

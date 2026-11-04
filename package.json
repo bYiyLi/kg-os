@@ -47,6 +47,7 @@
     "test:go": "node scripts/go-task.mjs test",
     "test:go:coverage": "node scripts/go-task.mjs coverage",
     "test:go:race": "node scripts/go-task.mjs race",
+    "test:mcp-contract": "node --test tests/mcp-tool-result.node-test.mjs",
     "test:native": "node scripts/test-lithograph.mjs",
     "check:quick": "node scripts/tasks.mjs quick",
     "typecheck": "node scripts/tasks.mjs typecheck",

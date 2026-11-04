@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 
+import { readMcpToolData as resultValue, readMcpToolEnvelope } from "./mcp-tool-result.mjs";
+
 // Execute against an explicitly disposable Instance, never the persistent KG OS Dev workspace.
 // This exercises the public MCP transport, QuickJS SDK bridge and real daemon/database together.
 const expectedMethods = [
@@ -35,15 +37,6 @@ const expectedMethods = [
   "evolution.merge.finalize",
   "evolution.merge.abort"
 ];
-
-function resultValue(response) {
-  if (response.isError || response.content?.[0]?.type !== "text") {
-    throw new Error("MCP real SDK matrix failed: " + JSON.stringify(response).slice(0, 900));
-  }
-  const parsed = JSON.parse(response.content[0].text);
-  assert.ok(Object.hasOwn(parsed, "result"), "SDK method must return a JSON-compatible result");
-  return parsed.result;
-}
 
 function createCalls(client) {
   const exercised = new Set();
@@ -314,8 +307,7 @@ async function verifyMerge(calls, branch, ref, body) {
 async function verifyPreviewAndHistory(client, branch, state) {
   const tool = async (name, args) => {
     const response = await client.callTool({ name, arguments: args });
-    assert.notEqual(response.isError, true, "MCP " + name + " failed");
-    return JSON.parse(response.content[0].text);
+    return resultValue(response);
   };
   const first = await tool("kgos_ontology_overview", { offset: 0, limit: 100 });
   assert.ok(first.totalLines > 100, "The multi-Branch fixture must exercise Preview pagination");
@@ -351,16 +343,19 @@ async function verifyReadOnlyIsolation(client, mainState) {
         "});"
     }
   });
-  assert.equal(forbidden.isError, true);
-  assert.equal(JSON.parse(forbidden.content[0].text).code, "PERMISSION_DENIED");
+  assert.equal(readMcpToolEnvelope(forbidden).code, "PERMISSION_DENIED");
   const missing = await client.callTool({
     name: "kgos_query",
     arguments: {
       code: 'return await evolution.get({state:"commit/' + "0".repeat(64) + '"});'
     }
   });
-  assert.equal(missing.isError, true);
-  assert.equal(JSON.parse(missing.content[0].text).code, "STATE_NOT_FOUND");
+  assert.equal(readMcpToolEnvelope(missing).code, "STATE_NOT_FOUND");
+  const recovered = await client.callTool({
+    name: "kgos_query",
+    arguments: { code: "return null;" }
+  });
+  assert.equal(resultValue(recovered), null, "Business failures must not break later calls");
 }
 
 export async function verifyMcpSdkMatrix(client) {

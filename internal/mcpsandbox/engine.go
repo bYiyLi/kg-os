@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"sync"
 	"time"
@@ -155,6 +156,8 @@ func (i *invocation) call(request callRequest) {
 	res := callResponse{ID: request.ID}
 	defer func() {
 		if recover() != nil {
+			observability.Log(i.ctx, slog.LevelError, "sandbox", "sandbox.host.panic",
+				slog.String("cause_class", "panic"), slog.String("stage", "sdk_call"))
 			i.send(callResponse{ID: request.ID, Code: "INTERNAL_ERROR", Message: "Internal SDK call failed"})
 		} else {
 			i.send(res)
@@ -229,7 +232,18 @@ func (i *invocation) streamCall(method string, args []json.RawMessage) (json.Raw
 		i.streams[id] = s
 		i.streamLock.Unlock()
 		go func() {
-			err := i.stream(ctx, target, args[1], func(v json.RawMessage) error {
+			var streamErr error
+			defer func() {
+				if recover() != nil {
+					observability.Log(ctx, slog.LevelError, "sandbox", "sandbox.host.panic",
+						slog.String("cause_class", "panic"), slog.String("stage", "stream_producer"))
+					streamErr = &CallError{Code: "INTERNAL_ERROR", Message: "Internal SDK stream failed"}
+				}
+				s.done <- streamErr
+				close(s.events)
+				s.cancel()
+			}()
+			streamErr = i.stream(ctx, target, args[1], func(v json.RawMessage) error {
 				// Unbuffered send: the Kernel may only produce the next event when the guest pulls.
 				if !json.Valid(v) {
 					return errors.New("invalid Kernel stream event")
@@ -245,8 +259,6 @@ func (i *invocation) streamCall(method string, args []json.RawMessage) (json.Raw
 					return ctx.Err()
 				}
 			})
-			s.done <- err
-			close(s.events)
 		}()
 		return json.Marshal(map[string]int{"streamId": id})
 	}
@@ -326,7 +338,10 @@ func ExecuteWithLimits(ctx context.Context, code string, readOnly bool, dispatch
 	runCtx, cancel := context.WithTimeout(ctx, limits.Timeout)
 	defer cancel()
 	defer func() {
-		if ctx.Err() != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			runErr = &ScriptError{Code: "TIMEOUT", Message: "Call timed out; writes may have completed"}
+			result = nil
+		} else if ctx.Err() != nil {
 			runErr = &ScriptError{Code: "CANCELLED", Message: "Call cancelled; writes may have completed"}
 			result = nil
 		} else if runCtx.Err() != nil {

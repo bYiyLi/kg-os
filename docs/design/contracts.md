@@ -16,6 +16,8 @@ KG OS adapter 的稳定 error envelope：
 
 `details` 可以省略。Ontology / Object / Evolution 的高层错误使用公共 Ref / path 定位，不泄露内部 Binding 或 Schema Locator。Graph 原样执行 Cypher 时保留 Lithograph 对该语句公开的错误位置、identifier 和 category，不因为名称带 `__kgos_` 就改写成 KG OS 禁止错误；认证 secret、运行时解析的 credential 和私有宿主诊断仍不能回显。公开数据库 category 包括 `PARSE_ERROR`、`SEMANTIC_ERROR`、`TYPE_ERROR`、`SCHEMA_ERROR`、`CONSTRAINT_ERROR`、`INVALID_ARGUMENT`、`READ_ONLY_SNAPSHOT`、`BRANCH_NOT_FOUND`、`TAG_NOT_FOUND`、`BRANCH_HEAD_MOVED`、`MERGE_CONFLICT`、`MERGE_SESSION_NOT_FOUND`、`MERGE_SESSION_CHANGED`、`RESOURCE_ERROR`、`IO_ERROR`、`INTERNAL_ERROR`，按实际底层结果映射，不按错误文案猜测。Evolution Merge 的可解决业务冲突仍通过 `merge.conflicts` 返回结构化 items；其 `MERGE_CONFLICT` 表示当前冲突阻止相应操作。
 
+MCP adapter 保留上述失败 code/message/details，但使用 [MCP 统一业务结果](mcp.md#mcp-对外健壮性合同)：成功 code=ok 并包含 data，失败包含 message/retryable；正常业务失败不设置 isError，文本与 structuredContent 表达同一 envelope。这不改变普通 HTTP API status、SDK exception 或 Kernel 公共错误类别。服务端请求到期为 TIMEOUT，客户端主动取消为 CANCELLED，脚本预算仍为 RESOURCE_ERROR；中断写入不能据此推定回滚或自动重试。
+
 KG OS 自有稳定 code 至少包括：
 
 ```text

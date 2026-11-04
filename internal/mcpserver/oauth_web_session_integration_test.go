@@ -10,11 +10,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/bYiyLi/kg-os/internal/daemon"
 	"github.com/bYiyLi/kg-os/internal/kernel"
+	"github.com/bYiyLi/kg-os/internal/mcpoauth"
 	"github.com/bYiyLi/kg-os/internal/mcpserver"
 	runtimehost "github.com/bYiyLi/kg-os/internal/runtime"
 	"github.com/bYiyLi/kg-os/internal/runtimeprofile"
@@ -53,15 +56,24 @@ func TestOAuthConsentReusesAuthenticatedWebSession(t *testing.T) {
 		handler.ServeHTTP(w, r)
 	}))
 	defer server.Close()
+	instanceRoot := t.TempDir()
+	if err := os.Chmod(instanceRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store, err := mcpoauth.Open(filepath.Join(instanceRoot, "mcp-oauth.db"), fmt.Sprintf("%x", sha256.Sum256([]byte(instanceToken))), server.URL, server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
 	service, err := mcpserver.New(&kernel.Service{}, mcpserver.Options{
 		Token: instanceToken, Path: "/mcp", OAuthIssuer: server.URL,
-		OAuthClient: &http.Client{Transport: consentCIMDTransport{body: doc}},
+		OAuthClient: &http.Client{Transport: consentCIMDTransport{body: doc}}, OAuthStore: store,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	runtime := &runtimehost.Runtime{
-		Paths:      runtimeprofile.Paths{Root: t.TempDir()},
+		Paths:      runtimeprofile.Paths{Root: instanceRoot},
 		Credential: runtimeprofile.Credential{Token: instanceToken},
 		Kernel:     &kernel.Service{},
 	}

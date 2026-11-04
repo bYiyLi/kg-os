@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
+	"github.com/bYiyLi/kg-os/internal/mcpoauth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -63,22 +65,24 @@ func TestOAuthConsentCodeCapacityNeverConsumesPendingApproval(t *testing.T) {
 	f := newOAuthFixture(t)
 	ticket, page := f.begin(nil)
 	page.Body.Close()
-	f.broker.mu.Lock()
+	base := f.broker.now()
 	for i := range maxPendingOAuth {
-		f.broker.codes[oauthHash(fmt.Sprintf("pending-code-%d", i))] = oauthAuthorization{
-			expires: f.broker.now().Add(time.Hour),
+		label := fmt.Sprintf("pending-code-%d", i)
+		err := f.store.PutCode(context.Background(), mcpoauth.Code{
+			Hash: oauthTestHash(label), Binding: mcpoauth.Binding{FamilyID: oauthTestHash("family:" + label), ClientID: oauthTestClient, Issuer: f.server.URL, Resource: f.server.URL, Scope: oauthScope, AuthMethod: "none"},
+			RedirectURI: oauthTestRedirect, Challenge: f.challenge, ExpiresAt: base.Add(codeLifetime),
+		}, base)
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
-	f.broker.mu.Unlock()
 	blocked := f.approve(ticket, oauthTestAdmin, f.server.URL)
 	if blocked.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("OAuth code budget did not fail closed: %d", blocked.StatusCode)
 	}
 	blocked.Body.Close()
 
-	f.broker.mu.Lock()
-	clear(f.broker.codes)
-	f.broker.mu.Unlock()
+	f.broker.now = func() time.Time { return base.Add(codeLifetime + time.Second) }
 	approved := f.approve(ticket, oauthTestAdmin, f.server.URL)
 	if approved.StatusCode != http.StatusOK {
 		t.Fatalf("backpressure consumed a pending authorization: %d", approved.StatusCode)
@@ -114,24 +118,31 @@ func TestOAuthCodeExchangeFailsClosedWhenAccessGrantCapacityIsFull(t *testing.T)
 		t.Fatal(err)
 	}
 	code := redirect.Query().Get("code")
-	f.broker.mu.Lock()
+	var firstAccess string
 	for i := range maxOAuthTokens {
-		f.broker.access[oauthHash(fmt.Sprintf("capacity-access-%d", i))] = oauthGrant{
-			clientID: oauthTestClient, issuer: f.broker.issuer, resource: f.broker.resource,
-			scope: oauthScope, expires: f.broker.now().Add(time.Hour),
+		access, _ := f.seedPair(fmt.Sprintf("capacity-%d", i), f.broker.now())
+		if i == 0 {
+			firstAccess = access
 		}
 	}
-	f.broker.mu.Unlock()
 	blocked := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL)
 	if blocked.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("issued an OAuth grant past the token budget: %d", blocked.StatusCode)
 	}
 	blocked.Body.Close()
 	replayed := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL)
-	if replayed.StatusCode != http.StatusBadRequest {
-		t.Fatalf("failed code exchange was replayable: %d", replayed.StatusCode)
+	if replayed.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("failed exchange consumed its code instead of retaining backpressure: %d", replayed.StatusCode)
 	}
 	replayed.Body.Close()
+	if _, err := f.store.Revoke(context.Background(), oauthTestHash(firstAccess), oauthTestClient, "none", f.broker.now()); err != nil {
+		t.Fatal(err)
+	}
+	recovered := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL)
+	if recovered.StatusCode != http.StatusOK {
+		t.Fatalf("uncommitted failed exchange consumed the authorization code: %d", recovered.StatusCode)
+	}
+	recovered.Body.Close()
 }
 
 func TestOAuthDecisionGuardsMalformedCallbackAndBrokenRequestBody(t *testing.T) {
@@ -186,9 +197,10 @@ func TestOAuthUnexpectedRequestAndMetadataTransportFailure(t *testing.T) {
 		t.Fatal("arbitrary client ID metadata URL accepted")
 	}
 	f.broker.client = &http.Client{Transport: inaccessibleCIMDTransport{}}
+	f.resetClientAuth()
 	_, failed := f.begin(nil)
-	if failed.StatusCode != http.StatusBadRequest {
-		t.Fatalf("unavailable CIMD did not fail closed: %d", failed.StatusCode)
+	if failed.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("unavailable CIMD was misreported as invalid client: %d", failed.StatusCode)
 	}
 	failed.Body.Close()
 }
@@ -234,8 +246,15 @@ func TestEmptyMCPToolScriptCannotExecute(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s request failed: %v", name, err)
 		}
-		if !result.IsError {
-			t.Fatalf("%s accepted an empty JavaScript program", name)
+		if result.IsError {
+			t.Fatalf("%s business failure broke the transport result", name)
+		}
+		var envelope map[string]any
+		if err := json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &envelope); err != nil {
+			t.Fatal(err)
+		}
+		if envelope["code"] != "SCRIPT_ERROR" {
+			t.Fatalf("%s empty script did not return SCRIPT_ERROR: %#v", name, envelope)
 		}
 	}
 }

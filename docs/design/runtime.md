@@ -124,6 +124,12 @@ Authorization: Bearer <token>
 
 固定 loopback bind 是当前安全边界的一部分。Bearer token 提供**认证**，错误 / stale endpoint 指向持有不同 token 的 Instance 时会拒绝请求；完整复制 `.kgos` 可保留相同 token，单靠 Bearer 不能证明物理目录归属，这一端口复用场景由下文拟新增的 [Web connection guard](#web-operational-数据目录)检测。现有无 guard 的 CLI / 第三方请求不因此新增物理 identity 保证。Bearer 不提供 transport confidentiality。v1 CLI-managed Runtime不暴露LAN bind，也不内置TLS；多用户、远程访问、细粒度授权或公网部署必须另行设计。
 
+### 持久 MCP OAuth 授权
+
+MCP 使用 Runtime 持有的独立 `<root>/.kgos/mcp-oauth.db`，复用普通 SQLite driver，不加载 Lithograph/Provider/Jieba，不进入 Knowledge Base 历史或 UI/Provider cache。0700 父目录、0600 数据库与 SQLite 日志文件；只保存授权 family、凭证/Code 摘要、PKCE binding 和固定授权元数据，不保存原始 Token、Code、assertion 或根凭证。Root Token 指纹、issuer/resource 绑定与刷新/撤销合同由 [MCP](mcp.md#oauth-长期连接与刷新恢复)拥有。
+
+Runtime 在 Instance lock 内打开 store，在关闭时释放；普通重启复用授权。OAuth 存储无法打开、损坏或运行中失败时保留原文件，不自动删除、重建或回退内存签发；OAuth 请求返回安全 503，metadata、合法根 Bearer MCP、API 与 Web 不因此失效。修复文件或权限后通过重启恢复。OAuth 认证状态不是可丢弃缓存，备份/恢复应与同一 Instance 的 auth.json 一起处理；镜像回退不等于授权数据库回滚。
+
 ### 持久 Web Session 与刷新恢复
 
 Web 登录使用单一根 Token，不引入账号或密码，也不把其凭证保存进 `.kgos/web/ui.db`（该 UI 存储目前尚未实现）。服务端独立管理 `<root>/.kgos/web-sessions.json`：0600 私有文件、0700 Instance 目录、原子写入、固定数量上限；仅存随机 Session ID 的 SHA-256 摘要、根 Token 指纹与到期时间，不存 Cookie 原值或根 Token。记录不属于知识版本历史。Cookie 名称使用本机 Instance 根目录路径的摘要命名空间，防止同一浏览器在不同端口打开多个 Workspace 时 Cookie 互相覆盖；复制另一目录的 Session 文件也不能凭原 Cookie 自动登录。登录、主动退出、过期及根 Token 更换使会话按记录撤销或失效；daemon 重启从独立文件恢复。Session 采用 30 天闲置有效期，每次成功恢复滚动延长；闲置超期必须重新提供根 Token，不暗中延长被登出的登录状态。

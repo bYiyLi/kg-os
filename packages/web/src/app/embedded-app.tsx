@@ -68,6 +68,21 @@ function refreshBridge(app: McpApp | null, refresh: (app: McpApp) => Promise<voi
   if (app !== null) void refresh(app);
 }
 
+function isWorkspaceResult(result: unknown): boolean {
+  try {
+    const data = readMcpResult(result);
+    return (
+      typeof data === "object" &&
+      data !== null &&
+      !Array.isArray(data) &&
+      "view" in data &&
+      data.view === "workspace"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function EmbeddedWorkspace() {
   const [connection, setConnection] = useState<Connection>({ status: "loading" });
   const [hostTheme, setHostTheme] = useState<Theme | undefined>();
@@ -112,7 +127,7 @@ function EmbeddedWorkspace() {
     app.addEventListener("hostcontextchanged", updateHost);
     app.addEventListener("toolresult", (result) => {
       // Only the entrypoint result is delivered here; never repeat the call.
-      if (result.isError === true) {
+      if (!isWorkspaceResult(result)) {
         generation.current++;
         readerRef.current = null;
         setConnection({ status: "error" });

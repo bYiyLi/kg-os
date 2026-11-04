@@ -11,16 +11,19 @@ import (
 	"github.com/bYiyLi/kg-os/internal/buildinfo"
 	"github.com/bYiyLi/kg-os/internal/kernel"
 	"github.com/bYiyLi/kg-os/internal/lithograph"
+	"github.com/bYiyLi/kg-os/internal/mcpoauth"
 	"github.com/bYiyLi/kg-os/internal/runtimeprofile"
 )
 
 type Runtime struct {
-	Paths      runtimeprofile.Paths
-	Config     runtimeprofile.Config
-	Credential runtimeprofile.Credential
-	Extensions []runtimeprofile.ResolvedExtension
-	Database   *lithograph.Host
-	Kernel     *kernel.Service
+	Paths           runtimeprofile.Paths
+	Config          runtimeprofile.Config
+	Credential      runtimeprofile.Credential
+	Extensions      []runtimeprofile.ResolvedExtension
+	Database        *lithograph.Host
+	Kernel          *kernel.Service
+	OAuthStore      *mcpoauth.Store
+	OAuthStoreError error
 
 	lock   *runtimeprofile.InstanceLock
 	closed bool
@@ -148,6 +151,7 @@ func openWithExtensions(ctx context.Context, root string, official []runtimeprof
 		Kernel:     kernelService,
 		lock:       nil,
 	}
+	runtime.OAuthStore, runtime.OAuthStoreError = openOAuthStore(paths, credential, config)
 	if held == nil {
 		runtime.lock = lock
 	}
@@ -179,6 +183,11 @@ func (runtime *Runtime) Close() error {
 	runtime.closed = true
 	runtimeprofile.ReleaseWebEmbeddingKey(runtime.Paths)
 	var failures []string
+	if runtime.OAuthStore != nil {
+		if err := runtime.OAuthStore.Close(); err != nil {
+			failures = append(failures, "OAuth store: "+err.Error())
+		}
+	}
 	if runtime.Database != nil {
 		if err := runtime.Database.Close(); err != nil {
 			failures = append(failures, "database: "+err.Error())

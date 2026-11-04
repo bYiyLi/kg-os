@@ -69,7 +69,7 @@ throw new Error("private-javascript-body");
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "kgos_mutate", Arguments: map[string]any{"code": script},
 	})
-	if err != nil || result == nil || !result.IsError {
+	if err != nil || toolErrorCode(t, result) != "SCRIPT_ERROR" {
 		t.Fatalf("expected a script failure after confirmed writes: %+v %v", result, err)
 	}
 	if branches, err := runtime.Kernel.EvolutionBranchList(ctx); err != nil || len(branches.Items) < 2 {

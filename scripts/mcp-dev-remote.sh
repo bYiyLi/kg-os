@@ -170,12 +170,18 @@ backup() {
   if [ -d "$workspace/.kgos/extensions" ]; then
     cp -R "$workspace/.kgos/extensions" "$directory/extensions" || fail "Could not back up extensions"
   fi
-  python3 - "$workspace/.kgos/kgos.db" "$directory/kgos.db" <<'PY'
+  python3 - "$workspace/.kgos" "$directory" <<'PY'
+from pathlib import Path
 import sqlite3
 import sys
-with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True) as source:
-    with sqlite3.connect(sys.argv[2]) as destination:
-        source.backup(destination)
+instance, snapshot = map(Path, sys.argv[1:])
+for name in ("kgos.db", "mcp-oauth.db"):
+    path = instance / name
+    if name == "mcp-oauth.db" and not path.exists():
+        continue  # Older Instances have no persistent OAuth database.
+    with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True) as source:
+        with sqlite3.connect(snapshot / name) as destination:
+            source.backup(destination)
 PY
   chmod 0600 "$directory/kgos.db"
   chmod -R go-rwx "$directory"

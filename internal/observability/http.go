@@ -65,7 +65,7 @@ func routeClass(path string, mcpPath []string) string {
 	switch {
 	case path == "/mcp", len(mcpPath) != 0 && path == mcpPath[0]:
 		return "mcp"
-	case path == "/oauth/authorize", path == "/oauth/token", path == "/oauth/decision", path == "/oauth/request":
+	case path == "/oauth/authorize", path == "/oauth/token", path == "/oauth/revoke", path == "/oauth/decision", path == "/oauth/request":
 		return "oauth"
 	case strings.HasPrefix(path, "/api/v1/web/auth/"):
 		return "web_auth"

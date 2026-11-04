@@ -23,6 +23,7 @@ const allowed = new Map([
     "github.com/aperturerobotics/go-quickjs-wasi-reactor",
     { version: "v0.15.1", file: "LICENSE", license: "MIT" }
   ],
+  ["github.com/go-jose/go-jose/v4", { version: "v4.1.4", file: "LICENSE", license: "Apache-2.0" }],
   ["github.com/google/jsonschema-go", { version: "v0.4.3", file: "LICENSE", license: "MIT" }],
   ["github.com/mattn/go-sqlite3", { version: "v1.14.52", file: "LICENSE", license: "MIT" }],
   [

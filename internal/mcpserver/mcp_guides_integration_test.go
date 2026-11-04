@@ -64,7 +64,7 @@ func TestDocumentedOntologyAndObjectLifecycle(t *testing.T) {
 	if err != nil || initial.IsError {
 		t.Fatalf("cannot read default Branch baseline: %v %#v", err, initial)
 	}
-	defaultHead := mcpText(t, initial)["result"].(map[string]any)["state"].(string)
+	defaultHead := mcpText(t, initial)["state"].(string)
 	steps := []struct {
 		guide string
 		index int
@@ -86,9 +86,7 @@ func TestDocumentedOntologyAndObjectLifecycle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if result.IsError {
-				t.Fatalf("published example failed: %#v", mcpText(t, result))
-			}
+			toolData(t, result)
 			// The real published examples must never accidentally advance the
 			// default Branch, even after recovery of a stale test Branch.
 			check, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "kgos_query", Arguments: map[string]any{
@@ -98,7 +96,7 @@ test:(await evolution.get({state:"branch/kgos-guide-demo"})).state};`,
 			if err != nil || check.IsError {
 				t.Fatalf("cannot verify Branch isolation: %v %#v", err, check)
 			}
-			state := mcpText(t, check)["result"].(map[string]any)
+			state := mcpText(t, check)
 			if state["main"] != defaultHead {
 				t.Fatalf("example modified default Branch: initial=%s actual=%v", defaultHead, state["main"])
 			}
@@ -114,7 +112,7 @@ return await object.read({at:s,refs:["node:Product","node:Note","relationship:HA
 	if err != nil || result.IsError {
 		t.Fatalf("final persisted models not readable: %v %#v", err, result)
 	}
-	value := mcpText(t, result)["result"].(map[string]any)
+	value := mcpText(t, result)
 	if len(value["results"].([]any)) != 3 {
 		t.Fatalf("wrong persisted models %#v", value)
 	}
@@ -198,7 +196,7 @@ func TestDocumentedPinnedReadingBoundaries(t *testing.T) {
 			if err != nil || reply == nil || reply.IsError {
 				t.Fatalf("reading example failed: %v %#v", err, reply)
 			}
-			result := object(t, mcpText(t, reply)["result"])
+			result := mcpText(t, reply)
 			models := object(t, result["ontology"])
 			if result["state"] != target.state || models["state"] != target.state {
 				t.Fatalf("reading example mixed target snapshots: %#v", result)

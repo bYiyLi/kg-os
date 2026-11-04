@@ -5,6 +5,8 @@ go 1.27.3
 require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c
 	github.com/aperturerobotics/go-quickjs-wasi-reactor v0.15.1
+	github.com/go-jose/go-jose/v4 v4.1.4
+	github.com/google/jsonschema-go v0.4.3
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/tetratelabs/wazero v1.12.0
@@ -14,7 +16,6 @@ require (
 )
 
 require (
-	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect

@@ -6,7 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"mime"
 	"net/http"
@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bYiyLi/kg-os/internal/mcpoauth"
 	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
@@ -75,19 +76,20 @@ func (o *oauthBroker) beginAuthorization(w http.ResponseWriter, r *http.Request)
 	redirect := onlyOAuthValue(query, "redirect_uri")
 	state := onlyOAuthValue(query, "state")
 	challenge := onlyOAuthValue(query, "code_challenge")
+	scope, validScope := normalizeOAuthScope(onlyOAuthValue(query, "scope"))
 	if !validOAuthClientID(clientID) || !validOAuthRedirect(redirect) ||
 		!oauthVisiblePattern.MatchString(state) || !oauthSecretPattern.MatchString(challenge) ||
 		onlyOAuthValue(query, "response_type") != "code" ||
 		onlyOAuthValue(query, "code_challenge_method") != "S256" ||
 		onlyOAuthValue(query, "resource") != o.resource ||
-		(query.Has("scope") && onlyOAuthValue(query, "scope") != oauthScope) {
+		!validScope || (query.Has("scope") && len(query["scope"]) != 1) {
 		oauthFailure(w, 400, "invalid_request")
 		return
 	}
 	redirects, err := o.redirectsFor(r.Context(), clientID)
 	if err != nil {
-		if err.Error() == "temporarily_unavailable" {
-			oauthFailure(w, 429, "temporarily_unavailable")
+		if errors.Is(err, errOAuthClientUnavailable) {
+			oauthFailure(w, 503, "temporarily_unavailable")
 		} else {
 			oauthFailure(w, 400, "invalid_client")
 		}
@@ -111,14 +113,14 @@ func (o *oauthBroker) beginAuthorization(w http.ResponseWriter, r *http.Request)
 	}
 	o.mu.Lock()
 	o.pruneLocked()
-	if len(o.tickets) >= maxPendingOAuth || len(o.codes) >= maxPendingOAuth {
+	if len(o.tickets) >= maxPendingOAuth {
 		o.mu.Unlock()
 		oauthFailure(w, 429, "temporarily_unavailable")
 		return
 	}
 	o.tickets[oauthHash(ticket)] = oauthAuthorization{
 		clientID: clientID, redirectURI: redirect, resource: o.resource, state: state,
-		challenge: challenge, expires: o.now().Add(ticketLifetime),
+		challenge: challenge, scope: scope, expires: o.now().Add(ticketLifetime),
 	}
 	o.mu.Unlock()
 	oauthHeaders(w)
@@ -145,7 +147,7 @@ func (o *oauthBroker) authorizationDetails(w http.ResponseWriter, r *http.Reques
 	}
 	oauthJSON(w, http.StatusOK, map[string]any{
 		"client_id": pending.clientID, "client_name": "ChatGPT",
-		"resource": pending.resource, "scope": oauthScope,
+		"resource": pending.resource, "scope": pending.scope,
 		"canWrite": true, "expires_at": pending.expires.UTC().Format(time.RFC3339),
 	})
 }
@@ -222,20 +224,29 @@ func (o *oauthBroker) finishAuthorization(w http.ResponseWriter, r *http.Request
 		oauthJSON(w, 200, map[string]string{"redirect_url": target})
 		return
 	}
-	if len(o.codes) >= maxPendingOAuth {
-		o.mu.Unlock()
-		oauthFailure(w, 503, "temporarily_unavailable")
-		return
-	}
 	code, err := randomOAuthSecret()
 	if err != nil {
 		o.mu.Unlock()
 		oauthFailure(w, 503, "temporarily_unavailable")
 		return
 	}
+	family, err := randomOAuthSecret()
+	if err != nil {
+		o.mu.Unlock()
+		oauthFailure(w, 503, "temporarily_unavailable")
+		return
+	}
+	err = o.store.PutCode(r.Context(), mcpoauth.Code{
+		Hash:        oauthHashString(code),
+		Binding:     mcpoauth.Binding{FamilyID: family, ClientID: pending.clientID, Issuer: o.issuer, Resource: pending.resource, Scope: pending.scope},
+		RedirectURI: pending.redirectURI, Challenge: pending.challenge, ExpiresAt: o.now().Add(codeLifetime),
+	}, o.now())
+	if err != nil {
+		o.mu.Unlock()
+		oauthFailure(w, 503, "temporarily_unavailable")
+		return
+	}
 	delete(o.tickets, key)
-	pending.expires = o.now().Add(codeLifetime)
-	o.codes[oauthHash(code)] = pending
 	o.mu.Unlock()
 	target, err := o.authorizationRedirect(pending, url.Values{"code": {code}})
 	if err != nil {
@@ -246,100 +257,212 @@ func (o *oauthBroker) finishAuthorization(w http.ResponseWriter, r *http.Request
 	oauthJSON(w, 200, map[string]string{"redirect_url": target})
 }
 
-func (o *oauthBroker) issueGrantLocked(grant oauthGrant) (map[string]any, error) {
-	o.pruneLocked()
-	if len(o.access) >= maxOAuthTokens || len(o.refresh) >= maxOAuthTokens {
-		return nil, fmt.Errorf("temporarily_unavailable")
-	}
+func (o *oauthBroker) newPair(method string) (oauthTokenPair, mcpoauth.Tokens, error) {
 	access, err := randomOAuthSecret()
 	if err != nil {
-		return nil, err
+		return oauthTokenPair{}, mcpoauth.Tokens{}, err
 	}
 	refresh, err := randomOAuthSecret()
 	if err != nil {
-		return nil, err
+		return oauthTokenPair{}, mcpoauth.Tokens{}, err
 	}
-	accessGrant := grant
-	accessGrant.expires = o.now().Add(accessLifetime)
-	refreshGrant := grant
-	refreshGrant.expires = o.now().Add(refreshLifetime)
-	o.access[oauthHash(access)] = accessGrant
-	o.refresh[oauthHash(refresh)] = refreshGrant
-	return map[string]any{
-		"access_token": access, "token_type": "Bearer", "expires_in": int(accessLifetime / time.Second),
-		"refresh_token": refresh, "scope": oauthScope,
-	}, nil
+	now := o.now()
+	return oauthTokenPair{AccessToken: access, RefreshToken: refresh},
+		mcpoauth.Tokens{AccessHash: oauthHashString(access), RefreshHash: oauthHashString(refresh),
+			AccessExpiresAt: now.Add(accessLifetime), RefreshExpiresAt: now.Add(refreshLifetime), AuthMethod: method}, nil
 }
-func (o *oauthBroker) issueToken(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Authorization") != "" {
-		oauthFailure(w, 401, "invalid_client")
-		return
+
+func (o *oauthBroker) authenticateClient(w http.ResponseWriter, r *http.Request, form url.Values, endpoint string) (string, bool) {
+	for _, values := range form {
+		if len(values) != 1 {
+			oauthFailure(w, 400, "invalid_request")
+			return "", false
+		}
 	}
+	if !validOAuthClientID(onlyOAuthValue(form, "client_id")) {
+		oauthFailure(w, 401, "invalid_client")
+		return "", false
+	}
+	method, err := o.clientAuth.Authenticate(r.Context(), onlyOAuthValue(form, "client_id"), endpoint, form, r.Header.Get("Authorization"))
+	if err != nil {
+		if errors.Is(err, errOAuthClientUnavailable) {
+			oauthServerFailure(w, r, "client_verification_unavailable")
+		} else {
+			oauthDiagnostic(r, "invalid_client", "client_authentication")
+			oauthFailure(w, 401, "invalid_client")
+		}
+		return "", false
+	}
+	return method, true
+}
+
+func (o *oauthBroker) tokenFailure(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, mcpoauth.ErrInvalidGrant) || errors.Is(err, mcpoauth.ErrInvalidToken) {
+		oauthDiagnostic(r, "invalid_grant", mcpoauth.Cause(err))
+		oauthFailure(w, 400, "invalid_grant")
+	} else {
+		oauthServerFailure(w, r, mcpoauth.Cause(err))
+	}
+}
+
+func (o *oauthBroker) issueToken(w http.ResponseWriter, r *http.Request) {
 	form, ok := readOAuthForm(w, r)
 	if !ok {
 		return
 	}
 	grantType := onlyOAuthValue(form, "grant_type")
-	clientID := onlyOAuthValue(form, "client_id")
-	resource := onlyOAuthValue(form, "resource")
-	if !validOAuthClientID(clientID) || resource != o.resource || form.Has("client_secret") || form.Has("client_assertion") {
-		oauthFailure(w, 400, "invalid_client")
-		return
-	}
 	if grantType != "authorization_code" && grantType != "refresh_token" {
 		oauthFailure(w, 400, "unsupported_grant_type")
 		return
 	}
-	o.mu.Lock()
-	o.pruneLocked()
-	grant := oauthGrant{clientID: clientID, issuer: o.issuer, resource: o.resource, scope: oauthScope}
-	if grantType == "authorization_code" {
-		code := onlyOAuthValue(form, "code")
-		redirect := onlyOAuthValue(form, "redirect_uri")
-		verifier := onlyOAuthValue(form, "code_verifier")
-		if !oauthSecretPattern.MatchString(code) {
-			o.mu.Unlock()
-			oauthFailure(w, 400, "invalid_grant")
-			return
-		}
-		key := oauthHash(code)
-		pending, exists := o.codes[key]
-		delete(o.codes, key)
-		if !exists || pending.clientID != clientID || pending.resource != resource || pending.redirectURI != redirect ||
-			!oauthVerifierPattern.MatchString(verifier) {
-			o.mu.Unlock()
-			oauthFailure(w, 400, "invalid_grant")
-			return
-		}
-		hash := sha256.Sum256([]byte(verifier))
-		expected := base64.RawURLEncoding.EncodeToString(hash[:])
-		if subtle.ConstantTimeCompare([]byte(expected), []byte(pending.challenge)) != 1 {
-			o.mu.Unlock()
-			oauthFailure(w, 400, "invalid_grant")
-			return
-		}
-	} else {
-		token := onlyOAuthValue(form, "refresh_token")
-		if !oauthSecretPattern.MatchString(token) {
-			o.mu.Unlock()
-			oauthFailure(w, 400, "invalid_grant")
-			return
-		}
-		key := oauthHash(token)
-		previous, exists := o.refresh[key]
-		delete(o.refresh, key)
-		if !exists || previous.clientID != clientID || previous.issuer != o.issuer || previous.resource != resource || previous.scope != oauthScope {
-			o.mu.Unlock()
-			oauthFailure(w, 400, "invalid_grant")
-			return
-		}
-		grant = previous
-	}
-	result, err := o.issueGrantLocked(grant)
-	o.mu.Unlock()
-	if err != nil {
-		oauthFailure(w, 503, "temporarily_unavailable")
+	resource := onlyOAuthValue(form, "resource")
+	if (grantType == "authorization_code" && resource != o.resource) || (resource != "" && resource != o.resource) {
+		oauthFailure(w, 400, "invalid_target")
 		return
 	}
-	oauthJSON(w, 200, result)
+	method, ok := o.authenticateClient(w, r, form, o.issuer+"/oauth/token")
+	if !ok {
+		return
+	}
+	clientID := onlyOAuthValue(form, "client_id")
+	o.tokenMu.Lock()
+	defer o.tokenMu.Unlock()
+	now := o.now()
+	for key, entry := range o.retries {
+		if !entry.expires.After(now) {
+			delete(o.retries, key)
+		}
+	}
+	if grantType == "authorization_code" {
+		code, verifier := onlyOAuthValue(form, "code"), onlyOAuthValue(form, "code_verifier")
+		if !oauthSecretPattern.MatchString(code) || !oauthVerifierPattern.MatchString(verifier) {
+			oauthFailure(w, 400, "invalid_grant")
+			return
+		}
+		if form.Has("scope") {
+			oauthFailure(w, 400, "invalid_request")
+			return
+		}
+		pair, tokens, err := o.newPair(method)
+		if err != nil {
+			oauthServerFailure(w, r, "entropy")
+			return
+		}
+		sum := sha256.Sum256([]byte(verifier))
+		binding, err := o.store.ExchangeCode(r.Context(), oauthHashString(code), clientID, onlyOAuthValue(form, "redirect_uri"),
+			resource, base64.RawURLEncoding.EncodeToString(sum[:]), tokens, now)
+		if err != nil {
+			o.tokenFailure(w, r, err)
+			return
+		}
+		pair.Scope = binding.Scope
+		oauthJSON(w, 200, pair.response())
+		return
+	}
+	refresh := onlyOAuthValue(form, "refresh_token")
+	if !oauthSecretPattern.MatchString(refresh) {
+		oauthFailure(w, 400, "invalid_grant")
+		return
+	}
+	requestedScope := onlyOAuthValue(form, "scope")
+	if requestedScope != "" {
+		normalized, valid := normalizeOAuthScope(requestedScope)
+		if !valid {
+			oauthFailure(w, 400, "invalid_scope")
+			return
+		}
+		requestedScope = normalized
+	}
+	key := oauthHash(refresh)
+	if method == "private_key_jwt" {
+		if previous, found := o.retries[key]; found {
+			if previous.clientID != clientID || (resource != "" && resource != previous.resource) || previous.requestedScope != requestedScope {
+				oauthDiagnostic(r, "invalid_grant", "retry_binding")
+				oauthFailure(w, 400, "invalid_grant")
+				return
+			}
+			binding, err := o.store.CurrentRefresh(r.Context(), oauthHashString(previous.pair.RefreshToken), clientID, resource, now)
+			if err != nil {
+				// Retain the signed retry marker until its original expiry. A
+				// transient backend failure must not turn the next retry into
+				// a strict replay that revokes the successfully rotated family.
+				o.tokenFailure(w, r, err)
+				return
+			}
+			if binding.FamilyID != previous.binding.FamilyID || binding.Generation != previous.binding.Generation || binding.AuthMethod != method {
+				oauthDiagnostic(r, "invalid_grant", "retry_generation")
+				oauthFailure(w, 400, "invalid_grant")
+				return
+			}
+			oauthJSON(w, 200, previous.pair.response())
+			return
+		}
+		if len(o.retries) >= maxOAuthRefreshRetries {
+			oauthServerFailure(w, r, "retry_budget")
+			return
+		}
+	}
+	// A valid current token exposes its granted scope before mutation. For an
+	// invalid/consumed token Rotate remains authoritative, including replay revoke.
+	current, currentErr := o.store.CurrentRefresh(r.Context(), oauthHashString(refresh), clientID, resource, now)
+	if currentErr != nil && !errors.Is(currentErr, mcpoauth.ErrInvalidGrant) {
+		o.tokenFailure(w, r, currentErr)
+		return
+	}
+	if currentErr == nil && requestedScope != "" && requestedScope != current.Scope {
+		oauthFailure(w, 400, "invalid_scope")
+		return
+	}
+	pair, tokens, err := o.newPair(method)
+	if err != nil {
+		oauthServerFailure(w, r, "entropy")
+		return
+	}
+	binding, err := o.store.Rotate(r.Context(), oauthHashString(refresh), clientID, resource, tokens, now)
+	if err != nil {
+		o.tokenFailure(w, r, err)
+		return
+	}
+	pair.Scope = binding.Scope
+	if method == "private_key_jwt" {
+		o.retries[key] = oauthRefreshRetry{clientID: clientID, resource: binding.Resource, requestedScope: requestedScope,
+			pair: pair, binding: binding, expires: now.Add(oauthRefreshRetryLifetime)}
+	}
+	oauthJSON(w, 200, pair.response())
+}
+
+func (o *oauthBroker) revokeToken(w http.ResponseWriter, r *http.Request) {
+	form, ok := readOAuthForm(w, r)
+	if !ok {
+		return
+	}
+	if resource := onlyOAuthValue(form, "resource"); resource != "" && resource != o.resource {
+		oauthFailure(w, 400, "invalid_target")
+		return
+	}
+	method, ok := o.authenticateClient(w, r, form, o.issuer+"/oauth/revoke")
+	if !ok {
+		return
+	}
+	token := onlyOAuthValue(form, "token")
+	if token == "" {
+		oauthFailure(w, 400, "invalid_request")
+		return
+	}
+	o.tokenMu.Lock()
+	defer o.tokenMu.Unlock()
+	family, err := o.store.Revoke(r.Context(), oauthHashString(token), onlyOAuthValue(form, "client_id"), method, o.now())
+	if err != nil {
+		oauthServerFailure(w, r, mcpoauth.Cause(err))
+		return
+	}
+	if family != "" {
+		for key, entry := range o.retries {
+			if entry.binding.FamilyID == family {
+				delete(o.retries, key)
+			}
+		}
+	}
+	oauthHeaders(w)
+	w.WriteHeader(http.StatusOK)
 }

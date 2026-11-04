@@ -15,7 +15,7 @@ const taskCommands = {
     ["check:spelling"],
     ["check:secrets"]
   ],
-  quick: [["check:go"], ["typecheck"], ["lint"], ["test"]],
+  quick: [["check:go"], ["typecheck"], ["lint"], ["test"], ["test:mcp-contract"]],
   typecheck: [
     ["exec", "tsc", "-b", "--pretty", "false"],
     ["exec", "tsc", "-p", "packages/web/tsconfig.json", "--pretty", "false"],
@@ -34,6 +34,7 @@ const taskCommands = {
     ["test:go:coverage"],
     ["check:go:security"],
     ["test:coverage"],
+    ["test:mcp-contract"],
     ["check:type-coverage"],
     ["check:duplicates"],
     ["check:unused"],

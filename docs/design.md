@@ -22,10 +22,12 @@
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听与 [D105 Web-first 初始化门禁](design/runtime.md#web-first-run-bootstrap)、`auth.json` / `initialized.json`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
 | [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |
 | [web.md](design/web.md) | 面向人的图谱优先界面、Branch / 领域树导航与居中历史 DAG 弹窗、[单画布知识搜索与局部探索](design/web.md#知识图谱画布与搜索)、本体视图、草稿与连接交互、[D110 四步 Token-first 初始化页面](design/web.md#web-first-run-setup)、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
-| [decisions.md](design/decisions.md) | D1–D122 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [decisions.md](design/decisions.md) | D1–D124 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 当前知识使用合同：[每轮强制检索及授权后变更](design/mcp.md#global-ai-guidance-and-daily-responsibility)、[D113 强制读取](design/decisions.md#d113-mandatory-knowledge-behavior)、[D119 先推荐后授权](design/decisions.md#d119-recommend-first-authorized-mutation)；此前 [D111](design/decisions.md#d111-task-scoped-knowledge-loading) / [D112](design/decisions.md#d112-global-ai-guidance-and-daily-responsibility) 的按任务选择读取与简单问候豁免已被替代，环境范围与其他有效边界保留。模型扩展与真实客户端验收见 [Phase 32](development/phases/32-knowledge-use-readiness.md)。源码修改、安装与发布分别取证。
+
+MCP 健壮性与长期授权按 [D124](design/decisions.md#d124-mcp-resilience) 和 [MCP 统一结果/恢复合同](design/mcp.md#mcp-对外健壮性合同)实施，验收归 [Phase 34](development/phases/34-mcp-resilience.md)。
 
 ## 从配置到调用
 

@@ -3,15 +3,17 @@ package mcpserver
 import (
 	"context"
 	"encoding/base64"
-	"time"
 
-	"github.com/bYiyLi/kg-os/internal/observability"
 	"github.com/bYiyLi/kg-os/internal/webui"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const workspaceResourceURI = "ui://kgos/workspace/v1"
 const workspaceMIMEType = "text/html;profile=mcp-app"
+
+type workspaceOutput struct {
+	View string `json:"view"`
+}
 
 const workspaceIconSVG = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g fill=\"none\" stroke=\"#000\" stroke-width=\"5\" stroke-linecap=\"round\"><path d=\"M16 17L48 32 16 47M16 17v30\"/><circle cx=\"16\" cy=\"17\" r=\"5\" fill=\"#000\"/><circle cx=\"48\" cy=\"32\" r=\"5\" fill=\"#000\"/><circle cx=\"16\" cy=\"47\" r=\"5\" fill=\"#000\"/></g></svg>"
 
@@ -42,7 +44,7 @@ func (s *Server) registerWorkspace(server *mcp.Server) {
 	})
 
 	closed := false
-	mcp.AddTool(server, &mcp.Tool{
+	registerTypedTool(s, server, &mcp.Tool{
 		Name:        "kgos_workspace",
 		Title:       "KG OS Workspace",
 		Description: "Open the interactive KG OS workspace in a supported MCP Apps host. This app-only entrypoint accepts no arguments; opening the interface does not directly read or modify KG OS data.",
@@ -65,14 +67,7 @@ func (s *Server) registerWorkspace(server *mcp.Server) {
 			MIMEType: "image/svg+xml",
 			Sizes:    []string{"any"},
 		}},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		started := s.beginTool(ctx)
-		if observer := observability.FromContext(ctx); observer != nil {
-			observer.Tool(ctx, "kgos_workspace", "", time.Since(started))
-		}
-		return &mcp.CallToolResult{
-			StructuredContent: map[string]any{"view": "workspace"},
-			Content:           []mcp.Content{&mcp.TextContent{Text: "Open KG OS Workspace"}},
-		}, nil, nil
+	}, schemaFor[workspaceOutput](), func(_ context.Context, _ struct{}) (any, error) {
+		return workspaceOutput{View: "workspace"}, nil
 	})
 }

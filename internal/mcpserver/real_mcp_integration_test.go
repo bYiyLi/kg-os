@@ -4,7 +4,6 @@ package mcpserver
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -61,18 +60,7 @@ func (r bearerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 }
 func mcpText(t *testing.T, result *mcp.CallToolResult) map[string]any {
 	t.Helper()
-	if result == nil || len(result.Content) != 1 {
-		t.Fatalf("unexpected content %#v", result)
-	}
-	item, ok := result.Content[0].(*mcp.TextContent)
-	if !ok {
-		t.Fatalf("expected text content, got %T", result.Content[0])
-	}
-	var payload map[string]any
-	if err := json.Unmarshal([]byte(item.Text), &payload); err != nil {
-		t.Fatalf("not JSON: %s: %v", item.Text, err)
-	}
-	return payload
+	return toolDataObject(t, result)
 }
 func TestRealKernelMCPToolsAndAuthentication(t *testing.T) {
 	runtime := phase16Runtime(t)
@@ -127,32 +115,21 @@ func TestRealKernelMCPToolsAndAuthentication(t *testing.T) {
 		return result
 	}
 	read := call("kgos_query", map[string]any{"code": "const v=await evolution.overview();return v"})
-	if read.IsError {
-		t.Fatalf("read failed: %#v", mcpText(t, read))
-	}
-	if mcpText(t, read)["result"] == nil {
+	if toolData(t, read) == nil {
 		t.Fatalf("missing result %#v", read)
 	}
 	forged := call("kgos_query", map[string]any{"code": "return await evolution.branch.create({name:'illegal',from:'branch/main'})"})
-	if !forged.IsError {
+	if toolErrorCode(t, forged) != "PERMISSION_DENIED" {
 		t.Fatalf("read tool permitted write %#v", forged)
 	}
 	create := call("kgos_mutate", map[string]any{"code": "const v=await evolution.overview();return await evolution.branch.create({name:'sandbox-proof',from:v.state})"})
-	if create.IsError {
-		t.Fatalf("write tool failed %#v", mcpText(t, create))
-	}
+	toolData(t, create)
 	preview := call("kgos_ontology_overview", map[string]any{"offset": 0, "limit": 100})
-	if preview.IsError {
-		t.Fatalf("preview error %#v", mcpText(t, preview))
-	}
 	page := mcpText(t, preview)
 	if page["viewRevision"] == nil || !strings.Contains(page["preview"].(string), "sandbox-proof") {
 		t.Fatalf("preview incomplete %#v", page)
 	}
 	ancestry := call("kgos_commit_ancestry", map[string]any{"root": "branch/main", "limit": 10})
-	if ancestry.IsError {
-		t.Fatalf("ancestry error %#v", mcpText(t, ancestry))
-	}
 	if !strings.Contains(mcpText(t, ancestry)["markdown"].(string), "Commit DAG") {
 		t.Fatalf("missing ancestry DAG")
 	}

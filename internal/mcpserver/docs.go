@@ -31,6 +31,11 @@ type docServerInfo struct {
 	Version string `json:"version"`
 }
 
+type docOutput struct {
+	ServerInfo docServerInfo `json:"serverInfo"`
+	Documents  []docPage     `json:"documents"`
+}
+
 func docsPaths(arguments any) ([]string, error) {
 	if arguments == nil {
 		return nil, nil
@@ -127,7 +132,7 @@ func readDocuments(ctx context.Context, source fs.FS, paths []string) (json.RawM
 
 func (s *Server) registerDocs(server *mcp.Server) {
 	closed := false
-	server.AddTool(&mcp.Tool{
+	s.registerTool(server, &mcp.Tool{
 		Name:        "kgos_docs",
 		Title:       "Read KG OS documentation",
 		Description: "Read built-in KG OS SDK, Cypher 25 and task guides, plus this running MCP server's build version in serverInfo.version. Omit paths or pass [] for the task-oriented index; pass an array of 1–32 exact Markdown paths to read multiple full documents in order. Separate from JavaScript; call kgos_query or kgos_mutate to act.",
@@ -141,13 +146,11 @@ func (s *Server) registerDocs(server *mcp.Server) {
 			"additionalProperties": false,
 		},
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, DestructiveHint: &closed, OpenWorldHint: &closed},
-	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		started := s.beginTool(ctx)
+	}, schemaFor[docOutput](), func(ctx context.Context, req *mcp.CallToolRequest) (any, error) {
 		paths, err := docsPaths(req.Params.Arguments)
 		if err != nil {
-			return s.finishTool(ctx, "kgos_docs", started, nil, err), nil
+			return nil, err
 		}
-		value, err := readDocuments(ctx, embeddedDocs, paths)
-		return s.finishTool(ctx, "kgos_docs", started, value, err), nil
+		return readDocuments(ctx, embeddedDocs, paths)
 	})
 }

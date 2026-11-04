@@ -95,7 +95,7 @@ func TestWorkspaceMCPToolAndResource(t *testing.T) {
 	if err != nil || opened.IsError {
 		t.Fatalf("open UI: %#v / %v", opened, err)
 	}
-	if opened.StructuredContent == nil {
+	if toolDataObject(t, opened)["view"] != "workspace" {
 		t.Fatalf("missing initial UI result: %#v", opened)
 	}
 

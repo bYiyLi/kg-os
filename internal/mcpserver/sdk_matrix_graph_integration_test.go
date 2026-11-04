@@ -49,8 +49,8 @@ func matrixGraphAndHistory(t *testing.T, calls *methodMatrix, origin, branch, me
 		failed := matrixRawTool(t, calls, "kgos_query", map[string]any{
 			"code": "return await graph.query(" + string(encoded) + ");",
 		})
-		if !failed.IsError || mcpText(t, failed)["code"] != code {
-			t.Fatalf("MCP scope error %v should be %s: %#v", rawDomain, code, mcpText(t, failed))
+		if toolErrorCode(t, failed) != code {
+			t.Fatalf("MCP scope error %v should be %s: %#v", rawDomain, code, toolEnvelope(t, failed))
 		}
 	}
 	events := calls.stream("graph.streamQuery", map[string]string{
@@ -130,14 +130,14 @@ func matrixGraphAndHistory(t *testing.T, calls *methodMatrix, origin, branch, me
 	denied := matrixRawTool(t, calls, "kgos_query", map[string]any{
 		"code": "return await evolution.branch.create({name:'read-must-not-write',from:" + stringifyString(origin) + "});",
 	})
-	if !denied.IsError || mcpText(t, denied)["code"] != "PERMISSION_DENIED" {
-		t.Fatalf("Read authorization failed: %#v", mcpText(t, denied))
+	if toolErrorCode(t, denied) != "PERMISSION_DENIED" {
+		t.Fatalf("Read authorization failed: %#v", toolEnvelope(t, denied))
 	}
 	missing := matrixRawTool(t, calls, "kgos_query", map[string]any{
 		"code": "return await evolution.get({state:'commit/" + strings.Repeat("0", 64) + "'});",
 	})
-	if !missing.IsError || mcpText(t, missing)["code"] != "STATE_NOT_FOUND" {
-		t.Fatalf("Missing State code changed: %#v", mcpText(t, missing))
+	if toolErrorCode(t, missing) != "STATE_NOT_FOUND" {
+		t.Fatalf("Missing State code changed: %#v", toolEnvelope(t, missing))
 	}
 	required := []string{
 		"ontology.read", "ontology.patch", "object.read", "object.readText", "object.patch",
@@ -175,8 +175,5 @@ func matrixRawTool(t *testing.T, calls *methodMatrix, name string, params map[st
 func matrixTool(t *testing.T, calls *methodMatrix, name string, params map[string]any) map[string]any {
 	t.Helper()
 	result := matrixRawTool(t, calls, name, params)
-	if result.IsError {
-		t.Fatalf("MCP Tool %s: %#v", name, mcpText(t, result))
-	}
 	return mcpText(t, result)
 }

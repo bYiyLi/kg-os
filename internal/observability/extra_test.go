@@ -80,6 +80,7 @@ func TestHTTPRoutingAndSecurityStatusBoundaries(t *testing.T) {
 	}{
 		{"POST", "/custom-mcp", http.StatusOK, "mcp"},
 		{"POST", "/oauth/token?code=secret-value", http.StatusForbidden, "oauth"},
+		{"POST", "/oauth/revoke?token=secret-value", http.StatusServiceUnavailable, "oauth"},
 		{"GET", "/api/v1/web/auth/session", http.StatusNoContent, "web_auth"},
 		{"POST", "/api/v1/graph/query", http.StatusBadRequest, "api"},
 		{"GET", "/.well-known/oauth-protected-resource", http.StatusOK, "static"},

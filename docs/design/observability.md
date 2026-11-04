@@ -103,6 +103,10 @@ HTTP 汇总排除已知的 Docker 健康探测（`GET /mcp` 返回预期 401）�
 
 这些是**尽力交付的诊断事件，不是 exactly-once、事务性 outbox 或审计保证**。日志写入失败不得回滚已提交的事务、掩盖原业务响应、阻断 daemon 的正常服务，也不得重放写入补日志；缺失事件不能据此证明没有发生操作。
 
+### MCP 健壮性与 OAuth 恢复事件
+
+MCP Tool 的 code=ok 才是业务成功，isError=false 或 HTTP 200 不能替代此判断。统一入口对成功、参数拒绝、内部异常、panic、超时各记录一次真实终态并释放 in-flight；此前已确认的 Kernel 写入事件不受后续脚本错误覆盖。OAuth 刷新、幂等重试、重放拒绝和撤销只记录现有 Request ID、固定 operation/outcome/error_code 或静态 cause_class；不记录 Token、Code、assertion、客户端任意文本或原始 panic/堆栈。认证后端暂时不可用记作服务故障，不能伪装凭证无效或永久撤销；失败日志不改变事务结果，也不触发写入重放。
+
 ## 输出、轮转与保留
 
 | 运行方式 | 正式输出 | 管理责任 |

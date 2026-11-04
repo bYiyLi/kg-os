@@ -118,6 +118,8 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 
 **Phase 28 当前为 `in_progress`（D115，2026-10-27）**。待发布源码目标四 Skill（三规范 + Doctor），已发布的 v0.3.5 七 Skill 私人 Plugin/安装手册保持不变；新候选的真实客户端、发布验收未完成。见 [Phase 28](phases/28-official-skill-roster.md)。
 
+**Phase 34 MCP 对外健壮性与 OAuth 生命周期为 `in_progress`。** 按用户批准的新合同实施统一结果、异常兜底、持久授权、滚动刷新与签名重试；范围、验收及真实证据见 [Phase 34](phases/34-mcp-resilience.md)，缺失门禁不以局部成功替代。
+
 ## 5. 路线总览
 
 | Phase | 状态 | 交付结果 | 主要输入 |

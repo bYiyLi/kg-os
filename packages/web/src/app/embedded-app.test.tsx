@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 // cspell:words hostcontextchanged toolresult
 
-import { EmbeddedApp, readOverview } from "./embedded-app.js";
+import { EmbeddedApp } from "./embedded-app.js";
 import { i18n, selectLocale } from "./i18n/index.js";
 
 const commitOne = vi.hoisted(() => "commit/" + "a".repeat(64));
@@ -26,9 +26,21 @@ const SHARED_HISTORY = "Shared history";
 
 function reply(value: unknown): {
   content: { type: string; text: string }[];
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 } {
-  return { content: [{ type: textType, text: JSON.stringify({ result: value }) }] };
+  const envelope = { code: "ok", data: value };
+  return {
+    content: [{ type: textType, text: JSON.stringify(envelope) }],
+    structuredContent: envelope
+  };
+}
+
+function failure(code: string, message: string) {
+  return {
+    isError: false,
+    content: [{ type: textType, text: JSON.stringify({ code, message, retryable: false }) }]
+  };
 }
 
 function domainReply(code: string) {
@@ -338,10 +350,7 @@ it("expands a world without get, selects its Domain and reads historical Domains
 
 it("keeps MCP resource errors local while preserving confirmed Domain navigation and overview", async () => {
   await renderEmbedded();
-  bridge.callServerTool.mockResolvedValueOnce({
-    isError: true,
-    content: [{ type: textType, text: '{"code":"RESOURCE_ERROR","message":"quota"}' }]
-  });
+  bridge.callServerTool.mockResolvedValueOnce(failure("RESOURCE_ERROR", "quota"));
   await click(WORLD_REFRESH);
   expect(document.body.textContent).toContain(commitOne);
   expect(document.body.textContent).toContain("World references may be out of date");
@@ -353,10 +362,7 @@ it("clears old Domains and an open history dialog after MCP authentication failu
   await renderEmbedded();
   await openHistory();
   expect(document.body.querySelectorAll(sidebarDomainSelector)).toHaveLength(1);
-  bridge.callServerTool.mockResolvedValueOnce({
-    isError: true,
-    content: [{ type: textType, text: '{"code":"AUTHENTICATION_FAILED"}' }]
-  });
+  bridge.callServerTool.mockResolvedValueOnce(failure("AUTHENTICATION_FAILED", "access denied"));
   await act(async () => {
     historyRow(SHARED_HISTORY).click();
     await Promise.resolve();
@@ -419,7 +425,7 @@ it("changes language without a new tool call, but refreshes only on explicit act
 it("reports failure without retaining stale branch data", async () => {
   await renderEmbedded();
   bridge.callServerTool.mockResolvedValue({
-    content: [{ type: textType, text: '{"result":{}}' }]
+    content: [{ type: textType, text: '{"code":"ok","data":{}}' }]
   });
   await act(async () => {
     button("Refresh").click();
@@ -497,35 +503,30 @@ it("updates host theme and language independently of MCP data", async () => {
   expect(overviewCalls()).toBe(1);
 });
 
-it("rejects errors and untrusted result envelopes", () => {
-  expect(() => readOverview({ isError: true, content: [] })).toThrow();
-  expect(() => readOverview({ content: [] })).toThrow();
-  expect(() => readOverview({ content: [{ type: textType, text: "{}" }] })).toThrow();
-  expect(() =>
-    readOverview({
-      content: [{ type: textType, text: '{"result":{"state":"","defaultBranch":2}}' }]
-    })
-  ).toThrow();
+it("accepts the workspace entrypoint envelope without repeating a server call", async () => {
+  await renderEmbedded();
+  const calls = bridge.callServerTool.mock.calls.length;
+  const handler = bridge.addEventListener.mock.calls.find(
+    (call) => call[0] === "toolresult"
+  )?.[1] as ((result: unknown) => void) | undefined;
+  expect(handler).toBeDefined();
+  act(() => handler?.(reply({ view: "workspace" })));
+  expect(document.body.querySelector(".embedded-connection [role='alert']")).toBeNull();
+  expect(document.body.textContent).toContain(commitOne);
+  expect(bridge.callServerTool).toHaveBeenCalledTimes(calls);
 });
 
 it.each([
-  null,
-  15,
-  [],
-  {},
-  { isError: true, content: [] },
-  { content: [] },
-  { content: [null] },
-  { content: [false, { type: "image", data: "" }] },
-  { content: [{ type: textType, text: null }] },
-  { content: [{ type: textType, text: "null" }] },
-  { content: [{ type: textType, text: "[]" }] },
-  { content: [{ type: textType, text: "42" }] },
-  { content: [{ type: textType, text: '{"result":null}' }] },
-  { content: [{ type: textType, text: '{"result":[]}' }] },
-  { content: [{ type: textType, text: '{"result":{"state":"","defaultBranch":"main"}}' }] },
-  { content: [{ type: textType, text: '{"result":{"state":"x","defaultBranch":""}}' }] },
-  { content: [{ type: textType, text: '{"result":{"state":42,"defaultBranch":"main"}}' }] }
-])("rejects malformed MCP results %#", (result) => {
-  expect(() => readOverview(result)).toThrow();
+  failure("INTERNAL_ERROR", "Workspace unavailable"),
+  reply({ view: "unexpected" }),
+  { structuredContent: { view: "workspace" } }
+])("invalidates the workspace for a failed or malformed entrypoint: %j", async (result) => {
+  await renderEmbedded();
+  const handler = bridge.addEventListener.mock.calls.find(
+    (call) => call[0] === "toolresult"
+  )?.[1] as ((result: unknown) => void) | undefined;
+  expect(handler).toBeDefined();
+  act(() => handler?.(result));
+  expect(document.body.querySelector(alertSelector)).not.toBeNull();
+  expect(document.body.textContent).not.toContain(commitOne);
 });

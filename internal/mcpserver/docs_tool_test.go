@@ -18,18 +18,7 @@ import (
 
 func docToolPayload(t *testing.T, result *mcp.CallToolResult) map[string]any {
 	t.Helper()
-	if result == nil || len(result.Content) != 1 {
-		t.Fatalf("unexpected MCP response %#v", result)
-	}
-	item, ok := result.Content[0].(*mcp.TextContent)
-	if !ok {
-		t.Fatalf("not a text result: %#v", result)
-	}
-	var value map[string]any
-	if err := json.Unmarshal([]byte(item.Text), &value); err != nil {
-		t.Fatal(err)
-	}
-	return value
+	return toolEnvelope(t, result)
 }
 
 func TestDocsViaRealMCPProtocolNoSkill(t *testing.T) {
@@ -91,10 +80,7 @@ func TestDocsViaRealMCPProtocolNoSkill(t *testing.T) {
 	}
 	page := func(result *mcp.CallToolResult) []any {
 		t.Helper()
-		if result.IsError {
-			t.Fatalf("documents error %#v", docToolPayload(t, result))
-		}
-		payload := docToolPayload(t, result)
+		payload := toolDataObject(t, result)
 		info, ok := payload["serverInfo"].(map[string]any)
 		if !ok || info["name"] != "kgos" || info["version"] != buildinfo.Version {
 			t.Fatalf("wrong running MCP server metadata: %#v", payload)
@@ -151,7 +137,7 @@ func TestDocsViaRealMCPProtocolNoSkill(t *testing.T) {
 	}
 	for _, args := range invalid {
 		got := call("kgos_docs", args)
-		if !got.IsError || docToolPayload(t, got)["code"] != "INVALID_ARGUMENT" {
+		if toolErrorCode(t, got) != "INVALID_ARGUMENT" {
 			t.Fatalf("accepted invalid docs input %#v: %#v", args, got)
 		}
 		if _, ok := docToolPayload(t, got)["documents"]; ok {
@@ -167,15 +153,15 @@ func TestDocsViaRealMCPProtocolNoSkill(t *testing.T) {
 		}
 	}
 	unknown := call("kgos_query", map[string]any{"code": "return typeof docs"})
-	if unknown.IsError || docToolPayload(t, unknown)["result"] != "undefined" {
+	if toolData(t, unknown) != "undefined" {
 		t.Fatalf("old docs global still visible: %#v", unknown)
 	}
 	denied := call("kgos_query", map[string]any{"code": `return await evolution.branch.create({name:"unauthorized",from:"branch/main"})`})
-	if !denied.IsError || docToolPayload(t, denied)["code"] != "PERMISSION_DENIED" {
+	if toolErrorCode(t, denied) != "PERMISSION_DENIED" {
 		t.Fatal("read-only privilege regression")
 	}
 	missing := call("kgos_query", map[string]any{"code": "return await docs.read('index.md')"})
-	if !missing.IsError {
+	if toolErrorCode(t, missing) != "SCRIPT_ERROR" {
 		t.Fatal("old sandbox docs method unexpectedly available")
 	}
 }

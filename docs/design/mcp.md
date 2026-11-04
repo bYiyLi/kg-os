@@ -121,8 +121,8 @@ kgosd --root <workspace-root> --host <address> --port <port>
 
 ##### 从 ChatGPT 跳转到现有 Web
 
-1. ChatGPT 访问 `/mcp` 时可收到 HTTP 401 + `WWW-Authenticate: Bearer resource_metadata=...`；启用 issuer 后，`/.well-known/oauth-protected-resource` 与 `/.well-known/oauth-protected-resource<mcp-path>` 返回一致的资源 metadata，`/.well-known/oauth-authorization-server` 暴露真正实现的 Authorization Code、PKCE S256、`none` public-client 与 CIMD 能力。`resource`、`issuer` 与 `kgos:access` 一致绑定。授权与交换仍使用 `/oauth/authorize`、`/oauth/token`，由**同一 `kgosd` Go 进程**提供。
-2. `GET /oauth/authorize` 先完整校验 `response_type=code`、`client_id`、`redirect_uri`、`state`、`resource`、`scope`、`code_challenge` 与 `code_challenge_method=S256`；仅允许从 `https://chatgpt.com/oauth/client.json` 或 `https://chatgpt.com/oauth/<id>/client.json` 读取可信 CIMD，验证精确的 `client_id`、`redirect_uris` 和 `none` 声明，不接受任意 URL、开放 DCR 或未验证的回调。先验证后创建有界、短效、随机不可猜的**待授权请求**，其中保存验证过的 OAuth 参数，不生成 code。
+1. ChatGPT 访问 `/mcp` 时可收到 HTTP 401 + `WWW-Authenticate: Bearer resource_metadata=...`；启用 issuer 后，`/.well-known/oauth-protected-resource` 与 `/.well-known/oauth-protected-resource<mcp-path>` 返回一致的资源 metadata，`/.well-known/oauth-authorization-server` 暴露真正实现的 Authorization Code、PKCE S256、`none` / `private_key_jwt` 客户端认证与 CIMD 能力。`resource`、`issuer` 与 `kgos:access` 一致绑定。授权与交换仍使用 `/oauth/authorize`、`/oauth/token`，由**同一 `kgosd` Go 进程**提供。
+2. `GET /oauth/authorize` 先完整校验 `response_type=code`、`client_id`、`redirect_uri`、`state`、`resource`、`scope`、`code_challenge` 与 `code_challenge_method=S256`；仅允许从 `https://chatgpt.com/oauth/client.json` 或 `https://chatgpt.com/oauth/<id>/client.json` 读取可信 CIMD，验证精确的 `client_id`、`redirect_uris` 和支持的客户端认证声明，不接受任意 URL、开放 DCR 或未验证的回调。先验证后创建有界、短效、随机不可猜的**待授权请求**，其中保存验证过的 OAuth 参数，不生成 code。
 3. Go 返回 `303` 跳转到**已有 KG OS Web 应用**的同源入口 `/?mcp_authorization=<request_id>`；此 URL 只携带授权请求引用，不包含 Instance Token、OAuth code、`state`、PKCE verifier 或任意回调地址。Web 使用原有应用框架、主题及现有认证组件，在工作区上方显示**连接授权弹窗**，不得再由 Go 输出独立授权 HTML/第二个登录页。
 4. Web **已经登录**时直接显示授权弹窗；**尚未登录**时先使用 Web 自己的认证交互，成功后仍在同一个待授权请求中显示弹窗。无需第二次输入管理员 Token。MCP 不负责决定 Web 如何跨页面保存登录状态；如尚不能在此次跳转中复用登录状态，属于 Web 登录模块未满足集成前置，不允许 MCP 私自创建备用 Session 或要求再输入一个 MCP Token。
 5. 弹窗至少显示经过验证的客户端名称（无法取得可信名称时显示已验证 `client_id`）、当前 Instance/资源地址及**可读、可写**权限，并提供明确的「授权连接 / 拒绝」。不能由任意请求参数伪造客户端名称或权限，不能因登录成功、刷新或已授权过同名客户端而自动同意。
@@ -143,8 +143,8 @@ kgosd --root <workspace-root> --host <address> --port <port>
 ##### OAuth Token 生命周期与恢复
 
 - Go 继续使用随机高熵、**不透明**的 Access/Refresh Token，服务端仅持有摘要及 client/issuer/resource/scope/有效期关联；`/oauth/token` 必须检查单次 code、同一个 `client_id`、完全相同的 `redirect_uri`、`resource` 和 RFC 7636 `code_verifier` S256。Refresh Token 限时且轮换后旧值立即失效；Access Token 只接受指定 MCP audience/Scope。
-- 保留目前的有界进程内 OAuth 授权状态，不新增 OAuth 数据库、用户表或 Token 持久化：授权请求 5 分钟、Code 1 分钟、Access Token 1 小时、Refresh Token 30 天；`kgosd` 重启后旧 OAuth Token 失效，需要客户端重新走 OAuth，**Web 已登录的用户只需再次确认授权**。Instance 根凭证的生命周期仍由 Runtime 负责，OAuth 不主动修改 `auth.json`。
-- Web 退出登录仅终止 Web 自己的登录状态，**不自动撤销此前已经批准的 MCP OAuth Grant**；现有授权仍受 Token 到期、Refresh 轮换及 `kgosd` 重启失效约束。本 Phase 不扩展为连接管理/撤销页面或单独的 Grant 持久化系统。
+- OAuth 已批准授权、Code 和 Token 摘要持久化到 Runtime 管理的独立 `.kgos/mcp-oauth.db`，不进入 Knowledge Graph 或版本历史。授权请求仍为 5 分钟进程内状态，Code 1 分钟，Access Token 硬有效期 24 小时、`expires_in=86340`，保留 1 分钟提前刷新余量；已签发 Token 沿用持久化的原到期时间，不因升级自动延长。Refresh Token 每次成功轮换后滚动延长 30 天。普通重启和升级保留授权；根凭证指纹或 issuer/resource 改变使旧授权失效。旧内存版本首次升级需要重新连接一次。存储不可用禁止删库重建、匿名或内存降级；OAuth 返回 503，metadata、合法根 Bearer、API 和 Web 保持各自能力。
+- Web 退出登录仅终止 Web 自己的登录状态，**不自动撤销此前已经批准的 MCP OAuth Grant**；现有授权受闲置到期、Refresh 轮换、显式撤销和根凭证/issuer 绑定约束；普通重启保留授权。不扩展连接管理页面。
 - 所有授权查询/决定、Token 交换必须有体积/数量/时间限制；禁用跨源调用、缓存、开放跳转、重放和重复同意。`request_id` 即使被复制或泄露，也只能定位待授权请求，**不能绕过有效 Web 登录及显式同意**。除了经 TLS 保护的授权 code 回调，不把任何 Token/code 放进 Web URL、日志、错误或持久 UI 状态。MCP 未认证拒绝与 OAuth 错误保持最小且无秘密差异。
 
 本节**只拥有 MCP 授权请求、OAuth 协议、凭证隔离及与 Web 的接口合同**。Web 登录/Session、通用认证弹窗实现和前端登录生命周期属于 Web/Runtime owner；MCP 只消费其已认证状态并提供连接授权所需数据与动作。Phase 17 MCP 认证代码已通过本地 Web Session Handler 集成与浏览器模拟验收，Dev 正式 Docker 构建及只读自动验收通过，用户也确认真实 ChatGPT 重新授权成功；未执行的 GitHub CI / 完整隔离矩阵不能记为通过。Phase 17 `done` 是用户明确批准的关闭例外，不等于正式发布或生产就绪。
@@ -214,7 +214,7 @@ type DocsOutput = {
 };
 ```
 
-- 仅接受可选的 `paths` 数组，不同时提供 `path` 字符串、`mode` 或额外字段。输入 `{}`、`{"paths":[]}` 都等价于 `{"paths":["index.md"]}`，返回**一篇完整的**任务导航首页；显式非空数组按提交顺序返回全部指定文件，每篇提供准确虚拟 `path` 与完整 Markdown `content`。一个文件也使用数组，且始终返回同样的 `documents` 结构。Go MCP Tool 以一个 JSON 文本结果返回 `DocsOutput`，不再套 JavaScript 的 `{"result":...}` 外壳。
+- 仅接受可选的 `paths` 数组，不同时提供 `path` 字符串、`mode` 或额外字段。输入 `{}`、`{"paths":[]}` 都等价于 `{"paths":["index.md"]}`，返回**一篇完整的**任务导航首页；显式非空数组按提交顺序返回全部指定文件，每篇提供准确虚拟 `path` 与完整 Markdown `content`。一个文件也使用数组，且始终返回同样的 `documents` 结构。Go MCP Tool 把 `DocsOutput` 放入统一 envelope 的 data，同时提供结构化结果与文本 JSON。
 - **运行版本**：每次成功的 `kgos_docs` 调用均返回 `serverInfo.name="kgos"` 和 `serverInfo.version`，其值直接取当前 `kgosd` 进程的 `buildinfo.Version`，与服务端注册 MCP 初始化信息所用的版本真源相同。旧版 MCP 未提供此输出时，不得从 SDK 文档标题、源码版本、工具数量或 Plugin 版本推测其运行版本。这是现有文档 Tool 的附加只读输出，不增加参数、Tool、认证范围或对数据库的访问。**该字段不代表 ChatGPT Plugin 版本**；Plugin 版本的获取与匹配暂不纳入本次实现。
 - 非空 `paths` 长度为 `1..32`，仅接受大小写精确匹配构建期白名单的 POSIX 相对 `.md` 文件路径；拒绝重复、空字符串、非字符串、`null`、绝对路径、路径穿越、反斜杠、URL、query/fragment、未知路径和额外参数，返回不泄露宿主路径的 `INVALID_ARGUMENT`。不把无效输入降级成首页，不读取任意工作区文件、Instance 数据库、网络或 Secret。
 - **整批原子返回**：只要任一路径无效或读取失败，整个 Tool 调用失败，不能先返回前几篇；各文档按源文件完整返回，禁止裁剪、摘要或静默分页。**所有请求（包括默认首页）**的序列化 JSON 结果（含路径/包装）最多 **4 MiB UTF-8 bytes**，超限返回 `RESOURCE_ERROR`，引导调用方按目录拆分 `paths` 重新请求；复用现有数量级的静态资源预算，不新增用户配置项、持久缓存或全文检索引擎。认证和 MCP 请求超时/取消/并发边界沿用现有 `kgosd`。
@@ -274,13 +274,14 @@ type ScriptInput = {
 };
 
 type ScriptOutput = {
-  result: JsonValue; // 复用 @kgos/sdk 的 JSON-compatible 类型
+  code: "ok";
+  data: JsonValue; // 复用 @kgos/sdk 的 JSON-compatible 类型
 };
 ```
 
 - `code` 是**异步 JavaScript 函数体**，支持 `async / await`、普通函数、变量、分支、循环、数组 / 对象、`Map` / `Set` 计算、`Promise.all()` 与 `for await...of` 流式消费。无需 import、Client 初始化、Endpoint、Token 或单独配置，也不额外增加 `state / branch / format / dryRun` 等 Tool 参数。
 - Sandbox **直接提供四个顶层命名空间**：`ontology`、`object`、`graph`、`evolution`。使用 `await graph.query(...)`、`await evolution.branch.list()`；**没有 `kgos.`、`sdk.` 前缀或第二套简写别名**。方法的参数、结果、错误和 StateRef 继续属于 `@kgos/sdk` 及对应业务 owner；一次脚本内的不同 SDK read 不会自动绑定同一个 State，调用方应显式使用同一个 resolved Commit 进行跨操作一致读取。
-- `return` 是**唯一正式结果出口**，可返回 JSON-compatible 的对象、数组、字符串、数字、布尔值或 `null`，MCP 成功结果统一为 `{ result: <返回值> }`。返回 `undefined` / 未执行 `return`、函数、`BigInt`、非有限数字、循环引用或其它不能无损表达为 JSON 的值时明确报执行结果错误，不能静默转换成 `null`、`{}` 或删字段。不额外提供独立的 `console.log` 输出合同；需要返回调试信息时直接放进 `return`。
+- `return` 是**唯一正式结果出口**，可返回 JSON-compatible 的对象、数组、字符串、数字、布尔值或 `null`，MCP 成功结果统一为 `{ code: "ok", data: <返回值> }`。返回 `undefined` / 未执行 `return`、函数、`BigInt`、非有限数字、循环引用或其它不能无损表达为 JSON 的值时明确报执行结果错误，不能静默转换成 `null`、`{}` 或删字段。不额外提供独立的 `console.log` 输出合同；需要返回调试信息时直接放进 `return`。
 - 每次 Invocation 的 JS 全局变量独立且结束即丢弃，不创建跨调用 Session；知识库持久状态只存在于原有 KG OS API / 数据库中。
 
 例如只读脚本：
@@ -326,7 +327,7 @@ return { state, models: models.results, data: data.rows };
 
 - `kgos_mutate` 允许在一个脚本中按顺序或并发调用任意已开放的 SDK 操作，但**整个 JavaScript Invocation 不构成自动事务**；单次 Object / Ontology Patch 的 `baseState` / Branch CAS、Graph Execute 的真实 Cypher 提交及 Evolution / Merge 的 revision 校验继续按原合同执行。不会因为多个 SDK 调用写在一个 `code` 中就自动保证原子性，也不创建跨方法 transaction、staging、`dryRun`、自动回滚、补偿或写入重试。
 - 若第一条写入成功、后续写入失败，**已成功的写入不会被撤销**，整个未捕获异常的脚本返回错误。例如 `branch.create` 成功后 `tag.create` 失败，创建的 Branch 仍然存在；调用方可通过 `branch.list` / `tag.list` 等 API 核实。成功的 SDK 调用返回值可在脚本中由调用方自行保留，但 MCP 不会根据日志推断整个执行成功、已回滚或可以安全重放。
-- JS 语法 / 运行错误、SDK 错误和 Sandbox 超限 / 取消都与正常 `return` 区分，MCP 调用失败时使用 `isError: true` 和有界、无凭证的结构化错误信息。SDK 公共错误保留已有 `code/message` 与安全的 `details`；脚本自身错误不伪装成数据库公共错误，超限明确报 `RESOURCE_ERROR`，取消明确标记为取消。宿主异常堆栈、Token 或执行器内部细节不得进入模型结果。脚本自行 `try/catch` 并 `return` 的 JSON 属于调用方显式决定的成功结果，MCP 不隐式替它判定每条写入成功。
+- 全部 MCP Tool 使用下方统一结果合同。JS、SDK、资源、取消和可捕获内部异常是正常 MCP result 内的业务失败，不设置 `isError: true`。SDK 公共错误保留稳定的大写 `code/message/details`；脚本错误不伪装数据库错误。脚本自行 `try/catch` 并 `return` 的 JSON 是成功执行的数据，不隐式证明每条 SDK 操作成功。宿主堆栈、Token 和执行器私有细节不得进入结果。
 - **超时、取消、断线或通信失败后，已发出的写入可能完成，也可能尚未完成**；结果未知时不得报告“写入失败且无副作用”，也不得自动再次提交。使用既有 Branch Head、State、History、Tag 或 Merge Session 读取来确认真实结果，不增加额外的持久执行日志 / 操作状态库。
 
 例如：
@@ -342,6 +343,28 @@ return { created, branches: branches.items };
 ```
 
 上述脚本如果 `branch.create` 已经成功，而后续 `branch.list` 失败，工具返回错误，但 Branch 仍可能已存在；**一次 Tool 失败不等于本次脚本中的所有 SDK 操作都回滚**。
+
+## MCP 对外健壮性合同
+
+全部五个 AI Tool 与 app-only workspace Tool 共享结果：成功为 `{"code":"ok","data":<任意合法 JSON>}`，失败为 `{"code":"STATE_NOT_FOUND","message":"...","retryable":false,"details":{}}`。成功必须包含 `data`，允许 null；失败必须有安全 message 与明确 retryable，details 可省略且保持既有公共语义。query/mutate 的 data 直接是脚本 return 值，不再套旧的 result。其他 Tool 的原成功对象放入 data，workspace 为 `{"view":"workspace"}`，原 UI metadata 不变。
+
+同一 envelope 序列化一次，同时交付 structuredContent 与首个 TextContent JSON。最终序列化 CallToolResult 的默认总预算为 4 MiB，包含两份结果；超限返回 RESOURCE_ERROR，不截断数据。所有 Tool 发布对应输出 Schema；脚本 data 允许任意 JSON。已知 Tool 由统一注册入口完成参数解码、既有校验、panic 捕获、结果和一次性观测收尾；普通业务失败返回 Go error=nil，不设置 isError。未知 Tool、非法 JSON-RPC、HTTP 认证、Origin 和并发拒绝仍属于协议/传输层，不伪装业务成功。本次一次性切换全部内置消费者，不保留旧成功格式兼容层。
+
+默认 HTTP 执行/读取预算 30 秒，脚本预算 15 秒；网络写截止时间比执行预算晚固定 2 秒，保留慢正文/不读响应保护。服务端执行到期为 TIMEOUT，脚本自身预算为 RESOURCE_ERROR，客户端主动取消为 CANCELLED。客户端先断线时不保证错误送达。Tool 入口和 Graph stream producer goroutine 分别捕获 panic，输出安全 INTERNAL_ERROR 并完成一次清理。观测按真实 code 判断失败，不以 HTTP 200 或 isError=false 推断成功。
+
+kgos_mutate 的失败均 retryable=false，执行后的错误提示先前写入可能完成，需读取 State/History 核实，绝不自动重放脚本。只读 TIMEOUT/IO_ERROR 等明确暂时故障可标记 retryable=true；参数、脚本、资源和结果格式错误需调整请求。
+
+### OAuth 长期连接与刷新恢复
+
+metadata 广告 offline_access，接受 kgos:access 与 kgos:access offline_access，按实际获批 scope 返回，兼容旧 scope 且刷新不能扩权。issuer/resource 地址保持当前合同。OAuth 数据库仅存高熵凭证 SHA-256 摘要、Code/PKCE binding、client/issuer/resource/scope、family/generation、消费/撤销及到期状态，不保存原始 Token、Code 或 assertion。父目录 0700、数据库与 journal 文件 0600，普通 SQLite 不加载图扩展。Code 消费与签发、Refresh 验证/消费/新签发均事务原子化；失败不提前销毁有效凭证。
+
+现有可信 ChatGPT CIMD 继续支持 none，并新增 private_key_jwt；不开放任意 CIMD/DCR。用成熟 go-jose/v4 路径验证 RS256、可信 JWKS/kid、iss/sub/aud/exp/iat/jti，family 绑定认证方法并拒绝降级。CIMD/JWKS 新鲜期 5 分钟，临时获取失败最多使用 1 小时内已验证缓存，未知 kid 或无可信缓存不放行。缓存、重放记录、持久状态均有固定硬上限，容量不足报暂时不可用，不淘汰有效授权。
+
+已验证 private_key_jwt 客户端对同旧 refresh/client/resource 提供 30 秒进程内幂等窗口，返回同一 Token pair；完全相同 assertion/request 允许 10 秒重试，其他重放拒绝。命中前仍验证 family 未撤销且 generation 当前。none 保持严格一次性轮换，确认已消费 refresh 重用后撤销对应 family，不误伤其他 family。若 commit 后响应丢失且服务立即重启，内存幂等回执无法恢复，仍可能需重新授权；不为此落盘原始 Token。
+
+新增 RFC 7009 /oauth/revoke 并广告端点，复用客户端认证与 endpoint audience。所持 access/refresh（含已消费 refresh）可定位并事务撤销对应 family，清理其幂等缓存；未知、已过期或已撤销 Token 对外统一成功。撤销、刷新和幂等检查采用一致并发顺序，缓存不能复活授权。Web logout 不撤销 MCP family。
+
+无 Bearer 为 discovery 401，明确失效 Token 为带 error=invalid_token 的 401；存储或认证依赖暂时失败为 503，不发 invalid-token challenge。Token/revoke 暂时失败返回 503 server_error，不谎报 invalid_grant 或撤销成功。OAuth 关键结果仅记录 request ID 与固定原因，不记录 Token、Code、assertion 或原始错误。
 
 ## Markdown 阅读呈现规范
 
@@ -659,7 +682,7 @@ flowchart TD
 完整安装按以下依赖推进：
 
 1. 用户手动部署或指定已有 `kgosd`，完成初始化、真实 Embedding、持久化、公网 HTTPS 与认证验收。`[server].public_origin` 为最终安全根 Origin；有效实例不重新初始化，不要求无关的宿主权限。
-2. 用户在指定 ChatGPT 账户/Workspace 添加或复用基础 MCP 应用，按实际界面完成 OAuth、安装、启用及新会话只读调用验收。管理员 Token 只输入自己的 KG OS Web；CIMD/PKCE 不要求把 Token 当 client secret。服务重启使进程内 OAuth 凭证失效时重新授权原连接，不默认删除重建。
+2. 用户在指定 ChatGPT 账户/Workspace 添加或复用基础 MCP 应用，按实际界面完成 OAuth、安装、启用及新会话只读调用验收。管理员 Token 只输入自己的 KG OS Web；CIMD/PKCE 不要求把 Token 当 client secret。普通服务重启保留持久 OAuth 授权；仅凭证确实失效时恢复原连接，不默认删除重建。
 3. AI 确认已有应用与真实 app/connection ID、服务版本及对应官方资源；识别用户指定旧私人 Plugin 与旧版官方基线的差异，列出定制迁移、冲突、版本化名称及安装范围，并在制作前核对目标持久指令入口的容量与已有内容；不可观测时说明限制，不假定其他入口存在或具有全局效力。用户确认方案后执行。目标 Plugin ID、app ID 与 OAuth client_id 不混同；未知旧内容不视为没有定制。
 4. 每次制作新的私人 Plugin，不原地更新旧 Plugin；展示名包含官方版本号，同版再次制作增加修订序号，实际对象保持独立。复用验证过的应用连接，保留所选版本的全部官方 Skill 与引用资源，迁移用户定制；有冲突由用户选择，不以旧包整体覆盖新版。新版本失败保留旧版，创建结果未知先查状态，不盲目重复创建。
 5. 在新会话验证新 Plugin 的实际安装、MCP 调用、版本、Skill 与引用资源，提供同包完整全局引导词和目标 ChatGPT 的配置步骤。保留现有个人指令，冲突由用户决定；空间不足不压缩官方正文，由用户选择可承载全文的持久指令入口或解决已有内容冲突，无法保存则保留未配置状态。配置保存与普通任务行为分别检查，不以 Doctor 探测冒充自动生效。新版本验收后，用户可选择卸载旧 Plugin；已有明确授权直接执行，保留共享 app/MCP 连接，不扩大共享或公开范围。
@@ -752,7 +775,7 @@ Skill 入口只拥有 VLog 的记录准入、事件身份、证据与延续规�
 
 | 项目 | 实际检查 |
 | --- | --- |
-| **D0 · 版本检查** | 通过目标 MCP 的 `kgos_docs.serverInfo.version` 读取实际运行版本；初始化元数据若可见则可核对，并查询 `bYiyLi/kg-releases` 最新稳定 Release 推荐升级。暂不检查 ChatGPT Plugin 版本或判断 Plugin/MCP 版本匹配；无法获取运行版本时说明证据不足 |
+| **D0 · 版本检查** | 通过目标 MCP 的 `kgos_docs.data.serverInfo.version` 读取实际运行版本；初始化元数据若可见则可核对，并查询 `bYiyLi/kg-releases` 最新稳定 Release 推荐升级。暂不检查 ChatGPT Plugin 版本或判断 Plugin/MCP 版本匹配；无法获取运行版本时说明证据不足 |
 | **D1 · 全局引导词** | 检查当前会话开始时是否由宿主自动加载与安装发行版匹配的完整官方正文；初始化用户自定义指令、项目指令有效，不要求 `system` 角色；同版冻结资产是对照内容，后续从 Skill/MCP/文件/工具/聊天消息读到正文不算生效 |
 | **D2 · MCP 与 State** | 真实调用 `kgos_docs` 与 `kgos_query`，仅在默认 Branch 处于任务范围内时使用 `evolution.overview`，以 `evolution.get` 固定目标 State，再用 `ontology.read` 核对一致性、issues 和模型可读性；不能用默认 Branch 替代指定目标 |
 | **D3 · 官方 Skills** | 核对实际安装包中的官方 Skill、引用资源及 MCP 接口；同包四份可读 `SKILL.md` 的 `metadata.version` 应声明一致，旧版缺字段或宿主不可读时标注版本不可验证，不跨 Plugin 比较，也不与 MCP 运行版本强制相同。版本声明与资源可读不代表 Skill 自动选用，调用行为另看真实轨迹 |

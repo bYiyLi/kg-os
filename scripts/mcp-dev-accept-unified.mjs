@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+import { readMcpToolData as toolValue } from "./mcp-tool-result.mjs";
+
 // Host-side, read-only Dev acceptance. The unified kgosd image has NO Node.js
 // runtime; this test client executes on the OpenClaw host, never in the image.
 // Secrets stay in the protected Dev data tree; never print them or responses.
@@ -46,11 +48,6 @@ async function rpc(method, params = {}) {
   assert.ok(body?.result, "MCP response has no result: " + method);
   return body.result;
 }
-function toolValue(response) {
-  assert.notEqual(response?.isError, true, "MCP tool returned error");
-  assert.equal(response?.content?.[0]?.type, "text");
-  return JSON.parse(response.content[0].text);
-}
 async function probe(path, expected) {
   const response = await fetch(base + path, { signal: AbortSignal.timeout(10000) });
   assert.equal(response.status, expected, "unexpected HTTP status: " + path);
@@ -66,19 +63,31 @@ assert.match(
   unauthenticated.headers.get("www-authenticate") ?? "",
   /oauth-protected-resource\/mcp/
 );
+assert.doesNotMatch(unauthenticated.headers.get("www-authenticate") ?? "", /invalid_token/);
 await unauthenticated.body?.cancel();
+const invalidToken = await fetch(mcpURL, {
+  headers: { Authorization: "Bearer invalid-oauth-access-token" },
+  signal: AbortSignal.timeout(10000)
+});
+assert.equal(invalidToken.status, 401);
+assert.match(invalidToken.headers.get("www-authenticate") ?? "", /error="invalid_token"/);
+await invalidToken.body?.cancel();
 
 const protectedResource = await (
   await probe("/.well-known/oauth-protected-resource/mcp", 200)
 ).json();
 assert.equal(protectedResource.resource, issuer);
 assert.deepEqual(protectedResource.authorization_servers, [issuer]);
+assert.ok(protectedResource.scopes_supported?.includes("offline_access"));
 const metadata = await (await probe("/.well-known/oauth-authorization-server", 200)).json();
 assert.equal(metadata.issuer, issuer);
 assert.equal(metadata.authorization_endpoint, issuer + "/oauth/authorize");
 assert.equal(metadata.token_endpoint, issuer + "/oauth/token");
+assert.equal(metadata.revocation_endpoint, issuer + "/oauth/revoke");
 assert.ok(metadata.code_challenge_methods_supported?.includes("S256"));
 assert.ok(metadata.token_endpoint_auth_methods_supported?.includes("none"));
+assert.ok(metadata.token_endpoint_auth_methods_supported?.includes("private_key_jwt"));
+assert.ok(metadata.scopes_supported?.includes("offline_access"));
 assert.equal(metadata.client_id_metadata_document_supported, true);
 
 const api = (credential) =>
@@ -149,6 +158,9 @@ if (hasWorkspace) {
     { type: "global" },
     { type: "thread" }
   ]);
+  assert.deepEqual(toolValue(await rpc("tools/call", { name: "kgos_workspace", arguments: {} })), {
+    view: "workspace"
+  });
   const resources = (await rpc("resources/list")).resources;
   assert.equal(
     resources.find((resource) => resource.uri === workspaceURI)?.mimeType,
@@ -181,17 +193,13 @@ assert.deepEqual(
 );
 const preview = await readTool("kgos_ontology_overview", { limit: 100 });
 assert.ok(preview.preview?.length > 0 && preview.viewRevision);
-const state = (
-  await readTool("kgos_query", {
-    code: "return (await evolution.overview()).state;"
-  })
-).result;
+const state = await readTool("kgos_query", {
+  code: "return (await evolution.overview()).state;"
+});
 assert.ok(typeof state === "string" && state.startsWith("commit/"));
-const branches = (
-  await readTool("kgos_query", {
-    code: "return (await evolution.branch.list()).items.map(x => x.name);"
-  })
-).result;
+const branches = await readTool("kgos_query", {
+  code: "return (await evolution.branch.list()).items.map(x => x.name);"
+});
 assert.ok(Array.isArray(branches) && branches.length > 0);
 const ancestry = await readTool("kgos_commit_ancestry", { root: state });
 assert.ok(Number.isInteger(ancestry.count) && ancestry.count > 0);

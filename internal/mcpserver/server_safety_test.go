@@ -92,7 +92,7 @@ func TestMCPToolErrorMappingKeepsPublicContract(t *testing.T) {
 	}
 	for _, tc := range tests {
 		result, err := toolResult(nil, tc.err)
-		if err != nil || result == nil || !result.IsError || len(result.Content) != 1 {
+		if err != nil || result == nil || result.IsError || len(result.Content) != 1 {
 			t.Fatalf("unexpected tool error %#v %v", result, err)
 		}
 		textContent, ok := result.Content[0].(*mcp.TextContent)
@@ -106,6 +106,7 @@ func TestMCPToolErrorMappingKeepsPublicContract(t *testing.T) {
 		if body["code"] != tc.code {
 			t.Errorf("expected error code %s: %#v", tc.code, body)
 		}
+		toolEnvelope(t, result)
 		if tc.public && body["details"] == nil {
 			t.Errorf("public error details lost: %#v", body)
 		}
@@ -124,7 +125,7 @@ func TestMCPToolErrorMappingKeepsPublicContract(t *testing.T) {
 		t.Fatal("expected one JSON response")
 	}
 	invalid, err := toolResult(func() {}, nil)
-	if err != nil || !invalid.IsError {
+	if err != nil || invalid.IsError || toolErrorCode(t, invalid) != "INTERNAL_ERROR" {
 		t.Fatal("non-JSON tool result was not reported as error")
 	}
 }
