@@ -116,8 +116,9 @@ test("G6 drag moves the node with elastic neighbor response and no automatic pin
     await search.fill("needle");
     await search.press("Enter");
     await expect(page.locator('.graph-route-status [data-status="ok"]')).toHaveCount(4);
+    // Match the other drag scenario's initialization window under full-suite load.
     await expect(page.locator(".graph-scene")).toHaveAttribute("data-ready", "true", {
-      timeout: 15_000
+      timeout: 20_000
     });
     await expect.poll(() => page.locator(".graph-scene canvas").count()).toBeGreaterThan(0);
     const target = page.locator('[data-node-id="' + runtime.targetId + '"]');

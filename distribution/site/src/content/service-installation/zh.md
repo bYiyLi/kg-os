@@ -485,7 +485,7 @@ diff -u acceptance-before.json acceptance-after.json
 5. 阅读授权风险与工具权限，仅在接受后勾选 **I understand and want to continue**，再选择 **Create as a plugin**。按页面提示完成 OAuth；确认跳转域名是你自己的 KG OS，必要时在该站点用管理员 Token 登录，核对并同意 ChatGPT 的连接请求。
 6. 检查服务实际发现的工具和名称，安装生成的基础 Plugin。新建会话，在输入框键入 **@** 并选择它。
 
-KG OS 当前连接权限包含读写；安装验收只执行只读调用，后续写入仍需你的授权。管理员 Token 只在自己的可信 KG OS Web 页面输入，不能放进 ChatGPT 的 client secret、安装提示词或聊天。服务重启后 OAuth Access/Refresh Token 会失效；在**原连接**重新授权即可，管理员身份和知识库仍保留。不要因此删除应用或重新初始化。
+KG OS 当前连接权限包含读写；安装验收只执行只读调用，后续写入仍需你的授权。管理员 Token 只在自己的可信 KG OS Web 页面输入，不能放进 ChatGPT 的 client secret、安装提示词或聊天。当前版本的 OAuth 授权保存在实例私有数据库中：同一实例、根 Token 与公网地址未变时，正常重启不会让有效授权失效。Access Token 有效期为 24 小时，Refresh Token 在持续使用时滚动保持 30 天有效。**从旧版内存授权机制首次升级**需要在**原连接**重新授权一次；授权过期、撤销、根 Token 更换或服务地址变更时也需要重新授权。保留原应用、管理员身份和知识库，不重新初始化。
 
 ### 在目标 ChatGPT 会话实际验证
 
@@ -685,7 +685,7 @@ diff -u acceptance-before-upgrade.json acceptance-upgrade.json
 
 核对实际镜像为所选 Tag/digest，按第 6 步检查 HTTPS、原管理员 Token、现有内容、State 和身份。兼容说明允许改变的元数据须按该版本说明判断，不能将差异一概当成功或据此重置。重复第 4 步的同网络真实 Embedding 检查；该检查同时支持 Web 与配置文件初始化，不为验收新增业务数据。模型或凭证问题按原初始化路径诊断，不重新初始化。
 
-重启会使旧 OAuth Token 失效：在原 ChatGPT 连接重新授权，按第 7 步重做只读验收。工具元数据变化时刷新原连接并在新会话检查。服务通过后，切换到**升级目标版本**的 KGHub 手册，按该版 ChatGPT 与私人 Plugin 步骤读取旧定制、确认迁移方案、创建新版本并验收；交接提示词、`INSTALL.md`、四个 Skill 和 Plugin 资源都必须对应目标版本，不继续复制本旧版第 8 步的固定版本提示词。再由你选择卸载旧版；不原地替换旧 Plugin，不删除共享连接。
+旧版内存 OAuth Token 无法迁移，**首次升级**请在原 ChatGPT 连接重新授权一次；之后正常重启应保留有效授权，不需要每次重复授权。按第 7 步重做只读验收；工具元数据变化时刷新原连接并在新会话检查。服务通过后，切换到**升级目标版本**的 KGHub 手册，按该版 ChatGPT 与私人 Plugin 步骤读取旧定制、确认迁移方案、创建新版本并验收；交接提示词、`INSTALL.md`、四个 Skill 和 Plugin 资源都必须对应目标版本，不继续复制本旧版第 8 步的固定版本提示词。再由你选择卸载旧版；不原地替换旧 Plugin，不删除共享连接。
 
 <a id="upgrade-recovery"></a>
 
@@ -808,7 +808,7 @@ diff -u acceptance-before-upgrade.json acceptance-upgrade.json
 | 证书失败或公网不可达                     | 核对 DNS A/AAAA、NAT、80/443、安全组及 Caddy 日志。先修网络与证书，不跳过 TLS 检查，也不把未初始化服务暴露出去                                                                               |
 | OAuth 地址不正确                         | 核对实例内 `[server].public_origin`，按下方受控配置编辑步骤修正为实际根 Origin，重启服务后重新检查元数据                                                                                     |
 | ChatGPT 缺少自定义 MCP 或 Plugin Creator | 核对当前账户、Workspace 与管理员策略，由你选择申请权限、使用另一个获准账户或先只完成服务；不自动切换账户或谎报完整安装                                                                       |
-| ChatGPT OAuth 失败或重启后失去授权       | 确认 HTTPS、`public_origin` 与元数据，再在原连接中重新授权。管理员 Token 只输入自己的 KG OS 页面；不删除应用或重新建库                                                                       |
+| ChatGPT OAuth 失败、过期或旧版升级后需重新授权       | 确认 HTTPS、`public_origin` 与元数据，再在原连接中重新授权。管理员 Token 只输入自己的 KG OS 页面；不删除应用或重新建库                                                                       |
 | ChatGPT 没有 KG OS 工具                  | 确认基础 Plugin 已安装且在新会话中通过 `@` 选中；必要时刷新原连接元数据。工具发现、授权和业务读取分别检查                                                                                    |
 | 新私人 Plugin 制作或验收失败             | 保留旧版与共享连接，查明本次创建结果和失败项后恢复；不要重复创建未知结果，不先卸载旧版                                                                                                       |
 | 升级失败                                 | 停止写入与失败服务，保留现场及停服前备份，按[升级恢复](#upgrade-recovery)选择修复或恢复；不删除数据重新安装                                                                                  |
