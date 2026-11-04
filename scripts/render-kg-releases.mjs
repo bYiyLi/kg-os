@@ -19,6 +19,9 @@ const generatedFiles = [
   "LICENSE",
   "COMMERCIAL-LICENSE.md",
   "scripts/render-release-installation.mjs",
+  "scripts/ci-report.mjs",
+  "scripts/release-candidate.mjs",
+  "scripts/release-delivery.mjs",
   "plugins/kgos/plugin.json",
   "plugins/kgos/.app.json.example"
 ];

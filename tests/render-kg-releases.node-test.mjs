@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join, posix } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { packPlugin } from "../distribution/scripts/release-candidate.mjs";
+import { assetPlan, releasePlan } from "../distribution/scripts/release-delivery.mjs";
 import { render, stampSkillVersion } from "../scripts/render-kg-releases.mjs";
 import {
   renderInstallationGuide,
@@ -668,29 +670,7 @@ test("stable Plugin archive embeds the matching rendered installer and all relea
         stampSkillVersion(await readFile(join(root, path), "utf8"), manifest.version)
       );
     }
-    const workflow = await readFile(join(directory, ".github/workflows/release.yml"), "utf8");
-    assert.ok(
-      workflow.indexOf("      - name: Render versioned installation") <
-        workflow.indexOf("      - name: Package complete")
-    );
-    assert.ok(
-      workflow.indexOf("      - name: Verify anonymous pull") <
-        workflow.indexOf("      - name: Render versioned installation")
-    );
-    const step = workflow
-      .split("      - name: Package complete official Plugin and Skills\n")[1]
-      .split("      - name:")[0];
-    const shell = step
-      .split("        run: |\n")[1]
-      .split("\n")
-      .map((line) => (line.startsWith("          ") ? line.slice(10) : line))
-      .join("\n");
-    const result = spawnSync("bash", ["-c", shell], {
-      cwd: directory,
-      encoding: "utf8",
-      env: { ...process.env, TAG: tag, STABLE_RELEASE: "true", RUNNER_TEMP: output }
-    });
-    assert.equal(result.status, 0, result.stdout + result.stderr);
+    await packPlugin(directory, output, manifest.version, digestRef.split("@")[1]);
     assert.equal(
       execFileSync("unzip", ["-p", join(output, `kgos-plugin-${tag}.zip`), "INSTALL.md"], {
         encoding: "utf8"
@@ -710,22 +690,6 @@ test("stable Plugin archive embeds the matching rendered installer and all relea
       assert.equal(archived, await readFile(join(directory, "plugins/kgos", path), "utf8"));
       assert.match(archived, /metadata:\n {2}version: "0\.3\.1"\n---/);
     }
-    const guideStep = workflow
-      .split(
-        "      - name: Render versioned installation guides using the verified image digest\n"
-      )[1]
-      .split("      - name:")[0];
-    const guideShell = guideStep
-      .split("        run: |\n")[1]
-      .split("\n")
-      .map((line) => (line.startsWith("          ") ? line.slice(10) : line))
-      .join("\n");
-    const guides = spawnSync("bash", ["-c", guideShell], {
-      cwd: directory,
-      encoding: "utf8",
-      env: { ...process.env, TAG: tag, DIGEST_REF: digestRef, RUNNER_TEMP: output }
-    });
-    assert.equal(guides.status, 0, guides.stdout + guides.stderr);
     const checksums = await readFile(join(output, `kgos-install-${tag}.sha256`), "utf8");
     assert.equal(checksums.trim().split("\n").length, 3);
     for (const name of [
@@ -751,110 +715,38 @@ test("stable Plugin archive embeds the matching rendered installer and all relea
   }
 });
 
-test("release publishing classifies stable and preview tags and rejects inconsistent recovery", async () => {
-  const workflow = await readFile(join(root, "distribution/.github/workflows/release.yml"), "utf8");
-  const publish = workflow.split("      - name: Publish public GitHub Release\n")[1];
-  assert.ok(publish, "The actual publish step must be exercised");
-  const shell = publish
-    .split("        run: |\n")[1]
-    .split("\n")
-    .map((line) => (line.startsWith("          ") ? line.slice(10) : line))
-    .join("\n");
-  const digestRef = `ghcr.io/byiyli/kgos@sha256:${"a".repeat(64)}`;
-  async function scenario({
-    stable,
-    exists = false,
-    isPrerelease = !stable,
-    body = `${revision} ${digestRef}`
-  }) {
-    const directory = await mkdtemp(join(tmpdir(), "kg-release-offline-publish-"));
-    const tag = stable ? "v0.3.1" : "v0.3.1-rc.1";
-    try {
-      await writeFile(
-        join(directory, "gh"),
-        `#!${process.execPath}
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-fs.appendFileSync(process.env.FIXTURE_CALLS, JSON.stringify(args) + '\\n');
-if (args[0] !== 'release') process.exit(21);
-if (args[1] === 'view') {
-  if (process.env.FIXTURE_EXISTS !== 'true') process.exit(1);
-  const field = args[args.indexOf('--json') + 1];
-  if (field === 'body') process.stdout.write(process.env.FIXTURE_BODY);
-  if (field === 'isPrerelease') process.stdout.write(process.env.FIXTURE_PRERELEASE);
-} else if (args[1] === 'create') {
-  const notes = args[args.indexOf('--notes-file') + 1];
-  if (!fs.existsSync(notes)) process.exit(22);
-} else if (args[1] === 'upload') {
-  for (const file of args.filter((arg) => arg.startsWith(process.env.RUNNER_TEMP + '/'))) {
-    if (!fs.existsSync(file)) process.exit(23);
-  }
-} else process.exit(24);
-`,
-        { mode: 0o755 }
+test("release recovery classifies previews and refuses mismatched or extra assets", () => {
+  for (const version of ["0.3.1", "0.3.1-rc.1"]) {
+    const candidate = { version, revision, image: { digest: `sha256:${"a".repeat(64)}` } };
+    const hash = "b".repeat(64);
+    const body = `Private source commit SHA: ${revision}\nVerified digest: ghcr.io/byiyli/kgos@${candidate.image.digest}\nCandidate SHA256: ${hash}`;
+    const release = { body, prerelease: version.includes("-") };
+    assert.equal(releasePlan(null, candidate, hash), "create");
+    assert.equal(releasePlan(release, candidate, hash), "resume");
+    assert.throws(
+      () => releasePlan({ ...release, prerelease: !release.prerelease }, candidate, hash),
+      /CLASSIFICATION/
+    );
+    for (const changed of [
+      body.replace(revision, "wrong-source"),
+      body.replace(candidate.image.digest, "wrong-digest"),
+      body.replace(hash, "wrong-candidate")
+    ]) {
+      assert.throws(
+        () => releasePlan({ ...release, body: changed }, candidate, hash),
+        /PROVENANCE/
       );
-      await writeFile(join(directory, `kgos-plugin-${tag}.zip`), "fixture");
-      if (stable) {
-        for (const name of [
-          `kgos-install-zh-${tag}.md`,
-          `kgos-install-en-${tag}.md`,
-          `kgos-INSTALL-${tag}.md`,
-          `kgos-install-${tag}.sha256`
-        ]) {
-          await writeFile(join(directory, name), "fixture");
-        }
-      }
-      const callsPath = join(directory, "calls.jsonl");
-      const result = spawnSync("bash", ["-c", shell], {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          PATH: `${directory}:${process.env.PATH}`,
-          RUNNER_TEMP: directory,
-          TAG: tag,
-          STABLE_RELEASE: String(stable),
-          REVISION: revision,
-          DIGEST_REF: digestRef,
-          IMAGE: `ghcr.io/byiyli/kgos:${tag}`,
-          GITHUB_REPOSITORY: "offline/fixture",
-          GITHUB_SHA: revision,
-          FIXTURE_CALLS: callsPath,
-          FIXTURE_EXISTS: String(exists),
-          FIXTURE_PRERELEASE: String(isPrerelease),
-          FIXTURE_BODY: body
-        }
-      });
-      const calls = (await readFile(callsPath, "utf8"))
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line));
-      return { ...result, calls };
-    } finally {
-      await rm(directory, { recursive: true, force: true });
     }
   }
-  for (const stable of [true, false]) {
-    const created = await scenario({ stable });
-    assert.equal(created.status, 0, created.stdout + created.stderr);
-    const create = created.calls.find((args) => args[1] === "create");
-    assert.ok(create);
-    assert.equal(create.includes("--prerelease"), !stable);
-    assert.equal(create.includes("--latest=false"), !stable);
-    assert.equal(created.calls.filter((args) => args[1] === "upload").length, stable ? 2 : 1);
-    const resumed = await scenario({ stable, exists: true });
-    assert.equal(resumed.status, 0, resumed.stdout + resumed.stderr);
-    assert.ok(!resumed.calls.some((args) => args[1] === "create"));
-    const mismatch = await scenario({ stable, exists: true, isPrerelease: stable });
-    assert.notEqual(mismatch.status, 0);
-    assert.match(mismatch.stdout, /classification differs/);
-    assert.ok(!mismatch.calls.some((args) => ["create", "edit", "upload"].includes(args[1])));
-  }
-  for (const body of [`wrong-source ${digestRef}`, `${revision} wrong-digest`]) {
-    const mismatch = await scenario({ stable: true, exists: true, body });
-    assert.notEqual(mismatch.status, 0);
-    assert.match(mismatch.stdout, /verified source or digest/);
-    assert.ok(!mismatch.calls.some((args) => ["create", "edit", "upload"].includes(args[1])));
-  }
+  const expected = { "plugin.zip": "a", "guide.md": "b" };
+  assert.deepEqual(assetPlan([], expected), ["plugin.zip", "guide.md"]);
+  assert.deepEqual(assetPlan([{ name: "plugin.zip" }], expected), ["guide.md"]);
+  assert.deepEqual(assetPlan([{ name: "plugin.zip" }, { name: "guide.md" }], expected), []);
+  assert.throws(() => assetPlan([{ name: "extra" }], expected), /CONFLICT/);
+  assert.throws(
+    () => assetPlan([{ name: "plugin.zip" }, { name: "plugin.zip" }], expected),
+    /CONFLICT/
+  );
 });
 
 test("rejects untrusted refs, mismatched revisions and unexpected public files", async () => {
