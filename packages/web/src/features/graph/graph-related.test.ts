@@ -98,6 +98,27 @@ it("does not count a parallel edge as an independent relevance vote", async () =
   expect(result.data.relationships.map((item) => item.id)).toEqual(["r:10", "r:11"]);
 });
 
+it("keeps a real self-loop without revisiting an already accepted search seed", async () => {
+  const run = vi.fn(async () => {
+    await Promise.resolve();
+    return [[node(1), edge(10, 1, 1), node(1), 0]];
+  });
+  const result = await enrichRelatedKnowledge({
+    state,
+    seeds,
+    signal: new AbortController().signal,
+    run,
+    connect: async () => {
+      await Promise.resolve();
+      return emptyGraph();
+    }
+  });
+  expect(result.failed).toBe(false);
+  expect(result.data.nodes.map((item) => item.id)).toEqual(["n:1"]);
+  expect(result.data.relationships.map((item) => item.id)).toEqual(["r:10"]);
+  expect(run).toHaveBeenCalledOnce();
+});
+
 it("rejects an out-of-range rank without accepting fabricated neighbors", async () => {
   const result = await enrichRelatedKnowledge({
     state,

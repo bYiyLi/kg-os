@@ -160,3 +160,69 @@ it("keeps stable angular ordering when the graph rows are reordered", () => {
   expect(original).toEqual(reversed);
   expect(focusLayerPositions(graph, new Map(), "n:1", new Set())).toEqual(new Map());
 });
+
+it("chooses an existing anchor deterministically and ignores unconnected discoveries", () => {
+  const graph = data([1, 2, 3, 4], [link(1, 3, 1), link(2, 2, 3)]);
+  const previous = new Map([
+    ["n:1", { x: -500, y: 80 }],
+    ["n:2", { x: 500, y: -80 }]
+  ]);
+  const tie = radialNeighborPositions(graph, previous, new Set());
+  expect(tie.has("n:3")).toBe(true);
+  expect(tie.has("n:4")).toBe(false);
+  expect(Math.hypot((tie.get("n:3")?.x ?? NaN) + 500, (tie.get("n:3")?.y ?? NaN) - 80)).toBeCloseTo(
+    220,
+    4
+  );
+  const expanded = radialNeighborPositions(graph, previous, new Set(["n:2"]));
+  expect(
+    Math.hypot((expanded.get("n:3")?.x ?? NaN) - 500, (expanded.get("n:3")?.y ?? NaN) + 80)
+  ).toBeCloseTo(220, 4);
+});
+
+it("rejects a nonfinite focus center before assigning any reachable coordinates", () => {
+  const graph = data([1, 2], [link(1, 1, 2)]);
+  for (const invalid of [NaN, Infinity, -Infinity]) {
+    expect(
+      focusLayerPositions(
+        graph,
+        new Map([
+          ["n:1", { x: 20, y: invalid }],
+          ["n:2", { x: 100, y: 200 }]
+        ]),
+        "n:1",
+        new Set()
+      )
+    ).toEqual(new Map());
+  }
+});
+
+it("keeps reachable outer-hop positions when an intermediate hop is not yet visible", () => {
+  const graph = data([1, 2, 3, 4], [link(1, 1, 2), link(2, 2, 3), link(3, 3, 4)]);
+  const previous = new Map([
+    ["n:1", { x: 0, y: 0 }],
+    ["n:2", { x: 250, y: 0 }],
+    ["n:4", { x: 720, y: 0 }]
+  ]);
+  const planned = focusLayerPositions(graph, previous, "n:1", new Set(["n:2"]));
+  expect(planned.has("n:2")).toBe(false);
+  expect(planned.has("n:3")).toBe(false);
+  expect(Math.hypot(planned.get("n:4")?.x ?? NaN, planned.get("n:4")?.y ?? NaN)).toBeCloseTo(
+    514,
+    3
+  );
+  expect(previous.get("n:4")).toEqual({ x: 720, y: 0 });
+});
+
+it("moves no pinned neighbors while keeping the center and unrelated nodes fixed", () => {
+  const graph = data([1, 2, 3, 4], [link(1, 1, 2), link(2, 1, 3)]);
+  const previous = new Map([
+    ["n:1", { x: 0, y: 0 }],
+    ["n:2", { x: 200, y: 0 }],
+    ["n:3", { x: -200, y: 0 }],
+    ["n:4", { x: 0, y: 500 }]
+  ]);
+  const pins = new Set(["n:2", "n:3"]);
+  expect(focusLayerPositions(graph, previous, "n:1", pins)).toEqual(new Map());
+  expect(previous.get("n:4")).toEqual({ x: 0, y: 500 });
+});

@@ -8,6 +8,7 @@ import {
   radialMotionEnvelope
 } from "./graph-g6-focus-motion.js";
 import { FakeG6Graph } from "./graph-g6-test-double.js";
+import { focusLayerPositions } from "./graph-radial-placement.js";
 
 const model: GraphData = {
   nodes: [
@@ -190,5 +191,66 @@ it("cancels if the graph was destroyed and tolerates rejected draw promises", as
   t.motion.focus(model, "n:1", new Set());
   await t.frame(170);
   expect(t.motion.activeFocusId).toBe("n:1");
+  t.motion.stop();
+});
+
+it("does not leave an animation running when all reachable neighbors are pinned", async () => {
+  const t = motionHarness();
+  t.motion.focus(model, "n:1", new Set(["n:2", "n:3"]));
+  await t.frame(0);
+  expect(t.frames.size).toBe(1);
+  t.motion.release();
+  await t.frame(35);
+  expect(t.motion.activeFocusId).toBeNull();
+  expect(t.frames.size).toBe(0);
+});
+
+it("skips settled targets and removed nodes without inventing positions", async () => {
+  const t = motionHarness();
+  t.motion.focus(model, "n:1", new Set());
+  const initial = new Map([
+    ["n:1", { x: 0, y: 0 }],
+    ["n:2", { x: 20, y: 0 }],
+    ["n:3", { x: 30, y: 0 }],
+    ["n:4", { x: 700, y: 700 }]
+  ]);
+  const targets = focusLayerPositions(model, initial, "n:1", new Set());
+  const two = targets.get("n:2") ?? { x: Number.NaN, y: Number.NaN };
+  expect(Number.isFinite(two.x)).toBe(true);
+  expect(Number.isFinite(two.y)).toBe(true);
+  t.graph.updateNodeData([{ id: "n:2", style: two }]);
+  t.graph.data.nodes = (t.graph.data.nodes ?? []).filter((node) => node.id !== "n:3");
+  await t.frame(120);
+  expect(t.position("n:2")).toEqual([two.x, two.y]);
+  expect(t.frames.size).toBe(0);
+});
+
+it("does not reschedule continuous frames with reduced motion enabled", async () => {
+  const t = motionHarness();
+  t.motion.focus(model, "n:1", new Set(), true);
+  await t.frame(0);
+  expect(t.graph.calls).toContain("draw");
+  expect(t.frames.size).toBe(0);
+  t.motion.release();
+  expect(t.motion.activeFocusId).toBeNull();
+});
+
+it("never loses a newly focused graph when a previous draw completes late", async () => {
+  const t = motionHarness();
+  let finishDraw!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    finishDraw = resolve;
+  });
+  t.graph.draw = vi.fn(() => waiting);
+  t.motion.focus(model, "n:1", new Set());
+  await t.frame(120);
+  expect(t.frames.size).toBe(0);
+  t.motion.focus(model, "n:1", new Set(["n:2"]));
+  expect(t.motion.activeFocusId).toBe("n:1");
+  finishDraw();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(t.frames.size).toBe(1);
   t.motion.stop();
 });
