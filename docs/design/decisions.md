@@ -1282,7 +1282,6 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **失败与取舍**：临时认证后端失败用 503，凭证明确失效才用 invalid_token；请求执行结束后保留 2 秒写响应余量。持久化增加独立认证状态及一个成熟 JWT 验证依赖，换取跨重启授权与安全刷新恢复；首次升级旧内存凭证需重连，commit 后响应丢失且立即重启仍不能恢复内存幂等回执。任何中断写入需核对真实 State，不自动重放或承诺回滚。
 - **职责与验证**：运行行为唯一真源为 [MCP](mcp.md#mcp-对外健壮性合同)，运行文件归 [Runtime](runtime.md#持久-mcp-oauth-授权)，阶段交付与实际证据归 [Phase 34](../development/phases/34-mcp-resilience.md)。本次格式切换同步内置 Web、脚本与文档，不增加旧格式兼容层；本地、隔离 Docker、远程 CI、真实 Host、提交、发布和部署分别取证。
 
-
 <a id="d125-unified-eight-skill-plugin"></a>
 
 ## D125：统一仓库管理八项专业 Skill（2026-11-05）

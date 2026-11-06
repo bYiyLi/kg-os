@@ -63,7 +63,7 @@
 ## 2026-10-21 七 Skill 原始计划与实施证据（历史）
 
 以下保留 D107 时期的七 Skill 计划、验收与执行记录作为历史依据；不作为当前八 Skill 的验收证明。
-<!-- cspell:words mcpserver -->
+<!-- cspell:words mcpserver testdata -->
 
 ## 目标与当前状态
 
