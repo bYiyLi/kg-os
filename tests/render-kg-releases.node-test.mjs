@@ -17,6 +17,53 @@ import {
   installationSnapshotFiles
 } from "../scripts/render-release-installation.mjs";
 
+const officialSkillNames = [
+  "design-ontology",
+  "kgos-doctor",
+  "kgos-ontology-implementation",
+  "kgos-organize-knowledge",
+  "kgos-record-vlog",
+  "kgos-retrieve-knowledge",
+  "kgos-review-knowledge",
+  "kgos-review-ontology"
+];
+const officialSkillFiles = [
+  "plugins/kgos/skills/design-ontology/SKILL.md",
+  "plugins/kgos/skills/design-ontology/assets/ontology-definition.md",
+  "plugins/kgos/skills/design-ontology/assets/user-confirmation.md",
+  "plugins/kgos/skills/design-ontology/references/bfo.md",
+  "plugins/kgos/skills/design-ontology/references/dolce.md",
+  "plugins/kgos/skills/design-ontology/references/gfo.md",
+  "plugins/kgos/skills/design-ontology/references/sumo.md",
+  "plugins/kgos/skills/design-ontology/references/ufo.md",
+  "plugins/kgos/skills/kgos-doctor/SKILL.md",
+  "plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md",
+  "plugins/kgos/skills/kgos-ontology-implementation/SKILL.md",
+  "plugins/kgos/skills/kgos-ontology-implementation/assets/ontology-definition.md",
+  "plugins/kgos/skills/kgos-ontology-implementation/references/kgos-conversion-rules.md",
+  "plugins/kgos/skills/kgos-organize-knowledge/SKILL.md",
+  "plugins/kgos/skills/kgos-organize-knowledge/references/examples/claim-threshold.md",
+  "plugins/kgos/skills/kgos-organize-knowledge/references/knowledge-conversion.md",
+  "plugins/kgos/skills/kgos-organize-knowledge/references/knowledge-persistence.md",
+  "plugins/kgos/skills/kgos-organize-knowledge/references/knowledge-quality-check.md",
+  "plugins/kgos/skills/kgos-record-vlog/SKILL.md",
+  "plugins/kgos/skills/kgos-record-vlog/references/cypher.md",
+  "plugins/kgos/skills/kgos-record-vlog/references/ontology.md",
+  "plugins/kgos/skills/kgos-retrieve-knowledge/SKILL.md",
+  "plugins/kgos/skills/kgos-retrieve-knowledge/references/retrieval-examples.md",
+  "plugins/kgos/skills/kgos-review-knowledge/SKILL.md",
+  "plugins/kgos/skills/kgos-review-knowledge/assets/knowledge-review-report.md",
+  "plugins/kgos/skills/kgos-review-knowledge/references/knowledge-quality-check.md",
+  "plugins/kgos/skills/kgos-review-ontology/SKILL.md",
+  "plugins/kgos/skills/kgos-review-ontology/assets/ontology-review-report.md",
+  "plugins/kgos/skills/kgos-review-ontology/references/bfo.md",
+  "plugins/kgos/skills/kgos-review-ontology/references/dolce.md",
+  "plugins/kgos/skills/kgos-review-ontology/references/gfo.md",
+  "plugins/kgos/skills/kgos-review-ontology/references/modeling-quality-checks.md",
+  "plugins/kgos/skills/kgos-review-ontology/references/sumo.md",
+  "plugins/kgos/skills/kgos-review-ontology/references/ufo.md"
+];
+
 const root = fileURLToPath(new URL("../", import.meta.url));
 const revision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 
@@ -34,55 +81,14 @@ test("only whitelisted public files are generated, deterministically", async () 
     const manifest = JSON.parse(await readFile(join(directory, "source.json"), "utf8"));
     assert.ok(first.files.length > 50);
     assert.deepEqual(
+      first.files.filter((path) => path.startsWith("plugins/kgos/skills/")).sort(),
+      officialSkillFiles
+    );
+    assert.equal(
       first.files.filter((path) => /^plugins\/kgos\/skills\/[^/]+\/SKILL\.md$/.test(path)).length,
-      4
+      officialSkillNames.length
     );
-    assert.deepEqual(
-      first.files
-        .filter((path) => path.startsWith("plugins/kgos/skills/kgos-ontology-standards/"))
-        .sort(),
-      [
-        "plugins/kgos/skills/kgos-ontology-standards/SKILL.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/foundations.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/bfo.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/ufo.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/dolce.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/sumo.md",
-        "plugins/kgos/skills/kgos-ontology-standards/references/foundations/gfo.md"
-      ].sort()
-    );
-    assert.deepEqual(
-      first.files
-        .filter((path) => path.startsWith("plugins/kgos/skills/kgos-knowledge-standards/"))
-        .sort(),
-      [
-        "plugins/kgos/skills/kgos-knowledge-standards/SKILL.md",
-        "plugins/kgos/skills/kgos-knowledge-standards/references/quality-audit.md"
-      ]
-    );
-    assert.deepEqual(
-      first.files.filter((path) => path.startsWith("plugins/kgos/skills/kgos-doctor/")).sort(),
-      [
-        "plugins/kgos/skills/kgos-doctor/SKILL.md",
-        "plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md"
-      ]
-    );
-    assert.deepEqual(
-      first.files
-        .filter((path) => path.startsWith("plugins/kgos/skills/kgos-vlog-standards/"))
-        .sort(),
-      [
-        "plugins/kgos/skills/kgos-vlog-standards/SKILL.md",
-        "plugins/kgos/skills/kgos-vlog-standards/references/cypher.md",
-        "plugins/kgos/skills/kgos-vlog-standards/references/ontology.md"
-      ]
-    );
-    assert.ok(
-      !first.files.some((path) => path.startsWith("plugins/kgos/skills/kgos-vlog-standards/tests/"))
-    );
+    assert.ok(!first.files.some((path) => /\/tests\//.test(path)));
     assert.ok(
       !first.files.some((path) => path.startsWith("plugins/kgos/skills/kgos-memory-standards/")),
       "Optional domain Skills are not part of the KG OS core Plugin"
@@ -155,12 +161,7 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.ok(!first.files.includes("plugins/kgos/.app.json"));
     assert.deepEqual(
       (await readdir(join(directory, "plugins/kgos/skills"))).sort(),
-      [
-        "kgos-doctor",
-        "kgos-knowledge-standards",
-        "kgos-ontology-standards",
-        "kgos-vlog-standards"
-      ].sort()
+      officialSkillNames.sort()
     );
     const sourceSkillDirs = (
       await readdir(join(root, "plugins/kgos/skills"), { withFileTypes: true })
@@ -171,7 +172,7 @@ test("only whitelisted public files are generated, deterministically", async () 
     assert.deepEqual(
       sourceSkillDirs,
       (await readdir(join(directory, "plugins/kgos/skills"))).sort(),
-      "Private source must contain exactly the four official Skills; do not retain retired independent Skills"
+      "Private source must contain exactly the eight official Skills; do not retain retired Skills"
     );
     assert.equal(
       await readFile(join(directory, "INSTALL.md"), "utf8"),
@@ -190,12 +191,7 @@ test("only whitelisted public files are generated, deterministically", async () 
     const version = JSON.parse(
       await readFile(join(directory, "plugins/kgos/plugin.json"), "utf8")
     ).version;
-    for (const skill of [
-      "kgos-doctor",
-      "kgos-knowledge-standards",
-      "kgos-ontology-standards",
-      "kgos-vlog-standards"
-    ]) {
+    for (const skill of officialSkillNames) {
       const path = `plugins/kgos/skills/${skill}/SKILL.md`;
       const source = await readFile(join(root, path), "utf8");
       assert.doesNotMatch(source, /^metadata:\n {2}version:/m);
@@ -658,12 +654,7 @@ test("stable Plugin archive embeds the matching rendered installer and all relea
     await writeFile(join(directory, "plugins/kgos/plugin.json"), JSON.stringify(manifest));
     // Simulate an earlier release's exported skills alongside the fixture
     // manifest. The actual tag exporter stamps these without manual edits.
-    for (const skill of [
-      "kgos-doctor",
-      "kgos-knowledge-standards",
-      "kgos-ontology-standards",
-      "kgos-vlog-standards"
-    ]) {
+    for (const skill of officialSkillNames) {
       const path = `plugins/kgos/skills/${skill}/SKILL.md`;
       await writeFile(
         join(directory, path),
@@ -677,12 +668,7 @@ test("stable Plugin archive embeds the matching rendered installer and all relea
       }),
       await readFile(join(output, `kgos-INSTALL-${tag}.md`), "utf8")
     );
-    for (const skill of [
-      "kgos-doctor",
-      "kgos-knowledge-standards",
-      "kgos-ontology-standards",
-      "kgos-vlog-standards"
-    ]) {
+    for (const skill of officialSkillNames) {
       const path = `skills/${skill}/SKILL.md`;
       const archived = execFileSync("unzip", ["-p", join(output, `kgos-plugin-${tag}.zip`), path], {
         encoding: "utf8"

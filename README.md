@@ -35,9 +35,11 @@ KG OS 的 `kgosd`、Kernel、Lithograph Host 和原生 MCP 使用 Go；浏览器
 
 **当前实现**：KG OS 已采用 Go `kgosd` 单进程承载 Web、API 和五个 AI-facing MCP Tool（另有 app-only 工作区 Tool），并通过 `kgos_docs` 为 AI 提供 SDK/Cypher/操作指南。底层 Ontology、Knowledge/Graph、Evolution、认证和原生扩展能力的实现及验收，按[开发计划](docs/development/README.md)和各 Phase 文件核实。
 
-**当前交付**：新版本只面向 Linux amd64 Docker。当前源码的官方 Plugin 包含四个 Skill：Ontology 统一本体建模与知识世界选择（内含方法论、有条件案例及基础本体原文导航），Knowledge 统一检索、写入和维护，另有 VLog、Doctor；先前 v0.3.5 的七 Skill 结构保留在其历史发布中。用户的私人 Plugin 不随源码更新自动升级。私有 `kg-os` 维护源码，公开 [`kg-releases`](https://github.com/bYiyLi/kg-releases) 按发布版本分发运行时、Plugin、对应官方 Skill 和唯一安装手册；是否已经正式发行取决于实际 Release、许可门禁及 CI 结果。
+**当前交付**：新版本只面向 Linux amd64 Docker。当前源码的单一官方 Plugin 整合八个 Skill：本体设计、落地和审核，知识整理保存、审核和检索应用，以及 VLog、Doctor；具体清单与职责见 [MCP owner](docs/design/mcp.md#kgos-official-skills)。原三个统一规范 Skill 目录已退役。此次整合尚未发行，产品与 Plugin 版本字段仍为 `0.3.16`，不表示已发布 v0.3.16 已包含新清单；历史 Tag、发行包和安装快照保持原状，按各自冻结资源验收。用户的私人 Plugin 不随源码更新自动升级。
 
-当前源码的 Ontology Skill 提供 BFO、UFO、DOLCE、SUMO、GFO 的固定原文索引、渐进读取指引及独立 KG OS 适配，不内置整套上游原件或 PDF 提取副本。索引按官方资料结构和文件功能说明用途、读取条件、范围与版本；由用户选择理论或自定义模型，子集不冒称完整理论。原文地址、许可及未覆盖部分见 [资料入口](plugins/kgos/skills/kgos-ontology-standards/references/foundations.md)，外部读取能力与可用性须按实际宿主核实。不再以独立官方业务模型仓库作为发现/同步入口；源码改造不修改现有模型或账户 Plugin。
+私有 `kg-os` 维护源码，公开 [`kg-releases`](https://github.com/bYiyLi/kg-releases) 按获准发布版本分发运行时、单一官方 Plugin、同版 Skill 和安装手册。源码 Skill 不独立编号，分发副本沿用产品 Manifest 版本注入；是否正式发行、安装或验证，以实际结果为准。
+
+当前[本体设计 Skill](plugins/kgos/skills/design-ontology/SKILL.md)与[本体审核 Skill](plugins/kgos/skills/kgos-review-ontology/SKILL.md)分别提供 BFO、UFO、DOLCE、SUMO、GFO 参考，按任务读取概念、条件和来源，精确定义及未覆盖内容再核对原件。模型选择由用户需求与依据决定，不内置强制业务模型，不把理论子集冒称完整原典。外部资料读取及许可须按实际来源核实；源码整合不修改实例模型或账户 Plugin。
 
 **历史版本**：最后一组 npm / 六平台原生发行版本为 `v0.2.1`；相关提交、CI、发布及恢复证据由 [Phase 00–13 历史验收](docs/development/README.md)和对应阶段文件保存，不在产品 README 复制第二套阶段日志。新镜像的进度不能从历史 npm Release 推断。
 

@@ -25,10 +25,10 @@ type vlogQueryCase struct {
 	Rows    [][]any        `json:"rows"`
 }
 
-// The Markdown code fences are the sole authored definitions; no duplicate YAML fixtures.
+// Historical Markdown fixtures preserve the English event-model engine regressions.
 func vlogGraphModels(t *testing.T) []vlogGraphModel {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(vlogSkillRoot, "references", "ontology.md"))
+	raw, err := os.ReadFile(filepath.Join(vlogHistoricalGraphRoot, "ontology.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func vlogGraphModels(t *testing.T) []vlogGraphModel {
 
 func vlogCypherQueries(t *testing.T) map[string]string {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(vlogSkillRoot, "references", "cypher.md"))
+	raw, err := os.ReadFile(filepath.Join(vlogHistoricalGraphRoot, "cypher.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func vlogCypherQueries(t *testing.T) map[string]string {
 
 func vlogQueryCases(t *testing.T) []vlogQueryCase {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join(vlogSkillRoot, "tests", "expected.json"))
+	raw, err := os.ReadFile(filepath.Join(vlogHistoricalGraphRoot, "expected.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,99 +11,111 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const ontologyStandardsRoot = "../../plugins/kgos/skills/kgos-ontology-standards"
-
-func TestOntologyStandardsResourceContract(t *testing.T) {
-	root, err := filepath.Abs(ontologyStandardsRoot)
-	if err != nil {
-		t.Fatal(err)
+// Text/resource checks do not claim real model selection or execution.
+func TestCurrentOntologySkillsResourceContract(t *testing.T) {
+	cases := []struct {
+		name     string
+		count    int
+		required []string
+	}{
+		{"design-ontology", 8, []string{
+			"assets/ontology-definition.md", "assets/user-confirmation.md",
+			"references/bfo.md", "references/ufo.md", "references/dolce.md", "references/sumo.md", "references/gfo.md",
+			"预期结果及依据", "不通过迁就模型改写预期", "自检清单",
+		}},
+		{"kgos-ontology-implementation", 3, []string{
+			"assets/ontology-definition.md", "references/kgos-conversion-rules.md",
+			"核验写入许可", "不在转换时擅自补设计", "信息一致性",
+			"不以写入成功代替验收通过",
+		}},
+		{"kgos-review-ontology", 8, []string{
+			"references/modeling-quality-checks.md", "assets/ontology-review-report.md",
+			"references/bfo.md", "references/ufo.md", "references/dolce.md", "references/sumo.md", "references/gfo.md",
+			"仅使用只读接口", "不提供替代模型、修复步骤、修改方案或补丁",
+			"相关真实知识", "无法确认",
+		}},
 	}
-	raw, err := os.ReadFile(filepath.Join(root, "SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	parts := strings.SplitN(string(raw), "---\n", 3)
-	if len(parts) != 3 || parts[0] != "" {
-		t.Fatal("missing YAML metadata")
-	}
-	var meta struct {
-		Name        string            `yaml:"name"`
-		Description string            `yaml:"description"`
-		Metadata    map[string]string `yaml:"metadata"`
-	}
-	decoder := yaml.NewDecoder(strings.NewReader(parts[1]))
-	decoder.KnownFields(true)
-	if err := decoder.Decode(&meta); err != nil {
-		t.Fatal(err)
-	}
-	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 {
-		t.Fatalf("invalid metadata: %+v", meta)
-	}
-	if !strings.Contains(string(raw), "[Ontology 变更确认模板](references/model-confirmation-template.md)") || !strings.Contains(string(raw), "未经具体方案确认") || !strings.Contains(string(raw), "references/foundations.md") {
-		t.Fatal("model confirmation and foundation source navigation must be reachable from Skill")
-	}
-	for _, expected := range []string{"[KG OS 本体论方法论](references/ontology-methodology.md)", "[本体建模案例](references/modeling-examples.md)", "## 2. 先确定本体语义", "## 5. 审查语义"} {
-		if !strings.Contains(string(raw), expected) {
-			t.Fatalf("missing ontology method in Skill: %s", expected)
-		}
-	}
-	template, err := os.ReadFile(filepath.Join(root, "references/model-confirmation-template.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, section := range []string{"## 1. 本次改动", "## 2. 数据关系图", "## 3. 数据影响", "## 4. 用户确认", "```mermaid"} {
-		if !strings.Contains(string(template), section) {
-			t.Fatalf("missing confirmation template section: %s", section)
-		}
-	}
-	method, err := os.ReadFile(filepath.Join(root, "references/ontology-methodology.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, section := range []string{"## 1. 基本认识", "## 2. 六步决策法", "## 3. 快速评审", "## 4. 外部研究依据"} {
-		if !strings.Contains(string(method), section) {
-			t.Fatalf("missing methodology section: %s", section)
-		}
-	}
-	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
-	queue, seen := []string{filepath.Join(root, "SKILL.md")}, map[string]bool{}
-	for len(queue) > 0 {
-		path := queue[0]
-		queue = queue[1:]
-		if seen[path] {
-			continue
-		}
-		seen[path] = true
-		body, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, link := range links.FindAllStringSubmatch(string(body), -1) {
-			target := strings.SplitN(strings.Trim(link[1], "<>"), "#", 2)[0]
-			if target == "" || strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") {
-				continue
+	for _, item := range cases {
+		t.Run(item.name, func(t *testing.T) {
+			root, err := filepath.Abs(filepath.Join("../../plugins/kgos/skills", item.name))
+			if err != nil {
+				t.Fatal(err)
 			}
-			next := filepath.Clean(filepath.Join(filepath.Dir(path), target))
-			if !strings.HasPrefix(next, root+string(os.PathSeparator)) {
-				t.Fatalf("resource outside standalone package: %s", next)
+			raw, err := os.ReadFile(filepath.Join(root, "SKILL.md"))
+			if err != nil {
+				t.Fatal(err)
 			}
-			queue = append(queue, next)
-		}
-	}
-	count := 0
-	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !entry.IsDir() {
-			count++
-			if !seen[path] {
-				return fmt.Errorf("unreachable runtime resource: %s", path)
+			parts := strings.SplitN(string(raw), "---\n", 3)
+			if len(parts) != 3 || parts[0] != "" {
+				t.Fatal("missing YAML metadata")
 			}
-		}
-		return nil
-	})
-	if err != nil || count != 10 || len(seen) != count {
-		t.Fatalf("runtime files=%d reachable=%d err=%v; want entrypoint, methods/examples and five-theory navigation", count, len(seen), err)
+			var meta struct {
+				Name        string `yaml:"name"`
+				Description string `yaml:"description"`
+			}
+			decoder := yaml.NewDecoder(strings.NewReader(parts[1]))
+			decoder.KnownFields(true)
+			if err := decoder.Decode(&meta); err != nil {
+				t.Fatal(err)
+			}
+			if meta.Name != item.name || strings.TrimSpace(meta.Description) == "" || len(meta.Description) > 1024 {
+				t.Fatalf("invalid unversioned source metadata: %+v", meta)
+			}
+			for _, expected := range item.required {
+				if !strings.Contains(string(raw), expected) {
+					t.Fatalf("missing current responsibility or resource: %s", expected)
+				}
+			}
+			links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
+			plain := regexp.MustCompile(`(?:references|assets)/[A-Za-z0-9_.-]+\.md`)
+			queue, seen := []string{filepath.Join(root, "SKILL.md")}, map[string]bool{}
+			for len(queue) > 0 {
+				path := queue[0]
+				queue = queue[1:]
+				if seen[path] {
+					continue
+				}
+				seen[path] = true
+				body, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				targets := []string{}
+				for _, link := range links.FindAllStringSubmatch(string(body), -1) {
+					target := strings.SplitN(strings.Trim(link[1], "<>"), "#", 2)[0]
+					if target == "" || strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") {
+						continue
+					}
+					targets = append(targets, filepath.Join(filepath.Dir(path), target))
+				}
+				// Approved design navigation also uses explicit plain root-relative paths.
+				for _, target := range plain.FindAllString(string(body), -1) {
+					targets = append(targets, filepath.Join(root, target))
+				}
+				for _, target := range targets {
+					next := filepath.Clean(target)
+					if !strings.HasPrefix(next, root+string(os.PathSeparator)) {
+						t.Fatalf("resource outside standalone package: %s", next)
+					}
+					queue = append(queue, next)
+				}
+			}
+			count := 0
+			err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if !entry.IsDir() {
+					count++
+					if !seen[path] {
+						return fmt.Errorf("unreachable runtime resource: %s", path)
+					}
+				}
+				return nil
+			})
+			if err != nil || count != item.count || len(seen) != count {
+				t.Fatalf("runtime files=%d reachable=%d error=%v; want %d", count, len(seen), err, item.count)
+			}
+		})
 	}
 }

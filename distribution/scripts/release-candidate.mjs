@@ -13,10 +13,14 @@ const hashPattern = /^[0-9a-f]{64}$/;
 const revisionPattern = /^[0-9a-f]{40}$/;
 const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const skillNames = [
+  "design-ontology",
   "kgos-doctor",
-  "kgos-knowledge-standards",
-  "kgos-ontology-standards",
-  "kgos-vlog-standards"
+  "kgos-ontology-implementation",
+  "kgos-organize-knowledge",
+  "kgos-record-vlog",
+  "kgos-retrieve-knowledge",
+  "kgos-review-knowledge",
+  "kgos-review-ontology"
 ];
 const locks = {
   pnpmLock: "pnpm-lock.yaml",

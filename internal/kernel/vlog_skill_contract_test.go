@@ -1,18 +1,15 @@
 package kernel_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/bYiyLi/kg-os/internal/kernel"
-	"gopkg.in/yaml.v3"
 )
 
-const vlogSkillRoot = "../../plugins/kgos/skills/kgos-vlog-standards"
+const vlogHistoricalGraphRoot = "testdata/vlog/graph"
 
 // Read original synthetic VLog instance regression fixtures, not published Skill resources.
 func vlogSkillExamples(t *testing.T) map[string]kernel.ObjectValue {
@@ -45,75 +42,8 @@ func vlogSkillExamples(t *testing.T) map[string]kernel.ObjectValue {
 	return values
 }
 
-func TestVLogSkillResourceContract(t *testing.T) {
-	root, err := filepath.Abs(vlogSkillRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw, err := os.ReadFile(filepath.Join(root, "SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	parts := strings.SplitN(string(raw), "---\n", 3)
-	if len(parts) != 3 || parts[0] != "" {
-		t.Fatal("missing YAML metadata")
-	}
-	var meta struct {
-		Name        string `yaml:"name"`
-		Description string `yaml:"description"`
-	}
-	decoder := yaml.NewDecoder(strings.NewReader(parts[1]))
-	decoder.KnownFields(true)
-	if err := decoder.Decode(&meta); err != nil {
-		t.Fatal(err)
-	}
-	if meta.Name != filepath.Base(root) || len(meta.Description) == 0 || len(meta.Description) > 1024 {
-		t.Fatalf("invalid metadata: %+v", meta)
-	}
-	links := regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
-	queue, seen := []string{filepath.Join(root, "SKILL.md")}, map[string]bool{}
-	for len(queue) > 0 {
-		path := queue[0]
-		queue = queue[1:]
-		if seen[path] {
-			continue
-		}
-		seen[path] = true
-		body, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, link := range links.FindAllStringSubmatch(string(body), -1) {
-			target := strings.SplitN(link[1], "#", 2)[0]
-			if target == "" || strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") {
-				continue
-			}
-			next := filepath.Clean(filepath.Join(filepath.Dir(path), target))
-			if !strings.HasPrefix(next, root+string(os.PathSeparator)) {
-				t.Fatalf("external runtime resource: %s", next)
-			}
-			queue = append(queue, next)
-		}
-	}
-	count := 0
-	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() && path == filepath.Join(root, "tests") {
-			return filepath.SkipDir
-		}
-		if !entry.IsDir() {
-			count++
-			if !seen[path] {
-				return fmt.Errorf("unreachable resource %s", path)
-			}
-		}
-		return nil
-	})
-	if err != nil || count != 3 || len(seen) != 3 {
-		t.Fatalf("runtime files=%d reachable=%d err=%v; want SKILL.md, ontology.md and cypher.md", count, len(seen), err)
-	}
+// These fixtures protect historical engine behavior, not the current VLog Skill.
+func TestVLogHistoricalFixtures(t *testing.T) {
 	vlogSkillExamples(t)
 	vlogLegacyModelFixture(t)
 	vlogGraphModels(t)

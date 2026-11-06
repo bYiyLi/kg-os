@@ -1,5 +1,5 @@
 {
-  "purpose": "Current standalone VLog Skill and D116/D119 behavioral evaluation inputs. Criteria are evaluator-only, not evidence of live ChatGPT Skill selection or behavior.",
+  "purpose": "Historical frozen evaluator material from the retired Skill layout; not current selection expectations or current acceptance evidence. Current standalone VLog Skill and D116/D119 behavioral evaluation inputs. Criteria are evaluator-only, not evidence of live ChatGPT Skill selection or behavior.",
   "cases": [
     {
       "id": "existing-ontology",
@@ -25,7 +25,11 @@
       "id": "time-property",
       "prompt": "有一次简单精确的部署发生时间，没有时间区间关联需求，要为每次部署创建 Time 节点吗？",
       "expectedApplies": true,
-      "criteria": ["可直接用 Event.occurredAt 属性", "不强制生成无意义 Time", "时区/精度必须真实"]
+      "criteria": [
+        "可直接用 Event.occurredAt 属性",
+        "不强制生成无意义 Time",
+        "时区/精度必须真实"
+      ]
     },
     {
       "id": "environment-place",
@@ -71,7 +75,11 @@
       "id": "planned-not-executed",
       "prompt": "已批准一项任务但尚未执行，能先创建一个已成功的 Event 吗？",
       "expectedApplies": true,
-      "criteria": ["决定作出的发生事实可记录", "计划未执行不能伪装成执行 Event", "不能编造 outcome"]
+      "criteria": [
+        "决定作出的发生事实可记录",
+        "计划未执行不能伪装成执行 Event",
+        "不能编造 outcome"
+      ]
     },
     {
       "id": "new-schema-confirmation",

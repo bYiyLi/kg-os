@@ -17,7 +17,7 @@ import (
 
 // Create the literal Markdown definitions and execute the literal Markdown queries
 // against an isolated real Lithograph graph. Historical VLogEntry remains independent.
-func TestVLogSkillEventOntology(t *testing.T) {
+func TestVLogHistoricalEventOntology(t *testing.T) {
 	r, initial := newVLogSkillRuntime(t)
 	ctx := context.Background()
 	models := vlogGraphModels(t)
@@ -82,7 +82,7 @@ func TestVLogSkillEventOntology(t *testing.T) {
 		t.Fatalf("new model changed unrelated existing Ontology: %v", err)
 	}
 
-	seed, err := os.ReadFile(filepath.Join(vlogSkillRoot, "tests", "seed.cypher"))
+	seed, err := os.ReadFile(filepath.Join(vlogHistoricalGraphRoot, "seed.cypher"))
 	if err != nil {
 		t.Fatal(err)
 	}

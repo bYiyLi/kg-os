@@ -3,5 +3,5 @@
 // remain immutable provenance. This entry never reads or overwrites a model.
 throw new Error(
   "VLog cross-repository sync is retired. See docs/guide/ontology-sources.md; " +
-    "maintain plugins/kgos/skills/kgos-vlog-standards/references in kg-os."
+    "maintain plugins/kgos/skills/kgos-record-vlog/references in kg-os."
 );

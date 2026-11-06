@@ -1,5 +1,7 @@
 # Phase 27：KG OS 官方知识规范 Skill 体系
 
+> 2026-11-05：当前八 Skill 源码清单与整合验收见 [Phase 28](28-official-skill-roster.md) 和 [D125](../../design/decisions.md#d125-unified-eight-skill-plugin)。本页既有四技能、七技能及单项验证记录保留其历史范围，不代表新技能已经通过同样验收。
+
 <!-- cspell:words testdata SKOS CIDOC pypdf Diátaxis Persistant Presential -->
 
 <a id="d122-remote-foundation-navigation"></a>
@@ -109,7 +111,7 @@ Review 检查完整收录范围、原文忠实与可读转换、概念身份/关
 
 **状态：`in_progress`**。原 Ontology/Branch 已合并为 `kgos-ontology-standards`；Knowledge/Retrieval/Maintenance 合并为唯一 `kgos-knowledge-standards`；VLog 保持独立。三个规范加 `kgos-doctor`，当前源码目标共 **四个官方 Skill**。已发行 v0.3.5 七 Skill、用户私人 Plugin 和当前部署不受本次本地修改影响。
 
-本阶段新增验收条件：统一 Ontology Skill 必须先进行本体语义与身份判断，明确能力问题、Ontology/Knowledge 分类边界及最小图结构；[KG OS 本体论方法论](../../../plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md)和[四个建模案例](../../../plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md)随 Skill 可独立读取。通过 [简版确认模板](../../../plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md) 向用户展示实际结构改动、关系图、语义与数据影响；**即使仅复用模型的建模任务，也须确认方案，普通 Knowledge 写入例外**。VLog 独立 `branch/vlog` 的内容归属不变。外部 `kgos-ontologies` 尚未创建时必须继续支持独立建模，不可强制依赖 GitHub 地址或额外 Skill。
+本阶段新增验收条件：统一 Ontology Skill 必须先进行本体语义与身份判断，明确能力问题、Ontology/Knowledge 分类边界及最小图结构；[KG OS 本体论方法论](https://github.com/bYiyLi/kg-os/blob/9ab07c32d35743299a57c26936fa8d492bdff7cd/plugins/kgos/skills/kgos-ontology-standards/references/ontology-methodology.md)和[四个建模案例](https://github.com/bYiyLi/kg-os/blob/9ab07c32d35743299a57c26936fa8d492bdff7cd/plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md)随 Skill 可独立读取。通过 [简版确认模板](https://github.com/bYiyLi/kg-os/blob/9ab07c32d35743299a57c26936fa8d492bdff7cd/plugins/kgos/skills/kgos-ontology-standards/references/model-confirmation-template.md) 向用户展示实际结构改动、关系图、语义与数据影响；**即使仅复用模型的建模任务，也须确认方案，普通 Knowledge 写入例外**。VLog 独立 `branch/vlog` 的内容归属不变。外部 `kgos-ontologies` 尚未创建时必须继续支持独立建模，不可强制依赖 GitHub 地址或额外 Skill。
 
 本次统一交付须通过：四目录源码与分发白名单一致、Ontology 包含入口与三份按需参考、Knowledge 包含入口与一份按需质量审计参考、所有链接可达；原 Ontology 及 Knowledge/Retrieval/Maintenance 历史教学案例仍作为隔离测试数据，现行案例还须由分发原文通过真实模型/查询验证。统一 Knowledge 的行为边界覆盖检索充分性、语义/身份/关系、更新冲突、质量审计、维护和写后核实，不将读/写/维护/审计强制串联，也不新增模型修改权限。此前冻结的分离 Skill 评测仅保留历史证据，统一 Ontology 使用 [建模评测](../../../tests/skills/ontology-unified-evaluation.json)，统一 Knowledge 使用 [知识评测](../../../tests/skills/knowledge-unified-evaluation.json)。实际客户端安装、版本发布及 CI 仍由 Phase 28 单独验收，不能标记 `done`。
 
@@ -296,7 +298,7 @@ Review 检查完整收录范围、原文忠实与可读转换、概念身份/关
 
 ### 实际产物与职责
 
-[VLog Skill](../../../plugins/kgos/skills/kgos-vlog-standards/SKILL.md) 版本 `1.0.0`，guidance 类型。运行时包为 **8 个 Markdown 文件**：入口、准入/事件、执行证据、跨世界追溯、演进/披露四份参考，以及三组决策案例。V1–V6负责记录质量，不执行维护/调度、不自动创建Branch、不设计固定Task/Run/Event/Result实体，也不复制通用SDK手册。
+[VLog Skill](https://github.com/bYiyLi/kg-os/blob/9ab07c32d35743299a57c26936fa8d492bdff7cd/plugins/kgos/skills/kgos-vlog-standards/SKILL.md) 版本 `1.0.0`，guidance 类型。运行时包为 **8 个 Markdown 文件**：入口、准入/事件、执行证据、跨世界追溯、演进/披露四份参考，以及三组决策案例。V1–V6负责记录质量，不执行维护/调度、不自动创建Branch、不设计固定Task/Run/Event/Result实体，也不复制通用SDK手册。
 
 三组案例共 **16 个情境及相邻条件**：A1–A5记录准入，E1–E5执行与结果，P1–P6跨世界与延续。其中三个JSON直接展示既定教学模型的实例目标，不是官方VLog Schema、已存在业务数据或工具调用参数。本轮完成这份质量Skill，**没有冻结官方Model、保留策略或Doctor结构化消费合同**，P27-05相关后续子项仍保留。
 
@@ -461,7 +463,7 @@ go test -race -tags=sqlite_fts5,lithograph_smoke -count=1 \
 
 ### 交付与职责
 
-[Knowledge Skill 入口](../../../plugins/kgos/skills/kgos-knowledge-standards/SKILL.md) 版本为 `1.0.0`，guidance 类型。运行时包为 **9 个 Markdown 文件**：入口、语义证据/身份关系/更新冲突/写入核实四份参考、四组决策案例。没有执行脚本、独立 Agent、全库治理、领域 Schema 模板或依赖其它 Skill 的强制加载。
+[Knowledge Skill 入口](https://github.com/bYiyLi/kg-os/blob/9ab07c32d35743299a57c26936fa8d492bdff7cd/plugins/kgos/skills/kgos-knowledge-standards/SKILL.md) 版本为 `1.0.0`，guidance 类型。运行时包为 **9 个 Markdown 文件**：入口、语义证据/身份关系/更新冲突/写入核实四份参考、四组决策案例。没有执行脚本、独立 Agent、全库治理、领域 Schema 模板或依赖其它 Skill 的强制加载。
 
 六项 K1–K6 约束当前实例任务。资料准入不设置主观长期价值评分；模型粒度和字段设计仍归 Ontology。四组案例分别含 E1–E3、I1–I4、U1–U5、W1–W5，共 **17 个决策情境及相邻条件**，不是 17 套本体；其中五段实例 JSON 是按既定模型描述的目标值，不是 SDK 请求或真实用户数据。
 

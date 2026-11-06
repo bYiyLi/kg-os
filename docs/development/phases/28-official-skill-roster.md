@@ -1,8 +1,44 @@
 # Phase 28：官方 Skill 清单收敛与通用 Skill 退役
 
+## 当前目标与状态（D125，2026-11-05）
+
+**状态：`in_progress`**。按用户确认的八项专业职责统一到 `plugins/kgos/`，仅保留一个 Plugin Manifest 和产品发行版本，不保留旧三项 `*-standards` 可调用目录。Doctor 使用已确认新设计。旧 Tag、历史验收与用户账户内已安装插件保持原状。
+
+当前源码清单：
+
+- `design-ontology`
+- `kgos-doctor`
+- `kgos-ontology-implementation`
+- `kgos-organize-knowledge`
+- `kgos-record-vlog`
+- `kgos-retrieve-knowledge`
+- `kgos-review-knowledge`
+- `kgos-review-ontology`
+
+### 当前验收边界
+
+- **源码和资源**：八个且仅八个 Skill，全部主文与引用资源齐全，知识整理使用已确认修订版；无私人 App 绑定、凭证或无关资料进入公开包。
+- **职责与引用**：检索应用、整理保存、知识审核、本体设计、落地、本体审核、VLog 和 Doctor 各自有界；审核只读，不自动提出或执行修改。Doctor 引用实际存在的新本体入口，全局引导与 INSTALL 正文一致。
+- **统一发行**：源码主文不保存独立版本；既有导出链为全部八份 Skill 注入同一产品/Plugin 版本。打包白名单、资源检查、安装模板及来源导航使用新清单，历史安装快照保持冻结。
+- **旧资产**：旧技能正文只在 Git 历史追溯；必要历史模型/查询/seed/expected 保留为明确标识的内核引擎夹具，不作为当前技能包或新技能行为验收。
+- **实际验证**：文件、引用、分发及确定性测试与真实 ChatGPT 的安装、发现、自动选用和 MCP 行为分开报告；未执行的宿主或写入测试保持未验证。源码或公开 main 同步不等于正式发版、服务部署或账户插件升级。
+
+本次仓库变更和 main 的既有公开资料自动同步已获用户批准；不创建正式 Tag、Release 或部署，不删除用户账户内插件或知识库数据。完整技能职责见 [MCP owner](../../design/mcp.md#kgos-official-skills)，决定见 [D125](../../design/decisions.md#d125-unified-eight-skill-plugin)。
+
+### 2026-11-05 源码整理验证
+
+- 使用 GitHub 连接读取既有源码和已确认技能，统一为八个技能、34 个技能文件。私人 App 绑定没有导入；公共教学引用移除私有 State 标识，历史来源改用可访问的冻结公开版本。GFO/SUMO 的 Markdown 换行只做无尾随空格的等效规范化。
+- 临时云端快照执行 `node --test tests/render-kg-releases.node-test.mjs tests/release-candidate.node-test.mjs tests/skills/knowledge-quality-contract.node-test.mjs`，**27/27 通过**。覆盖实际导出、版本注入、归档、安装资料及确定性技能合同，不等于模型行为或真实宿主验收。
+- 读取并扫描全部 143 个内核/MCP Go 测试文件，已迁移所有指向被移除技能目录的测试依赖；历史本体四场景和 VLog 图回归资料归入 `internal/kernel/testdata`，不作为公开技能资源。
+- 当前环境没有可用的 Go 编译器，未运行完整 `pnpm validate`、Go/原生集成或真实 ChatGPT 客户端验收。提交后的既有 CI 应针对确切源码版本验证，结果单独报告，不以前述 27 项替代。
+
+## 历史计划和证据
+
+下文记录原四 Skill、七 Skill 阶段的目标、测试与当时状态。保留其时间和原始含义，不将旧通过结果转成新八 Skill 验收。
+
 **D122 同步（2026-11-02）**：四 Skill 清单不变。当前 Ontology 提供五套理论固定原文导航、渐进读取与 KG OS 适配，Doctor D6 改为所选理论来源与适配检查，旧官方模型库发现/同步入口退役。此资料/规范增量按 [Phase 27 D122](27-knowledge-standards-skills.md#d122-remote-foundation-navigation) 做结果 Review 和确定性分发检查，不运行案例或行为评测；本 Phase 的真实宿主安装、发行与旧历史门禁仍未因此完成。旧版与用户定制不自动迁移。
 
-## 当前目标与状态（D115/D117，2026-10-28）
+## 2026-10-28 四 Skill 目标与验收（历史）
 
 **状态：`in_progress`**。当前待发布源码目标为 **四个官方 Skill：Ontology、Knowledge、VLog 与 Doctor**。原 Ontology/Branch 统一职责现由 `kgos-ontology-standards` 承担，D114 的临时名称 Modeling 已于 D117 更名；原 Knowledge/Retrieval/Maintenance 合并为 Knowledge。不恢复旧通用 `kgos`。
 
@@ -13,7 +49,7 @@
 - `kgos-vlog-standards`
 - `kgos-doctor`
 
-### 当前 Acceptance
+### 当时 Acceptance
 
 - **A28-01 · 源码与公开打包清单**：这四个且仅四个 Skill 目录出现在当前源码、打包白名单、插件清单检查与 Doctor 发现目标；被合并的旧目录不作为新候选重复导出。
 - **A28-01a · 同包 Skill 版本**：四份源码 `SKILL.md` 不维护版本号；公开导出从当前产品/Plugin 统一版本注入字符串 `metadata.version`，正式 Tag 必须同版，最终 ZIP 保留四份一致的版本，参考文件不改写。旧安装或宿主不可见时 Doctor 报告证据不足，而不是假设同版。
@@ -26,7 +62,7 @@
 
 ## 2026-10-21 七 Skill 原始计划与实施证据（历史）
 
-以下保留 D107 时期的七 Skill 计划、验收与执行记录作为历史依据；当前目标以上文 D115 为准。
+以下保留 D107 时期的七 Skill 计划、验收与执行记录作为历史依据；不作为当前八 Skill 的验收证明。
 <!-- cspell:words mcpserver -->
 
 ## 目标与当前状态

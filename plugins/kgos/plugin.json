@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "kgos",
   "version": "0.3.16",
-  "description": "KG OS MCP integration and four official knowledge graph skills.",
+  "description": "KG OS MCP integration and eight focused knowledge graph skills.",
   "author": {
     "name": "KG OS"
   },
@@ -15,7 +15,10 @@
         "longDescription": "Use your own private KG OS Instance to inspect pinned knowledge graph versions, query data, and perform controlled changes.",
         "developerName": "KG OS",
         "category": "Productivity",
-        "capabilities": ["Read", "Write"],
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
         "defaultPrompt": "Use the already selected KG OS instance and scope. Inspect all branches only when that scope permits it; otherwise read the known target State. Then help me with this knowledge graph."
       }
     }

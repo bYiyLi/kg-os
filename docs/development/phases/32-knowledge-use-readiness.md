@@ -38,9 +38,9 @@ P32-02/03 的文档与场景准备不依赖 P32-01 修复完成；涉及运行�
 
 | 交付 | 修改位置 | 验证 |
 | --- | --- | --- |
-| 分支命名要求及正反例 | `kgos-ontology-standards/SKILL.md` 与 `docs/guide/mcp-guides/evolution.md` | 名称合法性、用途可读性、用户指定名称与重名场景 |
+| 分支命名要求及正反例 | `kgos-ontology-implementation/SKILL.md` 与 `docs/guide/mcp-guides/evolution.md` | 名称合法性、用途可读性、用户指定名称与重名场景 |
 | 提交规范唯一正文 | `docs/guide/mcp-guides/evolution.md` | 简介/改动内容判据、支持 message 与新 Commit 条件、回读/并发边界；为仅 MCP 客户端提供最小命名规则 |
-| 独立写入场景接入 | `kgos-ontology-standards/SKILL.md`、`kgos-knowledge-standards/SKILL.md`、`kgos-vlog-standards/SKILL.md` 及各自通过 `kgos_docs` 读取的操作指南 | 普通 Knowledge 编辑可直接取得正确规范，不需已退役的分支 Skill；引用可达，不重复完整规则 |
+| 独立写入场景接入 | `kgos-ontology-implementation/SKILL.md`、`kgos-organize-knowledge/SKILL.md`、`kgos-record-vlog/SKILL.md` 及各自通过 `kgos_docs` 读取的操作指南 | 普通 Knowledge 编辑可直接取得正确规范，不需已退役的分支 Skill；引用可达，不重复完整规则 |
 | MCP 入口和生成资源 | `internal/mcpserver/server.go`、`packages/sdk/src/client.ts` / `types.ts` 的对应文档；运行现有 `scripts/generate-mcp-docs.mjs` | 服务端 Tool 元数据、生成 SDK/Guide 与来源一致；不新增不支持的参数 |
 | 产品呈现与失败路径 | 现有 MCP Preview / Web 定向回归；仅在发现实际缺陷时修复所属实现 | 回读与预览/页面一致，受限读取、并发、未知回执不越界 |
 | 旧记录处置边界 | 在本 Phase 验收证据中记录问题清单及处理建议 | 原引用和历史保留；未获具体授权不得执行整理 |

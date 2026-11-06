@@ -15,15 +15,15 @@ import (
 	host "github.com/bYiyLi/kg-os/internal/runtime"
 )
 
-// Published examples are the source of the executable YAML, Cypher and expected rows.
-// This intentionally does not duplicate Schema fixtures or execute against user data.
-func TestOntologyStandardsPublishedExamples(t *testing.T) {
+// Frozen historical scenarios preserve executable YAML, Cypher and expected rows.
+// They do not validate current Skill behavior or execute against user data.
+func TestOntologyHistoricalModelingExamples(t *testing.T) {
 	for _, key := range []string{"KGOS_LITHOGRAPH_LIBRARY", "KGOS_LITHOGRAPH_PROVIDER_LIBRARY", "KGOS_JIEBA_LIBRARY"} {
 		if _, err := os.Stat(os.Getenv(key)); err != nil {
 			t.Fatalf("native KG OS/Lithograph test dependency %s: %v", key, err)
 		}
 	}
-	file := "../../plugins/kgos/skills/kgos-ontology-standards/references/modeling-examples.md"
+	file := "testdata/ontology/historical-modeling-examples.md"
 	raw, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestOntologyStandardsPublishedExamples(t *testing.T) {
 
 	sections := regexp.MustCompile("(?m)^## 案例 [ABCD]：[^\\n]+").FindAllStringIndex(string(raw), -1)
 	if len(sections) != 4 {
-		t.Fatalf("published examples=%d; want four complete scenarios", len(sections))
+		t.Fatalf("historical examples=%d; want four complete scenarios", len(sections))
 	}
 	expectedNodes := []int{3, 3, 3, 5}
 	expectedChecks := []int{2, 2, 2, 3}
@@ -99,11 +99,11 @@ func TestOntologyStandardsPublishedExamples(t *testing.T) {
 		})
 	}
 	if !strings.Contains(string(raw), "新增类别") || !strings.Contains(string(raw), "来源") {
-		t.Fatal("published examples lost essential ontology decisions")
+		t.Fatal("historical examples lost essential ontology decisions")
 	}
 }
 
-// The public example remains the fixture; this tests the important distinction
+// The historical example remains the fixture; this tests the important distinction
 // between changing shared Index targets and deleting the Index itself.
 func checkPublishedIndexScopeAndDomainRemoval(t *testing.T, runtime *host.Runtime, state string) {
 	t.Helper()

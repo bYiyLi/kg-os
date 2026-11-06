@@ -1,5 +1,5 @@
 {
-  "purpose": "Frozen task inputs and evaluator-only expectations for the D119 recommend-first authorization contract across the four official KG OS Skills. Not runtime instructions, not model execution evidence.",
+  "purpose": "Historical frozen evaluator material from the retired Skill layout; not current selection expectations or current acceptance evidence. Frozen task inputs and evaluator-only expectations for the D119 recommend-first authorization contract across the four official KG OS Skills. Not runtime instructions, not model execution evidence.",
   "cases": [
     {
       "id": "global-greeting-read",

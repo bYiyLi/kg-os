@@ -15,14 +15,14 @@
 | [object.md](design/object.md) | 公共 aggregate/Knowledge Ref、共享 YAML/JSON、batch read 与统一 Patch |
 | [graph.md](design/graph.md) | Knowledge 数据模型、Graph query / execute、Cypher 与搜索边界 |
 | [evolution.md](design/evolution.md) | State / State Data、Branch、Tag、History、Diff、Merge Session |
-| [mcp.md](design/mcp.md) | `kgosd` Go 原生 MCP、五个 AI-facing Tool / `kgos_docs`、Cypher 手册、Plugin/Skill、认证与 ChatGPT UI、[当前四个官方 Skill](design/mcp.md#kgos-official-skills)（Ontology、Knowledge、VLog、Doctor）及旧通用 Skill 源码退役/私人安装迁移边界，以及 VLog 合同；Phase 22 `docs.read` 为历史接口 |
+| [mcp.md](design/mcp.md) | `kgosd` Go 原生 MCP、五个 AI-facing Tool / `kgos_docs`、Cypher 手册、Plugin/Skill、认证与 ChatGPT UI、[当前八个官方 Skill](design/mcp.md#kgos-official-skills)（本体设计/落地/审核、知识整理/审核/检索、VLog、Doctor，源码整合未发行）及旧通用 Skill 源码退役/私人安装迁移边界，以及 VLog 合同；Phase 22 `docs.read` 为历史接口 |
 | [contracts.md](design/contracts.md) | 跨能力共享的公共错误合同、D105 首次初始化错误，以及 Web 持久数据错误方案 |
 | [client.md](design/client.md) | `@kgos/sdk`、`@kgos/cli`、当前 Docker-only 交付、[D108 私有源码与公开 kg-releases 生成/CI](design/decisions.md#d108-private-source-public-releases)、TypeScript SDK、内部 CLI 与历史 npm 分发边界 |
 | [cli.md](design/cli.md) | AI-first CLI command tree、`--root` / `KGOS_ROOT`、分层 help、`doctor/init` setup、Runtime ensure、i18n、stdin/file、JSON/raw body/streaming、错误与 exit code |
 | [runtime.md](design/runtime.md) | Go `kgosd`、Workspace Root / `.kgos` Instance、Web/API/MCP 统一监听与 [D105 Web-first 初始化门禁](design/runtime.md#web-first-run-bootstrap)、`auth.json` / `initialized.json`、native Runtime artifacts、Provider cache / SQLite Extension、daemon lifecycle |
 | [observability.md](design/observability.md) | `kgosd` 结构化日志、Access Logs、关键业务/安全事件、Request ID、进程内 Metrics、日志轮转与受保护的只读诊断 |
 | [web.md](design/web.md) | 面向人的图谱优先界面、Branch / 领域树导航与居中历史 DAG 弹窗、[单画布知识搜索与局部探索](design/web.md#知识图谱画布与搜索)、本体视图、草稿与连接交互、[D110 四步 Token-first 初始化页面](design/web.md#web-first-run-setup)、前端国际化与语言偏好、持久 UI / 可丢弃缓存及受控 API 方案；[功能材料与覆盖矩阵](design/web-materials.md)管理视觉材料，[一致样例](design/web-examples.md)只作非规范评审输入 |
-| [decisions.md](design/decisions.md) | D1–D124 的决定、依据、备选和取舍，以及被替换架构记录 |
+| [decisions.md](design/decisions.md) | D1–D125 的决定、依据、备选和取舍，以及被替换架构记录 |
 | [implementation.md](design/implementation.md) | 已确认设计的实现约束、readiness、projection/compiler/adapter mapping 与集成验收；不得维护阶段状态或重新定义产品语义 |
 
 当前知识使用合同：[每轮强制检索及授权后变更](design/mcp.md#global-ai-guidance-and-daily-responsibility)、[D113 强制读取](design/decisions.md#d113-mandatory-knowledge-behavior)、[D119 先推荐后授权](design/decisions.md#d119-recommend-first-authorized-mutation)；此前 [D111](design/decisions.md#d111-task-scoped-knowledge-loading) / [D112](design/decisions.md#d112-global-ai-guidance-and-daily-responsibility) 的按任务选择读取与简单问候豁免已被替代，环境范围与其他有效边界保留。模型扩展与真实客户端验收见 [Phase 32](development/phases/32-knowledge-use-readiness.md)。源码修改、安装与发布分别取证。
@@ -43,8 +43,8 @@ MCP 健壮性与长期授权按 [D124](design/decisions.md#d124-mcp-resilience) 
 | AI 如何通过 MCP / 私人 Plugin 预览知识库及执行受控 SDK | [MCP / Plugin 设计](design/mcp.md) |
 | AI 日常知识管理使用哪份全局指令 | [Global AI Guidance 唯一正文](../plugins/kgos/skills/kgos-doctor/assets/global-ai-guidance.md)及[职责与版本边界](design/mcp.md#global-ai-guidance-and-daily-responsibility)；发行版按同包基线，读取对照不等于宿主已加载 |
 | AI 如何诊断 KG OS 版本、系统级引导、MCP/State、Skills、Knowledge、维护与本体来源/适配 | [Doctor D0–D6 设计](design/mcp.md#kgos-doctor-v1)、[D118 原基线](design/decisions.md#d118-kgos-doctor-six-checks)、[D122 原文导航/适配](design/decisions.md#d122-remote-foundation-navigation)、[Phase 25](development/phases/25-kgos-doctor.md)；D120 独立模型库发现为历史 |
-| AI 应依循哪些知识建模、创作、检索、维护及 VLog 规范 | [三个官方规范](design/mcp.md#kgos-standards-skill-suite)、[D117 Ontology 方法论](design/decisions.md#d117-ontology-methodology-and-skill-renaming)、[D115 知识规范合并](design/decisions.md#d115-unified-knowledge-lifecycle-skill)、[Phase 27](development/phases/27-knowledge-standards-skills.md)；现行 [Ontology](../plugins/kgos/skills/kgos-ontology-standards/SKILL.md)、[Knowledge](../plugins/kgos/skills/kgos-knowledge-standards/SKILL.md)、[VLog](../plugins/kgos/skills/kgos-vlog-standards/SKILL.md) 源码均已创建，实际安装与整包验收仍需另行取证 |
-| 当前官方 Skill 清单与历史 `kgos` 退役、私人安装如何迁移 | [当前四 Skill 清单](design/mcp.md#kgos-official-skills)、[D115](design/decisions.md#d115-unified-knowledge-lifecycle-skill)、[Phase 28](development/phases/28-official-skill-roster.md)；v0.3.5 七 Skill 为历史发行事实 |
+| AI 如何选择本体、知识、VLog 的专业职责 | [八个 Skill 的边界与精确资源](design/mcp.md#kgos-standards-skill-suite)；原 D115/D117 统一规范布局仅作历史，当前设计、落地、审核和检索职责分开；不因源码整合宣称发布或安装完成 |
+| 当前官方 Skill 清单与旧 Skill 退役、私人安装如何迁移 | [八 Skill 源码清单及发行边界](design/mcp.md#kgos-official-skills)；原三个 `*-standards` 源码退役，v0.3.5 七 Skill 及后续四 Skill 按历史冻结包保留，已有私人安装不会自动变化 |
 | MCP 内的 AI 怎样获取 SDK 入参、出参、Cypher 25 语法及使用示例 | [MCP Tool / 批量文档目标](design/mcp.md#mcp-tool-help)、[D102](design/decisions.md#d102-mcp-tool-taxonomy-and-batch-docs)、[Phase 23](development/phases/23-mcp-tool-taxonomy-and-docs.md)；已实现的 `docs.read` 历史基线见 [D100](design/decisions.md#d100-mcp-self-describing-docs) / [Phase 22](development/phases/22-mcp-self-describing-docs.md)，更早 Help 见 [Phase 20](development/phases/20-mcp-tool-help.md) |
 | KG OS 当前锁定哪个 Lithograph 版本，以及如何同步 MCP 手册 | 现用 v0.3.4 的 [Graph View / Domain 范围](design/graph.md#read-only-graph-view-与-domain-范围lithograph-v034)、[Phase 33](development/phases/33-domain-scoped-search.md)；历史 v0.3.3 升级见 [D103](design/decisions.md#d103-lithograph-v033-upgrade) / [Phase 24](development/phases/24-lithograph-v033-upgrade.md)，更早 v0.3.1 见 [D101](design/decisions.md#d101-lithograph-v031-upgrade) |
 | 人怎样浏览图谱、查询、编辑和管理版本 | [Web 设计](design/web.md)、[功能画板与覆盖](design/web-materials.md)、[一致评审样例](design/web-examples.md)；内置同源交付见 [Runtime](design/runtime.md#web-hosting) |

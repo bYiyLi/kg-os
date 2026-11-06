@@ -25,7 +25,9 @@ Follow the [installation guide](https://kgos.sites.y2l.top/en/install/) through 
 
 The guide helps you create or reuse a basic MCP app in ChatGPT and verify real calls, then provides a prompt for the AI installation steps. Use the **INSTALL.md linked from your selected manual version** ([v0.3.16 AI guide](https://kgos.sites.y2l.top/install/v0.3.16/INSTALL.md)). It guides AI to read the matching release, identify customizations in your old Plugin, and create a new versioned private Plugin after you confirm the plan. It covers the four official Skills, Global AI Guidance, and installation checks. Once the new Plugin passes verification, you choose whether to uninstall the old version; shared apps and MCP connections remain available.
 
-The complete setup includes a ready service, a ChatGPT app, your private Plugin, four official Skills, and global guidance. If you only need basic MCP, you can start using KG OS after the connection checks pass.
+The complete setup includes a ready service, a ChatGPT app, your private Plugin, all official Skills in the selected release, and global guidance. If you only need basic MCP, you can start using KG OS after the connection checks pass.
+
+The current source integrates eight bounded Skills into one Plugin: ontology design, implementation and review; knowledge organization, review and retrieval; activity logging; and Doctor. They share the product release version. This integration is unreleased and does not rewrite the v0.3.16 four-Skill archive or manuals, or automatically update private installations.
 
 ### Before you begin
 

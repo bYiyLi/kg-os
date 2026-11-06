@@ -1,5 +1,7 @@
 # KG OS 开发计划
 
+> 2026-11-05：当前官方 Skill 源码调整为八项专业职责、单一 Plugin 和统一发行版本，见 [Phase 28](phases/28-official-skill-roster.md) 与 [D125](../design/decisions.md#d125-unified-eight-skill-plugin)。该整合不代表既有阶段的真实客户端或正式发行验收已完成。
+
 本目录把[设计文档集](../design.md)中已经确认的产品与技术设计拆成可连续执行、可验证的开发阶段。Design 定义系统行为与边界；Development 只定义实现依赖、交付单位、状态、验收和完成证据。本地安装与命令操作见[开发指南](../guide/development.md)。
 
 先按目标进入：[路线与阶段入口](#5-路线总览)、[通用完成标准](#6-phase-通用完成标准)、[状态定义](#3-状态模型)。实现任务读取相关 Phase，不为单项改动加载全部历史；第 4 节和旧发布叙述是带日期的基线记录，不替代当前代码、Release 或部署核验。
