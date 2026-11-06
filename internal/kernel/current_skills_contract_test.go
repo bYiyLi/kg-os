@@ -19,7 +19,7 @@ func TestCurrentVLogDefinitionResources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blocks := regexp.MustCompile("(?ms)^### (domain|node|relationship):([^\\n]+)\\n\\n~~~yaml\\n(.*?)\\n~~~").FindAllStringSubmatch(string(raw), -1)
+	blocks := regexp.MustCompile(`(?ms)^### (domain|node|relationship):([^\n]+)\n\n~~~yaml\n(.*?)\n~~~`).FindAllStringSubmatch(string(raw), -1)
 	if len(blocks) != 10 || strings.Count(string(raw), "~~~yaml") != 10 {
 		t.Fatalf("want one Domain, four Nodes and five Relationships; got %d blocks", len(blocks))
 	}
@@ -82,7 +82,7 @@ func TestCurrentVLogDefinitionResources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	queries := regexp.MustCompile("(?ms)^## (Q[1-8]) [^\\n]+\\n.*?^~~~cypher\\n(.*?)\\n~~~").FindAllStringSubmatch(string(raw), -1)
+	queries := regexp.MustCompile(`(?ms)^## (Q[1-8]) [^\n]+\n.*?^~~~cypher\n(.*?)\n~~~`).FindAllStringSubmatch(string(raw), -1)
 	if len(queries) != 8 || strings.Count(string(raw), "~~~cypher") != 8 {
 		t.Fatalf("want eight current business queries; got %d", len(queries))
 	}
