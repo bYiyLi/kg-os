@@ -6,7 +6,7 @@ Internal release operations only. This guide is not exported to `kg-releases`. P
 
 | Private `bYiyLi/kg-os`                                                                         | Public `bYiyLi/kg-releases`                                                                              |
 | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Source, tests, design, CI templates, Plugin, eight current source Skills and unique installer | Only the generated runtime entrypoint, installer, Plugin, eight current source Skills and release CI/CD |
+| Source, tests, design, CI templates, Plugin, eight current source Skills and unique installer  | Only the generated runtime entrypoint, installer, Plugin, eight current source Skills and release CI/CD  |
 | Private `main` and authorized source `v*` tags                                                 | Generated manifest on `main`, mirrored public `v*` release tags                                          |
 | A minimal automatic synchronization workflow                                                   | Full CI, Linux amd64 Docker smoke, GHCR and GitHub Releases                                              |
 
