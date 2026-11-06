@@ -34,21 +34,13 @@
     {
       "id": "ambiguous-identity",
       "prompt": "库中有两个同名负责人，来源没有唯一编号，是否可以合并？",
-      "criteria": [
-        "不得仅凭同名合并",
-        "需要确认身份范围与依据",
-        "未决部分不自动改动"
-      ],
+      "criteria": ["不得仅凭同名合并", "需要确认身份范围与依据", "未决部分不自动改动"],
       "expectedSkill": "kgos-organize-knowledge"
     },
     {
       "id": "relationship-not-from-mention",
       "prompt": "一份资料同时提到组件 A、B，可否直接建立 A DEPENDS_ON B？",
-      "criteria": [
-        "共同出现不证明依赖关系",
-        "核对关系语义/端点/方向及直接依据",
-        "证据不足不造边"
-      ],
+      "criteria": ["共同出现不证明依赖关系", "核对关系语义/端点/方向及直接依据", "证据不足不造边"],
       "expectedSkill": "kgos-organize-knowledge"
     },
     {
@@ -74,11 +66,7 @@
     {
       "id": "different-sources-conflict",
       "prompt": "两个来源对同一事件给出不同结果，无法确认哪个正确。",
-      "criteria": [
-        "保留来源和适用范围",
-        "不按新旧或评分直接选赢家",
-        "真实未决不写成已确认"
-      ],
+      "criteria": ["保留来源和适用范围", "不按新旧或评分直接选赢家", "真实未决不写成已确认"],
       "expectedSkill": "kgos-organize-knowledge"
     },
     {
@@ -114,10 +102,7 @@
     {
       "id": "vlog-boundary",
       "prompt": "记录一次系统部署及验证结果，遵守 VLog 的专业归属。",
-      "criteria": [
-        "VLog 专业记录优先选择 VLog Skill",
-        "Knowledge 规则不改写独立 VLog 语义"
-      ],
+      "criteria": ["VLog 专业记录优先选择 VLog Skill", "Knowledge 规则不改写独立 VLog 语义"],
       "expectedSkill": "kgos-record-vlog"
     },
     {
@@ -304,10 +289,7 @@
       "id": "no-kgos-task",
       "prompt": "把这句普通问候翻译为英文：早上好。",
       "expectedSkill": "none",
-      "criteria": [
-        "不把普通翻译判作知识操作或系统自检",
-        "不执行无关写入"
-      ]
+      "criteria": ["不把普通翻译判作知识操作或系统自检", "不执行无关写入"]
     }
   ]
 }

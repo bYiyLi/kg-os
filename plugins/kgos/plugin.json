@@ -15,10 +15,7 @@
         "longDescription": "Use your own private KG OS Instance to inspect pinned knowledge graph versions, query data, and perform controlled changes.",
         "developerName": "KG OS",
         "category": "Productivity",
-        "capabilities": [
-          "Read",
-          "Write"
-        ],
+        "capabilities": ["Read", "Write"],
         "defaultPrompt": "Use the already selected KG OS instance and scope. Inspect all branches only when that scope permits it; otherwise read the known target State. Then help me with this knowledge graph."
       }
     }

@@ -137,7 +137,13 @@ test("current Skill catalog has valid metadata and all local Markdown resources 
 
 test("split Skills preserve read-only review, scoped saves and independent results", () => {
   const contracts = {
-    "kgos-retrieve-knowledge": ["KG OS 侧只读", "不可变 State", "完整正文", "top-k", "不能擅自切换实例"],
+    "kgos-retrieve-knowledge": [
+      "KG OS 侧只读",
+      "不可变 State",
+      "完整正文",
+      "top-k",
+      "不能擅自切换实例"
+    ],
     "kgos-organize-knowledge": [
       "只读、讨论和建议任务止于候选与建议",
       "不自行修改本体或新建分支",
@@ -145,12 +151,37 @@ test("split Skills preserve read-only review, scoped saves and independent resul
       "不直接重试",
       "内容检查、保存回读、检索检查和真实运行效果"
     ],
-    "kgos-review-knowledge": ["仅使用只读接口", "不提供替代文本、修复步骤或修改方案", "完整正文", "未核实项目不得算作通过"],
+    "kgos-review-knowledge": [
+      "仅使用只读接口",
+      "不提供替代文本、修复步骤或修改方案",
+      "完整正文",
+      "未核实项目不得算作通过"
+    ],
     "design-ontology": ["预期结果及依据", "不通过迁就模型改写预期", "自检清单"],
-    "kgos-ontology-implementation": ["核验写入许可", "不在转换时擅自补设计", "信息一致性", "不以写入成功代替验收通过"],
-    "kgos-review-ontology": ["仅使用只读接口", "不提供替代模型、修复步骤、修改方案或补丁", "相关真实知识", "无法确认"],
-    "kgos-record-vlog": ["操作成功不等于验证通过", "回执未知时先检查原目标", "日志保存失败不重做原操作", "不为日志保存成功再递归记一条日志"],
-    "kgos-doctor": ["全面自检覆盖 D0–D6", "冻结清单", "Plugin 发行版本与 MCP 运行版本是两个证据对象", "不执行修复、升级、部署或自动保存日志"]
+    "kgos-ontology-implementation": [
+      "核验写入许可",
+      "不在转换时擅自补设计",
+      "信息一致性",
+      "不以写入成功代替验收通过"
+    ],
+    "kgos-review-ontology": [
+      "仅使用只读接口",
+      "不提供替代模型、修复步骤、修改方案或补丁",
+      "相关真实知识",
+      "无法确认"
+    ],
+    "kgos-record-vlog": [
+      "操作成功不等于验证通过",
+      "回执未知时先检查原目标",
+      "日志保存失败不重做原操作",
+      "不为日志保存成功再递归记一条日志"
+    ],
+    "kgos-doctor": [
+      "全面自检覆盖 D0–D6",
+      "冻结清单",
+      "Plugin 发行版本与 MCP 运行版本是两个证据对象",
+      "不执行修复、升级、部署或自动保存日志"
+    ]
   };
   for (const [name, phrases] of Object.entries(contracts)) {
     const body = read(`plugins/kgos/skills/${name}/SKILL.md`);

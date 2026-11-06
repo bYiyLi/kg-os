@@ -4,213 +4,120 @@
     {
       "id": "whole-library-review",
       "prompt": "用户要整理整个个人学习知识世界，目前只查看了20条知识，尚有多种模型及未读页。能直接宣布全库维护完成吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "不以20条断言全库",
-        "说明未覆盖范围",
-        "尊重用户全库目标"
-      ]
+      "criteria": ["不以20条断言全库", "说明未覆盖范围", "尊重用户全库目标"]
     },
     {
       "id": "bounded-check-complete",
       "prompt": "用户明确只要检查学习库中的20条给定记录与它们的关联，查询和关系检查已覆盖这些对象，未发现问题。是否还必须扫描全库才算完成？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "限定范围内完成",
-        "不强制全库",
-        "无修改也有效"
-      ]
+      "criteria": ["限定范围内完成", "不强制全库", "无修改也有效"]
     },
     {
       "id": "maintenance-scoped-domain",
       "prompt": "用户说只维护学习Domain下的实例，但目前只知道Domain组织本体。你会直接将Domain当知识实例命名空间吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "Domain不是实例分区",
-        "结合实际Definition和条件确定范围",
-        "不乱查全库"
-      ]
+      "criteria": ["Domain不是实例分区", "结合实际Definition和条件确定范围", "不乱查全库"]
     },
     {
       "id": "exact-known-error",
       "prompt": "用户已给定唯一目标Ref和正确值，只要求将该Knowledge节点的title从错字A改为B并回读，没有其它整理任务。",
-      "mustInclude": [
-        "kgos-knowledge-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "普通单对象编辑归Knowledge"
-      ]
+      "mustInclude": ["kgos-knowledge-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["普通单对象编辑归Knowledge"]
     },
     {
       "id": "query-answer-only",
       "prompt": "用户只想查询小说经验库中三条经验并回答，不检查知识质量、不修改。",
-      "mustInclude": [
-        "kgos-retrieval-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "纯查询属于Retrieval"
-      ]
+      "mustInclude": ["kgos-retrieval-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["纯查询属于Retrieval"]
     },
     {
       "id": "doctor-environment",
       "prompt": "请只读检查我目前的KG OS连接、MCP授权、Skill安装和外部维护任务是否启用，不整理知识内容。",
       "mustInclude": [],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "不接管Doctor环境诊断"
-      ]
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["不接管Doctor环境诊断"]
     },
     {
       "id": "vlog-only",
       "prompt": "请把昨天已执行维护的原因、步骤、证据与结果写成VLog记录，已经给出需要的资料，不决定如何维护知识。",
-      "mustInclude": [
-        "kgos-vlog-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "系统记录格式归VLog"
-      ]
+      "mustInclude": ["kgos-vlog-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["系统记录格式归VLog"]
     },
     {
       "id": "branch-only",
       "prompt": "为小说经验库建立独立长期知识世界，确定从哪个有效State创建Branch；不执行数据清理。",
-      "mustInclude": [
-        "kgos-branch-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "世界和起点归Branch"
-      ]
+      "mustInclude": ["kgos-branch-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["世界和起点归Branch"]
     },
     {
       "id": "ontology-only",
       "prompt": "用户要设计一个学习Ontology的StudySession Node Definition与Property，并审查约束，不评估既有数据质量。",
-      "mustInclude": [
-        "kgos-ontology-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "纯模型设计归Ontology"
-      ]
+      "mustInclude": ["kgos-ontology-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["纯模型设计归Ontology"]
     },
     {
       "id": "same-name-distinct",
       "prompt": "学习库查到两位都叫Alex，但稳定键是同一目录下P1与P2，来源确认不同人。维护时合并吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "合理同名不合并",
-        "正确作用域和身份",
-        "保持各自关联"
-      ]
+      "criteria": ["合理同名不合并", "正确作用域和身份", "保持各自关联"]
     },
     {
       "id": "same-key-different-relations",
       "prompt": "两个节点被确认代表同一员工A/P1，甲关联2024年任职和来源X，乙关联2026年任职和来源Y。直接删乙能完成去重吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "先确认边及来源",
-        "合并需保护两个不同事实",
-        "不直接删一份"
-      ]
+      "criteria": ["先确认边及来源", "合并需保护两个不同事实", "不直接删一份"]
     },
     {
       "id": "fully-redundant-authorized",
       "prompt": "两个节点确实为同一业务身份、同一来源重复导入，乙无任何新信息/边；用户明确授权删除冗余节点，是否永远不能去重？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "可以安全地最小去重",
-        "不要保护规则变绝对禁止",
-        "实际回读验证"
-      ]
+      "criteria": ["可以安全地最小去重", "不要保护规则变绝对禁止", "实际回读验证"]
     },
     {
       "id": "same-sentence-independent-sources",
       "prompt": "小说经验库中两位作者给出完全相同一句写作建议，但来源彼此独立。为降低冗余是否删一条？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "不同来源的独立证据不简单删除",
-        "与同次重复导入区分"
-      ]
+      "criteria": ["不同来源的独立证据不简单删除", "与同次重复导入区分"]
     },
     {
       "id": "same-relationship-different-time",
       "prompt": "同一人物与项目之间同类型边有两条，期间分别2024和2026。模型允许多期事件。是重复吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "按期间角色判等",
-        "不是同端点同类型就重复"
-      ]
+      "criteria": ["按期间角色判等", "不是同端点同类型就重复"]
     },
     {
       "id": "top-k-negative",
       "prompt": "语义检索topK未找到同一实体，但有未被索引的记录，任务要求证明某身份范围无重复。能给确定结论吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "搜索缺口不支持全范围否定",
-        "需要真实结构化/完整覆盖或报告未知"
-      ]
+      "criteria": ["搜索缺口不支持全范围否定", "需要真实结构化/完整覆盖或报告未知"]
     },
     {
       "id": "zero-result-complete",
       "prompt": "业务键作用域已确定，结构化查询覆盖并完整翻页，发现某键只对应一条；当前任务仅确认这一键的重复情况。",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "有界证据足够",
-        "不无限扩大检索",
-        "限定库内结论"
-      ]
+      "criteria": ["有界证据足够", "不无限扩大检索", "限定库内结论"]
     },
     {
       "id": "opposing-fiction-advice",
       "prompt": "一条经验说第一人称增强代入感，另一条说第三人称扩大视角，目标不同。必须选一条作为正确吗？",
       "mustInclude": [],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustExclude": ["kgos-maintenance-standards"],
       "criteria": [
         "不同适用条件并存",
         "不强行统一",
@@ -220,12 +127,8 @@
     {
       "id": "same-time-conflict-unresolved",
       "prompt": "同一员工在同一时间按模型只能有一个主组织，但两份有冲突的确定值，来源尚不能判断哪份正确。",
-      "mustInclude": [
-        "kgos-knowledge-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-knowledge-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
       "criteria": [
         "确认存在冲突",
         "赢家未决",
@@ -236,12 +139,8 @@
     {
       "id": "same-time-conflict-proved",
       "prompt": "原员工主组织值A被可信来源确证是误录、真正是B，本次已授权局部修正。",
-      "mustInclude": [
-        "kgos-knowledge-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-knowledge-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
       "criteria": [
         "允许有据纠错",
         "避免无关修改",
@@ -252,37 +151,22 @@
     {
       "id": "opposing-sourced-claims",
       "prompt": "两个作者确实发表相反的创作评价，目标是清理冲突。是否删除其中一个来源主张？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "两个真实主张可并存",
-        "不把来源意见当确定事实冲突"
-      ]
+      "criteria": ["两个真实主张可并存", "不把来源意见当确定事实冲突"]
     },
     {
       "id": "historical-two-periods",
       "prompt": "2024年员工属于P1，2026年属于P2，两个业务时间不重叠。这是需要清理的矛盾吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "历史事实正确",
-        "业务时间非Commit时间",
-        "不删除合法历史"
-      ]
+      "criteria": ["历史事实正确", "业务时间非Commit时间", "不删除合法历史"]
     },
     {
       "id": "misquoted-source",
       "prompt": "既有记录把乙的主张误引成甲的，来源核对已证明错误，授权纠正引用归属。应该永久保留这份错误吗？",
-      "mustInclude": [
-        "kgos-knowledge-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-knowledge-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
       "criteria": [
         "有据纠错可执行",
         "不误判为观点变化",
@@ -292,50 +176,29 @@
     {
       "id": "age-only",
       "prompt": "小说技巧记录三年没变更，但仍明确有效范围、没有新证据表明失效。是否一律过期删除？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "年龄不证明失效",
-        "保持合法历史"
-      ]
+      "criteria": ["年龄不证明失效", "保持合法历史"]
     },
     {
       "id": "deprecated-dependency",
       "prompt": "一条建议仅适用于已证实弃用的引擎版本，用户要求维护当前可用建议。",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "核对外部版本证据",
-        "更新适用范围",
-        "保留有用历史"
-      ]
+      "criteria": ["核对外部版本证据", "更新适用范围", "保留有用历史"]
     },
     {
       "id": "optional-missing-edge",
       "prompt": "人物节点没有Team关系，但Ontology把关系设为可选，且没有其它必须属于Team的事实。需要自动造Team关系吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "允许缺边",
-        "开放世界未记录不等于事实虚假",
-        "不得造端点"
-      ]
+      "criteria": ["允许缺边", "开放世界未记录不等于事实虚假", "不得造端点"]
     },
     {
       "id": "required-known-edge",
       "prompt": "现有模型要求某已证实存在的关系，完整查询显示库里缺少该边，且已知正确端点。用户已授权修复此缺口。",
-      "mustInclude": [
-        "kgos-knowledge-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-knowledge-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
       "criteria": [
         "可以定位真正的表达缺口",
         "关系修改尊重已有模型",
@@ -346,126 +209,71 @@
     {
       "id": "model-cannot-express-history",
       "prompt": "当前模型只支持现在的任职，用户要求维护历史任职事实；本轮只授权质量巡检，不授权本体修改。",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "报告具体模型缺口",
-        "不自建字段类型",
-        "保留历史未决"
-      ]
+      "criteria": ["报告具体模型缺口", "不自建字段类型", "保留历史未决"]
     },
     {
       "id": "readonly-duplicates",
       "prompt": "只读Review发现有证据的同键重复，需要给出问题和处置建议；能先删一个测试是否正确吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "只读无删除授权",
-        "提供受影响边/范围与建议"
-      ]
+      "criteria": ["只读无删除授权", "提供受影响边/范围与建议"]
     },
     {
       "id": "authorized-three-links",
       "prompt": "用户已明确授权修复学习库三条确定错误关系，正确目标和证据给定。要额外删除其它所有孤立节点提高质量吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "目标限三条",
-        "不清全库",
-        "局部修改不额外反复批准"
-      ]
+      "criteria": ["目标限三条", "不清全库", "局部修改不额外反复批准"]
     },
     {
       "id": "incorrect-edge-text-only",
       "prompt": "人的描述已被修改，但错误关系仍指向Project X而不是已证实的Project Y。API成功意味着维护完成吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "不等于修复",
-        "核对实际关系端点",
-        "相关依赖验证"
-      ]
+      "criteria": ["不等于修复", "核对实际关系端点", "相关依赖验证"]
     },
     {
       "id": "broad-audit-partial",
       "prompt": "要求全库巡检，权限只可读两个Branch中的一个且只看了一页；如何报告结果？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "分可确认部分和未知",
-        "不宣称全部完成",
-        "不扩权限"
-      ]
+      "criteria": ["分可确认部分和未知", "不宣称全部完成", "不扩权限"]
     },
     {
       "id": "quiet-run",
       "prompt": "授权周期检查并记录结果，本次有界检查已充分且没有异常/变更。为了表明维护成功必须生成一个新Commit吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "无修改可完成",
-        "范围结果真实",
-        "记录由VLog且仍需授权"
-      ]
+      "criteria": ["无修改可完成", "范围结果真实", "记录由VLog且仍需授权"]
     },
     {
       "id": "no-vlog-authorization",
       "prompt": "只授权检查并修复知识，不要求系统VLog。修复后能因值得记录就自动写入branch/vlog吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "不自动取得记录权限",
-        "可报告结果/建议记录"
-      ]
+      "criteria": ["不自动取得记录权限", "可报告结果/建议记录"]
     },
     {
       "id": "stale-patch",
       "prompt": "已知错误属性从S0准备修正，另一个Agent同时在S1更新了来源信息。旧Patch被拒绝后，直接换baseState重发旧全文行吗？",
-      "mustInclude": [
-        "kgos-knowledge-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "已知单一实例的并发Patch属Knowledge",
-        "不因一个stale base触发全库Maintenance"
-      ]
+      "mustInclude": ["kgos-knowledge-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["已知单一实例的并发Patch属Knowledge", "不因一个stale base触发全库Maintenance"]
     },
     {
       "id": "lost-receipt",
       "prompt": "两个独立维护操作第一条确实提交，第二条调用断线结果未知。能报告全回滚并重跑全部吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "先核实head/history",
-        "已成功部分不重做",
-        "第二项未知不自动重试"
-      ]
+      "criteria": ["先核实head/history", "已成功部分不重做", "第二项未知不自动重试"]
     },
     {
       "id": "rejected-batch",
       "prompt": "更新目标A并新增另一个不合法对象的同次原子ObjectPatch被明确拒绝，目标Head未动。如何继续？",
       "mustInclude": [],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustExclude": ["kgos-maintenance-standards"],
       "criteria": [
         "区分明确拒绝与未知",
         "不宣称部分成功",
@@ -477,12 +285,8 @@
     {
       "id": "branch-head-moved-after-read",
       "prompt": "复核同一Branch第一次读固定S1，期间Branch前进S2，第二次读返回S2。能当同一一致快照统计吗？",
-      "mustInclude": [
-        "kgos-retrieval-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-retrieval-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
       "criteria": [
         "State不同不能混统计",
         "固定所需基线或明确版本比较",
@@ -492,12 +296,8 @@
     {
       "id": "query-graph-path-multiplicity",
       "prompt": "检查重复时Query返回10条图路径，但可能同一节点被多条路径命中。能认定有10个重复对象？",
-      "mustInclude": [
-        "kgos-retrieval-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-retrieval-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
       "criteria": [
         "路径数不等对象数",
         "按身份/稳定Ref去重计数",
@@ -507,145 +307,84 @@
     {
       "id": "old-maintenance-not-current",
       "prompt": "上次S0发现重复，S1已有修复证据，今天S2要求关注未决关系。应复制上次修复动作再跑吗？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "旧结论不等现态",
-        "先查实际已处理和未决",
-        "不重复成功动作"
-      ]
+      "criteria": ["旧结论不等现态", "先查实际已处理和未决", "不重复成功动作"]
     },
     {
       "id": "periodic-schedule-only",
       "prompt": "只要求每周自动安排知识巡检的运行时间，没有维护决策和知识质量工作。",
       "mustInclude": [],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "外部调度不属于本Skill"
-      ]
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["外部调度不属于本Skill"]
     },
     {
       "id": "doctor-availability-only",
       "prompt": "用户要查看MCP是否连通、初始化是否成功、插件是否启用，没有要求检查知识质量。",
       "mustInclude": [],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "不是环境Doctor"
-      ]
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["不是环境Doctor"]
     },
     {
       "id": "create-world",
       "prompt": "只想把小说经验和学习分两个长期Branch，并选从哪个State建立。",
-      "mustInclude": [
-        "kgos-branch-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "仅Branch管理"
-      ]
+      "mustInclude": ["kgos-branch-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["仅Branch管理"]
     },
     {
       "id": "pure-vlog-edit",
       "prompt": "维护已经结束，用户只要求纠正已有VLog对验证环境的误写，不再复核知识世界质量。",
-      "mustInclude": [
-        "kgos-vlog-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "VLog记录校正归VLog"
-      ]
+      "mustInclude": ["kgos-vlog-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["VLog记录校正归VLog"]
     },
     {
       "id": "pure-knowledge-update",
       "prompt": "两条业务事实的身份、更新依据和目标Ref已经确认，用户只要更新一条当前字段。",
-      "mustInclude": [
-        "kgos-knowledge-standards"
-      ],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "明确的普通实例改动"
-      ]
+      "mustInclude": ["kgos-knowledge-standards"],
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["明确的普通实例改动"]
     },
     {
       "id": "git-cleanup",
       "prompt": "维护Git代码仓库：清理本地工作分支和重命名文件，与KG OS知识图无关。",
       "mustInclude": [],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "不是KGOS维护"
-      ]
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["不是KGOS维护"]
     },
     {
       "id": "user-long-term-no-ai-access",
       "prompt": "目前没有MCP连接，用户只让设计学习知识世界质量巡检的判断方法，不要求执行。",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "可以给指导",
-        "不宣称实际读取/修改",
-        "不强制连接先行"
-      ]
+      "criteria": ["可以给指导", "不宣称实际读取/修改", "不强制连接先行"]
     },
     {
       "id": "composite-maintain-and-record",
       "prompt": "用户已授权实际修复知识库中一组确定重复，再根据真实修复和验证结果保存维护事件。设计职责应怎么拆分？",
-      "mustInclude": [
-        "kgos-maintenance-standards",
-        "kgos-vlog-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards", "kgos-vlog-standards"],
       "mustExclude": [],
-      "criteria": [
-        "Maintenance判断范围/策略与效果",
-        "VLog记录内容",
-        "宿主按原授权执行"
-      ]
+      "criteria": ["Maintenance判断范围/策略与效果", "VLog记录内容", "宿主按原授权执行"]
     },
     {
       "id": "no-trigger-travel-vlog",
       "prompt": "帮我整理旅游视频vlog字幕与剪辑安排，不涉及任何知识库。",
       "mustInclude": [],
-      "mustExclude": [
-        "kgos-maintenance-standards"
-      ],
-      "criteria": [
-        "非KGOS"
-      ]
+      "mustExclude": ["kgos-maintenance-standards"],
+      "criteria": ["非KGOS"]
     },
     {
       "id": "stale-batch-maintenance",
       "prompt": "正在执行已授权的学习知识世界批量质量维护，已确认一组重复和错误关联。处理其中一项时目标Branch从S0前进到S1，另一Agent补了新来源；本次维护该如何继续并验证？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "按当前维护批次继续",
-        "先查并发的S1变化",
-        "保留其它证据、仅处理授权目标并验证"
-      ]
+      "criteria": ["按当前维护批次继续", "先查并发的S1变化", "保留其它证据、仅处理授权目标并验证"]
     },
     {
       "id": "daily-related-candidates",
       "prompt": "已持续授权维护学习世界并修复相关质量问题。普通任务中发现一组疑似重复记录和过时关联，尚未确认身份或业务时间。接下来如何处理？",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
       "criteria": [
         "先核实疑似问题与合理差异",
@@ -656,22 +395,14 @@
     {
       "id": "daily-readonly-finding",
       "prompt": "此前有持续知识维护授权；用户本轮限定只读评审。发现几条确已错误的关系。请完成本次评审。",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
-      "criteria": [
-        "当前只读边界优先",
-        "报告错误与最小方案而不修复",
-        "不为验证运行写入探针"
-      ]
+      "criteria": ["当前只读边界优先", "报告错误与最小方案而不修复", "不为验证运行写入探针"]
     },
     {
       "id": "daily-unresolved-conflict",
       "prompt": "持续授权维护项目知识。日常任务发现同一对象、同一时点的两份可靠来源互相冲突；已核对身份、业务时间和可访问原文，仍无法裁决。现有模型允许保留不同来源主张，另有明确事实可继续用于任务。",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
       "criteria": [
         "确认冲突并保留来源与未决，不强迫统一或删除",
@@ -682,9 +413,7 @@
     {
       "id": "daily-adequate-no-repair",
       "prompt": "已授权维护项目知识。普通任务中两条内容看似冲突，经核实分别适用于不同时间和主体，当前记录和关系已准确表达差异，任务所需知识充分。请完成本次处理。",
-      "mustInclude": [
-        "kgos-maintenance-standards"
-      ],
+      "mustInclude": ["kgos-maintenance-standards"],
       "mustExclude": [],
       "criteria": [
         "确认合理差异并保留，无需制造修复",

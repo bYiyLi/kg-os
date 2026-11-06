@@ -5,11 +5,7 @@
       "id": "new-experience-existing-model",
       "prompt": "把这篇提示词经验保存到已有知识库，相关模型完全能够表达它；不用新建模型。",
       "expectedApplies": false,
-      "criteria": [
-        "复用实际目标模型",
-        "普通 Knowledge 写入不新增建模审批",
-        "不新建主题 Branch"
-      ]
+      "criteria": ["复用实际目标模型", "普通 Knowledge 写入不新增建模审批", "不新建主题 Branch"]
     },
     {
       "id": "experience-no-topic-branch",
@@ -87,11 +83,7 @@
       "id": "unavailable-model-repository",
       "prompt": "请完成一个新的模型设计，但 kgos-ontologies 仓库暂时无法访问。",
       "expectedApplies": true,
-      "criteria": [
-        "不编造官方模型",
-        "按已确认的真实需求独立建模",
-        "继续形成变更清单供审核"
-      ]
+      "criteria": ["不编造官方模型", "按已确认的真实需求独立建模", "继续形成变更清单供审核"]
     },
     {
       "id": "confirmation-scope-drift",

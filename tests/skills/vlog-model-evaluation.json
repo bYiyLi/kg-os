@@ -23,11 +23,7 @@
     {
       "id": "no-model-no-authorization",
       "prompt": "我只让你记录一次维护结果，但 branch/vlog 里没有可用的记录模型，也没有授权你创建本体论。你可以自行按推荐方案建模型吗？",
-      "criteria": [
-        "不能擅自建模",
-        "可提供准确草稿和明确缺口",
-        "不把模板视为授权"
-      ]
+      "criteria": ["不能擅自建模", "可提供准确草稿和明确缺口", "不把模板视为授权"]
     },
     {
       "id": "simple-decision",
@@ -80,20 +76,12 @@
     {
       "id": "recorded-at-not-observed",
       "prompt": "用户没有告诉我记录首次持久保存时间，现有VLog提交时间也可能是后来纠错产生。为了完整填写18个字段，能把现在的时间填进recordedAt吗？",
-      "criteria": [
-        "recordedAt可选",
-        "未可靠确认首次保存时间则省略",
-        "不拿最新Commit或当前时间冒充"
-      ]
+      "criteria": ["recordedAt可选", "未可靠确认首次保存时间则省略", "不拿最新Commit或当前时间冒充"]
     },
     {
       "id": "duplicate-delivery",
       "prompt": "同一真实维护Run的VLog写入请求断线。我还没查目标branch/vlog是否已保存，可以给它随机新entryKey再插一次吗？",
-      "criteria": [
-        "先回读或查询既定稳定entryKey",
-        "不能随机再写导致重复",
-        "区别Run身份与记录身份"
-      ]
+      "criteria": ["先回读或查询既定稳定entryKey", "不能随机再写导致重复", "区别Run身份与记录身份"]
     },
     {
       "id": "existing-structured-graph",
@@ -117,10 +105,7 @@
     {
       "id": "status-values-not-enforced",
       "prompt": "我已经采用推荐VLogEntry模型。只要executionStatus是STRING，数据库是不是会拒绝不在Skill建议列表中的状态，比如aborted？",
-      "criteria": [
-        "STRING不强制enum",
-        "状态枚举只是建议"
-      ]
+      "criteria": ["STRING不强制enum", "状态枚举只是建议"]
     },
     {
       "id": "requested-enum-enforcement-no-authorization",
@@ -144,11 +129,7 @@
     {
       "id": "external-source-without-commit",
       "prompt": "一个GitHub发布流程发生事故，需要记入vlog。来源只有真实workflow/run地址，没有KG OS sourceState；能否自行制造一个commit State来符合模板？",
-      "criteria": [
-        "外部来源不强求KGOS State",
-        "记录真实外部定位与证据",
-        "不伪造State或跨世界关系"
-      ]
+      "criteria": ["外部来源不强求KGOS State", "记录真实外部定位与证据", "不伪造State或跨世界关系"]
     }
   ]
 }
