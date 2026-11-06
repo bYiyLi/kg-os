@@ -17,9 +17,9 @@
 ## Scope
 
 1. **仓库分离**：现有 `bYiyLi/kg-os` 变为 Private，创建公开 `bYiyLi/kg-releases`；保留本地和远端源代码历史、旧公开 Fork 事实、原工作树中无关未提交修改；Lithograph 不变。
-2. **单一真源**：KG OS 的 `distribution/` 保存公开主页和 CI/CD 模板，`plugins/kgos/INSTALL.md` 是唯一安装指南真源；`scripts/render-kg-releases.mjs` 按受限白名单复制根安装指南、Plugin Manifest、无凭证配置样例、当前四个官方 Skill 与 Markdown 参考资源、许可证及私有确切 SHA/ref 的 `source.json`。公开仓库不能独立编辑，也不复制完整应用源码、仓库历史、Secret、私有日志或本地状态；历史通用 `kgos` 已按 [Phase 28](28-official-skill-roster.md) 从私有源码清理，不进入当前公开包。
+2. **单一真源**：KG OS 的 `distribution/` 保存公开主页和 CI/CD 模板，`plugins/kgos/INSTALL.md` 是唯一安装指南真源；`scripts/render-kg-releases.mjs` 按受限白名单复制根安装指南、Plugin Manifest、无凭证配置样例、当前八个官方 Skill 与 Markdown 参考资源、许可证及私有确切 SHA/ref 的 `source.json`。公开仓库不能独立编辑，也不复制完整应用源码、仓库历史、Secret、私有日志或本地状态；历史通用 `kgos` 已按 [Phase 28](28-official-skill-roster.md) 从私有源码清理，不进入当前公开包。
 3. **自动同步**：私有 `main` 与获授权 `v*` Tag Push 启动源仓库的最小 Sync 工作流；两个不同 Deploy Key 分别授予源→公开写权限与公开 CI→源只读权限。重复推送/Tag 重跑保持幂等，不强推公开 Tag。
-4. **公开完整 CI/CD**：按 D123 对候选执行完整质量、分发及 Linux amd64 OCI 回载 Smoke，封存并下载核验同一候选；Tag 只核验和推广原产物。普通 Push 不推送 GHCR，只有许可门禁已满足时可上传不含源码的受控候选二进制。Plugin 当前四 Skill，与三份手册、校验和及 provenance 一起追溯。
+4. **公开完整 CI/CD**：按 D123 对候选执行完整质量、分发及 Linux amd64 OCI 回载 Smoke，封存并下载核验同一候选；Tag 只核验和推广原产物。普通 Push 不推送 GHCR，只有许可门禁已满足时可上传不含源码的受控候选二进制。Plugin 当前八 Skill，与三份手册、校验和及 provenance 一起追溯；[D125](../../design/decisions.md#d125-unified-eight-skill-plugin) 的源码整合不改写历史发行清单或证明已正式发版。
 5. **安全和合规**：明确公开日志、fork、历史 AGPL 与双授权边界；正式二进制发布由公共仓库 `KGOS_BINARY_DISTRIBUTION_APPROVED` 门禁控制，在授权未解决前不能声明可发布。按用户最新决定，私有 GitHub Actions 只允许同步，不保留并行 CI/Release；公开失败由公开 CI/CD 处理。
 
 ## Acceptance

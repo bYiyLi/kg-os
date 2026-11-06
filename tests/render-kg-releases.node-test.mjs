@@ -851,6 +851,9 @@ test("agent installer has one installation flow and preserves official guidance"
       "utf8"
     );
     assert.match(template, /Global AI Guidance/);
+    assert.match(template, /D0–D3/);
+    assert.doesNotMatch(template, /D1–D3|四个(?:官方 )?Skill|four (?:official )?Skills/i);
+    assert.doesNotMatch(template, /kgos-(?:knowledge|ontology|vlog)-standards/);
   }
 });
 
