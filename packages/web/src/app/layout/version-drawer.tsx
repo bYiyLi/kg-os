@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogTitle } from "../../shared/ui/dialog.js";
 import { Button } from "../../shared/ui/button.js";
 import { useTranslation } from "react-i18next";
-import { Settings2 } from "lucide-react";
+import { Activity, Settings2 } from "lucide-react";
 import type { RefObject } from "react";
 
 import { Icon } from "../../shared/ui/icon.js";
@@ -11,11 +11,52 @@ import type { VersionHistory } from "../../features/version/use-version-history.
 
 import { AppBrand } from "./header.js";
 
+function DrawerActions({
+  onOpenObservability,
+  onOpenSettings,
+  observing
+}: {
+  onOpenObservability: (() => void) | undefined;
+  onOpenSettings: (() => void) | undefined;
+  observing: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="drawer-bottom">
+      {onOpenObservability !== undefined && (
+        <Button
+          variant="ghost"
+          className="sidebar-observability-button"
+          type="button"
+          aria-pressed={observing}
+          onClick={onOpenObservability}
+        >
+          <Activity className="icon" aria-hidden="true" />
+          <span>{t("observability.title")}</span>
+        </Button>
+      )}
+      {onOpenSettings !== undefined && (
+        <Button
+          variant="ghost"
+          className="sidebar-settings-button"
+          type="button"
+          onClick={onOpenSettings}
+        >
+          <Settings2 className="icon" aria-hidden="true" />
+          <span>{t("settings.title")}</span>
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function VersionDrawer({
   open,
   coveredByHistory = false,
   onOpenChange,
   onOpenSettings,
+  onOpenObservability,
+  observing = false,
   returnFocus,
   history,
   navigation,
@@ -26,6 +67,8 @@ export function VersionDrawer({
   coveredByHistory?: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenSettings?: (() => void) | undefined;
+  onOpenObservability?: (() => void) | undefined;
+  observing?: boolean;
   returnFocus?: RefObject<HTMLElement | null>;
   history: VersionHistory;
 } & Omit<WorldDirectoryProps, "history">) {
@@ -71,19 +114,11 @@ export function VersionDrawer({
             onOpenAllHistory={onOpenAllHistory}
           />
         </div>
-        <div className="drawer-bottom">
-          {onOpenSettings !== undefined && (
-            <Button
-              variant="ghost"
-              className="sidebar-settings-button"
-              type="button"
-              onClick={onOpenSettings}
-            >
-              <Settings2 className="icon" aria-hidden="true" />
-              <span>{t("settings.title")}</span>
-            </Button>
-          )}
-        </div>
+        <DrawerActions
+          onOpenObservability={onOpenObservability}
+          onOpenSettings={onOpenSettings}
+          observing={observing}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -37,6 +37,14 @@ import type {
   ObjectTextReadResult,
   OntologyReadRequest,
   OntologyReadResult,
+  ObservabilityLogListInput,
+  ObservabilityLogListResult,
+  ObservabilityOverviewResult,
+  ObservabilityRequestGetInput,
+  ObservabilityRequestGetResult,
+  ObservabilityRequestListInput,
+  ObservabilityRequestListResult,
+  ObservabilityWindow,
   PatchRequest,
   PatchResult,
   PublicError,
@@ -264,7 +272,37 @@ async function* graphEvents(
 export class KGOSClient {
   readonly system = {
     diagnostics: (options?: RequestOptions) =>
-      this.post<SystemDiagnosticsResult>("/api/v1/system/diagnostics", {}, options)
+      this.post<SystemDiagnosticsResult>("/api/v1/system/diagnostics", {}, options),
+    observability: {
+      overview: (window: ObservabilityWindow = {}, options?: RequestOptions) =>
+        this.post<ObservabilityOverviewResult>(
+          "/api/v1/system/observability/overview",
+          window,
+          options
+        ),
+      requests: {
+        list: (input: ObservabilityRequestListInput = {}, options?: RequestOptions) =>
+          this.post<ObservabilityRequestListResult>(
+            "/api/v1/system/observability/requests/list",
+            input,
+            options
+          ),
+        get: (input: ObservabilityRequestGetInput, options?: RequestOptions) =>
+          this.post<ObservabilityRequestGetResult>(
+            "/api/v1/system/observability/requests/get",
+            input,
+            options
+          )
+      },
+      logs: {
+        list: (input: ObservabilityLogListInput = {}, options?: RequestOptions) =>
+          this.post<ObservabilityLogListResult>(
+            "/api/v1/system/observability/logs/list",
+            input,
+            options
+          )
+      }
+    }
   };
   readonly web = {
     data: {

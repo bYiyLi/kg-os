@@ -77,8 +77,10 @@ func (o *oauthBroker) beginAuthorization(w http.ResponseWriter, r *http.Request)
 	state := onlyOAuthValue(query, "state")
 	challenge := onlyOAuthValue(query, "code_challenge")
 	scope, validScope := normalizeOAuthScope(onlyOAuthValue(query, "scope"))
-	if !validOAuthClientID(clientID) || !validOAuthRedirect(redirect) ||
-		!oauthVisiblePattern.MatchString(state) || !oauthSecretPattern.MatchString(challenge) ||
+	if (!validOAuthClientID(clientID) && !validDCRClientID(clientID)) || !validOAuthRedirect(redirect) ||
+		(state != "" && !oauthVisiblePattern.MatchString(state)) ||
+		(query.Has("state") && len(query["state"]) != 1) ||
+		!oauthSecretPattern.MatchString(challenge) ||
 		onlyOAuthValue(query, "response_type") != "code" ||
 		onlyOAuthValue(query, "code_challenge_method") != "S256" ||
 		onlyOAuthValue(query, "resource") != o.resource ||
@@ -86,7 +88,7 @@ func (o *oauthBroker) beginAuthorization(w http.ResponseWriter, r *http.Request)
 		oauthFailure(w, 400, "invalid_request")
 		return
 	}
-	redirects, err := o.redirectsFor(r.Context(), clientID)
+	document, err := o.clientAuth.Client(r.Context(), clientID, false)
 	if err != nil {
 		if errors.Is(err, errOAuthClientUnavailable) {
 			oauthFailure(w, 503, "temporarily_unavailable")
@@ -96,7 +98,7 @@ func (o *oauthBroker) beginAuthorization(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	allowed := false
-	for _, candidate := range redirects {
+	for _, candidate := range document.RedirectURIs {
 		if candidate == redirect {
 			allowed = true
 			break
@@ -105,6 +107,15 @@ func (o *oauthBroker) beginAuthorization(w http.ResponseWriter, r *http.Request)
 	if !allowed {
 		oauthFailure(w, 400, "invalid_client")
 		return
+	}
+	parsedRedirect, err := url.Parse(redirect)
+	if err != nil {
+		oauthFailure(w, 400, "invalid_client")
+		return
+	}
+	redirectPath := parsedRedirect.EscapedPath()
+	if redirectPath == "" {
+		redirectPath = "/"
 	}
 	ticket, err := randomOAuthSecret()
 	if err != nil {
@@ -121,6 +132,9 @@ func (o *oauthBroker) beginAuthorization(w http.ResponseWriter, r *http.Request)
 	o.tickets[oauthHash(ticket)] = oauthAuthorization{
 		clientID: clientID, redirectURI: redirect, resource: o.resource, state: state,
 		challenge: challenge, scope: scope, expires: o.now().Add(ticketLifetime),
+		clientName: document.ClientName, clientKind: document.Kind,
+		redirectHost: parsedRedirect.Host, redirectOrigin: parsedRedirect.Scheme + "://" + parsedRedirect.Host,
+		redirectPath: redirectPath, loopback: parsedRedirect.Scheme == "http",
 	}
 	o.mu.Unlock()
 	oauthHeaders(w)
@@ -146,7 +160,10 @@ func (o *oauthBroker) authorizationDetails(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	oauthJSON(w, http.StatusOK, map[string]any{
-		"client_id": pending.clientID, "client_name": "ChatGPT",
+		"client_id": pending.clientID, "client_name": pending.clientName,
+		"client_kind": pending.clientKind, "redirect_host": pending.redirectHost,
+		"redirect_origin": pending.redirectOrigin, "redirect_path": pending.redirectPath,
+		"loopback": pending.loopback,
 		"resource": pending.resource, "scope": pending.scope,
 		"canWrite": true, "expires_at": pending.expires.UTC().Format(time.RFC3339),
 	})
@@ -161,7 +178,12 @@ func (o *oauthBroker) authorizationRedirect(authorization oauthAuthorization, va
 	for key, group := range values {
 		params.Set(key, group[0])
 	}
-	params.Set("state", authorization.state)
+	// OAuth state is optional for compliant MCP clients. Never manufacture a
+	// blank state parameter or preserve an untrusted callback query state.
+	params.Del("state")
+	if authorization.state != "" {
+		params.Set("state", authorization.state)
+	}
 	params.Set("iss", o.issuer)
 	redirect.RawQuery = params.Encode()
 	return redirect.String(), nil
@@ -279,7 +301,7 @@ func (o *oauthBroker) authenticateClient(w http.ResponseWriter, r *http.Request,
 			return "", false
 		}
 	}
-	if !validOAuthClientID(onlyOAuthValue(form, "client_id")) {
+	if !validOAuthClientID(onlyOAuthValue(form, "client_id")) && !validDCRClientID(onlyOAuthValue(form, "client_id")) {
 		oauthFailure(w, 401, "invalid_client")
 		return "", false
 	}
@@ -341,6 +363,17 @@ func (o *oauthBroker) issueToken(w http.ResponseWriter, r *http.Request) {
 		}
 		if form.Has("scope") {
 			oauthFailure(w, 400, "invalid_request")
+			return
+		}
+		scope, err := o.store.CodeScope(r.Context(), oauthHashString(code))
+		if err != nil {
+			o.tokenFailure(w, r, err)
+			return
+		}
+		if scope != oauthScope && scope != oauthScope+" "+oauthOfflineScope {
+			// Outstanding Phase 34 codes can survive a restart. Never issue a
+			// new legacy-Scope Token after the Phase 36 upgrade.
+			oauthFailure(w, 400, "invalid_grant")
 			return
 		}
 		pair, tokens, err := o.newPair(method)
@@ -408,6 +441,12 @@ func (o *oauthBroker) issueToken(w http.ResponseWriter, r *http.Request) {
 	if currentErr != nil && !errors.Is(currentErr, mcpoauth.ErrInvalidGrant) {
 		o.tokenFailure(w, r, currentErr)
 		return
+	}
+	if currentErr == nil {
+		if _, legacy := legacyScope(current.Scope); legacy {
+			oauthFailure(w, 400, "invalid_grant")
+			return
+		}
 	}
 	if currentErr == nil && requestedScope != "" && requestedScope != current.Scope {
 		oauthFailure(w, 400, "invalid_scope")

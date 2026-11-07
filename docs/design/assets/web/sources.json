@@ -302,6 +302,18 @@
       "width": 1506,
       "height": 1045,
       "sha256": "7bc95dfb559f5f17341cac58089555303a5e077ae9d23d79c07de466685c6733"
+    },
+    {
+      "board": "OBS1",
+      "role": "core",
+      "file": "OBS1-observability-workbench.jpeg",
+      "source": "user-upload",
+      "sourceFileId": "file_0000000053388211832a4157e8ccf94a",
+      "sourceFilename": "9FBCECF9-652D-4444-8F9C-FF6D4460F4A0.jpeg",
+      "bytes": 402828,
+      "width": 1536,
+      "height": 864,
+      "sha256": "d1494ea914bbb554041bd2a160a1e9f4d810db49aef4e750188a7f7bcc18e3c9"
     }
   ],
   "documents": [

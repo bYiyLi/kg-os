@@ -30,7 +30,7 @@ test("renders API-backed world navigation with a blank graph canvas", async ({ p
   await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
   await expect(page.locator(".sidebar-collapse-button")).toHaveCount(0);
   await expect(sidebar.locator(".sidebar-settings-button")).toHaveText("Settings");
-  await expect(sidebar.locator(".sidebar-bottom button")).toHaveCount(1);
+  await expect(sidebar.locator(".sidebar-bottom button")).toHaveCount(2);
   await expect(page.locator(".graph-canvas-controls button:disabled")).toHaveCount(5);
   const graph = page.getByRole("region", { name: "Graph canvas" });
   await expect(graph.getByRole("group", { name: "Graph canvas", exact: true })).toBeVisible();

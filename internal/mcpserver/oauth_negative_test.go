@@ -24,19 +24,19 @@ func TestOAuthIssuerAndClientMetadataValidation(t *testing.T) {
 			t.Errorf("rejected issuer %q: %v", issuer, err)
 		}
 	}
-	for _, client := range []string{"https://chatgpt.com/oauth/client.json", "https://chatgpt.com/oauth/testing/client.json"} {
+	for _, client := range []string{"https://chatgpt.com/oauth/client.json", "https://chatgpt.com/oauth/testing/client.json", "https://muse.example.com/oauth/client.json"} {
 		if !validOAuthClientID(client) {
 			t.Errorf("rejected trusted URL %q", client)
 		}
 	}
-	for _, client := range []string{"http://chatgpt.com/oauth/client.json", "https://evil.example/oauth/client.json",
+	for _, client := range []string{"http://chatgpt.com/oauth/client.json", "https://127.0.0.1/oauth/client.json",
 		"https://chatgpt.com/oauth/client.json?redirect=https://evil.example", "https://chatgpt.com/oauth/../client.json",
-		"https://chatgpt.com/oauth/bad/index.json", "https://alice@chatgpt.com/oauth/client.json"} {
+		"https://chatgpt.com/", "https://alice@chatgpt.com/oauth/client.json"} {
 		if validOAuthClientID(client) {
 			t.Errorf("trusted forged CIMD %q", client)
 		}
 	}
-	for _, callback := range []string{"http://chatgpt.com/callback", "https://evil.example/", "https://chatgpt.com/#fragment",
+	for _, callback := range []string{"http://chatgpt.com/callback", "http://192.168.1.1/callback", "https://chatgpt.com/#fragment",
 		"https://alice@chatgpt.com/oauth/callback", ""} {
 		if validOAuthRedirect(callback) {
 			t.Errorf("trusted forged callback %q", callback)
@@ -56,6 +56,9 @@ func TestOAuthRejectsInvalidMetadataAndCapacity(t *testing.T) {
 		{[]byte(`{"client_id":"https://chatgpt.com/oauth/client.json","redirect_uris":["https://evil.example/redirect"],"token_endpoint_auth_method":"none"}`), 200},
 		{[]byte(`{"client_id":"https://chatgpt.com/oauth/client.json","redirect_uris":[],"token_endpoint_auth_method":"none"}`), 200},
 		{[]byte(`{"client_id":"https://chatgpt.com/oauth/client.json","redirect_uris":["https://chatgpt.com/callback"],"token_endpoint_auth_method":"client_secret_post"}`), 200},
+		{[]byte(`{"client_id":"https://chatgpt.com/oauth/client.json","client_name":"Untrusted","redirect_uris":["https://chatgpt.com/callback"],"grant_types":["client_credentials"]}`), 200},
+		{[]byte(`{"client_id":"https://chatgpt.com/oauth/client.json","client_name":"Untrusted","redirect_uris":["https://chatgpt.com/callback"],"response_types":["token"]}`), 200},
+		{[]byte(`{"client_id":"https://chatgpt.com/oauth/client.json","client_name":"Untrusted","redirect_uris":["https://chatgpt.com/callback"],"client_uri":"http://localhost"}`), 200},
 		{[]byte(strings.Repeat("x", maxClientDocumentBytes+1)), 200},
 		{original, 301},
 		{original, 503},
@@ -126,7 +129,7 @@ func TestOAuthWebAuthorizationIsProtectedAndSingleUse(t *testing.T) {
 	wrong.Body.Close()
 	authenticated := f.getDetails(ticket, oauthTestAdmin)
 	details := parseOAuthJSON(t, authenticated)
-	if details["client_name"] != "ChatGPT" || details["scope"] != oauthScope || details["canWrite"] != true || details["resource"] != f.server.URL {
+	if details["client_name"] != "ChatGPT" || details["scope"] != oauthScope || details["canWrite"] != true || details["resource"] != f.server.URL+"/mcp" {
 		t.Fatalf("incorrect verified client/permission details: %#v", details)
 	}
 	for _, tc := range []struct {
@@ -219,7 +222,7 @@ func TestOAuthRejectsForgedTokenGrantsAndRotation(t *testing.T) {
 	created.Body.Close()
 	code := redirect.Query().Get("code")
 	valid := url.Values{"grant_type": {"authorization_code"}, "client_id": {oauthTestClient},
-		"resource": {f.server.URL}, "code": {code}, "redirect_uri": {oauthTestRedirect}, "code_verifier": {oauthTestVerifier}}
+		"resource": {f.server.URL + "/mcp"}, "code": {code}, "redirect_uri": {oauthTestRedirect}, "code_verifier": {oauthTestVerifier}}
 	for _, variant := range []url.Values{
 		{"client_secret": {"unauthorized"}},
 		{"resource": {"https://another.example"}},
@@ -275,7 +278,7 @@ func TestOAuthRejectsForgedTokenGrantsAndRotation(t *testing.T) {
 		}
 		used[refresh] = true
 		response := f.postForm("/oauth/token", url.Values{"grant_type": {"refresh_token"}, "client_id": {oauthTestClient},
-			"resource": {f.server.URL}, "refresh_token": {refresh}}, "")
+			"resource": {f.server.URL + "/mcp"}, "refresh_token": {refresh}}, "")
 		if response.StatusCode != 200 {
 			t.Fatalf("rotate %d: %d", i, response.StatusCode)
 		}
@@ -283,7 +286,7 @@ func TestOAuthRejectsForgedTokenGrantsAndRotation(t *testing.T) {
 		refresh = next["refresh_token"].(string)
 	}
 	old := f.postForm("/oauth/token", url.Values{"grant_type": {"refresh_token"}, "client_id": {oauthTestClient},
-		"resource": {f.server.URL}, "refresh_token": {grant["refresh_token"].(string)}}, "")
+		"resource": {f.server.URL + "/mcp"}, "refresh_token": {grant["refresh_token"].(string)}}, "")
 	if old.StatusCode != 400 {
 		t.Fatalf("old rotated token replay: %d", old.StatusCode)
 	}
@@ -291,7 +294,7 @@ func TestOAuthRejectsForgedTokenGrantsAndRotation(t *testing.T) {
 	now := time.Now().Add(refreshLifetime + time.Hour)
 	f.broker.now = func() time.Time { return now }
 	expired := f.postForm("/oauth/token", url.Values{"grant_type": {"refresh_token"}, "client_id": {oauthTestClient},
-		"resource": {f.server.URL}, "refresh_token": {refresh}}, "")
+		"resource": {f.server.URL + "/mcp"}, "refresh_token": {refresh}}, "")
 	if expired.StatusCode != 400 {
 		t.Fatalf("expired refresh accepted: %d", expired.StatusCode)
 	}

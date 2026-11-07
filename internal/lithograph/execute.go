@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bYiyLi/kg-os/internal/observability"
 	sqlite3 "github.com/mattn/go-sqlite3"
 )
 
@@ -212,6 +213,15 @@ func executeRaw(
 	params any,
 	options any,
 ) (result Result, observedErr error) {
+	ctx, span := observability.StartSpan(ctx, "lithograph.execute")
+	defer span.End()
+	defer func() {
+		if observedErr != nil {
+			observability.SpanOutcome(span, "error")
+		} else {
+			observability.SpanOutcome(span, "succeeded")
+		}
+	}()
 	started := time.Now()
 	defer func() { observeDatabaseOperation(ctx, "execute", started, observedErr) }()
 	paramsJSON, err := marshalObject(params)
@@ -244,6 +254,15 @@ func streamRaw(
 	options any,
 	consume func(Event) error,
 ) (observedErr error) {
+	ctx, span := observability.StartSpan(ctx, "lithograph.stream")
+	defer span.End()
+	defer func() {
+		if observedErr != nil {
+			observability.SpanOutcome(span, "error")
+		} else {
+			observability.SpanOutcome(span, "succeeded")
+		}
+	}()
 	started := time.Now()
 	defer func() { observeDatabaseOperation(ctx, "stream", started, observedErr) }()
 	if consume == nil {

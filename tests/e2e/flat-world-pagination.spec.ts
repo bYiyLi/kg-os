@@ -59,7 +59,7 @@ test("completes every overview page before exposing the domain tree", async ({ p
   await expect(fixture.sidebar.getByRole("button", { name: "Load earlier versions" })).toHaveCount(
     0
   );
-  await expect(fixture.sidebar.locator(".sidebar-bottom").getByRole("button")).toHaveCount(1);
+  await expect(fixture.sidebar.locator(".sidebar-bottom").getByRole("button")).toHaveCount(2);
   expectPinnedRequests(fixture.calls);
 });
 

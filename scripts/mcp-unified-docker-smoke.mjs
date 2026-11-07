@@ -284,7 +284,7 @@ async function verifyHTTP(base) {
   const pathMetadata = await fetch(base + "/.well-known/oauth-protected-resource/mcp");
   assert.equal(pathMetadata.status, 200);
   const protectedResource = await pathMetadata.json();
-  assert.equal(protectedResource.resource, oauthIssuer);
+  assert.equal(protectedResource.resource, oauthIssuer + "/mcp");
   assert.deepEqual(protectedResource.authorization_servers, [oauthIssuer]);
   assert.ok(protectedResource.scopes_supported?.includes("offline_access"));
   const rootMetadata = await fetch(base + "/.well-known/oauth-protected-resource");

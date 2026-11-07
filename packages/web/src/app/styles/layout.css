@@ -736,18 +736,31 @@
 .sidebar-bottom,
 .drawer-bottom {
   display: flex;
-  height: 64px;
+  height: auto;
   min-height: 64px;
   flex: none;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
   padding: 8px 12px;
+}
+
+.sidebar-observability-button[aria-pressed="true"] {
+  background: var(--color-control-hover);
+  color: var(--color-text);
+}
+
+.app-shell.is-observing .knowledge-canvas {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .drawer-bottom {
   border-top: 1px solid var(--color-border-subtle);
 }
 
-.sidebar-settings-button {
+.sidebar-settings-button,
+.sidebar-observability-button {
   width: 100%;
   min-height: 44px;
   height: auto;
@@ -759,7 +772,8 @@
   text-align: left;
 }
 
-.sidebar-settings-button:hover {
+.sidebar-settings-button:hover,
+.sidebar-observability-button:hover {
   color: var(--color-text);
 }
 

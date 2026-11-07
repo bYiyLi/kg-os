@@ -990,6 +990,7 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 
 ### D97 KG OS 内建可观测性与关键业务结果事件（2026-10-15）
 
+- **后续替代范围**：本条记录 Phase 19 已验收的历史设计；2026-11-07 [D126](#d126-sqlite-observability-workbench) 定向替代其 JSONL/轮转、无独立诊断数据库和无 Web 观测查询的现行约束。其余业务结果真实性、认证隔离、安全白名单与 Phase 19 历史验收保持有效。
 - **决定**：在现有单进程 `kgosd` 内使用 Go `log/slog`、服务端生成的 Request ID、Kernel 确认结果事件和进程内聚合 Metrics 形成轻量可观测性。不引入独立 Agent、日志数据库、分布式追踪或新的 Lithograph 依赖。目标包含 JSON System/Access Logs、业务与安全事件、日志轮转、只读受控运行诊断；实现及阶段验收证据见 [Phase 19](../development/phases/19-observability.md)。
 - **业务真实结果**：关键写操作在确认结果的业务层记录，不能从 HTTP 200、Graph Execute 的调用形式、NDJSON 已输出的 row 或 MCP Tool 最终状态推断“持久提交”；`kgos_run` 中先成功、后失败的多个操作保留各自结果；取消/断线后的不确定写入按 `unknown` 处理，不重放也不承诺回滚。安全事件由实际认证/OAuth owner 确认，不通过日志新增用户权限或身份语义。
 - **运维与权限**：现有 `.kgos/logs` 作为本地诊断目录，单一文件轮转 owner；Docker 使用原有标准日志流和容器 retention。日志只是可丢弃诊断数据，不是业务 State、审计账本或 exactly-once 事件流。日志失败不能改变业务事务。受保护的 `POST /api/v1/system/diagnostics` 使用现有 API/Web 认证，不向 MCP OAuth Token 提供普通 API 访问权；CLI stdout/stderr 合同不变。
@@ -1291,3 +1292,27 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **版本与发布**：继续使用产品与 Plugin Manifest 的统一版本，源码 Skill 不维护独立版本，分发时注入同一 metadata.version。源插件曾使用的独立版本只属导入前来源，不成为八条并行版本线。源码合并和 main 的公开资料同步不等于正式 Tag、Release、运行服务升级或私人 Plugin 安装。
 - **清理与追溯**：移除旧 knowledge/ontology/vlog standards 可调用目录，Doctor 替换为新设计；旧设计和发布证据保留历史含义，必要引擎测试数据标记为历史夹具，不继续分发旧技能。用户账户内已安装的插件、共享 MCP 连接和知识库不在本次删除范围。
 - **边界**：仅调整技能、必要引用、打包与检查，保留底层 Kernel、MCP、权限与数据库接口。新的源码结果与实际宿主选择、加载、工具行为验收分别取证；未执行的测试不得标为通过。
+
+<a id="d126-sqlite-observability-workbench"></a>
+
+### D126 KG OS 独立 SQLite 诊断存储与 Web 运行观测（2026-11-07）
+
+- **用户决定**：采用已确认的运行观测页面，顶部概览、中部资源/请求趋势（含慢请求线）、底部「最近请求」树与右侧「执行日志」联动；链路追踪直接由可展开请求树表达，不新增独立链路、慢请求或 Tool 排行卡片。入口位于「设置」上方，保留左侧知识世界。
+- **存储选择**：以 `<workspace>/.kgos/logs/observability.sqlite` 作为唯一**完整结构化诊断持久化来源**，保存受控日志、Request/Operation/Span、资源/趋势聚合与系统事件；取消持续写入 `kgosd.log*` JSONL 文件，也不向 Docker stderr 复制完整日志。仅为启动失败、诊断库不可用等保留受控的应急 stderr 与现有内部 CLI 启动记录。旧 JSONL 文件不自动删除、导入或覆盖。
+- **链路技术选型（2026-11-07 补充确认）**：Phase 35 **使用 OpenTelemetry Go API/Trace SDK** 管理 Span 生命周期、Context 传播、`trace_id` / `span_id` 及父子关系，不再自建平行的 Span 引擎；原 `request_id` / `operation_id` 继续由 KG OS 可信生成并关联 `slog`，由有界自定义 SpanExporter 将安全投影写入本地 SQLite。只引入单进程 Go Trace SDK 能力，**不**部署 Collector、OTLP/Jaeger/Tempo、独立服务，也不强制引入 OTel Logs/Metrics SDK。
+- **性能与故障**：复用现有 Go `slog` 和 `go-sqlite3`，OTel 完成的 Span 使用有界 BatchSpanProcessor，开始事件另以非阻塞方式尽力留存；SQLite 使用 WAL、有界异步队列、单写入执行者、受限查询与过期淘汰；观测库不接入 `kgos.db`、Knowledge/Commit、OAuth/Web Session、备份或 Lithograph 内部。诊断不可用不得阻断业务或伪造写入结果；内存压力/OOM 后可能丢失尚未落盘记录，OOM 原因必须由可信宿主证据确认。
+- **读取与权限**：原 `POST /api/v1/system/diagnostics` 摘要接口保持兼容；新增需现有 Instance/Web 鉴权、Boot Guard 及有界分页的观测只读 API。只暴露安全白名单事件投影，不开放原始日志、任意文件或查询正文；MCP OAuth Token 不获得普通管理 API 权限。可观测性记录不是审计账本。
+- **与旧决定关系**：本决定**定向替代 D97 中的 JSON Lines/轮转作为现行正式持久化、全量 Docker stderr、「不新增诊断数据库、无 Web 查询」及「本阶段不引入 OpenTelemetry」的限制**；D97 的真实业务结果、Request ID、日志白名单、认证隔离、不改变事务结果和 Phase 19 历史验收均保持有效。
+- **唯一真源和状态**：[Observability](observability.md#运行观测数据与查询d126phase-35-目标) 拥有采集、关联、SQLite 和查询合同，[Runtime logs](runtime.md#logs) 拥有目录与生命周期，[Web](web.md#运行观测工作台d126phase-35-目标) 拥有交互；[Phase 35](../development/phases/35-observability-workbench.md) 为新开发/验收计划。设计已写入不等于代码实现、镜像发布或生产部署。
+
+<a id="d127-host-neutral-mcp-oauth"></a>
+
+### D127 通用 MCP OAuth 客户端身份与授权（2026-11-07）
+
+- **问题与用户决定**：实际接入 Muse 时，KG OS 当前的 ChatGPT 专属 Client ID 和回调允许列表阻碍标准 MCP OAuth 客户端授权，跳过授权又会被正常的 MCP Bearer 校验拒绝。用户要求参考 Nexum 设计与源码，将 KG OS 升级为 **Host-neutral MCP OAuth**；先写设计与新的开发计划并审查，不在本轮实现代码。
+- **对外协议一致**：用户进一步确认 KG OS 与 Nexum 的**外部 MCP OAuth 协议及生命周期可以直接保持一致**，差别主要是服务端用户身份与业务授权映射。Discovery、CIMD、DCR、PKCE、Token/Refresh、Bearer 错误及 Host 恢复行为以 Nexum 实际代码和 MCP/OAuth 规范为目标基线；不为 KG OS 引入厂商白名单、专用 OAuth 方言或额外的客户端操作流程。
+- **身份与注册**：按 MCP 2026-07-28，Client ID Metadata Document（CIMD）优先，RFC 7591 Dynamic Client Registration（DCR）兼容。CIMD 接受经严格 HTTPS 文档、精确 Client ID/redirect 验证的公开客户端；DCR 在 `/oauth/register` 注册受限公共客户端，HTTPS/本机 Loopback 回调精确匹配，**兼容可选 `application_type=web/native`，但不强制提供且不以其放宽或收紧 Loopback 校验**。不使用 Client Secret、静态手工 Host 配置或自动同意；DCR 名称不等于经认证的品牌。
+- **权限、Scope 与有效期**：继续使用 KG OS Instance 根身份、Web 登录/CSRF、OAuth Code/PKCE、`iss`/resource 绑定与 MCP/API Token 隔离；Scope 改为 Nexum 一致的 **`mcp` / `mcp offline_access`**，代表完整的 KG OS MCP 读写而非 Agent 权限。**新签发 Access Token 硬有效期 15 分钟、`expires_in=840` 秒**，新 Code 有效期 5 分钟，Refresh 滚动 30 天；仅请求 `mcp` 也可签发 Refresh，不因 Refresh 扩大 Scope。旧 `kgos:access` / 24 小时参数不再是新连接的目标。签名客户端重试、公共客户端轮换和明确授权仍有效；不引入多用户/Agent/领域权限体系。
+- **安全、存储与升级**：新增公开 IP 绑定且无重定向的安全 CIMD/JWKS Fetch、注册抗滥用与 Web 回调风险展示；复用原独立 `.kgos/mcp-oauth.db`、Family/Code/Token、撤销及错误分类，新增 DCR Client 记录与事务化 schema v1→v2。新的 OAuth `resource` 绑定真实 `<issuer><MCP Path>` Endpoint（默认 `/mcp`，支持现有自定义路径），旧数据库只迁移元数据绑定，原 Family/Token 的旧 Origin audience 和过期时间保持不变，仅保留旧 Access 到期前的读取兼容。旧 Access 按原有效期自然到期，不签发新的旧 Scope Token；旧 Refresh 不自动变更 Scope，原 Host 需要标准 OAuth 重新授权一次，协议恢复必须实测。损坏/失败 fail closed，不清空数据库；旧二进制不保证直接回读新 schema。
+- **边界、替代与取舍**：本决定定向替换 [D95](#d95-unified-mcp-web-authorization)、[D124](#d124-mcp-resilience) 的 ChatGPT 专属客户端校验以及 `kgos:access`/24 小时 Access **未来发行合同**，不改写 Phase 17/34 历史验收及不冲突的存储/故障恢复。统一协议让标准 Host 能连接两个产品；代价是旧连接必须一次性重新授权，并需为匿名 DCR、公开元数据 Fetch 承担存储与 SSRF 防护。不移植 Nexum 用户、Agent Grant、套餐或外部登录服务。
+- **真源和阶段**：协议、Web 最小接口及安全/迁移合同由 [MCP](mcp.md#host-neutral-mcp-oauth) 唯一维护，工作项与真实 Host 验收由 [Phase 36](../development/phases/36-host-neutral-mcp-oauth.md) 负责。Phase 36 与 [Phase 35](../development/phases/35-observability-workbench.md) 允许并行，不把设计写入等同于已实现、已通过真实 Muse 测试或已发行。

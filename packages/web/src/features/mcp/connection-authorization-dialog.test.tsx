@@ -21,8 +21,13 @@ const unavailableMessage = "unavailable";
 const details = {
   client_id: "https://chatgpt.com/oauth/client.json",
   client_name: "ChatGPT",
+  client_kind: "cimd",
+  redirect_host: "chatgpt.com",
+  redirect_origin: "https://chatgpt.com",
+  redirect_path: "/connector_platform_oauth_redirect",
+  loopback: false,
   resource: "https://kgos.example.com",
-  scope: "kgos:access",
+  scope: "mcp",
   canWrite: true,
   expires_at: "2099-01-01T00:00:00Z"
 };
@@ -82,6 +87,11 @@ it("shows verified ChatGPT and full write permissions in a modal", async () => {
   ).toBe(true);
   expect(document.body.textContent).toContain("Authorize Connection");
   expect(document.body.textContent).toContain("ChatGPT");
+  expect(document.body.textContent).toContain("Client name is self-declared");
+  expect(document.body.textContent).toContain("Registered callback host (exact match)");
+  expect(document.body.querySelector(".mcp-authorization-callback-host")?.textContent).toBe(
+    "chatgpt.com"
+  );
   expect(document.body.textContent).toContain("https://kgos.example.com");
   expect(document.body.textContent).toContain("Modify knowledge");
   expect(document.body.textContent).toContain("Manage branches");
@@ -93,8 +103,76 @@ it("shows verified ChatGPT and full write permissions in a modal", async () => {
   expect(authorize?.disabled).toBe(false);
 });
 
+it("does not present an arbitrary CIMD client's ChatGPT display name as verified branding", async () => {
+  await render(
+    vi.fn().mockResolvedValue(
+      response({
+        ...details,
+        client_id: "https://attacker.example/oauth/client.json",
+        client_name: "ChatGPT",
+        redirect_host: "attacker.example",
+        redirect_origin: "https://attacker.example",
+        redirect_path: "/callback"
+      })
+    )
+  );
+  expect(document.body.textContent).toContain("Client name is self-declared (CIMD)");
+  expect(document.body.querySelector(".mcp-authorization-callback-host")?.textContent).toBe(
+    "attacker.example"
+  );
+  expect(document.body.querySelector(".mcp-authorization-client-id")?.textContent).toBe(
+    "https://attacker.example/oauth/client.json"
+  );
+});
+
+it("shows a verified DCR desktop client and warns about its local callback", async () => {
+  const desktop = {
+    ...details,
+    client_id: "kg_mcp_" + "r".repeat(43),
+    client_name: "Muse Desktop",
+    client_kind: "dcr",
+    redirect_host: "127.0.0.1:17777",
+    redirect_origin: "http://127.0.0.1:17777",
+    redirect_path: "/callback",
+    loopback: true,
+    scope: "mcp offline_access"
+  };
+  await render(vi.fn().mockResolvedValue(response(desktop)));
+  expect(document.body.textContent).toContain("Muse Desktop");
+  expect(document.body.textContent).toContain("Client name is self-declared (DCR)");
+  expect(document.body.textContent).toContain("127.0.0.1:17777");
+  expect(document.body.textContent).toContain("local listener");
+  expect(document.body.querySelector<HTMLButtonElement>(approveSelector)?.disabled).toBe(false);
+});
+
+it("rejects inconsistent callback identity without offering approval", async () => {
+  await render(
+    vi.fn().mockResolvedValue(
+      response({
+        ...details,
+        redirect_host: "attacker.example"
+      })
+    )
+  );
+  expect(document.body.querySelector(alertSelector)?.textContent).toContain(unavailableMessage);
+  expect(document.body.querySelector<HTMLButtonElement>(approveSelector)?.disabled).toBe(true);
+});
+
+it("accepts a canonical HTTPS callback with an explicitly declared default port", async () => {
+  await render(
+    vi.fn().mockResolvedValue(
+      response({
+        ...details,
+        redirect_host: "chatgpt.com:443",
+        redirect_origin: "https://chatgpt.com:443"
+      })
+    )
+  );
+  expect(document.body.querySelector<HTMLButtonElement>(approveSelector)?.disabled).toBe(false);
+});
+
 it("never enables approval for missing or untrusted authorization details", async () => {
-  const fetcher = vi.fn().mockResolvedValue(response({ ...details, client_name: "Attacker" }));
+  const fetcher = vi.fn().mockResolvedValue(response({ ...details, client_name: "" }));
   await render(fetcher);
   expect(document.body.querySelector(alertSelector)?.textContent).toContain(unavailableMessage);
   expect(document.body.querySelector<HTMLButtonElement>(approveSelector)?.disabled).toBe(true);
@@ -139,9 +217,9 @@ it("submits an authenticated explicit denial without token fields", async () => 
 
 it.each([
   ["missing request", null, 200],
-  ["non-ChatGPT client", { ...details, client_id: "https://other.example/oauth" }, 200],
+  ["invalid client ID", { ...details, client_id: "javascript:invalid" }, 200],
   ["invalid resource", { ...details, resource: null }, 200],
-  ["missing write scope", { ...details, scope: "kgos:read" }, 200],
+  ["missing write scope", { ...details, scope: "invalid:scope" }, 200],
   ["read-only client", { ...details, canWrite: false }, 200],
   ["invalid expiration", { ...details, expires_at: "invalid" }, 200],
   ["expired request", { ...details, expires_at: "2001-01-01T00:00:00Z" }, 200],

@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -18,10 +19,11 @@ import (
 )
 
 var (
-	ErrInvalidGrant = errors.New("invalid OAuth grant")
-	ErrInvalidToken = errors.New("invalid OAuth access token")
-	ErrInvalid      = ErrInvalidToken
-	ErrLimit        = errors.New("OAuth storage budget exceeded")
+	ErrInvalidGrant   = errors.New("invalid OAuth grant")
+	ErrInvalidToken   = errors.New("invalid OAuth access token")
+	ErrInvalid        = ErrInvalidToken
+	ErrLimit          = errors.New("OAuth storage budget exceeded")
+	ErrClientNotFound = errors.New("OAuth client not registered")
 )
 
 const (
@@ -29,7 +31,17 @@ const (
 	maxCodes         = 128
 	maxTokens        = 65536
 	maxDatabaseBytes = 64 << 20
+	maxClients       = 512
 )
+
+// RegisteredClient is a DCR identity, not an OAuth authorization grant.
+type RegisteredClient struct {
+	ID           string
+	Name         string
+	URI          string
+	RedirectURIs []string
+	CreatedAt    time.Time
+}
 
 type Binding struct {
 	FamilyID   string
@@ -161,7 +173,7 @@ func (s *Store) initialize(ctx context.Context, rootFingerprint string, created 
 	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return fmt.Errorf("read OAuth store version: %w", err)
 	}
-	if version != 0 && version != 1 {
+	if version != 0 && version != 1 && version != 2 {
 		return errors.New("unsupported OAuth store version")
 	}
 	if version == 0 {
@@ -190,15 +202,23 @@ func (s *Store) initialize(ctx context.Context, rootFingerprint string, created 
 			"CREATE TABLE oauth_tokens (hash TEXT PRIMARY KEY, family_id TEXT NOT NULL REFERENCES oauth_families(id) ON DELETE CASCADE, kind INTEGER NOT NULL, generation INTEGER NOT NULL, expires_at INTEGER NOT NULL, consumed INTEGER NOT NULL DEFAULT 0)",
 			"CREATE INDEX oauth_tokens_family ON oauth_tokens(family_id)",
 			"CREATE INDEX oauth_tokens_expiry ON oauth_tokens(expires_at)",
-			"PRAGMA user_version=1",
 		} {
 			if _, err = tx.ExecContext(ctx, statement); err != nil {
 				return fmt.Errorf("create OAuth schema: %w", err)
 			}
 		}
 	}
+	if version < 2 {
+		if _, err = tx.ExecContext(ctx, "CREATE TABLE oauth_clients (id TEXT PRIMARY KEY, name TEXT NOT NULL, uri TEXT NOT NULL, redirects TEXT NOT NULL, created_at INTEGER NOT NULL)"); err != nil {
+			return fmt.Errorf("create OAuth client registry: %w", err)
+		}
+		if _, err = tx.ExecContext(ctx, "PRAGMA user_version=2"); err != nil {
+			return fmt.Errorf("set OAuth schema version: %w", err)
+		}
+	}
 	expected := map[string]string{"root_fingerprint": rootFingerprint, "issuer": s.issuer, "resource": s.resource}
 	reset := version == 0
+	migrateLegacyResource := false
 	for key, want := range expected {
 		var got string
 		err = tx.QueryRowContext(ctx, "SELECT value FROM oauth_metadata WHERE key=?", key).Scan(&got)
@@ -210,10 +230,24 @@ func (s *Store) initialize(ctx context.Context, rootFingerprint string, created 
 		} else if err != nil {
 			return fmt.Errorf("read OAuth store binding: %w", err)
 		} else if got != want {
-			reset = true
+			if key == "resource" && got == s.issuer && strings.HasPrefix(want, s.issuer+"/") {
+				migrateLegacyResource = true
+			} else {
+				reset = true
+			}
+		}
+	}
+	if migrateLegacyResource && !reset {
+		// Upgrade only the binding of the OAuth store. Historical Families,
+		// Codes and Access Tokens retain their original audience and expiry.
+		if _, err = tx.ExecContext(ctx, "UPDATE oauth_metadata SET value=? WHERE key='resource'", s.resource); err != nil {
+			return fmt.Errorf("migrate OAuth resource binding: %w", err)
 		}
 	}
 	if reset {
+		if _, err = tx.ExecContext(ctx, "DELETE FROM oauth_clients"); err != nil {
+			return err
+		}
 		if _, err = tx.ExecContext(ctx, "DELETE FROM oauth_codes"); err != nil {
 			return err
 		}
@@ -233,6 +267,69 @@ func (s *Store) initialize(ctx context.Context, rootFingerprint string, created 
 }
 
 func (s *Store) Close() error { return s.db.Close() }
+
+// CreateClient atomically limits registered DCR identities without conferring access.
+func (s *Store) CreateClient(ctx context.Context, client RegisteredClient) error {
+	if len(client.ID) < 32 || len(client.ID) > 128 || len(client.Name) == 0 || len(client.Name) > 255 ||
+		len(client.URI) > 2048 || len(client.RedirectURIs) == 0 || len(client.RedirectURIs) > 20 || client.CreatedAt.IsZero() {
+		return ErrInvalidGrant
+	}
+	for _, redirect := range client.RedirectURIs {
+		if redirect == "" || len(redirect) > 2048 {
+			return ErrInvalidGrant
+		}
+	}
+	redirects, err := json.Marshal(client.RedirectURIs)
+	if err != nil {
+		return ErrInvalidGrant
+	}
+	return s.transaction(ctx, func(tx *sql.Tx) error {
+		// Bound anonymous registration storage without removing a client that
+		// still owns an unexpired OAuth code or an active refresh family.
+		now := client.CreatedAt.UnixNano()
+		cutoff := client.CreatedAt.Add(-30 * 24 * time.Hour).UnixNano()
+		if _, err := tx.ExecContext(ctx, `DELETE FROM oauth_clients
+			WHERE created_at < ?
+			AND NOT EXISTS (
+				SELECT 1 FROM oauth_codes c
+				WHERE c.client_id=oauth_clients.id AND c.expires_at>?
+			)
+			AND NOT EXISTS (
+				SELECT 1 FROM oauth_families f
+				WHERE f.client_id=oauth_clients.id AND f.revoked=0 AND f.expires_at>?
+			)`, cutoff, now, now); err != nil {
+			return fmt.Errorf("prune unused OAuth clients: %w", err)
+		}
+		if err := budget(ctx, tx, "SELECT count(*) FROM oauth_clients", maxClients); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "INSERT INTO oauth_clients(id,name,uri,redirects,created_at) VALUES(?,?,?,?,?)",
+			client.ID, client.Name, client.URI, string(redirects), client.CreatedAt.UnixNano())
+		if err != nil {
+			return fmt.Errorf("register OAuth client: %w", err)
+		}
+		return nil
+	})
+}
+
+func (s *Store) GetClient(ctx context.Context, id string) (RegisteredClient, error) {
+	var client RegisteredClient
+	var redirects string
+	var created int64
+	err := s.db.QueryRowContext(ctx, "SELECT id,name,uri,redirects,created_at FROM oauth_clients WHERE id=?", id).
+		Scan(&client.ID, &client.Name, &client.URI, &redirects, &created)
+	if errors.Is(err, sql.ErrNoRows) {
+		return client, ErrClientNotFound
+	}
+	if err != nil {
+		return client, fmt.Errorf("read OAuth client: %w", err)
+	}
+	if err := json.Unmarshal([]byte(redirects), &client.RedirectURIs); err != nil || len(client.RedirectURIs) == 0 {
+		return RegisteredClient{}, errors.New("invalid stored OAuth client")
+	}
+	client.CreatedAt = time.Unix(0, created).UTC()
+	return client, nil
+}
 
 func validHash(value string) bool {
 	if len(value) != 64 || strings.ToLower(value) != value {
@@ -300,6 +397,24 @@ func (s *Store) PutCode(ctx context.Context, code Code, now time.Time) error {
 		}
 		return nil
 	})
+}
+
+// CodeScope returns the original grant scope without consuming the code.
+// The token endpoint uses this solely to reject pre-upgrade code exchange;
+// ExchangeCode remains the atomic authority for redemption and PKCE.
+func (s *Store) CodeScope(ctx context.Context, hash string) (string, error) {
+	if !validHash(hash) {
+		return "", ErrInvalidGrant
+	}
+	var scope string
+	err := s.db.QueryRowContext(ctx, "SELECT scope FROM oauth_codes WHERE hash=?", hash).Scan(&scope)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", classify("not_found", ErrInvalidGrant)
+	}
+	if err != nil {
+		return "", fmt.Errorf("read OAuth code scope: %w", err)
+	}
+	return scope, nil
 }
 
 func (s *Store) ExchangeCode(ctx context.Context, hash, clientID, redirectURI, resource, challenge string, tokens Tokens, now time.Time) (Binding, error) {
@@ -385,8 +500,19 @@ func readToken(ctx context.Context, query interface {
 	err := query.QueryRowContext(ctx, tokenQuery, hash).Scan(&t.binding.FamilyID, &t.binding.ClientID, &t.binding.Issuer, &t.binding.Resource, &t.binding.Scope, &t.binding.AuthMethod, &t.binding.Generation, &t.revoked, &t.familyExpiry, &t.kind, &t.generation, &t.expiry, &t.consumed)
 	return t, err
 }
+func (s *Store) resourceMatches(b Binding) bool {
+	if b.Resource == s.resource {
+		return true
+	}
+	// Read-only compatibility for issued pre-P36 Access credentials. A new
+	// Family can never be created with this legacy resource after migration.
+	return strings.HasPrefix(s.resource, s.issuer+"/") && b.Resource == s.issuer &&
+		(b.Scope == "kgos:access" || b.Scope == "kgos:access offline_access")
+}
+
 func (s *Store) current(t tokenState, now time.Time) bool {
-	return t.revoked == 0 && t.familyExpiry > now.UnixNano() && t.expiry > now.UnixNano() && t.binding.Issuer == s.issuer && t.binding.Resource == s.resource
+	return t.revoked == 0 && t.familyExpiry > now.UnixNano() && t.expiry > now.UnixNano() &&
+		t.binding.Issuer == s.issuer && s.resourceMatches(t.binding)
 }
 
 func (s *Store) Rotate(ctx context.Context, hash, clientID, resource string, tokens Tokens, now time.Time) (Binding, error) {
@@ -558,7 +684,7 @@ func Cause(err error) string {
 }
 
 func (s *Store) tokenFailure(t tokenState, now time.Time) string {
-	if t.binding.Issuer != s.issuer || t.binding.Resource != s.resource {
+	if t.binding.Issuer != s.issuer || !s.resourceMatches(t.binding) {
 		return "resource_mismatch"
 	}
 	if t.revoked != 0 {

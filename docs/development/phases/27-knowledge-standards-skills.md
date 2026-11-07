@@ -1,12 +1,22 @@
 # Phase 27：KG OS 官方知识规范 Skill 体系
 
+## 2026-11-06 人工验收结项
+
+**状态：`done`（用户明确表示手动验收通过，带保留项结项）。** 这是用户批准的阶段管理结项；以下原始 `in_progress`、失败、未执行记录反映当时实际情况，不代表所有原定验收已自动通过。本次只更新计划，未修改代码。
+
+- **已交付**：规范和本体方法已归入 D125 八个专业 Skill，旧四/七 Skill 留存历史证据。
+- **未实现或未完整交付**：旧 Skill 已退役；不能据旧模型试验推断新版八职责涵盖所有专业场景。
+- **未取得独立验收证据**：真实 ChatGPT 自动选择、跨连接自然任务与有据知识使用缺完整独立行为记录。
+
+保留项不会因为 `done` 自动消失；后续工作另行定义范围与验收。
+
 > 2026-11-05：当前八 Skill 源码清单与整合验收见 [Phase 28](28-official-skill-roster.md) 和 [D125](../../design/decisions.md#d125-unified-eight-skill-plugin)。本页既有四技能、七技能及单项验证记录保留其历史范围，不代表新技能已经通过同样验收。
 
 <!-- cspell:words testdata SKOS CIDOC pypdf Diátaxis Persistant Presential -->
 
 <a id="d122-remote-foundation-navigation"></a>
 
-## D122：基础本体原文引用与渐进加载（2026-11-02）
+## 历史 D122 实施记录（2026-11-02）
 
 **状态：`in_progress`**。按用户最新决定和 [D122](../../design/decisions.md#d122-remote-foundation-navigation)，在同一 draft PR #2 将整套原件内置改为固定原文导航。D121 的身份建模、知识质量规范、必要案例、旧业务模型库退出及 VLog 本仓维护继续有效；以下 D121 包体与检查记录标为历史，不作为当前资源合同。
 

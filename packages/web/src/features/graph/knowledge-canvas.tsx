@@ -30,6 +30,8 @@ interface CanvasProps {
   domain?: string | null;
   domainLabel?: string | null;
   blocked: boolean;
+  /** The observability view preserves this session but stops background graph fetching. */
+  suspended?: boolean;
 }
 
 // A different connection or immutable State owns a fresh scene and requests.
@@ -42,18 +44,28 @@ export function KnowledgeCanvas(props: CanvasProps) {
   );
 }
 
-function CanvasSession({ reader, state, domain, domainLabel, blocked }: CanvasProps) {
+function CanvasSession({
+  reader,
+  state,
+  domain,
+  domainLabel,
+  blocked,
+  suspended = false
+}: CanvasProps) {
   const surface = useRef<HTMLDivElement | null>(null);
   const scene = useRef<GraphSceneHandle | null>(null);
   const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set());
+  const initialFetch = useRef(false);
   const explorer = useGraphExplorer(reader, state, domain ?? undefined);
   const disabled = blocked || reader === null || state === null;
   const actions = useCanvasActions(explorer, surface, scene, disabled);
   // A new connection/State mounts a new session. Load real knowledge without
   // requiring a keyword; React StrictMode may re-run the effect safely.
   useEffect(() => {
-    if (reader !== null && state !== null) void explorer.search("");
-  }, [reader, state, domain]);
+    if (suspended || initialFetch.current || reader === null || state === null) return;
+    initialFetch.current = true;
+    void explorer.search("");
+  }, [reader, state, domain, suspended]);
   return (
     <div className="knowledge-canvas" ref={surface} onKeyDown={actions.keyDown}>
       <GraphScene

@@ -8,6 +8,15 @@ import { Icon } from "../../shared/ui/icon.js";
 import { useConnectionAuthorization } from "./authorization-state.js";
 import { AuthorizationVisuals } from "./authorization-visuals.js";
 
+function KGOSBrandMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <path d="M24 3.5 44.5 24 24 44.5 3.5 24 24 3.5Z" stroke="currentColor" strokeWidth="4.4" />
+      <path d="m24 14-7 10 7 10 7-10-7-10Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function ConnectionAuthorizationDialog({
   connection,
   requestId,
@@ -39,14 +48,7 @@ export function ConnectionAuthorizationDialog({
       >
         <div className="mcp-authorization-brand">
           <span className="mcp-brand-mark">
-            <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
-              <path
-                d="M24 3.5 44.5 24 24 44.5 3.5 24 24 3.5Z"
-                stroke="currentColor"
-                strokeWidth="4.4"
-              />
-              <path d="m24 14-7 10 7 10 7-10-7-10Z" fill="currentColor" />
-            </svg>
+            <KGOSBrandMark />
           </span>
           <strong>KG OS</strong>
           {languageControl}
@@ -62,6 +64,11 @@ export function ConnectionAuthorizationDialog({
           </Button>
         </div>
         <AuthorizationVisuals
+          clientName={details?.client_name}
+          clientID={details?.client_id}
+          clientKind={details?.client_kind}
+          redirectHost={details?.redirect_host}
+          loopback={details?.loopback}
           resource={details?.resource}
           permissionsVisible={details !== null}
           loading={loading}

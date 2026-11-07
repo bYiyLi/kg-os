@@ -20,7 +20,7 @@ func TestMCPAndOAuthBearerAuthenticationSchemeIsCaseInsensitive(t *testing.T) {
 	if err := os.Chmod(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store, err := mcpoauth.Open(filepath.Join(root, "mcp-oauth.db"), fmt.Sprintf("%x", sha256.Sum256([]byte(token))), "https://kgos.example", "https://kgos.example")
+	store, err := mcpoauth.Open(filepath.Join(root, "mcp-oauth.db"), fmt.Sprintf("%x", sha256.Sum256([]byte(token))), "https://kgos.example", "https://kgos.example/mcp")
 	if err != nil {
 		t.Fatal(err)
 	}

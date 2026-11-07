@@ -108,6 +108,27 @@
   font-size: 13px;
 }
 
+.mcp-authorization-target {
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.mcp-authorization-callback-host {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mcp-authorization-client-id {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .mcp-authorization-parties {
   display: grid;
   grid-template-columns: 1fr 40px 1fr;

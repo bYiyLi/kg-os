@@ -7,7 +7,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"regexp"
 	"sync"
 	"time"
 
@@ -21,13 +20,13 @@ const (
 	oauthJWKSProbeCooldown = 30 * time.Second
 )
 
-var oauthJWKSPathPattern = regexp.MustCompile(`^/oauth/(?:[A-Za-z0-9_-]{1,100}/)?jwks\.json$`)
-
 func validOAuthJWKSURI(raw string) bool {
 	parsed, err := url.Parse(raw)
-	return err == nil && parsed.Scheme == "https" && parsed.Host == "chatgpt.com" && parsed.User == nil &&
-		parsed.Opaque == "" && parsed.RawQuery == "" && !parsed.ForceQuery && parsed.Fragment == "" && parsed.RawPath == "" &&
-		oauthJWKSPathPattern.MatchString(parsed.Path) && parsed.String() == raw
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" ||
+		parsed.Opaque != "" || parsed.String() != raw {
+		return false
+	}
+	return validOAuthClientURI(raw)
 }
 
 type oauthJWKSCacheEntry struct {

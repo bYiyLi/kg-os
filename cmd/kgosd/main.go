@@ -28,37 +28,43 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		_, _ = io.WriteString(stderr, evaluation.Result.Stderr)
 		return evaluation.Result.ExitCode
 	}
-	logOutput := stderr
-	var logFile io.Closer
-	if evaluation.Mode != command.DaemonModeInit && os.Getenv("KGOS_INTERNAL_LOG_TO_FILE") == "1" {
-		paths, pathErr := runtimeprofile.ResolvePaths(evaluation.Root)
-		if pathErr != nil {
-			_, _ = fmt.Fprintln(stderr, "kgosd: invalid log directory")
-			return 1
-		}
-		// Setup may start before Runtime creates the Instance directories.
-		_ = os.MkdirAll(paths.LogsDir, 0o700)
-		file, openErr := observability.NewRotatingWriter(paths.LogsDir, observability.DefaultLogBytes, observability.DefaultLogFiles)
-		if openErr != nil {
-			_, _ = fmt.Fprintln(stderr, "kgosd: cannot open private diagnostic log")
-			// A damaged diagnostic destination must not block the database.
-			// Detached stdout/stderr still goes to the bounded startup log.
-			logOutput = io.Discard
-		} else {
-			logOutput, logFile = file, file
-			defer logFile.Close()
-		}
+	if os.Getenv("KGOS_INTERNAL_LOG_TO_FILE") == "1" {
+		// The CLI uses a shared O_TRUNC startup file descriptor. Keep all
+		// early/emergency output bounded without creating a second log store.
+		stdout, stderr = limitStartupOutputs(stdout, stderr)
 	}
-	observer, err := observability.New(logOutput, os.Getenv("KGOS_LOG_LEVEL"))
+	// The diagnostic SQLite is the sole regular log persistence. stderr is
+	// reserved for bounded emergency messages, never a second full JSONL copy.
+	observer, err := observability.New(io.Discard, os.Getenv("KGOS_LOG_LEVEL"))
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, "kgosd: invalid KGOS_LOG_LEVEL")
 		return 1
 	}
+	if paths, pathErr := runtimeprofile.ResolvePaths(evaluation.Root); pathErr == nil {
+		if store, storeErr := observability.OpenStore(paths.LogsDir, stderr); storeErr == nil {
+			observer.AttachStore(store)
+		} else {
+			_, _ = fmt.Fprintf(stderr,
+				"kgosd: diagnostic storage unavailable (cause_class=%s); continuing without persistent logs\n",
+				observability.StorageCause(storeErr))
+		}
+	} else {
+		_, _ = fmt.Fprintln(stderr, "kgosd: diagnostic path unavailable")
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := observer.Close(shutdownCtx); err != nil {
+			_, _ = fmt.Fprintf(stderr,
+				"kgosd: diagnostic shutdown incomplete (cause_class=%s)\n",
+				observability.StorageCause(err))
+		}
+	}()
 	ctx = observability.WithObserver(ctx, observer)
 	observer.Log(ctx, slog.LevelInfo, "runtime", "runtime.starting")
 	if evaluation.Mode != command.DaemonModeInit {
 		if err := serveFirstRun(ctx, evaluation, stdout, observer); err != nil {
-			observer.Log(ctx, slog.LevelError, "runtime", "runtime.serve.failed")
+			reportRuntimeFailure(ctx, observer, stderr, "runtime.serve.failed", "http_serve", err)
 			return 1
 		}
 		observer.Log(ctx, slog.LevelInfo, "runtime", "runtime.stopped")
@@ -66,17 +72,17 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	runtime, err := runtimehost.Open(ctx, evaluation.Root, nil)
 	if err != nil {
-		observer.Log(ctx, slog.LevelError, "runtime", "runtime.open.failed", slog.String("stage", "runtime_open"))
+		reportRuntimeFailure(ctx, observer, stderr, "runtime.open.failed", "runtime_open", err)
 		return 1
 	}
 	defer func() {
 		if err := runtime.Close(); err != nil {
-			observer.Log(ctx, slog.LevelError, "runtime", "runtime.close.failed")
+			reportRuntimeFailure(ctx, observer, stderr, "runtime.close.failed", "runtime_close", err)
 		}
 	}()
 	if evaluation.Mode == command.DaemonModeInit {
 		if err := initializeRuntime(ctx, runtime); err != nil {
-			observer.Log(ctx, slog.LevelError, "runtime", "runtime.init.failed")
+			reportRuntimeFailure(ctx, observer, stderr, "runtime.init.failed", "runtime_init", err)
 			return 1
 		}
 		_, _ = fmt.Fprintf(stdout, "KG OS initialized: %s\n", evaluation.Root)
@@ -84,6 +90,18 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	return 0
+}
+
+// Startup failures must remain diagnosable if the diagnostic database itself
+// is unavailable. Both outputs are fixed, credential-free classifications.
+func reportRuntimeFailure(ctx context.Context, observer *observability.Observer, stderr io.Writer, event, stage string, err error) {
+	cause := observability.StorageCause(err)
+	if cause == "storage_error" {
+		cause = "runtime_failure"
+	}
+	observer.Log(ctx, slog.LevelError, "runtime", event,
+		slog.String("stage", stage), slog.String("cause_class", cause))
+	_, _ = fmt.Fprintf(stderr, "kgosd: runtime failure (stage=%s, cause_class=%s)\n", stage, cause)
 }
 
 // readyHandler is shared by the normal listener and the process-local

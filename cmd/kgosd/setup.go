@@ -500,7 +500,7 @@ func (c *setupController) initialize() {
 	c.mu.Lock()
 	c.phase = "extensions"
 	c.mu.Unlock()
-	rt, err := runtimehost.OpenWithHeldLock(c.ctx, c.paths.WorkspaceRoot, c.lock, nil)
+	rt, err := runtimehost.OpenWithHeldLock(c.ctx, c.paths.WorkspaceRoot, c.lock, nil, c.settings.MCP.Path)
 	if err != nil {
 		runtimeprofile.ReleaseWebEmbeddingKey(c.paths)
 		c.initializationFailed()

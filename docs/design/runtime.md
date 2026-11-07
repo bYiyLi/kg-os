@@ -128,6 +128,8 @@ Authorization: Bearer <token>
 
 MCP 使用 Runtime 持有的独立 `<root>/.kgos/mcp-oauth.db`，复用普通 SQLite driver，不加载 Lithograph/Provider/Jieba，不进入 Knowledge Base 历史或 UI/Provider cache。0700 父目录、0600 数据库与 SQLite 日志文件；只保存授权 family、凭证/Code 摘要、PKCE binding 和固定授权元数据，不保存原始 Token、Code、assertion 或根凭证。Root Token 指纹、issuer/resource 绑定与刷新/撤销合同由 [MCP](mcp.md#oauth-长期连接与刷新恢复)拥有。
 
+**D127 / Phase 36 新目标（未实施）**：通用 MCP OAuth DCR 的有限客户端注册记录也放在这一个 SQLite 中，以事务化 `user_version=1 → 2` 迁移保持旧 Family/Code/Token、Root Token 指纹及 issuer/resource 边界；CIMD 元数据不另建持久表，运行观测 SQLite 不存 OAuth 内容。Runtime 仍只拥有文件路径、私有权限、打开/关闭及故障恢复；Client 解析、DCR schema 与注册协议的唯一真源是 [MCP](mcp.md#host-neutral-mcp-oauth)，实施及旧版回退兼容核查见 [Phase 36](../development/phases/36-host-neutral-mcp-oauth.md)。
+
 Runtime 在 Instance lock 内打开 store，在关闭时释放；普通重启复用授权。OAuth 存储无法打开、损坏或运行中失败时保留原文件，不自动删除、重建或回退内存签发；OAuth 请求返回安全 503，metadata、合法根 Bearer MCP、API 与 Web 不因此失效。修复文件或权限后通过重启恢复。OAuth 认证状态不是可丢弃缓存，备份/恢复应与同一 Instance 的 auth.json 一起处理；镜像回退不等于授权数据库回滚。
 
 ### 持久 Web Session 与刷新恢复
@@ -556,7 +558,9 @@ endpoint 永远是本机 loopback URL。token绝不能写入lock；CLI从同一I
 
 ### `logs/`
 
-`logs/` 保存 `kgosd` 的本地诊断日志，不属于 Knowledge Base history 或业务状态真源。结构化日志、关键业务事件、请求关联、文件轮转/保留、容器日志分工与 Metrics 统一由 [Observability](observability.md) 拥有；具体实现与已通过的验收证据见 [Phase 19](../development/phases/19-observability.md)。
+`logs/` 是 Instance 的**可丢弃诊断目录**，不属于 Knowledge Base history、`kgos.db` 或业务状态真源。[Phase 19](../development/phases/19-observability.md) 的当前实现曾将内部 CLI 日志写入 `kgosd.log` 并轮转，Docker 使用 stderr；这些仍是历史已验收基线。
+
+按 [D126](decisions.md#d126-sqlite-observability-workbench) 的 **Phase 35 目标**，常规运行诊断统一持久化为 `<workspace>/.kgos/logs/observability.sqlite`（含 SQLite 自有 WAL/SHM），不再生成/复制完整 JSONL 日志；该库与 `kgos.db`、OAuth/Web Session 及可选 Provider Cache 独立，不进入知识版本历史或业务备份。应急启动信息和诊断库故障仅通过受控 stderr、内部 CLI 现有有界 `kgosd.startup.log` 输出；失败不能妨碍业务库正常启动。原 `kgosd.log*` 仅保留为旧版文件，升级不自动删除或迁移。权限、生命周期、空间保留、损坏隔离、写入降级与诊断 API 规则由 [Observability](observability.md#输出保留与应急通道phase-35-目标) 拥有，实施与验收见 [Phase 35](../development/phases/35-observability-workbench.md)。
 
 ### `kgos.db`
 

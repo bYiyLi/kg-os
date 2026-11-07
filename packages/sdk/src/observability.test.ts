@@ -5,6 +5,87 @@ import { KGOSClient, KGOSDaemonError, KGOSTransportError } from "./index.js";
 // cspell:words goroutines
 
 describe("KG OS observability SDK", () => {
+  it("uses existing authenticated transport for all bounded historical diagnostic routes", async () => {
+    const overview = {
+      availability: "available",
+      coverage: { dropped: 0, truncated: false },
+      total: 0,
+      success: 0,
+      errors: 0,
+      slow: 0,
+      incomplete: 0,
+      trend: [],
+      resources: [],
+      events: [],
+      snapshot: {}
+    };
+    const list = {
+      availability: "available",
+      coverage: overview.coverage,
+      items: [],
+      next_cursor: ""
+    };
+    const detail = {
+      availability: "available",
+      coverage: overview.coverage,
+      request: {},
+      spans: [],
+      logs: []
+    };
+    const logs = {
+      availability: "available",
+      coverage: overview.coverage,
+      items: [{ id: 1, request_id: "req_" + "b".repeat(32), event: "http.request.finished" }]
+    };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify(overview)))
+      .mockResolvedValueOnce(new Response(JSON.stringify(list)))
+      .mockResolvedValueOnce(new Response(JSON.stringify(detail)))
+      .mockResolvedValueOnce(new Response(JSON.stringify(logs)));
+    const client = new KGOSClient({
+      endpoint: "http://127.0.0.1:5000",
+      token: "web-access",
+      fetch: fetcher
+    });
+    const controller = new AbortController();
+    await expect(
+      client.system.observability.overview({}, { signal: controller.signal })
+    ).resolves.toEqual(overview);
+    await expect(
+      client.system.observability.requests.list({ limit: 50, route: "mcp" })
+    ).resolves.toEqual(list);
+    await expect(
+      client.system.observability.requests.get({
+        request_id: "req_12345678901234567890123456789012",
+        limit: 10
+      })
+    ).resolves.toEqual(detail);
+    await expect(
+      client.system.observability.logs.list({ limit: 25, level: "WARN" })
+    ).resolves.toEqual(logs);
+    expect(fetcher.mock.calls.map(([path]) => path)).toEqual([
+      "http://127.0.0.1:5000/api/v1/system/observability/overview",
+      "http://127.0.0.1:5000/api/v1/system/observability/requests/list",
+      "http://127.0.0.1:5000/api/v1/system/observability/requests/get",
+      "http://127.0.0.1:5000/api/v1/system/observability/logs/list"
+    ]);
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      body: "{}",
+      signal: controller.signal,
+      headers: { Authorization: "Bearer web-access", Accept: "application/json" }
+    });
+    expect(fetcher.mock.calls[1]?.[1]).toMatchObject({
+      body: JSON.stringify({ limit: 50, route: "mcp" })
+    });
+    expect(fetcher.mock.calls[2]?.[1]).toMatchObject({
+      body: JSON.stringify({ request_id: "req_12345678901234567890123456789012", limit: 10 })
+    });
+    expect(fetcher.mock.calls[3]?.[1]).toMatchObject({
+      body: JSON.stringify({ limit: 25, level: "WARN" })
+    });
+  });
   it("retrieves process-local diagnostics without changing the authentication contract", async () => {
     const diagnostics = {
       uptime_seconds: 8,

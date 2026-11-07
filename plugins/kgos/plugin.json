@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "kgos",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "description": "KG OS MCP integration and eight focused knowledge graph skills.",
   "author": {
     "name": "KG OS"

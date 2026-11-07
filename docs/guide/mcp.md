@@ -71,11 +71,13 @@ return { state, model, graphData };
 
 Ontology 预览的 `viewRevision` 属于进程内有界缓存；过期后返回 `VIEW_EXPIRED`，重新从 `offset=0` 获取新视图。索引中的 Offset/Lines 是整个 Markdown 文档的**绝对行号**，不是本页相对行号。详细 AI 操作方法以 [MCP 任务指南](mcp-guides/index.md)、[状态读取](mcp-guides/reading.md)、[错误恢复](mcp-guides/errors.md) 和当前连接的 `kgos_docs` 为准，不再依赖历史通用 Skill。
 
-## 4. ChatGPT OAuth 与私人 Plugin
+## 4. 通用 MCP OAuth 与私人 Plugin
 
-用户自行准备可从 ChatGPT 访问的 HTTPS 入口，例如 `https://kgos.example.com/mcp`，在 `.kgos/config.toml` 中配置 `[server].public_origin = "https://kgos.example.com"`，随后重启 KG OS，而**不是**完整的 `/mcp` URL。代理必须同时公开同源 Web `/` 与静态资源、Web 登录 API、`/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/request`、`/oauth/decision`、`/oauth/token`、`/oauth/revoke`。
+用户自行准备可从 MCP 客户端访问的 HTTPS 入口，例如 `https://kgos.example.com/mcp`，在 `.kgos/config.toml` 中配置 `[server].public_origin = "https://kgos.example.com"`，随后重启 KG OS，而**不是**完整的 `/mcp` URL。代理必须同时公开同源 Web `/` 与静态资源、Web 登录 API、`/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/register`、`/oauth/authorize`、`/oauth/request`、`/oauth/decision`、`/oauth/token`、`/oauth/revoke`。
 
-ChatGPT 连接使用受限 CIMD 客户端与 OAuth Authorization Code + PKCE S256。Go 校验后将浏览器跳转到**现有 KG OS Web**；已登录直接显示连接授权弹窗，未登录先执行 Web 原有登录，随后明确允许或拒绝。OAuth Code/Access/Refresh 由 Go 管理，对用户透明。Web 登录沿用已有持久 Session。待授权请求 5 分钟有效；已批准 OAuth 授权保存于独立认证库，普通重启保留。新签发 Access Token 硬有效期为 24 小时，向客户端报告 `expires_in=86340`（23 小时 59 分钟）以提前刷新；已签发 Token 保留原到期时间。Refresh 每次成功使用滚动续期 30 天；连续 30 天未刷新、撤销或根凭证变更才需重新授权。首次升级旧内存版本需重新连接一次；签名刷新响应丢失且立即重启仍可能需重连，不能绕过认证。
+**Phase 36 实现目标（尚未单独发布/部署验收）**：通用标准 MCP Host（包括 ChatGPT、Muse）通过 Discovery 选择公开 HTTPS CIMD 或 RFC 7591 DCR，而不受特定厂商域名白名单限制。DCR 在 `/oauth/register` 仅取得公共 Client ID，**不会直接获得知识库访问权**；所有客户端仍使用 Authorization Code + PKCE S256，经**现有 KG OS Web** 登录并明确同意完整读写权限后才能取得 MCP Token。Web 展示客户端自行声明的名称、已验证的回调主机及本机 Loopback 风险，不向客户端交付 Instance 根凭证。MCP OAuth Access Token 不能访问普通 HTTP API。
+
+新 OAuth `resource` 是完整 MCP URL（如 `https://kgos.example.com/mcp`，使用自定义 `--mcp-path` 时改为实际路径），`issuer` 仍为站点 Origin。升级仅迁移 OAuth 存储资源元数据，保留旧 Access 已签发 audience、Scope 与过期时间；旧 Code/Refresh 不能升级换发。新的 Scope 为 `mcp`，长期连接可使用 `mcp offline_access`；Code 有效期 5 分钟，Access Token 硬有效期 15 分钟、报告 `expires_in=840`（14 分钟提前刷新），Refresh 每次成功使用滚动续期 30 天。已通过安全校验的签名客户端允许有界相同请求重试，公共客户端仍严格轮换并支持撤销。升级前已签发的旧 `kgos:access` Access Token 只在其原有效期内继续有效（最多按原 24 小时签发），旧 Refresh 不会暗中改写为新 Scope：Host 必须通过标准 OAuth **重新授权一次**。旧数据、数据库版本与发布回退须按 [Phase 36](../development/phases/36-host-neutral-mcp-oauth.md) 的验收结果判断，不靠删除 OAuth 库恢复。**当前已发布的 v0.3.17 仍是历史 ChatGPT 专属 Scope/期限行为；只有真实运行版本已经升级后才按本段的新协议连接。**
 
 在 macOS/Linux 上，OAuth 存储要求实例 `.kgos` 目录权限为 `0700`，`mcp-oauth.db` 文件为 `0600`。手工预建目录后应核对权限；权限不符合、存储损坏或不可用时 OAuth 返回 503，根 Bearer MCP、API 和 Web 仍保持各自能力。由实例所有者修复目录/文件权限后重启恢复；不要删除认证库来处理此错误。
 

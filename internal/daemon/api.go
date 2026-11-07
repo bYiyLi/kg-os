@@ -40,6 +40,7 @@ func NewHandlerWithSettings(runtime *runtimehost.Runtime, fallback http.Handler,
 	mux := http.NewServeMux()
 	sessions.routes(mux, runtime.Credential.Token, bootID)
 	newSettingsService(runtime, settings).routes(mux)
+	mountObservability(mux, runtime.Credential.Token)
 	mux.HandleFunc("/api/v1/system/diagnostics", postJSONHandler(
 		runtime.Credential.Token,
 		func(ctx context.Context, _ struct{}) (observability.Snapshot, error) {
@@ -68,7 +69,7 @@ func NewHandlerWithSettings(runtime *runtimehost.Runtime, fallback http.Handler,
 		if mediaType == "application/x-ndjson" {
 			writeGraphStream(response, func(consume func(kernel.GraphStreamEvent) error) error {
 				return runtime.Kernel.StreamGraphQuery(request.Context(), input, consume)
-			})
+			}, request.Context())
 			return
 		}
 		result, err := runtime.Kernel.QueryGraph(request.Context(), input)
@@ -89,7 +90,7 @@ func NewHandlerWithSettings(runtime *runtimehost.Runtime, fallback http.Handler,
 		if mediaType == "application/x-ndjson" {
 			writeGraphStream(response, func(consume func(kernel.GraphStreamEvent) error) error {
 				return runtime.Kernel.StreamGraphExecute(request.Context(), input, consume)
-			})
+			}, request.Context())
 			return
 		}
 		result, err := runtime.Kernel.ExecuteGraph(request.Context(), input)
@@ -414,6 +415,7 @@ func (err *graphStreamWriteError) Unwrap() error { return err.err }
 type graphHTTPStream struct {
 	response   http.ResponseWriter
 	controller *http.ResponseController
+	ctx        context.Context
 	started    bool
 	terminal   bool
 }
@@ -421,9 +423,15 @@ type graphHTTPStream struct {
 func writeGraphStream(
 	response http.ResponseWriter,
 	stream func(func(kernel.GraphStreamEvent) error) error,
+	requestContext ...context.Context,
 ) {
+	ctx := context.Background()
+	if len(requestContext) != 0 && requestContext[0] != nil {
+		ctx = requestContext[0]
+	}
 	_, ok := response.(http.Flusher)
 	if !ok {
+		observability.SetStreamResult(ctx, "error", string(kernel.CodeInternal))
 		kernel.WriteJSONError(response, &kernel.PublicError{
 			Code:    kernel.CodeInternal,
 			Message: "HTTP streaming is unavailable",
@@ -433,10 +441,12 @@ func writeGraphStream(
 	output := &graphHTTPStream{
 		response:   response,
 		controller: http.NewResponseController(response),
+		ctx:        ctx,
 	}
 	err := stream(output.writeEvent)
 	if err == nil {
 		if !output.terminal {
+			observability.SetStreamResult(ctx, "error", string(kernel.CodeInternal))
 			public := &kernel.PublicError{
 				Code:    kernel.CodeInternal,
 				Message: "Graph stream ended without a terminal event",
@@ -451,8 +461,10 @@ func writeGraphStream(
 	}
 	var writeErr *graphStreamWriteError
 	if errors.As(err, &writeErr) {
+		observability.SetStreamResult(ctx, "error", string(kernel.CodeIO))
 		return
 	}
+	observability.SetStreamResult(ctx, "error", string(kernel.AsPublicError(err).Code))
 	if !output.started {
 		kernel.WriteJSONError(response, err)
 		return
@@ -473,7 +485,13 @@ func (stream *graphHTTPStream) writeEvent(event kernel.GraphStreamEvent) error {
 	if event.Type == "summary" {
 		stream.terminal = true
 	}
-	return stream.writeLine(body)
+	if err := stream.writeLine(body); err != nil {
+		return err
+	}
+	if event.Type == "summary" {
+		observability.SetStreamResult(stream.ctx, "succeeded", "")
+	}
+	return nil
 }
 
 func (stream *graphHTTPStream) writeError(public *kernel.PublicError) error {
@@ -488,6 +506,7 @@ func (stream *graphHTTPStream) writeError(public *kernel.PublicError) error {
 		return err
 	}
 	stream.terminal = true
+	observability.SetStreamResult(stream.ctx, "error", string(public.Code))
 	return stream.writeLine(body)
 }
 
@@ -594,6 +613,9 @@ func writeJSON(response http.ResponseWriter, status int, value any) {
 
 func writeJSONErrorStatus(response http.ResponseWriter, status int, err error) {
 	public := kernel.AsPublicError(err)
+	if recorder, ok := response.(interface{ RecordPublicError(string) }); ok {
+		recorder.RecordPublicError(string(public.Code))
+	}
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
 	response.Header().Set("X-Content-Type-Options", "nosniff")
 	response.WriteHeader(status)

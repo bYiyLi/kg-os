@@ -40,7 +40,9 @@ export function readOnlySettingsSnapshot(): SettingsSnapshot {
 }
 
 export async function openPreferenceSettings(page: Page) {
-  await page.locator(".sidebar-settings-button:visible").click();
+  // Observability also uses this visual class; select the actual Settings
+  // action by accessible name rather than a shared decorative class.
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Settings", exact: true });
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('[data-settings-category="display"]')).toHaveAttribute(

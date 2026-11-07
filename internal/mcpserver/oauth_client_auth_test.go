@@ -238,7 +238,7 @@ func TestOAuthClientMetadataStaleDoesNotReplaceNewAuthority(t *testing.T) {
 	if _, err := f.auth.Client(ctx, oauthTestClient, false); !errors.Is(err, errOAuthClientUnavailable) {
 		t.Fatalf("browser approval accepted stale authority: %v", err)
 	}
-	f.transport.set(oauthTestClient, oauthClientDocument{ClientID: oauthTestClient, RedirectURIs: []string{oauthTestRedirect}, AuthenticationMethod: "none"}, 200)
+	f.transport.set(oauthTestClient, oauthClientDocument{ClientID: oauthTestClient, ClientName: "Updated Client", RedirectURIs: []string{oauthTestRedirect}, AuthenticationMethod: "none"}, 200)
 	doc, err := f.auth.Client(ctx, oauthTestClient, true)
 	if err != nil || doc.allows(oauthPrivateKeyJWT) {
 		t.Fatalf("new authority ignored: %+v %v", doc, err)

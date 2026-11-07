@@ -216,8 +216,8 @@ it("requires authentication before the static shell can be used", async () => {
 
 it("applies automatic and manual theme preferences through the settings dialog", async () => {
   await renderConnectedApp();
-  expect(document.body.querySelectorAll(".sidebar-bottom button")).toHaveLength(1);
-  expect(document.body.querySelector(".sidebar-bottom")?.textContent).toBe("Settings");
+  expect(document.body.querySelectorAll(".sidebar-bottom button")).toHaveLength(2);
+  expect(document.body.querySelector(".sidebar-bottom")?.textContent).toContain("Settings");
   await openSettings();
   expect(currentTheme()).toBe("dark");
   expect(buttonByName("Follow system").getAttribute(PRESSED_ATTRIBUTE)).toBe("true");
@@ -302,6 +302,7 @@ it("opens a mobile version drawer and closes using the close control", async () 
   expect(dialog.querySelectorAll(".commit-item")).toHaveLength(0);
   expect(fetchedRoute(HISTORY_ROUTE)).toBe(false);
   expect(dialog.querySelectorAll(".sidebar-settings-button")).toHaveLength(1);
+  expect(dialog.querySelectorAll(".sidebar-observability-button")).toHaveLength(1);
   expect(dialog.querySelector(".theme-toggle")).toBeNull();
   expect(dialog.querySelector(".language-switcher")).toBeNull();
   await act(async () => {

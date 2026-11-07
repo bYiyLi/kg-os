@@ -1,9 +1,12 @@
 import { settingsEnglish } from "../../features/settings/settings-translations.js";
+import { observabilityEnglish } from "../../features/observability/observability-translations.js";
 
 export const en = {
   settings: settingsEnglish,
   ui: { closeNotification: "Close notification", notifications: "Notifications" },
   meta: { title: "KG OS", description: "KG OS knowledge graph workspace" },
+  observability: observabilityEnglish,
+
   language: {
     label: "Interface language",
     system: "Follow system language",
@@ -386,9 +389,13 @@ export const en = {
   },
   mcp: {
     title: "Authorize Connection",
-    description: "ChatGPT wants to connect to your KG OS instance.",
+    description: "An external MCP client requests access to your KG OS instance.",
     cancelConnection: "Cancel connection",
     externalAssistant: "External AI Assistant",
+    selfDeclared: "Client name is self-declared",
+    callbackHost: "Registered callback host (exact match)",
+    loopbackWarning:
+      "This callback uses a local listener. Only approve if you initiated the connection in the trusted desktop app.",
     yourGraph: "Your Knowledge Graph",
     loading: "Loading connection request...",
     permissionsTitle: "This application will be able to:",
@@ -406,10 +413,11 @@ export const en = {
     cancel: "Cancel",
     authorize: "Authorize Connection",
     authorizing: "Authorizing...",
-    footnote: "By continuing, you trust ChatGPT to access this KG OS instance.",
+    footnote:
+      "Approving grants the displayed client full MCP read and write access to this instance.",
     error: {
-      unavailable: "This connection request is unavailable. Start again from ChatGPT.",
-      failed: "Could not complete authorization. Start again from ChatGPT."
+      unavailable: "This connection request is unavailable. Start again from your MCP client.",
+      failed: "Could not complete authorization. Start again from your MCP client."
     }
   }
 } as const;

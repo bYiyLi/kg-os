@@ -1,6 +1,6 @@
 # MCP 与私人 OpenAI Plugin
 
-<!-- cspell:words Streamable Asyncify mcpserver testdata -->
+<!-- cspell:words Streamable Asyncify mcpserver mcpauth testdata -->
 
 本文件是 KG OS **Go 原生 MCP、Tool 命名与文档接口、受控 JavaScript 执行、私人 OpenAI Plugin / Skill 与 Markdown Preview / Ancestry** 的设计真源。KG OS 业务语义不由 MCP 定义：Ontology、Object / Patch、Graph / Cypher、Evolution 分别由其设计 owner 负责；统一监听与 Instance 生命周期见 [Runtime](runtime.md)，公开 TypeScript SDK 的逻辑合同见 [Client](client.md)。
 
@@ -8,13 +8,15 @@
 
 **2026-10-14 MCP 认证目标调整（[D95](decisions.md#d95-unified-mcp-web-authorization)、[Phase 17](../development/phases/17-mcp-web-authorization.md) `done`（用户验收例外））**：MCP 不再拥有独立管理员 Token，使用同一个 Instance 认证真源；ChatGPT 的 OAuth 授权转入现有 KG OS Web，通过其登录状态及连接授权弹窗完成。**Go OAuth 路由、Web 授权弹窗和持久 Web Session 已实现并经过本地测试，相关代码现已进入 `main@8e7bf56`；2026-10-14 新版 Dev 曾完成正式 Docker 构建部署，用户确认 ChatGPT 重新授权测试成功。Phase 17 关闭时远端 GitHub CI / 最新完整隔离矩阵未执行，用户批准带例外关闭，不代表 CI 通过**。Web 登录状态由 Web/Runtime owner 负责，本文件只定义 MCP 的对接与安全合同。
 
+**2026-11-07 新目标（[D127](decisions.md#d127-host-neutral-mcp-oauth)、[Phase 36](../development/phases/36-host-neutral-mcp-oauth.md) `in_progress`）**：将 Phase 17/34 已实现的 ChatGPT 专属 Client ID/redirect 限制升级为通用 MCP OAuth 客户端身份与安全授权，CIMD 优先、DCR 兼容。**当前本地源码已有实现与专项测试，仍未完成全部验收或正式发布**；现有已发布实例仍按原 ChatGPT 限制运行，不能因代码写入就宣称 Muse 已可连接。规范合同见 [通用 OAuth](#host-neutral-mcp-oauth)，旧 Phase 17 授权章节保留实现历史与不变的身份边界。
+
 ## 目标与边界
 
 - AI 使用 KG OS 时应先了解真实的 Branch / Commit / Ontology，然后按需读取和操作 Knowledge；避免每次为了取得版本及模型结构都先编写一段 JavaScript。
 - 一个专门的 MCP 文档 Tool 负责首次发现和按需批量阅读公开文档；两个直接读取 Tool 负责 Ontology 与 Commit 导航；两个 JavaScript 执行 Tool 负责组合完整公共 SDK 能力。不把 SDK 每个方法机械提升为单独的 MCP Tool，也不在 MCP 定义新的知识模型、Search DSL 或事务语义。
 - `kgos_ontology_overview` 提供**完整的 Ontology 只读视图，按行取窗口**；不为节省上下文而删除 Definition、Property、Constraint、Index 或关系。它不保存可编辑 Markdown、不提供文件系统路径、不产生新的数据库资源。
 - AI 的模型理解、信息提炼、Commit Message 编写以及工具编排属于外部 AI / 官方 Skill；MCP 只提供确定性数据、执行与安全边界。
-- ChatGPT Web 与 Desktop 为目标客户端；用户自托管自己的 KG OS Instance，私人安装自己的 Plugin。**不提交公共插件目录，不集中托管用户知识库。**
+- 标准 MCP 客户端（含 ChatGPT、Muse 等）为目标连接方；ChatGPT 的 Web/Apps 适配与私人 Plugin 是可选宿主集成。用户自托管自己的 KG OS Instance，**不提交公共插件目录，不集中托管用户知识库**。
 
 ## 部署与责任划分
 
@@ -111,6 +113,8 @@ kgosd --root <workspace-root> --host <address> --port <port>
 
 #### 统一 Instance 认证与 Web 内的 MCP 连接授权（Phase 17 目标）
 
+**历史实现基线**：本节记载 Phase 17 的 ChatGPT 专用允许列表、回调和用户验收，不作为 Phase 36 完成后仍生效的通用 Client 身份限制。新的 Client 解析、回调、授权页面字段、Scope、Code/Access 有效期及注册行为以 [D127 通用 OAuth](#host-neutral-mcp-oauth) 为准；单 Instance 根身份、Web 登录、凭证隔离及 D124 的持久存储/Refresh 轮换/撤销/故障恢复继续有效。
+
 ##### 身份与能力边界
 
 - **唯一根凭证**：继续使用 Runtime 已有的 `<workspace>/.kgos/auth.json` Instance Token，不创建 MCP 管理员 Token、用户表、密码、独立身份供应商或第二份认证配置。Web 登录状态由 Web/Runtime 的既有认证 owner 提供，MCP **只消费服务端已验证的 Web 登录上下文**；不定义 Web Session 的创建、Cookie 方案、持久化、跨标签同步或登录 UI。
@@ -148,6 +152,80 @@ kgosd --root <workspace-root> --host <address> --port <port>
 - 所有授权查询/决定、Token 交换必须有体积/数量/时间限制；禁用跨源调用、缓存、开放跳转、重放和重复同意。`request_id` 即使被复制或泄露，也只能定位待授权请求，**不能绕过有效 Web 登录及显式同意**。除了经 TLS 保护的授权 code 回调，不把任何 Token/code 放进 Web URL、日志、错误或持久 UI 状态。MCP 未认证拒绝与 OAuth 错误保持最小且无秘密差异。
 
 本节**只拥有 MCP 授权请求、OAuth 协议、凭证隔离及与 Web 的接口合同**。Web 登录/Session、通用认证弹窗实现和前端登录生命周期属于 Web/Runtime owner；MCP 只消费其已认证状态并提供连接授权所需数据与动作。Phase 17 MCP 认证代码已通过本地 Web Session Handler 集成与浏览器模拟验收，Dev 正式 Docker 构建及只读自动验收通过，用户也确认真实 ChatGPT 重新授权成功；未执行的 GitHub CI / 完整隔离矩阵不能记为通过。Phase 17 `done` 是用户明确批准的关闭例外，不等于正式发布或生产就绪。
+
+<a id="host-neutral-mcp-oauth"></a>
+
+### 通用 MCP OAuth 客户端身份与授权（D127 / Phase 36 目标）
+
+#### 目标、适用范围与既有边界
+
+**目标**：标准 MCP Client 应能够按 OAuth Discovery 自动发现 KG OS 的授权服务、采用公开 HTTPS Client ID Metadata Document（CIMD）或 RFC 7591 Dynamic Client Registration（DCR），经**现有 Web 登录 + 显式授权**取得仅适用于当前 Instance 的 MCP OAuth Token。不能以 Host 名称（ChatGPT/Muse/Claude 等）或厂商域名判断授权资格，也不提供未登录/未同意即可访问知识库的途径。
+
+**对外协议复用原则（2026-11-07 用户进一步确认）**：KG OS **以 Nexum 当前已实现的外部 MCP OAuth 协议为直接兼容性基线**，不是只选择性借鉴 CIMD/DCR。相同的标准 MCP Client 不应为了接入 KG OS 而修改其 Discovery、客户端注册、授权请求、Code/PKCE、Token/Refresh、Bearer 错误恢复或回调处理逻辑。协议的 HTTP method、请求/响应字段、认证方法、metadata 声明、错误分类和安全校验均以 Nexum 对外行为及 MCP/OAuth 标准核对；不得凭 KG OS 产品名引入另一套 OAuth 方言、Host allowlist 或额外的客户端交互步骤。
+
+**唯一系统职责差异是授权主体和业务权限映射**：Nexum 的 Browser 用户登录和 Grant 指向 `ownerId + Agent set`；KG OS 使用现有 Web Instance 登录，在批准后将 OAuth Client 绑定到**当前 Instance 的 MCP 能力**，不需要多用户、Agent 选择或套餐权益。由服务端处理这段映射，客户端仍使用相同的 OAuth 交互。**MCP 授权 Scope 与 Token 有效期也以 Nexum 为目标基线**：`mcp` / `mcp offline_access`、Access 硬有效期 15 分钟、`expires_in=840`（14 分钟刷新提示）、Refresh 滚动 30 天。产品各自的 `resource` URL 和 MCP Tool 集仍由各自实际实例声明，不要求客户端编写 KG OS 专属适配。KG OS 已有 `/oauth/revoke` 继续作为标准兼容扩展，不因 Nexum 当前路由集不同而删除。
+
+本合同替换 [Phase 17](#单管理员-chatgpt-oauth-认证) 和 [D124](#mcp-对外健壮性合同) 中“只认可 ChatGPT 的 CIMD/redirect、不开放 DCR”、硬编码客户端名称、**旧 `kgos:access` Scope 以及 24 小时 Access 有效期**的现行目标；历史实现与验收记录仍如实保留。继续保留：
+
+- Runtime 现有单 Instance Token、`[server].public_origin`、Go `kgosd` 同进程服务 Web/API/MCP/OAuth、Web 登录与 CSRF 防护；不新增账号、独立授权页或 Instance 管理身份。
+- `/mcp` 仅接受可信调用方持有的 Instance Bearer 或显式同意后获得的 MCP OAuth Token；OAuth Token **永不**授予普通 `/api/v1/*`、Web Session 或根凭证的访问权。外部 Host 必须使用 OAuth，不把直接 Bearer 当作绕过同意的兼容方案。
+- 新 Scope `mcp` 仍代表该 Instance 的**完整 MCP 读写能力**（包括 `kgos_mutate`），`offline_access` 仅表示长期连接意图，不增加业务权限。按 Nexum 的兼容语义，仅请求 `mcp` 的客户端也可以获得 Refresh Token；Token 返回的 `scope` 必须是实际获批的规范化 Scope，不因刷新扩权。不增加细粒度 Scope、Agent 选择、多用户 Grant 或额外知识模型。
+- D124 已存在的独立 `.kgos/mcp-oauth.db`、凭证摘要、不透明 Token、Code 单次消费、PKCE S256、Refresh 滚动 30 天、签名重试/公开客户端严格轮换、撤销和故障分类仍作为基础能力。本阶段将**新签发** Access Token 统一改为 **15 分钟硬有效期，`expires_in=840`**；新的 Authorization Code 有效期对齐 Nexum 的 5 分钟。无需重新建设独立 Token 服务，也不保留 24 小时作为新 Token 配置选项。
+
+#### Discovery 与端点合同
+
+| 端点 | 目标行为 | 边界 |
+| --- | --- | --- |
+| `/mcp` 无 Bearer | 401 + `WWW-Authenticate: Bearer resource_metadata=...` | 沿用现有 Origin、Boot Guard、认证与 MCP audience 边界 |
+| `/.well-known/oauth-protected-resource` 及 MCP-path 版本 | 宣告当前 `resource`、单一 issuer、`mcp` / `offline_access` | 仅公开 Discovery，不暴露实例数据/凭证 |
+| `/.well-known/oauth-authorization-server` | 宣告现有 `authorization_endpoint`、`token_endpoint`、`revocation_endpoint`、`code_challenge_methods_supported=["S256"]`、`client_id_metadata_document_supported=true` 及新的 `registration_endpoint=<issuer>/oauth/register` | 仅在实现真实 DCR 路由后宣告；`grant_types` 仍为 `authorization_code`、`refresh_token`，`token_endpoint_auth_methods_supported` 为 `none` / `private_key_jwt`（RS256） |
+| `POST /oauth/register` | RFC 7591 DCR；合法请求返回 201 + 公共 Client ID 与标准注册元数据 | **仅注册身份，不授予任何 Scope、Grant、Code 或 Token**；禁止发 Client Secret / 注册管理凭证 |
+| `GET /oauth/authorize` | 从已验证 CIMD 或持久化 DCR Client 解析身份，再校验 redirect/resource/scope/state/PKCE，才建立待授权请求 | 未验证的 redirect **绝不**用于错误响应或浏览器导航 |
+| `GET /oauth/request` 与 `POST /oauth/decision` | 复用 Web 原弹窗/认证/CSRF，只从服务端已验证请求展示 Client、回调与读写权限并决定批准/拒绝 | 不新增登录页、未登录不暴露 Client 明细；任何表单参数不能更改回调或 Scope |
+| `POST /oauth/token` / `POST /oauth/revoke` | 保留 Code/Refresh/撤销协议；按 Client 来源解析其认证方法 | DCR 为 `none`；CIMD 可为 `none` 或已验证 `private_key_jwt`，不回退/降级认证方法 |
+
+仅公开的 Discovery 元数据允许无凭证 `GET/OPTIONS` 与相应的只读 CORS，不向浏览器暴露 Cookie/Token；DCR 注册、用户会话和授权决定**不**因 Discovery 的 CORS 而开放跨源写入。**新 OAuth `resource` 精确绑定 `<issuer><MCP Path>`**（默认 `<issuer>/mcp`；若通过 `--mcp-path` 自定义路径则使用实际 Endpoint），`issuer` 与回调 `iss` 仍为公共 Origin。新授权与 Token/Refresh 不再使用根地址作为资源；旧 Access 保留原始 Origin audience 和过期时间，不静默改写或延长。
+
+#### Client 识别、CIMD 安全与缓存
+
+客户端身份解析采用两条互斥路径：**URL 型 Client ID** 是具备非根路径的公开 HTTPS CIMD URL；**非 URL 型 Client ID** 仅在当前 OAuth SQLite 的 DCR 注册表中精确命中时有效。不存在的 ID、裸域名、任意普通 HTTPS redirect、URL 片段/userinfo/不合格 scheme 均不能冒充合法客户端；不内置 ChatGPT/Muse 等 Host allowlist，也不自动以相似名称匹配。
+
+对 CIMD 必须从 Client ID 指定地址获取严格 JSON，并校验文档中的 `client_id` 与请求 URL **字节级一致**、`client_name` 非空、`redirect_uris` 非空且逐项合法。像 Nexum 一样兼容单值 `token_endpoint_auth_method` 与复数 `token_endpoint_auth_methods_supported`，有效客户端方法只允许 `none` 或已验证的 `private_key_jwt`，均未声明时按 Nexum 的公共客户端默认 `none`；后一模式要求公开 HTTPS `jwks_uri` 与 RS256。已有有效的 ChatGPT CIMD 声明仍须通过，不能因为增加其它 Client 就收紧其合法字段或容量。显示名称仅为经校验的**客户端自声明信息**，不是 KG OS 对品牌或身份的官方背书。
+
+**取消 ChatGPT Host 限制前必须补上安全出站边界**：CIMD 和 JWKS 读取只允许公开 HTTPS；拒绝 loopback/private/link-local/multicast/reserved 地址、userinfo/fragment、任意 HTTP 降级与重定向。DNS 解析并校验全部目标 IP，直连或使用 HTTP/HTTPS 代理 CONNECT 时只允许这些已校验 IP 作为连接目标。HTTPS 代理连接先以**代理域名**验证代理证书，隧道内再以**原始客户端域名**验证目标 TLS 证书，两层不能混用 ServerName；禁止通过代理、IPv6、重定向或 DNS rebinding 绕开边界。请求有显式超时、响应大小、并发与缓存硬上限，不得把获取失败解释为认证成功。D124 既有 5 分钟 fresh / 最多 1 小时有界 stale-cache 只适用于 **Token/撤销的已验证短时网络故障**；新浏览器授权不借 stale metadata 继续授予新权限。无可信缓存、证书/身份不符、签名或未知 kid 必须拒绝。
+
+#### DCR 注册与客户端回调
+
+DCR 作为 **MCP 2026-07-28 的兼容能力**，只提供 RFC 7591 公共客户端注册（不增加用户操作端、客户端管理 UI 或客户端 Secret）。请求必须满足：
+
+- 请求体最多 64 KiB；`client_name` 为 1–255 字符；`redirect_uris` 为 1–20 个无重复 URI，每项不超过 2048 字符；可选 `client_uri` 最多 2048 字符且为公开 HTTPS。JSON 不接受不支持或冲突的认证/Grant 字段。
+- `token_endpoint_auth_method` 为空或 `none`；`grant_types` 只允许 `authorization_code`、`refresh_token`，`response_types` 只允许 `code`；Scope 只允许 `mcp` 或 `mcp offline_access`，不接受注册时扩大权限。
+- **与 Nexum 一样不要求或依据 `application_type` 决定回调合法性**：回调统一只允许有效 HTTPS 或 `http://localhost`、IPv4 loopback（`127.0.0.0/8`）和 IPv6 loopback（`::1`）的 HTTP URI。其他 HTTP、私网 LAN、通配、userinfo、fragment、非 HTTP scheme 及开放重定向拒绝。使用注册时**完整原样保存的 URI**精确匹配授权请求，不做通配端口/路径自动放宽；桌面客户端必须先注册实际回调端口，再请求授权。与 Nexum 一样兼容可选的 `application_type=web/native`，但不要求客户端必须声明，也不以此改变 Loopback 的安全判定；将来若扩展标准注册字段，应保证两端协议兼容，不把可选声明变成新的客户端门禁。
+- 注册成功生成密码学不可猜测的不透明 `client_id`，返回其声明的公开注册元数据；`client_name` / `client_uri` 是用户界面的自声明材料，不授予品牌可信度或访问权。DCR 无法证明发起客户端的组织身份，安全边界仍是精确回调、PKCE、用户同意及 MCP Token 限权。
+
+注册端点允许匿名申请，但必须有**单实例资源上限**：最多 512 个持久 DCR Client；直接公网 TCP 来源每分钟最多 10 次，全实例每分钟最多 60 次。对于经 loopback/私网反向代理汇聚的请求，不能把所有用户的共享代理 IP 当作单一终端执行 10 次限速，后端保留全局 60 次限额，并要求**可信入口自行按真实客户端来源限流**。KG OS 不自动信任客户端发送的 `Forwarded` 或 `X-Forwarded-For`，也不引入任意可信代理配置。触及速率或总量边界返回 429/受控错误，无 Client/Grant/Token 副作用；容量充足时注册不要求 Web 登录，但绝不能凭注册直接获得 OAuth Token。清理可回收长期无活跃 Family 的客户端记录，不得删除仍有有效授权/Code/Token 的 Client；数据大小同时受现有 OAuth SQLite 的 64 MiB 上限约束。不引入新的外部注册服务或配置系统。
+
+#### 现有 Web 授权与生命周期接合
+
+`GET /oauth/authorize` 必须完成 Client Identity、redirect 精确校验、PKCE S256、`resource` 与 Scope 后才创建 5 分钟进程内待授权请求；`state` 与 Nexum 一样可选，提供时必须是单一合法值，回调只回显原有非空 `state`，并保存**经过校验的 Client 显示名称/来源、回调主机/本机回调标识的快照**。Web 只展示该快照，不触发未受约束的新外部 Fetch；`GET /oauth/request` 在已有 `client_id`、`client_name`、`resource`、`scope`、`canWrite`、`expires_at` 基础上，最小增加 Client 来源、已校验的回调 Host 与 Loopback 标识。页面清楚展示当前 Instance 的**完整读写**、回调域名，并对 Loopback 显示本机程序可接收 Code 的风险提示；Client 名称/URI 只能转义后作为纯文本展示，不加载远端图标、脚本或第三方资源。**CIMD 和 DCR 的 Client 名称都是自声明资料**，不能凭名称宣称 ChatGPT 等品牌已被认证；Web 应更醒目地展示实际验证的 Client ID 和回调主机，避免名称冒充。
+
+用户已经登录才可查看请求详情，必须再显式选择批准或拒绝。回调只能由 Go 使用原待授权请求中精确验证过的 URI 构造，并保留 `state`、`iss`；失败时不跳转未验证目的地。Web Session 退出不等于 Token 撤销，已签发的 Family 沿用 D124；不得因 DCR 重新注册、客户端名称相同或曾经批准而自动同意。Web owner 只调整现有弹窗的数据展示与双语文案，不增加独立授权页面。
+
+#### 持久化、迁移、错误与降级
+
+沿用独立 `.kgos/mcp-oauth.db`，只为 DCR 增加必要的 Client 注册记录（Client ID、展示字段、精确 callback URI 集合、创建时间）；CIMD 不重复复制成持久 Client Registry。Store 现有 schema `user_version=1`，实施时进行事务化的 **v1 → v2 增量迁移**，保留已有 `oauth_families`、`oauth_codes`、`oauth_tokens` 与其 issuer/resource/root fingerprint 绑定。对于根凭证指纹与 issuer 不变、仅持久元数据仍记录旧 Origin audience 的数据库，在同一事务中将 `oauth_metadata.resource` 更正为 `<issuer><MCP Path>`；**既有 Family/Code/Token 的 resource、Scope 与到期时间原样保留**。仅旧 Scope + 旧 Origin audience 的已签发 Access 可以按照原过期时间继续被验证，其他不匹配绑定仍拒绝。**DCR 注册同样属于当前 issuer 与 Instance 根凭证的绑定域**；issuer 或根凭证变化时不能把旧 DCR Client ID 当成新实例/新授权服务器的有效注册。根凭证更换导致旧授权失效的规则仍生效。
+
+**旧连接的有限迁移，不恢复旧 Scope 为新协议选项**：升级前签发的 `kgos:access` Access Token 可以继续按照其数据库中原有的硬到期时间使用（最长仍为原签发时的 24 小时），不会被缩短、延长或赋予普通 API 权限；新签发和新授权一律只使用 `mcp` Scope、15 分钟硬有效期和 840 秒刷新提示。旧 `kgos:access` Refresh Token 不能静默将 Scope 变为 `mcp`；要求现有 Host 通过标准 OAuth **重新授权一次**获取新 Family，旧 Refresh 的交换返回标准 `invalid_grant`，不可冒充服务器故障或自动扩权。升级时保留历史 Family/Token 记录以完成短期校验与安全迁移；不生成长寿命的旧 Scope 新凭证，最多在过渡窗口结束后按原存储清理规则回收。Phase 36 必须以真实 ChatGPT 重连验证 Host 能否对 `invalid_grant` 正确重新授权；如果不能，实施前依据实际证据优化过渡方案，不能把现有用户连接意外失效当作成功。
+
+已批准授权继续使用现有 Family/Code/Token 模型，不新增独立 Grant 表、第二数据库、领域图节点或新身份层。DCR 注册存储拒绝/数据库损坏/迁移失败必须 **fail closed**，不得清库重建、退化到内存注册或绕过验证；注册/授权/刷新失败按 HTTP 400（非法客户端/参数）、401（无效 Bearer）、403（Origin/权限）、429（受限）、503（存储/出站暂时失败）分类，不能把暂时故障误报为永久 `invalid_client` 或有效授权撤销。Public Origin 未配置时沿用现有 OAuth 不可用与可信直接 Bearer 行为。
+
+升级前应核对现有数据库结构、版本及备份/恢复手段；**旧版本只认识 v1 schema，不保证直接打开升级后的 v2 库**，任何回退策略必须在隔离环境验证，不得靠删除 OAuth 数据库完成回滚。DCR 客户端数据不进入 Knowledge Graph、版本历史或观测 SQLite；观测只记匿名化的固定原因、Request ID 和结果，不记录 URI 查询中的 Code、Token、JWT、完整 Client metadata 或秘密。
+
+#### 真实验收与证据
+
+验证分为协议/安全负例、SQLite v1→v2 迁移/故障、Web 登录/同意、MCP Tool/SDK 回归和真实 Host。至少覆盖 ChatGPT 现有 CIMD、非 ChatGPT 公开 CIMD、DCR 原生 Loopback 与 HTTPS、浏览器批准/拒绝、重启/刷新/撤销以及内网 SSRF/开放重定向/伪造 Client/DB 失败。真实 Muse 连接和真实 ChatGPT 连接必须分别给出 OAuth Discovery、同意、Tool、重连的可定位证据；不把只读模拟客户端或 Nexum 的既有测试说成 KG OS 的宿主验收。
+
+本合同参考 [Nexum MCP OAuth 设计](https://github.com/bYiyLi/Nexum/blob/c78d60f55f4c8478c4333f2505493ee103a05820/docs/design/mcp-oauth-grants.md) 及其 `internal/mcpauth` 实现（2026-11-07 本地核读）、[MCP 2026-07-28 Client Registration](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/authorization/client-registration.mdx) 与 [安全考虑](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/authorization/security-considerations.mdx)。外部参考只提供协议与实现证据，**KG OS 以本节和 D127 为目标合同**；进度、验收与未完成项只在 [Phase 36](../development/phases/36-host-neutral-mcp-oauth.md) 维护。
 
 ### 首次使用与验收边界
 
@@ -355,6 +433,8 @@ return { created, branches: branches.items };
 kgos_mutate 的失败均 retryable=false，执行后的错误提示先前写入可能完成，需读取 State/History 核实，绝不自动重放脚本。只读 TIMEOUT/IO_ERROR 等明确暂时故障可标记 retryable=true；参数、脚本、资源和结果格式错误需调整请求。
 
 ### OAuth 长期连接与刷新恢复
+
+**当前实现与新目标的分界**：本小节中“仅 ChatGPT CIMD、不开通任意 CIMD/DCR”、`kgos:access` 及其 24 小时 Access / 86340 秒提示，是 [D124](decisions.md#d124-mcp-resilience) 已交付版本的历史合同；这些现行目标已由 [D127 通用 OAuth](#host-neutral-mcp-oauth) 定向替代。Phase 36 实施前旧实现仍实际存在；本小节其余存储、签名、刷新恢复、撤销与故障分类继续有效，不因目标更新提前宣称代码已迁移。
 
 metadata 广告 offline_access，接受 kgos:access 与 kgos:access offline_access，按实际获批 scope 返回，兼容旧 scope 且刷新不能扩权。issuer/resource 地址保持当前合同。OAuth 数据库仅存高熵凭证 SHA-256 摘要、Code/PKCE binding、client/issuer/resource/scope、family/generation、消费/撤销及到期状态，不保存原始 Token、Code 或 assertion。父目录 0700、数据库与 journal 文件 0600，普通 SQLite 不加载图扩展。Code 消费与签发、Refresh 验证/消费/新签发均事务原子化；失败不提前销毁有效凭证。
 

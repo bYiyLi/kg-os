@@ -39,16 +39,23 @@ var (
 type oauthClientDocument struct {
 	ClientID              string   `json:"client_id"`
 	ClientName            string   `json:"client_name"`
+	ClientURI             string   `json:"client_uri,omitempty"`
+	Kind                  string   `json:"-"`
 	RedirectURIs          []string `json:"redirect_uris"`
 	AuthenticationMethod  string   `json:"token_endpoint_auth_method"`
 	AuthenticationMethods []string `json:"token_endpoint_auth_methods_supported"`
 	SigningAlgorithm      string   `json:"token_endpoint_auth_signing_alg"`
 	JWKSURI               string   `json:"jwks_uri"`
+	GrantTypes            []string `json:"grant_types"`
+	ResponseTypes         []string `json:"response_types"`
 }
 
 func (d oauthClientDocument) allows(method string) bool {
-	if d.AuthenticationMethod == method {
-		return true
+	// As in Nexum: when the plural metadata field is present it is the
+	// authoritative method set. Do not union conflicting declarations,
+	// which could silently downgrade a signed client to public auth.
+	if len(d.AuthenticationMethods) == 0 {
+		return d.AuthenticationMethod == method
 	}
 	for _, candidate := range d.AuthenticationMethods {
 		if candidate == method {
@@ -73,6 +80,7 @@ type oauthAssertionReplay struct {
 
 type oauthClientAuthenticator struct {
 	client     *http.Client
+	registered func(context.Context, string) (oauthClientDocument, error)
 	now        func() time.Time
 	mu         sync.Mutex
 	documents  map[string]oauthClientCacheEntry
@@ -104,6 +112,9 @@ func newOAuthClientAuthenticator(client *http.Client, now func() time.Time) *oau
 // New browser approvals always require fresh redirect authority.
 func (a *oauthClientAuthenticator) Client(ctx context.Context, clientID string, allowStale bool) (oauthClientDocument, error) {
 	if !validOAuthClientID(clientID) {
+		if a.registered != nil {
+			return a.registered(ctx, clientID)
+		}
 		return oauthClientDocument{}, errOAuthInvalidClient
 	}
 	now := a.now()
@@ -175,6 +186,8 @@ func (a *oauthClientAuthenticator) currentClient(clientID string, allowStale boo
 func cloneOAuthClient(document oauthClientDocument) oauthClientDocument {
 	document.RedirectURIs = append([]string(nil), document.RedirectURIs...)
 	document.AuthenticationMethods = append([]string(nil), document.AuthenticationMethods...)
+	document.GrantTypes = append([]string(nil), document.GrantTypes...)
+	document.ResponseTypes = append([]string(nil), document.ResponseTypes...)
 	return document
 }
 
@@ -192,9 +205,15 @@ func (a *oauthClientAuthenticator) fetchClient(ctx context.Context, clientID str
 	if err != nil {
 		return document, err
 	}
-	if json.Unmarshal(data, &document) != nil || document.ClientID != clientID || len(document.ClientName) > 512 ||
+	if json.Unmarshal(data, &document) != nil || document.ClientID != clientID || strings.TrimSpace(document.ClientName) == "" || len(document.ClientName) > 512 ||
 		len(document.RedirectURIs) == 0 || len(document.RedirectURIs) > 128 ||
-		len(document.AuthenticationMethods) > 8 || (!document.allows("none") && !document.allows(oauthPrivateKeyJWT)) {
+		len(document.AuthenticationMethods) > 8 {
+		return oauthClientDocument{}, errOAuthInvalidClient
+	}
+	if document.AuthenticationMethod == "" && len(document.AuthenticationMethods) == 0 {
+		document.AuthenticationMethod = "none"
+	}
+	if !document.allows("none") && !document.allows(oauthPrivateKeyJWT) {
 		return oauthClientDocument{}, errOAuthInvalidClient
 	}
 	for _, redirect := range document.RedirectURIs {
@@ -202,10 +221,16 @@ func (a *oauthClientAuthenticator) fetchClient(ctx context.Context, clientID str
 			return oauthClientDocument{}, errOAuthInvalidClient
 		}
 	}
+	if !oauthOnlyAllowed(document.GrantTypes, "authorization_code", "refresh_token") ||
+		!oauthOnlyAllowed(document.ResponseTypes, "code") ||
+		(document.ClientURI != "" && !validOAuthClientURI(document.ClientURI)) {
+		return oauthClientDocument{}, errOAuthInvalidClient
+	}
 	if document.allows(oauthPrivateKeyJWT) && (!validOAuthJWKSURI(document.JWKSURI) ||
 		(document.SigningAlgorithm != "" && document.SigningAlgorithm != string(jose.RS256))) {
 		return oauthClientDocument{}, errOAuthInvalidClient
 	}
+	document.Kind = "cimd"
 	return document, nil
 }
 
@@ -219,6 +244,9 @@ func fetchOAuthJSON(ctx context.Context, client *http.Client, target string, lim
 	request.Header.Set("Accept", "application/json")
 	response, err := client.Do(request)
 	if err != nil {
+		if errors.Is(err, errOAuthUnsafeDestination) {
+			return nil, errOAuthInvalidClient
+		}
 		return nil, errOAuthClientUnavailable
 	}
 	defer response.Body.Close()

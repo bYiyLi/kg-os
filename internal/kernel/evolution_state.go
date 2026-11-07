@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 const defaultEvolutionBranch = "main"
@@ -118,6 +119,8 @@ func (service *Service) EvolutionAncestry(ctx context.Context, request Evolution
 }
 
 func (service *Service) EvolutionStateCreate(ctx context.Context, request StateCreateRequest) (observed StateCreateResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.state_create")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		recordBusinessResult(ctx, "evolution.state.create", "committed", observed.State, 0, started, loggedErr)
@@ -158,6 +161,8 @@ func (service *Service) EvolutionStateCreate(ctx context.Context, request StateC
 }
 
 func (service *Service) EvolutionStateSetData(ctx context.Context, request StateSetDataRequest) (observed StateSetDataResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.state_set_data")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		recordBusinessResult(ctx, "evolution.state.set_data", "applied", observed.State, 0, started, loggedErr)
@@ -177,6 +182,8 @@ func (service *Service) EvolutionStateSetData(ctx context.Context, request State
 }
 
 func (service *Service) EvolutionStateClearData(ctx context.Context, request StateClearDataRequest) (observed StateClearDataResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.state_clear_data")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		recordBusinessResult(ctx, "evolution.state.clear_data", "applied", observed.State, 0, started, loggedErr)
@@ -200,6 +207,8 @@ func (service *Service) EvolutionBranchList(ctx context.Context) (EvolutionRefLi
 }
 
 func (service *Service) EvolutionBranchCreate(ctx context.Context, request BranchCreateRequest) (observed BranchMutationResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.branch_create")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		recordBusinessResult(ctx, "evolution.branch.create", "applied", observed.State, 0, started, loggedErr)
@@ -219,6 +228,8 @@ func (service *Service) EvolutionBranchCreate(ctx context.Context, request Branc
 }
 
 func (service *Service) EvolutionBranchDelete(ctx context.Context, request BranchDeleteRequest) (observed BranchMutationResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.branch_delete")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		recordBusinessResult(ctx, "evolution.branch.delete", "applied", observed.PreviousState, 0, started, loggedErr)
@@ -242,6 +253,8 @@ func (service *Service) EvolutionTagList(ctx context.Context) (EvolutionRefListR
 }
 
 func (service *Service) EvolutionTagCreate(ctx context.Context, request TagCreateRequest) (observed TagMutationResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.tag_create")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		recordBusinessResult(ctx, "evolution.tag.create", "applied", observed.State, 0, started, loggedErr)
@@ -261,6 +274,8 @@ func (service *Service) EvolutionTagCreate(ctx context.Context, request TagCreat
 }
 
 func (service *Service) EvolutionTagMove(ctx context.Context, request TagMoveRequest) (observed TagMutationResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.tag_move")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		recordBusinessResult(ctx, "evolution.tag.move", "applied", observed.State, 0, started, loggedErr)
@@ -280,6 +295,8 @@ func (service *Service) EvolutionTagMove(ctx context.Context, request TagMoveReq
 }
 
 func (service *Service) EvolutionTagDelete(ctx context.Context, request TagDeleteRequest) (observed TagMutationResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.tag_delete")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		recordBusinessResult(ctx, "evolution.tag.delete", "applied", observed.PreviousState, 0, started, loggedErr)

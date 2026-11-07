@@ -122,7 +122,7 @@ func New(k *kernel.Service, settings Options) (*Server, error) {
 		}
 		if !authorized {
 			if s.oauth != nil {
-				challenge := fmt.Sprintf("Bearer resource_metadata=%q", s.oauth.resourceMetadataURL())
+				challenge := fmt.Sprintf("Bearer resource_metadata=%q, scope=%q", s.oauth.resourceMetadataURL(), oauthScope)
 				if fields := strings.Fields(r.Header.Get("Authorization")); len(fields) > 0 && strings.EqualFold(fields[0], "Bearer") {
 					challenge += ", error=\"invalid_token\""
 				}

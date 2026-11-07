@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 
-// Only the disposable Docker instance receives these synthetic approvals.
-// ChatGPT's public metadata is used without following its browser callback.
-const clientID = "https://chatgpt.com/oauth/client.json";
-const scope = "kgos:access offline_access";
+// Only the disposable Docker instance receives synthetic approvals.
+// Use real DCR instead of relying on ChatGPT's public metadata/network.
+// Real ChatGPT and Muse host acceptance is a separate Phase 36 gate.
+const scope = "mcp offline_access";
 
 async function request(base, path, options = {}) {
   return fetch(base + path, { ...options, signal: AbortSignal.timeout(15_000) });
@@ -45,25 +45,35 @@ function assertTokenPair(pair) {
     "OAuth fixture refresh token shape was invalid"
   );
   assert.equal(pair.token_type, "Bearer");
-  assert.equal(pair.expires_in, 86340, "OAuth fixture did not advertise early refresh");
+  assert.equal(pair.expires_in, 840, "OAuth fixture did not advertise the 14-minute refresh hint");
   assert.equal(pair.scope, scope, "OAuth fixture lost its granted scope");
 }
 
-async function tokenRequest(base, issuer, values) {
+async function tokenRequest(base, issuer, clientID, values) {
   return request(base, "/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: clientID, resource: issuer, ...values })
+    body: new URLSearchParams({ client_id: clientID, resource: issuer + "/mcp", ...values })
   });
 }
 
 export async function prepareOAuthRestart({ base, rootToken, issuer }) {
-  const metadataResponse = await fetch(clientID, { signal: AbortSignal.timeout(15_000) });
-  assert.equal(metadataResponse.status, 200, "Public OAuth client metadata was unavailable");
+  const redirectURI = "http://127.0.0.1:49179/callback";
+  const metadataResponse = await request(base, "/oauth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_name: "KG OS isolated Docker MCP Client",
+      redirect_uris: [redirectURI],
+      token_endpoint_auth_method: "none",
+      scope
+    })
+  });
+  assert.equal(metadataResponse.status, 201, "OAuth DCR public client registration failed");
   const metadata = await metadataResponse.json();
-  assert.equal(metadata.client_id, clientID, "Public OAuth client metadata identity changed");
-  const redirectURI = metadata.redirect_uris?.[0];
-  assert.ok(typeof redirectURI === "string", "Public OAuth client metadata had no redirect");
+  const clientID = metadata.client_id;
+  assert.match(clientID, /^kg_mcp_[A-Za-z0-9_-]{43}$/, "DCR did not issue a public client ID");
+  assert.equal(metadata.client_secret, undefined, "DCR leaked a client secret");
   const verifier = randomBytes(32).toString("base64url");
   const state = randomBytes(16).toString("base64url");
   const parameters = new URLSearchParams({
@@ -71,7 +81,7 @@ export async function prepareOAuthRestart({ base, rootToken, issuer }) {
     client_id: clientID,
     redirect_uri: redirectURI,
     state,
-    resource: issuer,
+    resource: issuer + "/mcp",
     scope,
     code_challenge: createHash("sha256").update(verifier).digest("base64url"),
     code_challenge_method: "S256"
@@ -99,7 +109,7 @@ export async function prepareOAuthRestart({ base, rootToken, issuer }) {
   assert.equal(callback.searchParams.get("state"), state, "OAuth fixture state changed");
   const code = callback.searchParams.get("code");
   assert.ok(code, "OAuth fixture approval did not issue a code");
-  const exchanged = await tokenRequest(base, issuer, {
+  const exchanged = await tokenRequest(base, issuer, clientID, {
     grant_type: "authorization_code",
     code,
     redirect_uri: redirectURI,
@@ -109,12 +119,12 @@ export async function prepareOAuthRestart({ base, rootToken, issuer }) {
   const pair = await exchanged.json();
   assertTokenPair(pair);
   await listTools(base, pair.access_token);
-  return pair;
+  return { ...pair, client_id: clientID };
 }
 
 export async function verifyOAuthRestart({ base, rootToken, issuer, session }) {
   await listTools(base, session.access_token);
-  const refreshed = await tokenRequest(base, issuer, {
+  const refreshed = await tokenRequest(base, issuer, session.client_id, {
     grant_type: "refresh_token",
     refresh_token: session.refresh_token
   });
@@ -131,7 +141,7 @@ export async function verifyOAuthRestart({ base, rootToken, issuer, session }) {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: clientID,
+        client_id: session.client_id,
         token: session.refresh_token,
         token_type_hint: "refresh_token"
       })
@@ -143,7 +153,7 @@ export async function verifyOAuthRestart({ base, rootToken, issuer, session }) {
   }
   await listTools(base, session.access_token, 401);
   await listTools(base, pair.access_token, 401);
-  const deniedRefresh = await tokenRequest(base, issuer, {
+  const deniedRefresh = await tokenRequest(base, issuer, session.client_id, {
     grant_type: "refresh_token",
     refresh_token: pair.refresh_token
   });

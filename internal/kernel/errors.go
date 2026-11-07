@@ -163,6 +163,9 @@ func HTTPStatus(err error) int {
 
 func WriteJSONError(response http.ResponseWriter, err error) {
 	public := AsPublicError(err)
+	if recorder, ok := response.(interface{ RecordPublicError(string) }); ok {
+		recorder.RecordPublicError(string(public.Code))
+	}
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
 	response.Header().Set("X-Content-Type-Options", "nosniff")
 	response.WriteHeader(HTTPStatus(public))

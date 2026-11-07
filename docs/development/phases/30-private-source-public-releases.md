@@ -1,5 +1,15 @@
 # Phase 30 — Private KG OS Source & Generated Public Releases
 
+## 2026-11-06 人工验收结项
+
+**状态：`done`（用户明确表示手动验收通过，带保留项结项）。** 这是用户批准的阶段管理结项；以下原始 `in_progress`、失败、未执行记录反映当时实际情况，不代表所有原定验收已自动通过。本次只更新计划，未修改代码。
+
+- **已交付**：v0.3.17 候选 CI、Docker 构建/封存、正式 Release 和官网流程已有实际成功证据。
+- **未实现或未完整交付**：核心发布链路未见缺项；GitHub 外部协作者权限设置曾因 403 受阻，未证实已配置。
+- **未取得独立验收证据**：外部权限管理检查不足；发布、生产部署和私人 Plugin 更新不能混为一项。
+
+保留项不会因为 `done` 自动消失；后续工作另行定义范围与验收。
+
 <!-- cspell:words opencontainers -->
 
 ## Design inputs
@@ -8,7 +18,7 @@
 - [Client：Docker-only 发布架构](../../design/client.md#私有源码与公开分发仓库)
 - [公开发布模板与密钥配置真源](../../guide/distribution-maintenance.md)
 
-## 当前状态
+## 历史状态（2026-11-03）
 
 `in_progress`（2026-11-03，D123 候选推广增量）。新实现需通过本地合同检查、实际公开 Linux 候选/交接及独立 Review，尚未发行新版。以下首发验收为历史基线。
 

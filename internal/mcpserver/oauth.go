@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strings"
@@ -21,31 +22,33 @@ import (
 )
 
 const (
-	oauthScope                = "kgos:access"
+	oauthScope                = "mcp"
+	legacyOAuthScope          = "kgos:access"
 	oauthOfflineScope         = "offline_access"
 	ticketLifetime            = 5 * time.Minute
-	codeLifetime              = time.Minute
-	accessLifetime            = 24 * time.Hour
+	codeLifetime              = 5 * time.Minute
+	accessLifetime            = 15 * time.Minute
 	accessRefreshHint         = accessLifetime - time.Minute
 	refreshLifetime           = 30 * 24 * time.Hour
 	clientCacheLifetime       = 5 * time.Minute
 	maxPendingOAuth           = 128
 	maxOAuthTokens            = 256
-	maxClientDocumentBytes    = 16384
+	maxClientDocumentBytes    = 64 << 10
 	oauthRefreshRetryLifetime = 30 * time.Second
 	maxOAuthRefreshRetries    = 1024
 )
 
 var (
-	oauthSecretPattern     = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
-	oauthVerifierPattern   = regexp.MustCompile(`^[A-Za-z0-9._~-]{43,128}$`)
-	oauthVisiblePattern    = regexp.MustCompile(`^[!-~]{1,512}$`)
-	oauthClientPathPattern = regexp.MustCompile(`^/oauth/(?:client\.json|[A-Za-z0-9_-]{1,100}/client\.json)$`)
+	oauthSecretPattern   = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+	oauthVerifierPattern = regexp.MustCompile(`^[A-Za-z0-9._~-]{43,128}$`)
+	oauthVisiblePattern  = regexp.MustCompile(`^[!-~]{1,512}$`)
 )
 
 type oauthAuthorization struct {
-	clientID, redirectURI, resource, state, challenge, scope string
-	expires                                                  time.Time
+	clientID, redirectURI, resource, state, challenge, scope           string
+	clientName, clientKind, redirectHost, redirectOrigin, redirectPath string
+	loopback                                                           bool
+	expires                                                            time.Time
 }
 
 type oauthTokenPair struct {
@@ -82,6 +85,7 @@ type oauthBroker struct {
 	storeErr               error
 	tokenMu                sync.Mutex
 	retries                map[[32]byte]oauthRefreshRetry
+	registrationTimes      map[string][]time.Time
 }
 
 func newOAuthBroker(issuer, path, instanceToken string, client *http.Client) (*oauthBroker, error) {
@@ -96,7 +100,7 @@ func newOAuthBroker(issuer, path, instanceToken string, client *http.Client) (*o
 		return nil, errors.New("OAuth issuer must be an origin")
 	}
 	if client == nil {
-		client = &http.Client{Timeout: 5 * time.Second}
+		client = secureOAuthClient()
 	}
 	copyClient := *client
 	if copyClient.Timeout == 0 || copyClient.Timeout > 5*time.Second {
@@ -104,11 +108,12 @@ func newOAuthBroker(issuer, path, instanceToken string, client *http.Client) (*o
 	}
 	copyClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	o := &oauthBroker{
-		issuer: normalized, resource: normalized, path: path, instanceDigest: sha256.Sum256([]byte(instanceToken)),
+		issuer: normalized, resource: normalized + path, path: path, instanceDigest: sha256.Sum256([]byte(instanceToken)),
 		client: &copyClient, now: time.Now, tickets: make(map[[32]byte]oauthAuthorization),
-		retries: make(map[[32]byte]oauthRefreshRetry),
+		retries: make(map[[32]byte]oauthRefreshRetry), registrationTimes: make(map[string][]time.Time),
 	}
 	o.clientAuth = newOAuthClientAuthenticator(o.client, func() time.Time { return o.now() })
+	o.clientAuth.registered = o.registeredClient
 	return o, nil
 }
 func randomOAuthSecret() (string, error) {
@@ -172,10 +177,25 @@ func (o *oauthBroker) authorize(ctx context.Context, token string) (string, erro
 		return "", err
 	}
 	scope, ok := normalizeOAuthScope(binding.Scope)
-	if !ok || scope != binding.Scope || binding.Issuer != o.issuer || binding.Resource != o.resource {
+	if !ok {
+		// Already issued access tokens retain their hard expiry through migration.
+		scope, ok = legacyScope(binding.Scope)
+	}
+	legacyAudience := false
+	if _, legacy := legacyScope(binding.Scope); legacy {
+		legacyAudience = binding.Resource == o.issuer && o.resource == o.issuer+o.path
+	}
+	if !ok || scope != binding.Scope || binding.Issuer != o.issuer ||
+		(binding.Resource != o.resource && !legacyAudience) {
 		return "", mcpoauth.ErrInvalid
 	}
 	return fmt.Sprintf("%x", o.instanceDigest), nil
+}
+func legacyScope(value string) (string, bool) {
+	if value == legacyOAuthScope || value == legacyOAuthScope+" "+oauthOfflineScope {
+		return value, true
+	}
+	return "", false
 }
 func (o *oauthBroker) principal(token string) (string, bool) {
 	principal, err := o.authorize(context.Background(), token)
@@ -206,17 +226,55 @@ func normalizeOAuthScope(value string) (string, bool) {
 	return oauthScope, true
 }
 func validOAuthClientID(raw string) bool {
-	parsed, err := url.Parse(raw)
-	return err == nil && parsed.Scheme == "https" && parsed.Host == "chatgpt.com" && parsed.User == nil &&
-		parsed.Opaque == "" && parsed.RawQuery == "" && !parsed.ForceQuery && parsed.Fragment == "" && parsed.RawPath == "" && oauthClientPathPattern.MatchString(parsed.Path) && parsed.String() == raw
+	return validOAuthPublicURL(raw, true)
 }
 func validOAuthRedirect(raw string) bool {
 	if len(raw) == 0 || len(raw) > 2048 {
 		return false
 	}
 	parsed, err := url.Parse(raw)
-	return err == nil && parsed.Scheme == "https" && parsed.Host == "chatgpt.com" && parsed.User == nil &&
-		parsed.Fragment == "" && parsed.Opaque == "" && parsed.String() == raw
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" ||
+		parsed.Opaque != "" || parsed.String() != raw {
+		return false
+	}
+	hostname := parsed.Hostname()
+	if !validOAuthRedirectHost(hostname) {
+		return false
+	}
+	if parsed.Scheme == "https" {
+		return true
+	}
+	if parsed.Scheme != "http" {
+		return false
+	}
+	if strings.EqualFold(parsed.Hostname(), "localhost") {
+		return true
+	}
+	ip, err := netip.ParseAddr(parsed.Hostname())
+	return err == nil && ip.IsLoopback()
+}
+
+// URL parsing accepts wildcard DNS labels (such as *.example.org). An OAuth
+// redirect host must instead be a concrete IP, localhost or DNS name; redirect
+// matching itself remains byte-for-byte exact.
+func validOAuthRedirectHost(host string) bool {
+	if host == "" || len(host) > 253 || strings.ContainsAny(host, "*?%\\") {
+		return false
+	}
+	if _, err := netip.ParseAddr(host); err == nil {
+		return true
+	}
+	for _, label := range strings.Split(host, ".") {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+		for _, r := range label {
+			if !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-') {
+				return false
+			}
+		}
+	}
+	return true
 }
 func (o *oauthBroker) redirectsFor(ctx context.Context, clientID string) ([]string, error) {
 	document, err := o.clientAuth.Client(ctx, clientID, false)
@@ -231,7 +289,7 @@ func (o *oauthBroker) resourceMetadataPath() string {
 func (o *oauthBroker) resourceMetadataURL() string { return o.issuer + o.resourceMetadataPath() }
 func (o *oauthBroker) routes() map[string]http.Handler {
 	paths := []string{"/.well-known/oauth-protected-resource", o.resourceMetadataPath(), "/.well-known/oauth-authorization-server",
-		"/oauth/authorize", "/oauth/request", "/oauth/decision", "/oauth/token", "/oauth/revoke"}
+		"/oauth/register", "/oauth/authorize", "/oauth/request", "/oauth/decision", "/oauth/token", "/oauth/revoke"}
 	routes := make(map[string]http.Handler, len(paths))
 	for _, path := range paths {
 		switch path {
@@ -248,19 +306,29 @@ func (o *oauthBroker) routes() map[string]http.Handler {
 func (o *oauthBroker) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/.well-known/oauth-protected-resource", o.resourceMetadataPath():
+		if r.Method == http.MethodOptions {
+			o.metadataOptions(w)
+			return
+		}
 		if r.Method != http.MethodGet {
 			oauthFailure(w, 405, "invalid_request")
 			return
 		}
+		o.metadataCORS(w)
 		oauthJSON(w, 200, map[string]any{"resource": o.resource, "authorization_servers": []string{o.issuer}, "scopes_supported": []string{oauthScope, oauthOfflineScope}})
 	case "/.well-known/oauth-authorization-server":
+		if r.Method == http.MethodOptions {
+			o.metadataOptions(w)
+			return
+		}
 		if r.Method != http.MethodGet {
 			oauthFailure(w, 405, "invalid_request")
 			return
 		}
+		o.metadataCORS(w)
 		oauthJSON(w, 200, map[string]any{
 			"issuer": o.issuer, "authorization_endpoint": o.issuer + "/oauth/authorize", "token_endpoint": o.issuer + "/oauth/token",
-			"revocation_endpoint": o.issuer + "/oauth/revoke", "response_types_supported": []string{"code"},
+			"revocation_endpoint": o.issuer + "/oauth/revoke", "registration_endpoint": o.issuer + "/oauth/register", "response_types_supported": []string{"code"},
 			"grant_types_supported": []string{"authorization_code", "refresh_token"}, "code_challenge_methods_supported": []string{"S256"},
 			"token_endpoint_auth_methods_supported":            []string{"none", "private_key_jwt"},
 			"revocation_endpoint_auth_methods_supported":       []string{"none", "private_key_jwt"},
@@ -278,6 +346,11 @@ func (o *oauthBroker) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		switch r.URL.Path {
+		case "/oauth/register":
+			if r.Method == http.MethodPost {
+				o.registerClient(w, r)
+				return
+			}
 		case "/oauth/authorize":
 			if r.Method == http.MethodGet {
 				o.beginAuthorization(w, r)
@@ -309,4 +382,14 @@ func (o *oauthBroker) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		oauthFailure(w, 405, "invalid_request")
 	}
+}
+
+func (o *oauthBroker) metadataCORS(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+func (o *oauthBroker) metadataOptions(w http.ResponseWriter) {
+	o.metadataCORS(w)
+	w.WriteHeader(http.StatusNoContent)
 }

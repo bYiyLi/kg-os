@@ -69,8 +69,8 @@ func TestOAuthConsentCodeCapacityNeverConsumesPendingApproval(t *testing.T) {
 	for i := range maxPendingOAuth {
 		label := fmt.Sprintf("pending-code-%d", i)
 		err := f.store.PutCode(context.Background(), mcpoauth.Code{
-			Hash: oauthTestHash(label), Binding: mcpoauth.Binding{FamilyID: oauthTestHash("family:" + label), ClientID: oauthTestClient, Issuer: f.server.URL, Resource: f.server.URL, Scope: oauthScope, AuthMethod: "none"},
-			RedirectURI: oauthTestRedirect, Challenge: f.challenge, ExpiresAt: base.Add(codeLifetime),
+			Hash: oauthTestHash(label), Binding: mcpoauth.Binding{FamilyID: oauthTestHash("family:" + label), ClientID: oauthTestClient, Issuer: f.server.URL, Resource: f.server.URL + "/mcp", Scope: oauthScope, AuthMethod: "none"},
+			RedirectURI: oauthTestRedirect, Challenge: f.challenge, ExpiresAt: base.Add(time.Second),
 		}, base)
 		if err != nil {
 			t.Fatal(err)
@@ -82,7 +82,7 @@ func TestOAuthConsentCodeCapacityNeverConsumesPendingApproval(t *testing.T) {
 	}
 	blocked.Body.Close()
 
-	f.broker.now = func() time.Time { return base.Add(codeLifetime + time.Second) }
+	f.broker.now = func() time.Time { return base.Add(2 * time.Second) }
 	approved := f.approve(ticket, oauthTestAdmin, f.server.URL)
 	if approved.StatusCode != http.StatusOK {
 		t.Fatalf("backpressure consumed a pending authorization: %d", approved.StatusCode)
@@ -92,7 +92,7 @@ func TestOAuthConsentCodeCapacityNeverConsumesPendingApproval(t *testing.T) {
 
 func TestOAuthTokenRejectsMalformedCodeAndRefreshSecrets(t *testing.T) {
 	f := newOAuthFixture(t)
-	badCode := f.exchange("short", oauthTestVerifier, oauthTestClient, f.server.URL)
+	badCode := f.exchange("short", oauthTestVerifier, oauthTestClient, f.server.URL+"/mcp")
 	if badCode.StatusCode != http.StatusBadRequest {
 		t.Fatalf("malformed code accepted: %d", badCode.StatusCode)
 	}
@@ -100,7 +100,7 @@ func TestOAuthTokenRejectsMalformedCodeAndRefreshSecrets(t *testing.T) {
 	for _, token := range []string{"short", strings.Repeat("z", 43)} {
 		badRefresh := f.postForm("/oauth/token", url.Values{
 			"grant_type": {"refresh_token"}, "client_id": {oauthTestClient},
-			"resource": {f.server.URL}, "refresh_token": {token},
+			"resource": {f.server.URL + "/mcp"}, "refresh_token": {token},
 		}, "")
 		if badRefresh.StatusCode != http.StatusBadRequest {
 			t.Fatalf("forged refresh token accepted: %d", badRefresh.StatusCode)
@@ -125,12 +125,12 @@ func TestOAuthCodeExchangeFailsClosedWhenAccessGrantCapacityIsFull(t *testing.T)
 			firstAccess = access
 		}
 	}
-	blocked := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL)
+	blocked := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL+"/mcp")
 	if blocked.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("issued an OAuth grant past the token budget: %d", blocked.StatusCode)
 	}
 	blocked.Body.Close()
-	replayed := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL)
+	replayed := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL+"/mcp")
 	if replayed.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("failed exchange consumed its code instead of retaining backpressure: %d", replayed.StatusCode)
 	}
@@ -138,7 +138,7 @@ func TestOAuthCodeExchangeFailsClosedWhenAccessGrantCapacityIsFull(t *testing.T)
 	if _, err := f.store.Revoke(context.Background(), oauthTestHash(firstAccess), oauthTestClient, "none", f.broker.now()); err != nil {
 		t.Fatal(err)
 	}
-	recovered := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL)
+	recovered := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL+"/mcp")
 	if recovered.StatusCode != http.StatusOK {
 		t.Fatalf("uncommitted failed exchange consumed the authorization code: %d", recovered.StatusCode)
 	}

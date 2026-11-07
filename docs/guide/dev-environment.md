@@ -45,7 +45,7 @@ Dev 多阶段构建生成 Web 静态资源和当前 Go `kgosd`（CGO + SQLite FT
 
 运行中的容器以非 root UID 1000 访问旧 Workspace，**不更改现有数据所有权**；正式镜像仍默认 UID 10001。统一 Go listener 在容器内监听 3777，宿主仍发布 `0.0.0.0:3777`；公开入口同时包含 Web、API 和 MCP，但它们保留独立认证。Dev 宿主的直接 HTTP 无传输加密，只用于可信受控网络；ChatGPT 通过原 HTTPS 代理访问。
 
-Dev Compose 已配置 `KGOS_MCP_OAUTH_ISSUER=${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}`，由同一个 `kgosd` 直接提供Web 集成 OAuth。HTTPS 代理必须原样转发 `/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/authorize`、`/oauth/token`、`/oauth/revoke`、`/oauth/request`、`/oauth/decision` 以及同源 Web `/`、静态资源和 Web 登录入口，并保留 Authorization 等必要 Header。Go OAuth 的 CIMD 文档验证使用受控出站 HTTP 客户端；保留宿主现有 `HTTP_PROXY` / `HTTPS_PROXY` 配置，不依赖 Node.js 网络代理。
+Dev Compose 已配置 `KGOS_MCP_OAUTH_ISSUER=${KGOS_DEV_OAUTH_ISSUER:-https://kgos-dev.y2l.top}`，由同一个 `kgosd` 直接提供 Web 集成 OAuth。HTTPS 代理必须原样转发 `/mcp`、`/.well-known/oauth-protected-resource`、`/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/oauth/register`（Phase 36 新端点）、`/oauth/authorize`、`/oauth/token`、`/oauth/revoke`、`/oauth/request`、`/oauth/decision` 以及同源 Web `/`、静态资源和 Web 登录入口，并保留 Authorization 等必要 Header。OAuth `resource` 为站点 Origin 加实际 MCP 路径（默认 `/mcp`，自定义 `--mcp-path` 使用该路径），而 issuer 仍为 Origin。Go OAuth 的 CIMD/JWKS 使用受控 HTTPS 出站客户端：先解析并固定经校验的公网 IP，直连或经 HTTP/HTTPS 代理 CONNECT 均以已校验 IP 为目标；HTTPS 代理先校验其自己的域名与证书，隧道内另以原始客户端域名校验目标 TLS。DCR 仍有全实例每分钟 60 次限制；若外层代理使用 loopback/私网地址，后端不以代理共享 IP 施加 10 次限制，可信入口应自行按真实来源限流，不能直接相信 `X-Forwarded-For`。不依赖 Node.js 网络代理或未经校验的目标重解析。该 Phase 36 行为以真实运行镜像为准。
 
 ## 2. 统一管理入口
 
@@ -65,9 +65,9 @@ pnpm dev:mcp rollback    # 手工回到上次通过验收的镜像，保留数�
 pnpm dev:mcp stop        # 仅停止 KG OS Dev 容器，不删除 Workspace
 ```
 
-Phase 19 已将 `kgosd` 的诊断日志统一为 JSON Lines，使用可选 `KGOS_LOG_LEVEL=DEBUG|INFO|WARN|ERROR`（默认 INFO，修改后重启生效）；不能借 DEBUG 输出 Token、Cypher、Patch 或脚本正文。Docker 使用容器日志流，受控 Dev Compose 限制日志大小与文件数；正式镜像无法单独强制宿主 Docker driver 的日志保留策略。CLI 自动启动的本地 `kgosd` 由自身维护 `.kgos/logs/kgosd.log`（单文件 10 MiB，最多 5 个），`kgosd.startup.log` 保存启动地址与早期错误，不应拿它充当业务事件日志。
+**先核对正在运行的镜像版本**：已部署的旧 Phase 19 镜像将常规诊断作为 JSON Lines 输出到 Docker 日志流或旧轮转文件；`pnpm dev:mcp logs` / `logs-follow` 只能查看当前容器实际输出，不能证明诊断事件不存在。Phase 35 **本地未提交代码**改为单一 Instance 私有 `.kgos/logs/observability.sqlite` 保存安全日志、请求、Span、历史指标，Docker stderr 仅用于启动或诊断库故障等有界应急输出，`kgosd.startup.log` 仅保留早期启动信息。旧 `kgosd.log*` 不自动删除或迁移。支持可选 `KGOS_LOG_LEVEL=DEBUG|INFO|WARN|ERROR`（默认 INFO，重启生效），关键请求/业务/安全结果不因调高等级丢失，仍可能在队列或存储故障时出现明确的诊断覆盖缺口；任何等级都不能输出 Token、Cypher、Patch、脚本正文或原始错误。
 
-对当前已授权的 Instance，可通过 `POST /api/v1/system/diagnostics`（JSON 请求体 `{}`）取得进程内指标摘要；必须使用合法 Instance Bearer，或符合现有 Web Access Bearer + Boot Guard 的浏览器会话。不能用 MCP OAuth Token 调用普通 API。需要定位单次请求时，使用服务端返回的 `X-KGOS-Request-ID` 与只属于该 Instance 的安全日志关联；诊断 API 不提供原始日志下载。**Phase 19 能力已部署 Dev 并通过本地只读诊断验收；远端 CI 完成与否仍按 Phase 19 开发记录独立判断。**
+对当前已授权的 Instance，可通过 `POST /api/v1/system/diagnostics`（JSON 请求体 `{}`）取得进程内指标摘要。若**运行版本实际包含 Phase 35**，还可从 Web 运行观测工作台，或经受保护的 `/api/v1/system/observability/{overview,requests/list,requests/get,logs/list}` 对应 POST 路由查看历史、请求树与筛选日志。定位一次故障先保存 `X-KGOS-Request-ID`、已验证的公共错误码及所在运行版本，再按请求和 Span 查看固定 `operation`、`stage`、`cause_class` 与业务结果；HTTP 200 不表示 MCP Tool 或 Graph Stream 一定成功。只允许合法 Instance Bearer 或有效 Web Access Bearer + Boot Guard，**MCP OAuth Token 不能调用普通管理 API**，也不提供原始日志下载。Phase 19 历史 Dev 验收不能代替 Phase 35 新版部署或 CI 验收。
 
 入口为 `scripts/mcp-dev.mjs`，远端单机生命周期归 `scripts/mcp-dev-remote.sh`，**Go 单进程只读验收由 OpenClaw 宿主执行 `scripts/mcp-dev-accept-unified.mjs`**，Compose 归仓库根 `compose.dev.yaml`。回退仅允许入口为 Go `kgosd` 的已保留镜像；旧 Node MCP 专用验收脚本已经删除。这些是可重复执行的 Dev 入口，不在持久 `data/` 中保存第二套部署脚本。
 

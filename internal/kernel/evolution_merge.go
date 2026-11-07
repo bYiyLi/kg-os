@@ -6,12 +6,15 @@ import (
 	"time"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 func (service *Service) EvolutionMergeStart(
 	ctx context.Context,
 	request MergeStartRequest,
 ) (observed MergeSession, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.merge_start")
+	defer span.End()
 	started := time.Now()
 	defer func() { recordBusinessResult(ctx, "evolution.merge.start", "applied", "", 0, started, loggedErr) }()
 	if err := validateBranchName(request.Branch); err != nil {
@@ -138,6 +141,8 @@ func (service *Service) EvolutionMergeResolve(
 	ctx context.Context,
 	request MergeResolveRequest,
 ) (observed MergeSession, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.merge_resolve")
+	defer span.End()
 	started := time.Now()
 	defer func() { recordBusinessResult(ctx, "evolution.merge.resolve", "applied", "", 0, started, loggedErr) }()
 	if err := validateMergeSessionToken(request.Session); err != nil {
@@ -227,6 +232,8 @@ func (service *Service) EvolutionMergeFinalize(
 	ctx context.Context,
 	request MergeFinalizeRequest,
 ) (observed MergeFinalizeResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.merge_finalize")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		recordBusinessResult(ctx, "evolution.merge.finalize", "committed", observed.State, 0, started, loggedErr)
@@ -273,6 +280,8 @@ func (service *Service) EvolutionMergeAbort(
 	ctx context.Context,
 	request MergeAbortRequest,
 ) (observed MergeAbortResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.evolution.merge_abort")
+	defer span.End()
 	started := time.Now()
 	defer func() { recordBusinessResult(ctx, "evolution.merge.abort", "applied", "", 0, started, loggedErr) }()
 	if err := validateMergeSessionToken(request.Session); err != nil {

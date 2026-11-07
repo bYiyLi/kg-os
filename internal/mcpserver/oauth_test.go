@@ -73,6 +73,7 @@ func newOAuthFixture(t *testing.T) *oauthFixture {
 	t.Helper()
 	doc := map[string]any{
 		"client_id":                             oauthTestClient,
+		"client_name":                           "ChatGPT",
 		"redirect_uris":                         []string{oauthTestRedirect},
 		"token_endpoint_auth_methods_supported": []string{"none"},
 	}
@@ -89,7 +90,7 @@ func newOAuthFixture(t *testing.T) *oauthFixture {
 		t.Fatal(err)
 	}
 	f.storePath = filepath.Join(storeRoot, "mcp-oauth.db")
-	store, err := mcpoauth.Open(f.storePath, fmt.Sprintf("%x", sha256.Sum256([]byte(oauthTestAdmin))), f.server.URL, f.server.URL)
+	store, err := mcpoauth.Open(f.storePath, fmt.Sprintf("%x", sha256.Sum256([]byte(oauthTestAdmin))), f.server.URL, f.server.URL+"/mcp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +154,7 @@ func (f *oauthFixture) begin(modify url.Values) (string, *http.Response) {
 		"client_id": {oauthTestClient}, "redirect_uri": {oauthTestRedirect},
 		"state": {"opaque-state"}, "response_type": {"code"},
 		"code_challenge": {f.challenge}, "code_challenge_method": {"S256"},
-		"resource": {f.server.URL}, "scope": {oauthScope},
+		"resource": {f.server.URL + "/mcp"}, "scope": {oauthScope},
 	}
 	for key, entries := range modify {
 		values[key] = entries
@@ -234,7 +235,7 @@ func TestGoOAuthAuthorizationAndRefresh(t *testing.T) {
 		t.Fatalf("metadata: %d", metadata.StatusCode)
 	}
 	resource := parseOAuthJSON(t, metadata)
-	if resource["resource"] != fixture.server.URL {
+	if resource["resource"] != fixture.server.URL+"/mcp" {
 		t.Fatalf("resource: %#v", resource)
 	}
 	root := parseOAuthJSON(t, fixture.get("/.well-known/oauth-protected-resource"))
@@ -263,7 +264,7 @@ func TestGoOAuthAuthorizationAndRefresh(t *testing.T) {
 	}
 	codeResponse.Body.Close()
 	code := destination.Query().Get("code")
-	result := fixture.exchange(code, oauthTestVerifier, oauthTestClient, fixture.server.URL)
+	result := fixture.exchange(code, oauthTestVerifier, oauthTestClient, fixture.server.URL+"/mcp")
 	if result.StatusCode != 200 {
 		t.Fatalf("exchange: %d %#v", result.StatusCode, parseOAuthJSON(t, result))
 	}
@@ -273,7 +274,7 @@ func TestGoOAuthAuthorizationAndRefresh(t *testing.T) {
 	if !fixture.service.authorized("Bearer " + token) {
 		t.Fatal("access token rejected")
 	}
-	replay := fixture.exchange(code, oauthTestVerifier, oauthTestClient, fixture.server.URL)
+	replay := fixture.exchange(code, oauthTestVerifier, oauthTestClient, fixture.server.URL+"/mcp")
 	if replay.StatusCode != 400 {
 		t.Fatalf("code reused: %d", replay.StatusCode)
 	}
@@ -281,7 +282,7 @@ func TestGoOAuthAuthorizationAndRefresh(t *testing.T) {
 	rotate := func(refresh string) *http.Response {
 		return fixture.postForm("/oauth/token", url.Values{
 			"grant_type": {"refresh_token"}, "client_id": {oauthTestClient},
-			"resource": {fixture.server.URL}, "refresh_token": {refresh},
+			"resource": {fixture.server.URL + "/mcp"}, "refresh_token": {refresh},
 		}, "")
 	}
 	response := rotate(refresh)
@@ -380,12 +381,12 @@ func TestGoOAuthRejectsUntrustedAndWrongGrants(t *testing.T) {
 	target, _ := url.Parse(codeRedirect.Header.Get("Location"))
 	codeRedirect.Body.Close()
 	code := target.Query().Get("code")
-	wrong := f.exchange(code, "x"+oauthTestVerifier[1:], oauthTestClient, f.server.URL)
+	wrong := f.exchange(code, "x"+oauthTestVerifier[1:], oauthTestClient, f.server.URL+"/mcp")
 	if wrong.StatusCode != 400 {
 		t.Fatalf("wrong verifier accepted: %d", wrong.StatusCode)
 	}
 	wrong.Body.Close()
-	replay := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL)
+	replay := f.exchange(code, oauthTestVerifier, oauthTestClient, f.server.URL+"/mcp")
 	if replay.StatusCode != http.StatusOK {
 		t.Fatalf("invalid verifier consumed the valid code: %d", replay.StatusCode)
 	}
@@ -416,13 +417,13 @@ func TestGoOAuthExpiryAndRestart(t *testing.T) {
 	grant := f.grant(nil)
 	access := grant["access_token"].(string)
 	refresh := grant["refresh_token"].(string)
-	if grant["expires_in"] != float64(86340) {
+	if grant["expires_in"] != float64(840) {
 		t.Fatalf("missing early refresh hint: %#v", grant)
 	}
 	if err := f.store.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := mcpoauth.Open(f.storePath, fmt.Sprintf("%x", sha256.Sum256([]byte(oauthTestAdmin))), f.server.URL, f.server.URL)
+	reopened, err := mcpoauth.Open(f.storePath, fmt.Sprintf("%x", sha256.Sum256([]byte(oauthTestAdmin))), f.server.URL, f.server.URL+"/mcp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,7 +443,7 @@ func TestGoOAuthExpiryAndRestart(t *testing.T) {
 		t.Fatal("expired access token accepted")
 	}
 	response := f.postForm("/oauth/token", url.Values{
-		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL}, "refresh_token": {refresh},
+		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL + "/mcp"}, "refresh_token": {refresh},
 	}, "")
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("persisted refresh rejected: %d", response.StatusCode)
@@ -450,9 +451,9 @@ func TestGoOAuthExpiryAndRestart(t *testing.T) {
 	rotated := parseOAuthJSON(t, response)
 	// Active refresh extends the idle deadline, so the first authorization's
 	// 30-day anniversary is not itself an expiry.
-	f.broker.now = func() time.Time { return base.Add(refreshLifetime + 30*time.Minute) }
+	f.broker.now = func() time.Time { return base.Add(refreshLifetime + 10*time.Minute) }
 	response = f.postForm("/oauth/token", url.Values{
-		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL}, "refresh_token": {rotated["refresh_token"].(string)},
+		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL + "/mcp"}, "refresh_token": {rotated["refresh_token"].(string)},
 	}, "")
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("active rolling refresh expired at original anniversary: %d", response.StatusCode)
@@ -460,7 +461,7 @@ func TestGoOAuthExpiryAndRestart(t *testing.T) {
 	latest := parseOAuthJSON(t, response)
 	f.broker.now = func() time.Time { return base.Add(2*refreshLifetime + time.Hour) }
 	response = f.postForm("/oauth/token", url.Values{
-		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL}, "refresh_token": {latest["refresh_token"].(string)},
+		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL + "/mcp"}, "refresh_token": {latest["refresh_token"].(string)},
 	}, "")
 	if response.StatusCode != http.StatusBadRequest {
 		t.Fatalf("idle-expired refresh accepted: %d", response.StatusCode)
@@ -470,6 +471,7 @@ func TestGoOAuthExpiryAndRestart(t *testing.T) {
 
 func (f *oauthFixture) resetClientAuth() {
 	f.broker.clientAuth = newOAuthClientAuthenticator(f.broker.client, func() time.Time { return f.broker.now() })
+	f.broker.clientAuth.registered = f.broker.registeredClient
 }
 
 func (f *oauthFixture) grant(modify url.Values) map[string]any {
@@ -487,7 +489,7 @@ func (f *oauthFixture) grant(modify url.Values) map[string]any {
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	exchanged := f.exchange(callback.Query().Get("code"), oauthTestVerifier, oauthTestClient, f.server.URL)
+	exchanged := f.exchange(callback.Query().Get("code"), oauthTestVerifier, oauthTestClient, f.server.URL+"/mcp")
 	if exchanged.StatusCode != http.StatusOK {
 		f.t.Fatalf("exchange: %d", exchanged.StatusCode)
 	}
@@ -499,7 +501,7 @@ func oauthTestHash(value string) string { return fmt.Sprintf("%x", sha256.Sum256
 func (f *oauthFixture) seedPair(label string, now time.Time) (string, string) {
 	f.t.Helper()
 	codeHash := oauthTestHash("code:" + label)
-	binding := mcpoauth.Binding{FamilyID: oauthTestHash("family:" + label), ClientID: oauthTestClient, Issuer: f.server.URL, Resource: f.server.URL, Scope: oauthScope, AuthMethod: "none"}
+	binding := mcpoauth.Binding{FamilyID: oauthTestHash("family:" + label), ClientID: oauthTestClient, Issuer: f.server.URL, Resource: f.server.URL + "/mcp", Scope: oauthScope, AuthMethod: "none"}
 	code := mcpoauth.Code{Hash: codeHash, Binding: binding, RedirectURI: oauthTestRedirect, Challenge: f.challenge, ExpiresAt: now.Add(codeLifetime)}
 	if err := f.store.PutCode(context.Background(), code, now); err != nil {
 		f.t.Fatal(err)
@@ -507,7 +509,7 @@ func (f *oauthFixture) seedPair(label string, now time.Time) (string, string) {
 	access := oauthTestHash("access:" + label)[:43]
 	refresh := oauthTestHash("refresh:" + label)[:43]
 	tokens := mcpoauth.Tokens{AccessHash: oauthTestHash(access), RefreshHash: oauthTestHash(refresh), AccessExpiresAt: now.Add(accessLifetime), RefreshExpiresAt: now.Add(refreshLifetime), AuthMethod: "none"}
-	if _, err := f.store.ExchangeCode(context.Background(), codeHash, oauthTestClient, oauthTestRedirect, f.server.URL, f.challenge, tokens, now); err != nil {
+	if _, err := f.store.ExchangeCode(context.Background(), codeHash, oauthTestClient, oauthTestRedirect, f.server.URL+"/mcp", f.challenge, tokens, now); err != nil {
 		f.t.Fatal(err)
 	}
 	return access, refresh

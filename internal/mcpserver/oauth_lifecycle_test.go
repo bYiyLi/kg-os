@@ -350,17 +350,17 @@ func lockOAuthDatabase(t *testing.T, path, mode string) (*sql.DB, *sql.Tx) {
 	return db, tx
 }
 
-func TestOAuthAccessLifetimeIs24HoursForIssuanceAndRefresh(t *testing.T) {
+func TestOAuthAccessLifetimeIs15MinutesForIssuanceAndRefresh(t *testing.T) {
 	f := newOAuthFixture(t)
 	issued := time.Date(2026, time.November, 4, 0, 0, 0, 123, time.UTC)
 	f.broker.now = func() time.Time { return issued }
 	grant := f.grant(nil)
-	if grant["expires_in"] != float64(86340) {
+	if grant["expires_in"] != float64(840) {
 		t.Fatalf("authorization-code response did not preserve one-minute refresh margin: %#v", grant)
 	}
 	checkLifetime := func(token string, created time.Time) {
 		t.Helper()
-		for _, elapsed := range []time.Duration{time.Hour + time.Second, 24*time.Hour - time.Nanosecond, 24 * time.Hour} {
+		for _, elapsed := range []time.Duration{time.Minute + time.Second, 15*time.Minute - time.Nanosecond, 15 * time.Minute} {
 			at := created.Add(elapsed)
 			f.broker.now = func() time.Time { return at }
 			request, err := http.NewRequest(http.MethodGet, f.server.URL+"/mcp", nil)
@@ -375,7 +375,7 @@ func TestOAuthAccessLifetimeIs24HoursForIssuanceAndRefresh(t *testing.T) {
 			challenge := response.Header.Get("WWW-Authenticate")
 			response.Body.Close()
 			want := http.StatusMethodNotAllowed
-			if elapsed == 24*time.Hour {
+			if elapsed == 15*time.Minute {
 				want = http.StatusUnauthorized
 			}
 			if response.StatusCode != want {
@@ -387,17 +387,17 @@ func TestOAuthAccessLifetimeIs24HoursForIssuanceAndRefresh(t *testing.T) {
 		}
 	}
 	checkLifetime(grant["access_token"].(string), issued)
-	renewedAt := issued.Add(24 * time.Hour)
+	renewedAt := issued.Add(15 * time.Minute)
 	f.broker.now = func() time.Time { return renewedAt }
 	response := f.postForm("/oauth/token", url.Values{
-		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL},
+		"grant_type": {"refresh_token"}, "client_id": {oauthTestClient}, "resource": {f.server.URL + "/mcp"},
 		"refresh_token": {grant["refresh_token"].(string)},
 	}, "")
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("refresh after access expiry: %d", response.StatusCode)
 	}
 	renewed := parseOAuthJSON(t, response)
-	if renewed["expires_in"] != float64(86340) {
+	if renewed["expires_in"] != float64(840) {
 		t.Fatalf("refresh response did not preserve one-minute refresh margin: %#v", renewed)
 	}
 	checkLifetime(renewed["access_token"].(string), renewedAt)

@@ -379,7 +379,7 @@ func TestStoreRejectsUnsafeFilesWithoutReplacement(t *testing.T) {
 					t.Fatal(err)
 				}
 				if kind == "version" {
-					_, err = s.db.Exec("PRAGMA user_version=2")
+					_, err = s.db.Exec("PRAGMA user_version=3")
 				} else {
 					_, err = s.db.Exec("PRAGMA user_version=0")
 				}

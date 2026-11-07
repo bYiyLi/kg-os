@@ -2,7 +2,7 @@ import { cn } from "../../shared/lib/utils.js";
 import { useThemePreference } from "../../shared/lib/use-theme-preference.js";
 import type { Theme } from "../../shared/lib/use-theme-preference.js";
 import { useEffect, useRef, useState } from "react";
-import type { ComponentProps, CSSProperties, ReactNode } from "react";
+import type { ComponentProps, CSSProperties, ReactNode, RefObject } from "react";
 import type { Connection } from "../../core/client/connect.js";
 import { SettingsDialog } from "../../features/settings/settings-dialog.js";
 
@@ -18,8 +18,9 @@ import { VersionSidebar } from "./version-sidebar.js";
 import { Workspace } from "./workspace.js";
 import { LanguageSwitcher } from "./language-switcher.js";
 import { KnowledgeCanvas } from "../../features/graph/knowledge-canvas.js";
+import { ObservabilityWorkbench } from "../../features/observability/observability-workbench.js";
 import type { GraphReader } from "../../features/graph/graph-search.js";
-import type { ResolvedState } from "@kgos/sdk";
+import type { KGOSClient, ResolvedState } from "@kgos/sdk";
 
 interface WorkspaceShellProps {
   children?: ReactNode;
@@ -115,6 +116,105 @@ function selectedDomainLabel(navigation: ReturnType<typeof useWorldNavigation>):
   return node?.title ?? node?.name ?? selected.ref;
 }
 
+function WorkspaceSurface({
+  reader,
+  state,
+  domain,
+  domainLabel,
+  observing,
+  blocked,
+  client,
+  canvasChildren
+}: {
+  reader: GraphReader | null;
+  state: ResolvedState | null;
+  domain: string | null;
+  domainLabel: string | null;
+  observing: boolean;
+  blocked: boolean;
+  client: KGOSClient | null;
+  canvasChildren?: ReactNode;
+}) {
+  return (
+    <Workspace>
+      <KnowledgeCanvas
+        reader={reader}
+        state={state}
+        domain={domain}
+        domainLabel={domainLabel}
+        suspended={observing}
+        blocked={blocked}
+      />
+      {observing && client !== null && <ObservabilityWorkbench client={client} />}
+      {canvasChildren}
+    </Workspace>
+  );
+}
+
+type ShellDirectory = Pick<
+  ComponentProps<typeof VersionSidebar>,
+  "history" | "navigation" | "onOpenHistory" | "onOpenAllHistory"
+>;
+
+function ShellNavigation({
+  sidebar,
+  dialogs,
+  directory,
+  historyDialog,
+  navigationTrigger,
+  observing,
+  authenticationRequired,
+  openObservability
+}: {
+  sidebar: ReturnType<typeof useSidebarLayout>;
+  dialogs: ReturnType<typeof useWorkspaceDialogs>;
+  directory: ShellDirectory;
+  historyDialog: ReturnType<typeof useHistoryDialog>;
+  navigationTrigger: RefObject<HTMLButtonElement | null>;
+  observing: boolean;
+  authenticationRequired: boolean;
+  openObservability: (() => void) | undefined;
+}) {
+  return (
+    <>
+      <VersionSidebar
+        collapsed={sidebar.collapsed}
+        {...directory}
+        observing={observing}
+        onOpenObservability={openObservability}
+        onOpenSettings={dialogs.openSettings}
+      />
+      <SidebarHandle {...sidebar.handleProps} ref={navigationTrigger} />
+      <VersionDrawer
+        open={dialogs.narrow && dialogs.versionsOpen && !authenticationRequired}
+        coveredByHistory={historyDialog.open}
+        onOpenChange={dialogs.setVersionsOpen}
+        {...directory}
+        observing={observing}
+        onOpenObservability={openObservability}
+        onOpenSettings={dialogs.openSettings}
+        returnFocus={navigationTrigger}
+      />
+    </>
+  );
+}
+
+function useObservabilitySelection(
+  connection: Connection | null,
+  authenticationRequired: boolean,
+  dialogs: ReturnType<typeof useWorkspaceDialogs>
+) {
+  const [observing, setObserving] = useState(false);
+  const openObservability =
+    connection === null || authenticationRequired
+      ? undefined
+      : () => {
+          setObserving((current) => !current);
+          if (dialogs.narrow) dialogs.setVersionsOpen(false);
+        };
+  return { observing, openObservability };
+}
+
 export function WorkspaceShell({
   children,
   canvasChildren,
@@ -132,6 +232,11 @@ export function WorkspaceShell({
   const navigationTrigger = useRef<HTMLButtonElement>(null);
   const dialogs = useWorkspaceDialogs(authenticationRequired);
   const sidebar = useSidebarLayout(dialogs);
+  const { observing, openObservability } = useObservabilitySelection(
+    connection,
+    authenticationRequired,
+    dialogs
+  );
   const history = useVersionHistory(versionReader, initialVersionState, defaultVersionBranch);
   const navigation = useWorldNavigation(domainReader, history);
   const historyDialog = useHistoryDialog(history, navigation.clearSelection);
@@ -141,46 +246,43 @@ export function WorkspaceShell({
     onOpenHistory: historyDialog.onOpenHistory,
     onOpenAllHistory: historyDialog.onOpenAllHistory
   };
-
   return (
     <div
       className={cn("app-shell", "theme-" + theme, {
         "is-sidebar-collapsed": sidebar.collapsed,
         "is-resizing": sidebar.resizing,
-        "is-auth-required": authenticationRequired
+        "is-auth-required": authenticationRequired,
+        "is-observing": observing
       })}
       data-theme={theme}
       style={{ "--sidebar-width": String(sidebar.width) + "px" } as CSSProperties}
     >
-      <VersionSidebar
-        collapsed={sidebar.collapsed}
-        {...directory}
-        onOpenSettings={dialogs.openSettings}
+      <ShellNavigation
+        sidebar={sidebar}
+        dialogs={dialogs}
+        directory={directory}
+        historyDialog={historyDialog}
+        navigationTrigger={navigationTrigger}
+        observing={observing}
+        authenticationRequired={authenticationRequired}
+        openObservability={openObservability}
       />
-      <Workspace>
-        <KnowledgeCanvas
-          reader={graphReader ?? connection?.client.graph ?? null}
-          state={history.selectedCommit as ResolvedState | null}
-          domain={navigation.selected?.ref ?? null}
-          domainLabel={selectedDomainLabel(navigation)}
-          blocked={
-            authenticationRequired ||
-            dialogs.settingsOpen ||
-            dialogs.versionsOpen ||
-            historyDialog.open ||
-            history.selectingCommit !== null
-          }
-        />
-        {canvasChildren}
-      </Workspace>
-      <SidebarHandle {...sidebar.handleProps} ref={navigationTrigger} />
-      <VersionDrawer
-        open={dialogs.narrow && dialogs.versionsOpen && !authenticationRequired}
-        coveredByHistory={historyDialog.open}
-        onOpenChange={dialogs.setVersionsOpen}
-        {...directory}
-        onOpenSettings={dialogs.openSettings}
-        returnFocus={navigationTrigger}
+      <WorkspaceSurface
+        reader={graphReader ?? connection?.client.graph ?? null}
+        state={history.selectedCommit as ResolvedState | null}
+        domain={navigation.selected?.ref ?? null}
+        domainLabel={selectedDomainLabel(navigation)}
+        client={connection?.client ?? null}
+        observing={observing && !authenticationRequired}
+        blocked={
+          authenticationRequired ||
+          observing ||
+          dialogs.settingsOpen ||
+          dialogs.versionsOpen ||
+          historyDialog.open ||
+          history.selectingCommit !== null
+        }
+        canvasChildren={canvasChildren}
       />
       <VersionDag
         open={historyDialog.open}

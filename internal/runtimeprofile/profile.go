@@ -42,10 +42,15 @@ func ResolvePaths(root string) (Paths, error) {
 }
 
 func EnsureDirectories(paths Paths) error {
-	for _, path := range []string{paths.Root, paths.CacheDir, paths.ExtensionsDir, paths.LogsDir} {
+	for _, path := range []string{paths.Root, paths.CacheDir, paths.ExtensionsDir} {
 		if err := os.MkdirAll(path, 0o700); err != nil {
 			return fmt.Errorf("create runtime directory %q: %w", path, err)
 		}
 	}
+	// Diagnostic persistence is best-effort. A damaged logs/ entry must not
+	// prevent opening the business Instance or accepting client requests.
+	// OpenStore independently validates this optional directory and reports
+	// failure through its emergency channel.
+	_ = os.MkdirAll(paths.LogsDir, 0o700)
 	return nil
 }

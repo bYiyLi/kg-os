@@ -50,11 +50,11 @@ func OpenWithOfficialExtensions(
 	official []runtimeprofile.ExtensionConfig,
 	client *http.Client,
 ) (_ *Runtime, returnErr error) {
-	return openWithExtensions(ctx, root, official, client, nil)
+	return openWithExtensions(ctx, root, official, client, nil, "/mcp")
 }
 
 // OpenWithHeldLock opens the Kernel under the listener's already-owned lock.
-func OpenWithHeldLock(ctx context.Context, root string, held *runtimeprofile.InstanceLock, client *http.Client) (*Runtime, error) {
+func OpenWithHeldLock(ctx context.Context, root string, held *runtimeprofile.InstanceLock, client *http.Client, mcpPath string) (*Runtime, error) {
 	if held == nil {
 		return nil, fmt.Errorf("instance lock is required")
 	}
@@ -65,10 +65,10 @@ func OpenWithHeldLock(ctx context.Context, root string, held *runtimeprofile.Ins
 	if pkg.Version != buildinfo.Version {
 		return nil, fmt.Errorf("runtime package version %q does not match kgosd version %q", pkg.Version, buildinfo.Version)
 	}
-	return openWithExtensions(ctx, root, pkg.OfficialExtensions(), client, held)
+	return openWithExtensions(ctx, root, pkg.OfficialExtensions(), client, held, mcpPath)
 }
 
-func openWithExtensions(ctx context.Context, root string, official []runtimeprofile.ExtensionConfig, client *http.Client, held *runtimeprofile.InstanceLock) (_ *Runtime, returnErr error) {
+func openWithExtensions(ctx context.Context, root string, official []runtimeprofile.ExtensionConfig, client *http.Client, held *runtimeprofile.InstanceLock, mcpPath string) (_ *Runtime, returnErr error) {
 	if len(official) != 3 ||
 		official[0].Entrypoint != runtimeprofile.LithographEntrypoint ||
 		official[1].Entrypoint != runtimeprofile.ProviderEntrypoint ||
@@ -151,7 +151,7 @@ func openWithExtensions(ctx context.Context, root string, official []runtimeprof
 		Kernel:     kernelService,
 		lock:       nil,
 	}
-	runtime.OAuthStore, runtime.OAuthStoreError = openOAuthStore(paths, credential, config)
+	runtime.OAuthStore, runtime.OAuthStoreError = openOAuthStore(paths, credential, config, mcpPath)
 	if held == nil {
 		runtime.lock = lock
 	}

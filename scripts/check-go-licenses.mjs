@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-// cspell:words aperturerobotics segmentio tetratelabs yosida uritemplate
+// cspell:words aperturerobotics segmentio tetratelabs yosida uritemplate cespare logr stdr
 import { resolve } from "node:path";
 
 import { runCapture } from "./process.mjs";
@@ -11,6 +11,25 @@ const env = {
   GOTOOLCHAIN: "go1.27.3"
 };
 const allowed = new Map([
+  ["github.com/cespare/xxhash/v2", { version: "v2.3.0", file: "LICENSE.txt", license: "MIT" }],
+  ["github.com/go-logr/logr", { version: "v1.4.4", file: "LICENSE", license: "Apache-2.0" }],
+  ["github.com/go-logr/stdr", { version: "v1.2.2", file: "LICENSE", license: "Apache-2.0" }],
+  [
+    "github.com/google/uuid",
+    { version: "v1.6.0", file: "LICENSE", license: "BSD-3-Clause-Google" }
+  ],
+  ["go.opentelemetry.io/auto/sdk", { version: "v1.2.1", file: "LICENSE", license: "Apache-2.0" }],
+  ["go.opentelemetry.io/otel", { version: "v1.47.0", file: "LICENSE", license: "Apache-2.0" }],
+  ["go.opentelemetry.io/otel/log", { version: "v1.47.0", file: "LICENSE", license: "Apache-2.0" }],
+  [
+    "go.opentelemetry.io/otel/metric",
+    { version: "v1.47.0", file: "LICENSE", license: "Apache-2.0" }
+  ],
+  ["go.opentelemetry.io/otel/sdk", { version: "v1.47.0", file: "LICENSE", license: "Apache-2.0" }],
+  [
+    "go.opentelemetry.io/otel/trace",
+    { version: "v1.47.0", file: "LICENSE", license: "Apache-2.0" }
+  ],
   [
     "github.com/BurntSushi/toml",
     {
@@ -96,6 +115,14 @@ for (const [path, metadata] of modules) {
     if (
       !license.includes("Redistribution and use in source and binary forms") ||
       !license.includes("Neither the name of Google LLC") ||
+      !license.includes('"AS IS"')
+    ) {
+      throw new Error(path + " no longer matches the reviewed BSD-3-Clause license text");
+    }
+  } else if (reviewed.license === "BSD-3-Clause-Google") {
+    if (
+      !license.includes("Redistribution and use in source and binary forms") ||
+      !license.includes("Neither the name of Google Inc.") ||
       !license.includes('"AS IS"')
     ) {
       throw new Error(path + " no longer matches the reviewed BSD-3-Clause license text");

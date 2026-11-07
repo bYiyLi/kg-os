@@ -324,6 +324,15 @@ func Execute(ctx context.Context, code string, readOnly bool, dispatch DispatchF
 }
 
 func ExecuteWithLimits(ctx context.Context, code string, readOnly bool, dispatch DispatchFunc, stream StreamFunc, limits Limits) (result json.RawMessage, runErr error) {
+	ctx, span := observability.StartSpan(ctx, "sandbox.execute")
+	defer span.End()
+	defer func() {
+		if runErr != nil {
+			observability.SpanOutcome(span, "unknown")
+		} else {
+			observability.SpanOutcome(span, "succeeded")
+		}
+	}()
 	limits = limits.effective()
 	if err := limits.validate(); err != nil {
 		return nil, err

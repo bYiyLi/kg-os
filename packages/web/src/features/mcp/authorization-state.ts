@@ -5,6 +5,11 @@ import type { Connection } from "../../core/client/connect.js";
 interface AuthorizationDetails {
   client_id: string;
   client_name: string;
+  client_kind: "cimd" | "dcr";
+  redirect_host: string;
+  redirect_origin: string;
+  redirect_path: string;
+  loopback: boolean;
   resource: string;
   scope: string;
   canWrite: boolean;
@@ -14,21 +19,85 @@ interface AuthorizationDetails {
 function isAuthorizationDetails(value: unknown): value is AuthorizationDetails {
   if (value === null || typeof value !== "object") return false;
   const record = value as Partial<AuthorizationDetails>;
+  let validClient = false;
+  if (record.client_kind === "dcr") {
+    validClient = /^kg_mcp_[A-Za-z0-9_-]{43}$/.test(record.client_id ?? "");
+  } else if (record.client_kind === "cimd" && typeof record.client_id === "string") {
+    try {
+      const identity = new URL(record.client_id);
+      validClient =
+        identity.protocol === "https:" &&
+        identity.pathname !== "/" &&
+        identity.username === "" &&
+        identity.password === "" &&
+        identity.search === "" &&
+        identity.hash === "" &&
+        identity.toString() === record.client_id;
+    } catch {
+      validClient = false;
+    }
+  }
+  let callback: URL;
+  let declaredHost: URL;
+  try {
+    callback = new URL(record.redirect_origin ?? "");
+    declaredHost = new URL(callback.protocol + "//" + (record.redirect_host ?? ""));
+  } catch {
+    return false;
+  }
+  const host = callback.hostname.toLowerCase();
+  const loopbackHost =
+    host === "localhost" || host === "[::1]" || /^127\.(?:\d{1,3}\.){2}\d{1,3}$/.test(host);
+  const validCallbackOrigin =
+    callback.username === "" &&
+    callback.password === "" &&
+    callback.pathname === "/" &&
+    callback.search === "" &&
+    callback.hash === "" &&
+    declaredHost.username === "" &&
+    declaredHost.password === "" &&
+    declaredHost.pathname === "/" &&
+    declaredHost.search === "" &&
+    declaredHost.hash === "" &&
+    declaredHost.host === callback.host &&
+    (callback.protocol === "https:" || (callback.protocol === "http:" && loopbackHost));
   return (
-    record.client_name === "ChatGPT" &&
-    record.client_id?.startsWith("https://chatgpt.com/oauth/") === true &&
+    typeof record.client_name === "string" &&
+    record.client_name.trim().length > 0 &&
+    record.client_name.length <= 512 &&
+    typeof record.client_id === "string" &&
+    record.client_id.length > 0 &&
+    record.client_id.length <= 2048 &&
+    validClient &&
+    (record.client_kind === "cimd" || record.client_kind === "dcr") &&
+    typeof record.redirect_host === "string" &&
+    record.redirect_host.length > 0 &&
+    typeof record.redirect_path === "string" &&
+    record.redirect_path.startsWith("/") &&
+    typeof record.loopback === "boolean" &&
+    record.loopback === (callback.protocol === "http:") &&
+    validCallbackOrigin &&
     typeof record.resource === "string" &&
-    record.scope === "kgos:access" &&
+    (record.scope === "mcp" || record.scope === "mcp offline_access") &&
     record.canWrite === true &&
     typeof record.expires_at === "string"
   );
 }
 
-function trustedRedirect(value: unknown): value is string {
+function trustedRedirect(value: unknown, details: AuthorizationDetails): value is string {
   if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.host === "chatgpt.com" && url.username === "";
+    const expected = new URL(details.redirect_origin);
+    return (
+      url.protocol === expected.protocol &&
+      url.origin === expected.origin &&
+      url.host === expected.host &&
+      url.pathname === details.redirect_path &&
+      url.username === "" &&
+      url.password === "" &&
+      url.hash === ""
+    );
   } catch {
     return false;
   }
@@ -93,7 +162,7 @@ export function useConnectionAuthorization(connection: Connection, requestId: st
         result !== null && typeof result === "object" && "redirect_url" in result
           ? result.redirect_url
           : undefined;
-      if (!trustedRedirect(destination)) throw new Error("Invalid OAuth redirect");
+      if (!trustedRedirect(destination, details)) throw new Error("Invalid OAuth redirect");
       window.location.assign(destination);
     } catch {
       decisionPending.current = false;

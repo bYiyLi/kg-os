@@ -1,8 +1,18 @@
 # Phase 25：KG OS Doctor · 使用环境自检
 
+## 2026-11-06 人工验收结项
+
+**状态：`done`（用户明确表示手动验收通过，带保留项结项）。** 这是用户批准的阶段管理结项；以下原始 `in_progress`、失败、未执行记录反映当时实际情况，不代表所有原定验收已自动通过。本次只更新计划，未修改代码。
+
+- **已交付**：Doctor D0–D6 与 MCP 版本读取已有源码/运行证据。
+- **未实现或未完整交付**：ChatGPT Plugin 版本读取及与 MCP 自动匹配依原 D0 决定暂不实现，不算已交付。
+- **未取得独立验收证据**：真实宿主完整 D0–D6、自定义引导加载来源和 Skill 自动选用仍缺逐项独立验收。
+
+保留项不会因为 `done` 自动消失；后续工作另行定义范围与验收。
+
 <!-- cspell:words mcpserver -->
 
-## 当前目标与状态
+## 历史目标与当时状态（2026-11-02）
 
 **状态：`in_progress`（2026-11-02）**。Doctor 是用户按需触发的只读自检 Skill，现行合同见 [MCP Doctor 设计](../../design/mcp.md#kgos-doctor-v1)、[D118 六项原基线](../../design/decisions.md#d118-kgos-doctor-six-checks)、[D120 官方 Ontology 扩展](../../design/decisions.md#d120-doctor-official-ontology-review) 和 [Skill 正文](../../../plugins/kgos/skills/kgos-doctor/SKILL.md)。历史 D104 的五项诊断、四状态及参考文件结构已由 D118 取代；D120 新增非阻断 D6；D121 将其改为所选理论来源与适配核对，不再从独立模型库发现/升级，历史测试与评审不改写。
 

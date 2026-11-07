@@ -52,7 +52,7 @@ func (f *oauthSignedFixture) signedGrant(t *testing.T) map[string]any {
 		t.Fatal(err)
 	}
 	form := f.form(t, "/oauth/token", "code-exchange", url.Values{
-		"grant_type": {"authorization_code"}, "resource": {f.server.URL}, "code": {callback.Query().Get("code")},
+		"grant_type": {"authorization_code"}, "resource": {f.server.URL + "/mcp"}, "code": {callback.Query().Get("code")},
 		"redirect_uri": {oauthTestRedirect}, "code_verifier": {oauthTestVerifier},
 	})
 	response = f.postForm("/oauth/token", form, "")
@@ -63,7 +63,7 @@ func (f *oauthSignedFixture) signedGrant(t *testing.T) map[string]any {
 }
 
 func (f *oauthSignedFixture) refreshForm(t *testing.T, refresh, id string) url.Values {
-	return f.form(t, "/oauth/token", id, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "resource": {f.server.URL}})
+	return f.form(t, "/oauth/token", id, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "resource": {f.server.URL + "/mcp"}})
 }
 
 func TestOAuthAuthenticatedRefreshRetriesReturnOnePairWithinBothWindows(t *testing.T) {

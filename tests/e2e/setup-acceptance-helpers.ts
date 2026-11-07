@@ -6,8 +6,8 @@ import { join, resolve } from "node:path";
 import { expect } from "@playwright/test";
 import type { APIRequestContext, Page } from "@playwright/test";
 
-// Verify that the persisted Instance Origin, rather than a daemon flag, is
-// the issuer used by the live MCP OAuth discovery endpoints.
+// Verify the persisted Instance Origin supplies the authorization issuer,
+// while the protected resource identifies the concrete MCP endpoint.
 export async function expectPersistedOriginAndOAuth(
   request: APIRequestContext,
   endpoint: string,
@@ -34,7 +34,7 @@ export async function expectPersistedOriginAndOAuth(
   expect(
     (await resourceMetadata.json()) as { resource: string; authorization_servers: string[] }
   ).toMatchObject({
-    resource: "https://kgos.example.com",
+    resource: "https://kgos.example.com/mcp",
     authorization_servers: ["https://kgos.example.com"]
   });
 }

@@ -8,9 +8,12 @@ import (
 	"time"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 func (service *Service) PatchOntology(ctx context.Context, request PatchRequest) (observed PatchResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.ontology.patch")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		outcome := "committed"
@@ -23,6 +26,8 @@ func (service *Service) PatchOntology(ctx context.Context, request PatchRequest)
 }
 
 func (service *Service) PatchObjects(ctx context.Context, request PatchRequest) (observed PatchResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.object.patch")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		outcome := "committed"

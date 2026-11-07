@@ -10,8 +10,13 @@ const webToken = "kgws_" + "b".repeat(43);
 const details = {
   client_id: "https://chatgpt.com/oauth/client.json",
   client_name: "ChatGPT",
+  client_kind: "cimd",
+  redirect_host: "chatgpt.com",
+  redirect_origin: "https://chatgpt.com",
+  redirect_path: "/connector_platform_oauth_redirect",
+  loopback: false,
   resource: "https://kgos.example.com",
-  scope: "kgos:access",
+  scope: "mcp",
   canWrite: true,
   expires_at: "2099-01-01T00:00:00Z"
 };

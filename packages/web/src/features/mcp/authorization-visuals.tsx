@@ -18,23 +18,6 @@ const permissions = [
   }
 ] as const;
 
-function ClientMark() {
-  return (
-    <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      <g stroke="currentColor" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
-        {Array.from({ length: 6 }, (_, index) => (
-          <path
-            key={index}
-            d="M32 13c10-5 19 3 17 12-1 4-4 8-8 10L27 43"
-            transform={"rotate(" + String(index * 60) + " 32 32)"}
-          />
-        ))}
-        <path d="m25 28 7-5 8 5v8l-8 5-8-5v-8Z" />
-      </g>
-    </svg>
-  );
-}
-
 function KGOSMark() {
   return (
     <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
@@ -50,11 +33,38 @@ function KGOSMark() {
   );
 }
 
+function CallbackIdentity({
+  clientID,
+  redirectHost
+}: {
+  clientID: string | undefined;
+  redirectHost: string | undefined;
+}) {
+  const { t } = useTranslation();
+  return (
+    <p className="mcp-authorization-target">
+      <span>{t("mcp.callbackHost")}</span>
+      <strong className="mcp-authorization-callback-host">{redirectHost}</strong>
+      <span className="mcp-authorization-client-id">{clientID}</span>
+    </p>
+  );
+}
+
 export function AuthorizationVisuals({
+  clientName,
+  clientID,
+  clientKind,
+  redirectHost,
+  loopback,
   resource,
   permissionsVisible,
   loading
 }: {
+  clientName: string | undefined;
+  clientID: string | undefined;
+  clientKind: "cimd" | "dcr" | undefined;
+  redirectHost: string | undefined;
+  loopback: boolean | undefined;
   resource: string | undefined;
   permissionsVisible: boolean;
   loading: boolean;
@@ -71,10 +81,14 @@ export function AuthorizationVisuals({
       <div className="mcp-authorization-parties">
         <div>
           <span className="mcp-authorization-app-mark" aria-hidden="true">
-            <ClientMark />
+            <Icon name="monitor" />
           </span>
-          <strong>ChatGPT</strong>
-          <small>{t("mcp.externalAssistant")}</small>
+          <strong>{clientName ?? t("mcp.externalAssistant")}</strong>
+          <small>
+            {clientKind === undefined
+              ? t("mcp.externalAssistant")
+              : `${t("mcp.selfDeclared")} (${clientKind.toUpperCase()})`}
+          </small>
         </div>
         <Icon name="arrowRight" />
         <div>
@@ -85,6 +99,7 @@ export function AuthorizationVisuals({
           <small>{resource ?? t("mcp.yourGraph")}</small>
         </div>
       </div>
+      {permissionsVisible && <CallbackIdentity clientID={clientID} redirectHost={redirectHost} />}
       {loading && (
         <p className="mcp-authorization-loading" role="status">
           {t("mcp.loading")}
@@ -113,6 +128,12 @@ export function AuthorizationVisuals({
           {t("mcp.trustNotice")}
         </span>
       </p>
+      {loopback === true && (
+        <p className="mcp-authorization-notice">
+          <Icon name="help" />
+          <span>{t("mcp.loopbackWarning")}</span>
+        </p>
+      )}
     </>
   );
 }

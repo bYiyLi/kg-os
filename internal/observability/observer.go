@@ -14,6 +14,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const RequestIDHeader = "X-KGOS-Request-ID"
@@ -24,17 +27,34 @@ const (
 	observerKey contextKey = iota
 	requestKey
 	surfaceKey
+	surfaceTrackerKey
 )
 
+// A transport request can be classified only after its authentication
+// middleware has run. Share its trusted classification with the outer HTTP
+// completion observer; a child context value alone would not propagate back.
+type surfaceTracker struct {
+	mu              sync.RWMutex
+	value           string
+	streamOutcome   string
+	streamErrorCode string
+}
+
 type Observer struct {
-	logger        *slog.Logger
-	runID         string
-	start         time.Time
-	mu            sync.Mutex
-	http          HTTPMetrics
-	mcp           MCPMetrics
-	business      BusinessMetrics
-	sandboxLimits uint64
+	logger         *slog.Logger
+	level          slog.Level
+	store          *Store
+	tracer         trace.Tracer
+	tracerProvider *sdktrace.TracerProvider
+	metricsStop    chan struct{}
+	metricsDone    chan struct{}
+	runID          string
+	start          time.Time
+	mu             sync.Mutex
+	http           HTTPMetrics
+	mcp            MCPMetrics
+	business       BusinessMetrics
+	sandboxLimits  uint64
 }
 
 func New(output io.Writer, rawLevel string) (*Observer, error) {
@@ -64,7 +84,7 @@ func New(output io.Writer, rawLevel string) (*Observer, error) {
 			return attr
 		},
 	})
-	return &Observer{logger: slog.New(handler), runID: id, start: time.Now()}, nil
+	return &Observer{logger: slog.New(handler), level: level, runID: id, start: time.Now()}, nil
 }
 
 func newID(prefix string) (string, error) {
@@ -88,11 +108,25 @@ func FromContext(ctx context.Context) *Observer {
 func WithSurface(ctx context.Context, s string) context.Context {
 	switch s {
 	case "api", "web", "mcp", "internal":
+		if tracker, ok := ctx.Value(surfaceTrackerKey).(*surfaceTracker); ok {
+			tracker.mu.Lock()
+			tracker.value = s
+			tracker.mu.Unlock()
+			return ctx
+		}
 		return context.WithValue(ctx, surfaceKey, s)
 	}
 	return ctx
 }
 func Surface(ctx context.Context) string {
+	if tracker, ok := ctx.Value(surfaceTrackerKey).(*surfaceTracker); ok {
+		tracker.mu.RLock()
+		s := tracker.value
+		tracker.mu.RUnlock()
+		if s != "" {
+			return s
+		}
+	}
 	s, _ := ctx.Value(surfaceKey).(string)
 	if s == "" {
 		return "internal"
@@ -104,9 +138,54 @@ func WithRequest(ctx context.Context, o *Observer) (context.Context, string, err
 	if err != nil {
 		return ctx, "", err
 	}
-	return context.WithValue(WithObserver(ctx, o), requestKey, id), id, nil
+	ctx = context.WithValue(WithObserver(ctx, o), requestKey, id)
+	return context.WithValue(ctx, surfaceTrackerKey, &surfaceTracker{}), id, nil
 }
 func RequestID(ctx context.Context) string { id, _ := ctx.Value(requestKey).(string); return id }
+
+// SetStreamResult records a trusted terminal result independently of HTTP
+// status. Graph NDJSON may already have sent 200 before its final error.
+func SetStreamResult(ctx context.Context, outcome, code string) {
+	tracker, ok := ctx.Value(surfaceTrackerKey).(*surfaceTracker)
+	if !ok || (outcome != "succeeded" && outcome != "error") {
+		return
+	}
+	tracker.mu.Lock()
+	defer tracker.mu.Unlock()
+	if tracker.streamOutcome == "error" && outcome == "succeeded" {
+		return
+	}
+	tracker.streamOutcome = outcome
+	if outcome == "error" {
+		tracker.streamErrorCode = SafeCode(code)
+	} else {
+		tracker.streamErrorCode = ""
+	}
+}
+
+func StreamResult(ctx context.Context) (string, string) {
+	tracker, ok := ctx.Value(surfaceTrackerKey).(*surfaceTracker)
+	if !ok {
+		return "", ""
+	}
+	tracker.mu.RLock()
+	defer tracker.mu.RUnlock()
+	return tracker.streamOutcome, tracker.streamErrorCode
+}
+
+// Required diagnostic events survive KGOS_LOG_LEVEL filtering. This list is
+// intentionally narrow: successful static/health/polling traffic stays quiet.
+func requiredDiagnosticEvent(event string) bool {
+	switch event {
+	case "http.request.finished", "mcp.tool.finished", "business.operation.finished",
+		"security.authorization.decided", "runtime.starting", "runtime.started",
+		"runtime.stopped", "runtime.initialized", "runtime.init.failed",
+		"runtime.serve.failed", "runtime.open.failed", "runtime.close.failed":
+		return true
+	}
+	return false
+}
+
 func (o *Observer) Log(ctx context.Context, level slog.Level, component, event string, fields ...slog.Attr) {
 	if o == nil {
 		return
@@ -115,8 +194,30 @@ func (o *Observer) Log(ctx context.Context, level slog.Level, component, event s
 	if id := RequestID(ctx); id != "" {
 		attrs = append(attrs, slog.String("request_id", id))
 	}
+	if id := OperationID(ctx); id != "" {
+		attrs = append(attrs, slog.String("operation_id", id))
+	}
+	if traceID, spanID := activeSpanID(ctx); traceID != "" {
+		attrs = append(attrs, slog.String("trace_id", traceID), slog.String("span_id", spanID))
+	}
 	attrs = append(attrs, fields...)
-	o.logger.LogAttrs(ctx, level, event, attrs...)
+	if o.store != nil && level < o.level && requiredDiagnosticEvent(event) {
+		// slog.Logger checks Handler.Enabled before calling Handle. Required
+		// records bypass only that level gate; storeHandler still applies its
+		// strict field allowlist before queueing.
+		record := slog.NewRecord(time.Now(), level, event, 0)
+		record.AddAttrs(attrs...)
+		_ = o.logger.Handler().Handle(ctx, record)
+	} else {
+		o.logger.LogAttrs(ctx, level, event, attrs...)
+	}
+	if o.store != nil && component == "runtime" {
+		switch event {
+		case "runtime.starting", "runtime.started", "runtime.stopped", "runtime.initialized", "runtime.init.failed",
+			"runtime.serve.failed", "runtime.open.failed", "runtime.close.failed":
+			o.store.System(systemRecord{Time: time.Now(), RunID: o.runID, Event: event})
+		}
+	}
 }
 func Log(ctx context.Context, level slog.Level, component, event string, fields ...slog.Attr) {
 	if o := FromContext(ctx); o != nil {
@@ -154,9 +255,13 @@ func Business(ctx context.Context, result BusinessResult) {
 	default:
 		result.Outcome = "unknown"
 	}
-	id, err := newID("op_")
-	if err != nil {
-		return
+	id := OperationID(ctx)
+	if id == "" {
+		var err error
+		id, err = newID("op_")
+		if err != nil {
+			return
+		}
 	}
 	fields := []slog.Attr{
 		slog.String("operation_id", id), slog.String("surface", Surface(ctx)),
@@ -175,6 +280,7 @@ func Business(ctx context.Context, result BusinessResult) {
 	if result.TargetKind != "" {
 		fields = append(fields, slog.String("target_kind", result.TargetKind))
 	}
+	SpanOutcome(trace.SpanFromContext(ctx), result.Outcome)
 	level := slog.LevelInfo
 	if result.Outcome == "unknown" {
 		level = slog.LevelWarn
@@ -224,6 +330,12 @@ func (o *Observer) Tool(ctx context.Context, name, code string, elapsed time.Dur
 		fields = append(fields, slog.String("error_code", code))
 	}
 	o.Log(ctx, level, "mcp", "mcp.tool.finished", fields...)
+	SpanOutcome(trace.SpanFromContext(ctx), outcome)
+	if o.store != nil {
+		o.store.ToolEnd(requestRecord{
+			RequestID: RequestID(ctx), Tool: name, Outcome: outcome, ErrorCode: code,
+		})
+	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.mcp.InFlight > 0 {
@@ -251,7 +363,11 @@ func (o *Observer) SandboxLimit(ctx context.Context) {
 		slog.String("cause_class", "budget"))
 }
 func Security(ctx context.Context, operation, decision string) {
-	Log(ctx, slog.LevelInfo, "security", "security.authorization.decided", slog.String("operation", operation), slog.String("decision", decision))
+	level := slog.LevelInfo
+	if decision == "rejected" || decision == "unknown" {
+		level = slog.LevelWarn
+	}
+	Log(ctx, level, "security", "security.authorization.decided", slog.String("operation", operation), slog.String("decision", decision))
 }
 
 type Buckets struct {

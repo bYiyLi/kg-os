@@ -58,6 +58,148 @@ export interface SystemDiagnosticsResult {
   sandbox: { resource_limits_total: number };
 }
 
+/** Explicit, bounded historical query window; defaults to the last 24 hours. */
+export interface ObservabilityWindow {
+  from?: string;
+  to?: string;
+}
+
+export interface ObservabilityCoverage {
+  from?: string;
+  to?: string;
+  dropped: number;
+  truncated: boolean;
+}
+
+export interface ObservabilityTrendPoint {
+  time: string;
+  total: number;
+  success: number;
+  errors: number;
+  slow: number;
+}
+
+export interface ObservabilityResourcePoint {
+  time: string;
+  heap_bytes: number;
+  rss_bytes: number | null;
+  cgroup_used_bytes: number | null;
+  cgroup_max_bytes: number | null;
+  cpu_percent: number | null;
+  goroutines: number;
+  gc_pauses_ns: number;
+}
+
+export interface ObservabilitySystemEvent {
+  time: string;
+  run_id: string;
+  event: string;
+}
+
+/** Live diagnostics and historical points are different sources. */
+export interface ObservabilityOverviewResult {
+  availability: "available" | "unavailable";
+  /** Build version reported by the running daemon, not a repository or release guess. */
+  version: string;
+  coverage: ObservabilityCoverage;
+  total: number;
+  success: number;
+  errors: number;
+  slow: number;
+  incomplete: number;
+  trend: ObservabilityTrendPoint[];
+  resources: ObservabilityResourcePoint[];
+  events: ObservabilitySystemEvent[];
+  snapshot: SystemDiagnosticsResult;
+}
+
+export interface ObservabilityRequest {
+  request_id: string;
+  run_id: string;
+  trace_id?: string;
+  route: string;
+  surface: string;
+  method: string;
+  tool?: string;
+  started_at: string;
+  finished_at?: string;
+  status?: number;
+  duration_ms?: number;
+  outcome: string;
+  error_code?: string;
+}
+
+export interface ObservabilitySpan {
+  trace_id: string;
+  span_id: string;
+  parent_span_id?: string;
+  request_id?: string;
+  operation_id?: string;
+  name: string;
+  started_at: string;
+  finished_at?: string;
+  duration_ms?: number;
+  outcome: string;
+}
+
+export interface ObservabilityLog {
+  id: number;
+  time: string;
+  level: string;
+  component: string;
+  event: string;
+  request_id?: string;
+  operation_id?: string;
+  span_id?: string;
+  fields: Record<string, string | number | boolean | null>;
+}
+
+/** Authenticated, bounded log timeline across the Instance's recorded events. */
+export interface ObservabilityLogListInput extends ObservabilityWindow {
+  cursor?: string;
+  limit?: number;
+  level?: "DEBUG" | "INFO" | "WARN" | "ERROR";
+}
+
+export interface ObservabilityLogListResult {
+  availability: "available" | "unavailable";
+  coverage: ObservabilityCoverage;
+  items: ObservabilityLog[];
+  next_cursor?: string;
+}
+
+export interface ObservabilityRequestListInput extends ObservabilityWindow {
+  cursor?: string;
+  limit?: number;
+  route?: "api" | "mcp" | "web_auth" | "oauth";
+  outcome?: "succeeded" | "error" | "incomplete";
+  slow?: boolean;
+}
+
+export interface ObservabilityRequestListResult {
+  availability: "available" | "unavailable";
+  coverage: ObservabilityCoverage;
+  items: ObservabilityRequest[];
+  next_cursor?: string;
+}
+
+export interface ObservabilityRequestGetInput {
+  request_id: string;
+  operation_id?: string;
+  span_id?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ObservabilityRequestGetResult {
+  availability: "available" | "unavailable";
+  coverage: ObservabilityCoverage;
+  request: ObservabilityRequest;
+  spans: ObservabilitySpan[];
+  logs: ObservabilityLog[];
+  next_cursor?: string;
+}
+
 /** Public KG OS Object categories; not internal Lithograph resource kinds. */
 export type ObjectKind =
   | "domain"

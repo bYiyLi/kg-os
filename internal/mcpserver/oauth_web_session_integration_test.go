@@ -45,7 +45,7 @@ func TestOAuthConsentReusesAuthenticatedWebSession(t *testing.T) {
 	t.Parallel()
 	const instanceToken = "phase17-isolated-instance-root-credential"
 	doc, err := json.Marshal(map[string]any{
-		"client_id": consentClientID, "redirect_uris": []string{consentRedirectURI},
+		"client_id": consentClientID, "client_name": "ChatGPT", "redirect_uris": []string{consentRedirectURI},
 		"token_endpoint_auth_methods_supported": []string{"none"},
 	})
 	if err != nil {
@@ -60,7 +60,7 @@ func TestOAuthConsentReusesAuthenticatedWebSession(t *testing.T) {
 	if err := os.Chmod(instanceRoot, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store, err := mcpoauth.Open(filepath.Join(instanceRoot, "mcp-oauth.db"), fmt.Sprintf("%x", sha256.Sum256([]byte(instanceToken))), server.URL, server.URL)
+	store, err := mcpoauth.Open(filepath.Join(instanceRoot, "mcp-oauth.db"), fmt.Sprintf("%x", sha256.Sum256([]byte(instanceToken))), server.URL, server.URL+"/mcp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestOAuthConsentReusesAuthenticatedWebSession(t *testing.T) {
 		"client_id": {consentClientID}, "redirect_uri": {consentRedirectURI},
 		"state": {"expected-state"}, "response_type": {"code"},
 		"code_challenge":        {base64.RawURLEncoding.EncodeToString(challenge[:])},
-		"code_challenge_method": {"S256"}, "resource": {server.URL}, "scope": {"kgos:access"},
+		"code_challenge_method": {"S256"}, "resource": {server.URL + "/mcp"}, "scope": {"mcp"},
 	}
 	start := send(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil, "", "", "", nil)
 	if start.StatusCode != http.StatusSeeOther {
@@ -218,7 +218,7 @@ func TestOAuthConsentReusesAuthenticatedWebSession(t *testing.T) {
 	form := url.Values{
 		"grant_type": {"authorization_code"}, "client_id": {consentClientID},
 		"redirect_uri": {consentRedirectURI}, "code": {code},
-		"code_verifier": {verifier}, "resource": {server.URL},
+		"code_verifier": {verifier}, "resource": {server.URL + "/mcp"},
 	}
 	req, err := http.NewRequest(http.MethodPost, server.URL+"/oauth/token", strings.NewReader(form.Encode()))
 	if err != nil {

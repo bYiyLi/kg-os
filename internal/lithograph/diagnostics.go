@@ -23,12 +23,22 @@ func observeDatabaseOperation(ctx context.Context, stage string, started time.Ti
 	}
 	if err != nil {
 		level = slog.LevelWarn
-		reason := "database_error"
+		reason := observability.StorageCause(err)
+		if reason == "storage_error" {
+			reason = "database_error"
+		}
 		switch {
 		case errors.Is(err, context.Canceled):
 			reason = "cancelled"
 		case errors.Is(err, context.DeadlineExceeded):
 			reason = "deadline_exceeded"
+		}
+		if category, _, _, ok := ErrorDetails(err); ok {
+			// ErrorCategory is fixed and public. DatabaseError.Message is not.
+			fields = append(fields, slog.String("error_code", string(category)))
+			if reason == "database_error" {
+				reason = "lithograph_error"
+			}
 		}
 		fields = append(fields, slog.String("cause_class", reason))
 	}

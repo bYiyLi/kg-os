@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 type GraphQueryRequest struct {
@@ -60,7 +61,16 @@ type graphStreamProjector struct {
 	seenColumns bool
 }
 
-func (service *Service) QueryGraph(ctx context.Context, request GraphQueryRequest) (GraphQueryResult, error) {
+func (service *Service) QueryGraph(ctx context.Context, request GraphQueryRequest) (observed GraphQueryResult, observedErr error) {
+	ctx, span := observability.StartSpan(ctx, "kernel.graph.query")
+	defer func() {
+		if observedErr != nil {
+			observability.SpanOutcome(span, "error")
+		} else {
+			observability.SpanOutcome(span, "succeeded")
+		}
+		span.End()
+	}()
 	params, err := validateGraphQueryRequest(request)
 	if err != nil {
 		return GraphQueryResult{}, err
@@ -99,6 +109,8 @@ func (service *Service) ExecuteGraph(
 	ctx context.Context,
 	request GraphExecuteRequest,
 ) (observed GraphExecuteResult, loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.graph.execute")
+	defer span.End()
 	started := time.Now()
 	defer func() {
 		// execute can contain read-only Cypher; 'applied' means only that
@@ -138,7 +150,16 @@ func (service *Service) StreamGraphQuery(
 	ctx context.Context,
 	request GraphQueryRequest,
 	consume func(GraphStreamEvent) error,
-) error {
+) (observedErr error) {
+	ctx, span := observability.StartSpan(ctx, "kernel.graph.stream_query")
+	defer func() {
+		if observedErr != nil {
+			observability.SpanOutcome(span, "error")
+		} else {
+			observability.SpanOutcome(span, "succeeded")
+		}
+		span.End()
+	}()
 	if consume == nil {
 		return publicError(CodeInvalidArgument, "Graph stream consumer is required", nil)
 	}
@@ -175,6 +196,8 @@ func (service *Service) StreamGraphExecute(
 	request GraphExecuteRequest,
 	consume func(GraphStreamEvent) error,
 ) (loggedErr error) {
+	ctx, span := observability.StartOperation(ctx, "kernel.graph.stream_execute")
+	defer span.End()
 	started := time.Now()
 	var observedState string
 	defer func() {

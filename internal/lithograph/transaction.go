@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 type Transaction struct {
@@ -96,6 +98,15 @@ func (transaction *Transaction) Stream(
 }
 
 func (transaction *Transaction) Commit(ctx context.Context) (rawCommit []byte, returnErr error) {
+	ctx, span := observability.StartSpan(ctx, "lithograph.commit")
+	defer span.End()
+	defer func() {
+		if returnErr != nil {
+			observability.SpanOutcome(span, "unknown")
+		} else {
+			observability.SpanOutcome(span, "committed")
+		}
+	}()
 	started := time.Now()
 	defer func() { observeDatabaseOperation(ctx, "commit", started, returnErr) }()
 	operationCtx, done, err := transaction.host.operationContext(ctx)

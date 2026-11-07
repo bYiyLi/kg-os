@@ -1,5 +1,6 @@
 import type { en } from "./en.js";
 import { settingsChinese } from "../../features/settings/settings-translations.js";
+import { observabilityChinese } from "../../features/observability/observability-translations.js";
 
 type TranslationShape<T> = {
   [Key in keyof T]: T[Key] extends string ? string : TranslationShape<T[Key]>;
@@ -9,6 +10,8 @@ export const zhCN = {
   settings: settingsChinese,
   ui: { closeNotification: "关闭通知", notifications: "通知" },
   meta: { title: "KG OS", description: "KG OS 知识图谱工作区" },
+  observability: observabilityChinese,
+
   language: {
     label: "界面语言",
     system: "跟随系统语言",
@@ -375,9 +378,12 @@ export const zhCN = {
   },
   mcp: {
     title: "授权连接",
-    description: "ChatGPT 希望连接到您的 KG OS 实例。",
+    description: "外部 MCP 客户端正在申请访问您的 KG OS 实例。",
     cancelConnection: "取消连接",
     externalAssistant: "外部 AI 助手",
+    selfDeclared: "客户端名称由申请方自行声明",
+    callbackHost: "已与注册信息精确匹配的回调主机",
+    loopbackWarning: "此回调会交给本机监听的应用。仅在您亲自从可信桌面应用发起连接时授权。",
     yourGraph: "您的知识图谱",
     loading: "正在加载连接请求…",
     permissionsTitle: "此应用将可以：",
@@ -395,10 +401,10 @@ export const zhCN = {
     cancel: "取消",
     authorize: "授权连接",
     authorizing: "正在授权…",
-    footnote: "继续即表示您信任 ChatGPT 访问此 KG OS 实例。",
+    footnote: "批准后，该客户端将获得此实例 MCP 的完整读写权限。",
     error: {
-      unavailable: "此连接请求不可用，请从 ChatGPT 重新发起。",
-      failed: "无法完成授权，请从 ChatGPT 重新发起。"
+      unavailable: "此连接请求不可用，请从您的 MCP 客户端重新发起。",
+      failed: "无法完成授权，请从您的 MCP 客户端重新发起。"
     }
   }
 } satisfies TranslationShape<typeof en>;
