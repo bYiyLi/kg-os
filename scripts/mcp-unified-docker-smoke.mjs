@@ -495,14 +495,47 @@ try {
     })
   );
   assert.equal(created.name, "unified-persist");
-  // Docker preserves stdout and stderr as separate streams; kgosd startup
-  // locators use stdout while structured diagnostics go to stderr.
+  // Structured diagnostics now live only in the private SQLite store.
+  // Verify the authenticated timeline instead of relying on docker logs,
+  // which deliberately contain no normal business or MCP event stream.
+  let diagnosticEvents = new Set();
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const response = await fetch(endpoint + "/api/v1/system/observability/logs/list", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ limit: 100 })
+    });
+    assert.equal(response.status, 200, "Instance cannot read its diagnostic timeline");
+    const timeline = await response.json();
+    assert.equal(timeline.availability, "available", "Diagnostic store is unavailable");
+    assert.ok(Array.isArray(timeline.items), "Diagnostic timeline has no items");
+    const serialized = JSON.stringify(timeline.items);
+    assert.doesNotMatch(serialized, /unified-persist/, "Diagnostic record leaked an object name");
+    assert.doesNotMatch(serialized, /"token"/, "Diagnostic record leaked a credential field");
+    diagnosticEvents = new Set(timeline.items.map((entry) => entry.event));
+    if (
+      diagnosticEvents.has("business.operation.finished") &&
+      diagnosticEvents.has("mcp.tool.finished")
+    ) {
+      break;
+    }
+    await new Promise((done) => setTimeout(done, 200));
+  }
+  assert.ok(
+    diagnosticEvents.has("business.operation.finished"),
+    "No persisted business diagnostics"
+  );
+  assert.ok(diagnosticEvents.has("mcp.tool.finished"), "No persisted MCP diagnostics");
   const collectedLogs = await runCapture("docker", ["logs", container], { cwd: root });
   const logs = collectedLogs.stdout + collectedLogs.stderr;
-  assert.match(logs, /"event":"business.operation.finished"/);
-  assert.match(logs, /"event":"mcp.tool.finished"/);
-  assert.doesNotMatch(logs, /unified-persist/, "Log leaked an object name");
-  assert.doesNotMatch(logs, /"token"/, "Log leaked a credential field");
+  assert.doesNotMatch(
+    logs,
+    /"event":"business.operation.finished"/,
+    "Docker duplicated private business logs"
+  );
+  assert.doesNotMatch(logs, /"event":"mcp.tool.finished"/, "Docker duplicated private MCP logs");
+  assert.doesNotMatch(logs, /unified-persist/, "Docker log leaked an object name");
+  assert.doesNotMatch(logs, /"token"/, "Docker log leaked a credential field");
   await stop();
   const restartedEndpoint = await start();
   await connect(restartedEndpoint);
