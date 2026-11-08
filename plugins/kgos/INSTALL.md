@@ -1,8 +1,8 @@
-# KG OS v0.3.18 私人 Plugin 安装指南
+# KG OS v0.3.19 私人 Plugin 安装指南
 
 本文件是可编辑的单一 Plugin 八 Skill 安装模板，不是已发行版本的冻结快照。开发源码和实际发布包可能不同，不能仅凭 Manifest 版本字段认定八项技能已经发行。正式安装须使用所选 Release 的冻结清单、手册和归档；开发预览须标明源码基线与未发行状态。
 
-版本化资源：[冻结安装指南](https://kgos.sites.y2l.top/install/v0.3.18/INSTALL.md)、[中文官网手册](https://kgos.sites.y2l.top/zh/install/v0.3.18/)、[English guide](https://kgos.sites.y2l.top/en/install/v0.3.18/)、[正式 Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.18)与[官方归档](https://github.com/bYiyLi/kg-releases/releases/download/v0.3.18/kgos-plugin-v0.3.18.zip)。这些地址由发布流程按获准 Tag 渲染；准备源码期间必须核对归档的实际清单，不以旧包充当下列八 Skill 的资源。
+版本化资源：[冻结安装指南](https://kgos.sites.y2l.top/install/v0.3.19/INSTALL.md)、[中文官网手册](https://kgos.sites.y2l.top/zh/install/v0.3.19/)、[English guide](https://kgos.sites.y2l.top/en/install/v0.3.19/)、[正式 Release](https://github.com/bYiyLi/kg-releases/releases/tag/v0.3.19)与[官方归档](https://github.com/bYiyLi/kg-releases/releases/download/v0.3.19/kgos-plugin-v0.3.19.zip)。这些地址由发布流程按获准 Tag 渲染；准备源码期间必须核对归档的实际清单，不以旧包充当下列八 Skill 的资源。
 
 后续发布时按获准 Tag 生成并核对对应手册、下载地址、Manifest、八 Skill 清单及引导词，所有组件使用同一产品发行版本。当前源码资源见 [plugin.json](plugin.json)及下列入口：
 - [design-ontology](skills/design-ontology/SKILL.md)：本体设计。
@@ -27,9 +27,9 @@
 
 **起点**：沿用用户指定的应用、账户/Workspace 和服务地址；缺少时只问对应名称或目标。区分基础 MCP Plugin、应用/连接 ID 与私人 Plugin ID，不把 OAuth client_id 当应用 ID。读取指定对象的真实元数据和绑定，不遍历无关账户、设备或浏览器标签。AI 缺少执行工具与用户账户缺少能力分别说明，并给出启用入口或具体用户操作。
 
-**连接验收**：复用已有有效证据；需要新验证时，通过目标应用的 `kgos_docs` 读取当前 SDK 指南，再用 `kgos_query` 调用 `evolution.overview`、`evolution.get` 与同一不可变 State 的 `ontology.read`。确认实际绑定地址与用户目标一致、返回相同 State、`consistency.status=valid`、`consistency.issues=[]` 且 Ontology 可读；外层工具成功但结果含业务错误不能通过。空库可通过，不创建模型、知识、Branch 或 Commit。发现基础应用未就绪，指向[官网连接步骤](https://kgos.sites.y2l.top/zh/install/v0.3.18/#connect-chatgpt)，只暂停依赖它的安装操作。
+**连接验收**：复用已有有效证据；需要新验证时，通过目标应用的 `kgos_docs` 读取当前 SDK 指南，再用 `kgos_query` 调用 `evolution.overview`、`evolution.get` 与同一不可变 State 的 `ontology.read`。确认实际绑定地址与用户目标一致、返回相同 State、`consistency.status=valid`、`consistency.issues=[]` 且 Ontology 可读；外层工具成功但结果含业务错误不能通过。空库可通过，不创建模型、知识、Branch 或 Commit。发现基础应用未就绪，指向[官网连接步骤](https://kgos.sites.y2l.top/zh/install/v0.3.19/#connect-chatgpt)，只暂停依赖它的安装操作。
 
-**版本**：优先从目标连接 `kgos_docs` 成功响应的 `serverInfo.version` 取得实际 MCP 服务构建版本；旧服务缺少该字段时复用可信部署验收记录，仍无证据则说明版本不可验证，不用 Plugin Manifest 推断服务版本。对正式发行取得所选 Tag 的 Plugin 归档、Manifest、该版 Skill 与完整引用资源并核对校验信息；对当前源码预览核对已授权的精确源码基线与八 Skill 资源，明确其未发行状态，不能下载上方历史归档代替。服务版本不匹配时说明差异，让用户选择[对应版本手册](https://kgos.sites.y2l.top/zh/install/v0.3.18/)或明确服务升级计划，不自动升级或把其他版/候选资源套用到当前实例。本指南控制本次安装交互，随版资料用于核对技术事实。
+**版本**：优先从目标连接 `kgos_docs` 成功响应的 `serverInfo.version` 取得实际 MCP 服务构建版本；旧服务缺少该字段时复用可信部署验收记录，仍无证据则说明版本不可验证，不用 Plugin Manifest 推断服务版本。对正式发行取得所选 Tag 的 Plugin 归档、Manifest、该版 Skill 与完整引用资源并核对校验信息；对当前源码预览核对已授权的精确源码基线与八 Skill 资源，明确其未发行状态，不能下载上方历史归档代替。服务版本不匹配时说明差异，让用户选择[对应版本手册](https://kgos.sites.y2l.top/zh/install/v0.3.19/)或明确服务升级计划，不自动升级或把其他版/候选资源套用到当前实例。本指南控制本次安装交互，随版资料用于核对技术事实。
 
 **继续条件**：明确目标账户、已验证应用及真实绑定 ID、服务版本与可用官方基线。缺少连接或 Creator 能力时，提供具体恢复步骤；没有实际保存能力不能把下载 ZIP 称为已安装。
 
@@ -41,7 +41,7 @@
 
 **方案与授权**：简要列出目标账户与应用、官方资源版本、新 Plugin 名称、迁移清单/冲突、制作安装分工、引导词配置、验收及可选旧版清理。默认不公开、不扩大共享；用户选择冲突处理和迁移范围，明确同意后执行。无需迁移时直接给首次安装方案，已经确认的决定不重复询问。
 
-**版本名称**：每次创建独立的新 Plugin，不调用原地更新。正式发行名称包含官方版本，如 `KG OS v0.3.18`；当前源码预览还须标明未发行及源码基线，不能与同号历史发行混淆。同版再次制作使用 `KG OS v0.3.18 · r2` 等递增修订标识，并采用独立包名和新 Plugin ID。Manifest 使用宿主支持的版本格式，官方资源版本与私人修订分别记录，不伪称新的官方发行。
+**版本名称**：每次创建独立的新 Plugin，不调用原地更新。正式发行名称包含官方版本，如 `KG OS v0.3.19`；当前源码预览还须标明未发行及源码基线，不能与同号历史发行混淆。同版再次制作使用 `KG OS v0.3.19 · r2` 等递增修订标识，并采用独立包名和新 Plugin ID。Manifest 使用宿主支持的版本格式，官方资源版本与私人修订分别记录，不伪称新的官方发行。
 
 **继续条件**：用户确认具体方案、定制冲突、引导词保存方案或其已知限制及必要权限；未解决的定制迁移不能报完成，保留旧 Plugin 及其定制资料。
 

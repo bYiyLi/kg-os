@@ -46,6 +46,8 @@
 
 ## 开发、CI 与 Release 分工
 
+- **MCP OAuth 出站规则**：按 [MCP OAuth 设计](docs/design/mcp.md#host-neutral-mcp-oauth)与 [D128](docs/design/decisions.md#d128-oauth-metadata-no-ssrf-ip-filter) 实现 CIMD/JWKS 读取，不增加 SSRF 目的地址黑名单或 DNS/IP 网段过滤；代理 Fake-IP、保留地址与私网解析结果不因 IP 类型直接拒绝。继续保留 HTTPS/TLS 证书校验、禁止重定向、客户端声明与回调精确校验、请求超时和大小限制。不能把此决定扩展为取消 OAuth 身份验证或其他接口认证。
+
 - **Mac 工作树是源码真源，不是 Docker 测试机**：日常编码、Go/TypeScript/native 定向测试、`pnpm validate` 与 Review 在 Mac 进行；**不在 Mac 运行 Docker、Compose 或 Buildx**，也不要求 Mac 配置 Docker Engine/Context。Mac 缺少 Docker 不是开发阻塞项。
 - **OpenClaw 负责开发阶段 Docker 实测**：通过 `ssh openclaw` 访问现有 Linux amd64 主机，在 `/data/apps/KgosDev` 用现有受控入口执行镜像构建、隔离容器/临时 Volume 的完整 MCP/SDK/重启测试。长期 Dev Instance 不接受破坏性写入。Mac 可以远程触发 OpenClaw 的测试，但 Docker 命令实际在 OpenClaw 执行。
 - **私有源码、公开 CI/CD**：`kg-os` 与 `distribution/` 是唯一真源，公开 `kg-releases` 没有独立编辑源。私有 Actions 仅 `sync-kg-releases.yml`，同步精确 SHA/Ref，不运行质量门禁或发布；公开 Ubuntu Validate 与 Docker 两 Job 验证同一 revision。正式 Tag 经完整 CI、镜像 Smoke、平台/revision/digest 与匿名拉取核验后发布；普通 main 不推 GHCR，不恢复旧 native/npm matrix。发布许可门禁 `KGOS_BINARY_DISTRIBUTION_APPROVED=true` 仍须满足；具体流程见 [D108](docs/design/decisions.md#d108-private-source-public-releases) 和[分发维护](docs/guide/distribution-maintenance.md)，配置存在不等于 CI 通过。

@@ -24,12 +24,12 @@ func TestOAuthIssuerAndClientMetadataValidation(t *testing.T) {
 			t.Errorf("rejected issuer %q: %v", issuer, err)
 		}
 	}
-	for _, client := range []string{"https://chatgpt.com/oauth/client.json", "https://chatgpt.com/oauth/testing/client.json", "https://muse.example.com/oauth/client.json"} {
+	for _, client := range []string{"https://chatgpt.com/oauth/client.json", "https://chatgpt.com/oauth/testing/client.json", "https://muse.example.com/oauth/client.json", "https://127.0.0.1/oauth/client.json", "https://198.18.0.16/oauth/client.json"} {
 		if !validOAuthClientID(client) {
-			t.Errorf("rejected trusted URL %q", client)
+			t.Errorf("rejected valid HTTPS client URL %q", client)
 		}
 	}
-	for _, client := range []string{"http://chatgpt.com/oauth/client.json", "https://127.0.0.1/oauth/client.json",
+	for _, client := range []string{"http://chatgpt.com/oauth/client.json",
 		"https://chatgpt.com/oauth/client.json?redirect=https://evil.example", "https://chatgpt.com/oauth/../client.json",
 		"https://chatgpt.com/", "https://alice@chatgpt.com/oauth/client.json"} {
 		if validOAuthClientID(client) {

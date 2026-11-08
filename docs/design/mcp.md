@@ -188,17 +188,17 @@ kgosd --root <workspace-root> --host <address> --port <port>
 
 #### Client 识别、CIMD 安全与缓存
 
-客户端身份解析采用两条互斥路径：**URL 型 Client ID** 是具备非根路径的公开 HTTPS CIMD URL；**非 URL 型 Client ID** 仅在当前 OAuth SQLite 的 DCR 注册表中精确命中时有效。不存在的 ID、裸域名、任意普通 HTTPS redirect、URL 片段/userinfo/不合格 scheme 均不能冒充合法客户端；不内置 ChatGPT/Muse 等 Host allowlist，也不自动以相似名称匹配。
+客户端身份解析采用两条互斥路径：**URL 型 Client ID** 是具备非根路径的 HTTPS CIMD URL；**非 URL 型 Client ID** 仅在当前 OAuth SQLite 的 DCR 注册表中精确命中时有效。不存在的 ID、裸域名、任意普通 HTTPS redirect、URL 片段/userinfo/不合格 scheme 均不能冒充合法客户端；不内置 ChatGPT/Muse 等 Host allowlist，也不自动以相似名称匹配。
 
-对 CIMD 必须从 Client ID 指定地址获取严格 JSON，并校验文档中的 `client_id` 与请求 URL **字节级一致**、`client_name` 非空、`redirect_uris` 非空且逐项合法。像 Nexum 一样兼容单值 `token_endpoint_auth_method` 与复数 `token_endpoint_auth_methods_supported`，有效客户端方法只允许 `none` 或已验证的 `private_key_jwt`，均未声明时按 Nexum 的公共客户端默认 `none`；后一模式要求公开 HTTPS `jwks_uri` 与 RS256。已有有效的 ChatGPT CIMD 声明仍须通过，不能因为增加其它 Client 就收紧其合法字段或容量。显示名称仅为经校验的**客户端自声明信息**，不是 KG OS 对品牌或身份的官方背书。
+对 CIMD 必须从 Client ID 指定地址获取严格 JSON，并校验文档中的 `client_id` 与请求 URL **字节级一致**、`client_name` 非空、`redirect_uris` 非空且逐项合法。像 Nexum 一样兼容单值 `token_endpoint_auth_method` 与复数 `token_endpoint_auth_methods_supported`，有效客户端方法只允许 `none` 或已验证的 `private_key_jwt`，均未声明时按 Nexum 的公共客户端默认 `none`；后一模式要求 HTTPS `jwks_uri` 与 RS256。已有有效的 ChatGPT CIMD 声明仍须通过，不能因为增加其它 Client 就收紧其合法字段或容量。显示名称仅为经校验的**客户端自声明信息**，不是 KG OS 对品牌或身份的官方背书。
 
-**取消 ChatGPT Host 限制前必须补上安全出站边界**：CIMD 和 JWKS 读取只允许公开 HTTPS；拒绝 loopback/private/link-local/multicast/reserved 地址、userinfo/fragment、任意 HTTP 降级与重定向。DNS 解析并校验全部目标 IP，直连或使用 HTTP/HTTPS 代理 CONNECT 时只允许这些已校验 IP 作为连接目标。HTTPS 代理连接先以**代理域名**验证代理证书，隧道内再以**原始客户端域名**验证目标 TLS 证书，两层不能混用 ServerName；禁止通过代理、IPv6、重定向或 DNS rebinding 绕开边界。请求有显式超时、响应大小、并发与缓存硬上限，不得把获取失败解释为认证成功。D124 既有 5 分钟 fresh / 最多 1 小时有界 stale-cache 只适用于 **Token/撤销的已验证短时网络故障**；新浏览器授权不借 stale metadata 继续授予新权限。无可信缓存、证书/身份不符、签名或未知 kid 必须拒绝。
+**CIMD/JWKS 出站（D128 修订）**：只接受格式合法的 HTTPS 元数据与 JWKS URI，不进行 SSRF 目的 IP 黑名单、公网 IP 分类或 DNS 网段过滤；即使目标域名解析到 loopback、私网、保留地址或代理 Fake-IP，也不因 IP 类型直接拒绝。连接时可固定本次已解析 IP，HTTP Host、TLS SNI 和证书校验仍使用原始客户端域名；HTTP/HTTPS 代理保留对代理及目标证书的独立校验。禁止 HTTP 降级、userinfo/fragment 和重定向，保留显式超时、响应大小、并发与缓存上限。CIMD 的 Client ID、回调精确匹配及 JWKS 签名验证不变；失败不得被解释为已认证。D124 既有 5 分钟 fresh / 最多 1 小时有界 stale-cache 只适用于 Token/撤销的已验证短时网络故障，新浏览器授权不使用 stale metadata。**接受的风险**：对客户端自声明的 HTTPS 目标不再拦截内网地址，可能允许匿名请求触达服务端可访问的 HTTPS 内网服务；部署者须按网络环境承担此风险。
 
 #### DCR 注册与客户端回调
 
 DCR 作为 **MCP 2026-07-28 的兼容能力**，只提供 RFC 7591 公共客户端注册（不增加用户操作端、客户端管理 UI 或客户端 Secret）。请求必须满足：
 
-- 请求体最多 64 KiB；`client_name` 为 1–255 字符；`redirect_uris` 为 1–20 个无重复 URI，每项不超过 2048 字符；可选 `client_uri` 最多 2048 字符且为公开 HTTPS。JSON 不接受不支持或冲突的认证/Grant 字段。
+- 请求体最多 64 KiB；`client_name` 为 1–255 字符；`redirect_uris` 为 1–20 个无重复 URI，每项不超过 2048 字符；可选 `client_uri` 最多 2048 字符且为 HTTPS。JSON 不接受不支持或冲突的认证/Grant 字段。
 - `token_endpoint_auth_method` 为空或 `none`；`grant_types` 只允许 `authorization_code`、`refresh_token`，`response_types` 只允许 `code`；Scope 只允许 `mcp` 或 `mcp offline_access`，不接受注册时扩大权限。
 - **与 Nexum 一样不要求或依据 `application_type` 决定回调合法性**：回调统一只允许有效 HTTPS 或 `http://localhost`、IPv4 loopback（`127.0.0.0/8`）和 IPv6 loopback（`::1`）的 HTTP URI。其他 HTTP、私网 LAN、通配、userinfo、fragment、非 HTTP scheme 及开放重定向拒绝。使用注册时**完整原样保存的 URI**精确匹配授权请求，不做通配端口/路径自动放宽；桌面客户端必须先注册实际回调端口，再请求授权。与 Nexum 一样兼容可选的 `application_type=web/native`，但不要求客户端必须声明，也不以此改变 Loopback 的安全判定；将来若扩展标准注册字段，应保证两端协议兼容，不把可选声明变成新的客户端门禁。
 - 注册成功生成密码学不可猜测的不透明 `client_id`，返回其声明的公开注册元数据；`client_name` / `client_uri` 是用户界面的自声明材料，不授予品牌可信度或访问权。DCR 无法证明发起客户端的组织身份，安全边界仍是精确回调、PKCE、用户同意及 MCP Token 限权。
@@ -223,9 +223,9 @@ DCR 作为 **MCP 2026-07-28 的兼容能力**，只提供 RFC 7591 公共客户�
 
 #### 真实验收与证据
 
-验证分为协议/安全负例、SQLite v1→v2 迁移/故障、Web 登录/同意、MCP Tool/SDK 回归和真实 Host。至少覆盖 ChatGPT 现有 CIMD、非 ChatGPT 公开 CIMD、DCR 原生 Loopback 与 HTTPS、浏览器批准/拒绝、重启/刷新/撤销以及内网 SSRF/开放重定向/伪造 Client/DB 失败。真实 Muse 连接和真实 ChatGPT 连接必须分别给出 OAuth Discovery、同意、Tool、重连的可定位证据；不把只读模拟客户端或 Nexum 的既有测试说成 KG OS 的宿主验收。
+验证分为协议/安全负例、SQLite v1→v2 迁移/故障、Web 登录/同意、MCP Tool/SDK 回归和真实 Host。至少覆盖 ChatGPT 现有 CIMD、非 ChatGPT HTTPS CIMD、DCR 原生 Loopback 与 HTTPS、浏览器批准/拒绝、重启/刷新/撤销，以及代理 Fake-IP 元数据/JWKS 连接、HTTP 降级/重定向拒绝、伪造 Client/DB 失败。真实 Muse 连接和真实 ChatGPT 连接必须分别给出 OAuth Discovery、同意、Tool、重连的可定位证据；不把只读模拟客户端或 Nexum 的既有测试说成 KG OS 的宿主验收。
 
-本合同参考 [Nexum MCP OAuth 设计](https://github.com/bYiyLi/Nexum/blob/c78d60f55f4c8478c4333f2505493ee103a05820/docs/design/mcp-oauth-grants.md) 及其 `internal/mcpauth` 实现（2026-11-07 本地核读）、[MCP 2026-07-28 Client Registration](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/authorization/client-registration.mdx) 与 [安全考虑](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/authorization/security-considerations.mdx)。外部参考只提供协议与实现证据，**KG OS 以本节和 D127 为目标合同**；进度、验收与未完成项只在 [Phase 36](../development/phases/36-host-neutral-mcp-oauth.md) 维护。
+本合同参考 [Nexum MCP OAuth 设计](https://github.com/bYiyLi/Nexum/blob/c78d60f55f4c8478c4333f2505493ee103a05820/docs/design/mcp-oauth-grants.md) 及其 `internal/mcpauth` 实现（2026-11-07 本地核读）、[MCP 2026-07-28 Client Registration](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/authorization/client-registration.mdx) 与 [安全考虑](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/authorization/security-considerations.mdx)。外部参考只提供协议与实现证据，**KG OS 以本节、D127 的未替代部分和 D128 为目标合同**；进度、验收与未完成项只在 [Phase 36](../development/phases/36-host-neutral-mcp-oauth.md) 维护。
 
 ### 首次使用与验收边界
 

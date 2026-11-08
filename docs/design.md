@@ -29,7 +29,7 @@
 
 MCP 健壮性与长期授权按 [D124](design/decisions.md#d124-mcp-resilience) 和 [MCP 统一结果/恢复合同](design/mcp.md#mcp-对外健壮性合同)实施，验收归 [Phase 34](development/phases/34-mcp-resilience.md)。
 
-**MCP OAuth 新目标**：通用 Client ID/回调、CIMD、DCR 及安全出站连接由 [D127](design/decisions.md#d127-host-neutral-mcp-oauth) 和 [MCP Host-neutral OAuth 合同](design/mcp.md#host-neutral-mcp-oauth)定义，开发与真实 Muse/ChatGPT 验收见 [Phase 36](development/phases/36-host-neutral-mcp-oauth.md)。当前仍为设计/计划，不能视为已实现或已发布。
+**MCP OAuth 新目标**：通用 Client ID/回调、CIMD、DCR 由 [D127](design/decisions.md#d127-host-neutral-mcp-oauth) 和 [MCP Host-neutral OAuth 合同](design/mcp.md#host-neutral-mcp-oauth)定义，出站 IP/SSRF 过滤以 [D128](design/decisions.md#d128-oauth-metadata-no-ssrf-ip-filter) 的修订为准；开发与真实 Muse/ChatGPT 验收见 [Phase 36](development/phases/36-host-neutral-mcp-oauth.md)。当前仍为设计/计划，不能视为已实现或已发布。
 
 ## 从配置到调用
 

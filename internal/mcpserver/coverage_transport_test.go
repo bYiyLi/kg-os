@@ -101,36 +101,31 @@ func TestOAuthOutboundRejectsUnsupportedRequestsBeforeConnecting(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		transport oauthSafeTransport
-		isUnsafe  bool
 	}{
 		{"failed DNS", oauthSafeTransport{
 			lookup: func(context.Context, string, string) ([]netip.Addr, error) {
 				return nil, errors.New("offline")
-			}}, false},
+			}}},
 		{"empty DNS", oauthSafeTransport{
 			lookup: func(context.Context, string, string) ([]netip.Addr, error) {
 				return []netip.Addr{}, nil
-			}}, false},
+			}}},
 		{"invalid proxy configuration", oauthSafeTransport{
 			lookup: func(context.Context, string, string) ([]netip.Addr, error) {
 				return []netip.Addr{netip.MustParseAddr("1.1.1.1")}, nil
 			}, proxyFor: func(*http.Request) (*url.URL, error) {
 				return nil, errors.New("unusable proxy")
-			}}, false},
+			}}},
 		{"unsupported proxy protocol", oauthSafeTransport{
 			lookup: func(context.Context, string, string) ([]netip.Addr, error) {
 				return []netip.Addr{netip.MustParseAddr("1.1.1.1")}, nil
 			}, proxyFor: func(*http.Request) (*url.URL, error) {
 				return &url.URL{Scheme: "ftp", Host: "proxy.example"}, nil
-			}}, false},
-		{"nonpublic resolved IP", oauthSafeTransport{
-			lookup: func(context.Context, string, string) ([]netip.Addr, error) {
-				return []netip.Addr{netip.MustParseAddr("169.254.169.254")}, nil
-			}}, true},
+			}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := tc.transport.RoundTrip(request)
-			if err == nil || (tc.isUnsafe && !errors.Is(err, errOAuthUnsafeDestination)) {
+			if err == nil {
 				t.Fatalf("invalid metadata outbound policy accepted: %v", err)
 			}
 		})

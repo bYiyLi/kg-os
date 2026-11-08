@@ -8,7 +8,7 @@ describe("CLI help", () => {
     expect(rootHelp()).toContain("KGOS_ROOT=<workspace-root>");
     expect(rootHelp()).toContain("--root > KGOS_ROOT");
     expect(rootHelp()).toContain("ontology");
-    expect(versionText()).toBe("0.3.18\n");
+    expect(versionText()).toBe("0.3.19\n");
   });
 
   it.each(["doctor", "init", "ontology", "object", "graph", "evolution"])(

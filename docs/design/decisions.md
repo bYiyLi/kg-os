@@ -1316,3 +1316,11 @@ CLI / SDK / Web / Skill (TypeScript / npm)
 - **安全、存储与升级**：新增公开 IP 绑定且无重定向的安全 CIMD/JWKS Fetch、注册抗滥用与 Web 回调风险展示；复用原独立 `.kgos/mcp-oauth.db`、Family/Code/Token、撤销及错误分类，新增 DCR Client 记录与事务化 schema v1→v2。新的 OAuth `resource` 绑定真实 `<issuer><MCP Path>` Endpoint（默认 `/mcp`，支持现有自定义路径），旧数据库只迁移元数据绑定，原 Family/Token 的旧 Origin audience 和过期时间保持不变，仅保留旧 Access 到期前的读取兼容。旧 Access 按原有效期自然到期，不签发新的旧 Scope Token；旧 Refresh 不自动变更 Scope，原 Host 需要标准 OAuth 重新授权一次，协议恢复必须实测。损坏/失败 fail closed，不清空数据库；旧二进制不保证直接回读新 schema。
 - **边界、替代与取舍**：本决定定向替换 [D95](#d95-unified-mcp-web-authorization)、[D124](#d124-mcp-resilience) 的 ChatGPT 专属客户端校验以及 `kgos:access`/24 小时 Access **未来发行合同**，不改写 Phase 17/34 历史验收及不冲突的存储/故障恢复。统一协议让标准 Host 能连接两个产品；代价是旧连接必须一次性重新授权，并需为匿名 DCR、公开元数据 Fetch 承担存储与 SSRF 防护。不移植 Nexum 用户、Agent Grant、套餐或外部登录服务。
 - **真源和阶段**：协议、Web 最小接口及安全/迁移合同由 [MCP](mcp.md#host-neutral-mcp-oauth) 唯一维护，工作项与真实 Host 验收由 [Phase 36](../development/phases/36-host-neutral-mcp-oauth.md) 负责。Phase 36 与 [Phase 35](../development/phases/35-observability-workbench.md) 允许并行，不把设计写入等同于已实现、已通过真实 Muse 测试或已发行。
+
+<a id="d128-oauth-metadata-no-ssrf-ip-filter"></a>
+
+### D128 MCP OAuth 元数据出站不再过滤 SSRF 目的 IP（2026-11-08）
+
+- **原因与决定**：KG OS Prod v0.3.18 使用 ChatGPT CIMD 时，运行网络可把 `chatgpt.com` DNS 解析为保留网段 Fake-IP，原 D127 的公网 IP 过滤拒绝正常的 OAuth 元数据验证。用户明确决定移除 MCP OAuth CIMD/JWKS 的 SSRF 目的地址限制，不再按目标 DNS/IP 属于公有、私有、回环或保留网段拒绝请求。
+- **保留边界**：只接受有效 HTTPS URI，继续验证 TLS/代理证书、Client ID 文档身份、redirect 精确匹配、JWKS 签名及 OAuth Code/PKCE/Scope/Resource；不跟随重定向，维持超时、响应大小、并发与有界缓存。此调整不取消 DCR 回调规则、注册来源限流、Instance 身份或 MCP/API 权限。
+- **取舍与风险**：放弃 IP 类别过滤意味着恶意客户端能够让服务端尝试访问可路由的内网 HTTPS 地址，存在 SSRF/内部网络探测风险；不在 KG OS 加例外白名单或以 Host 名称特判替代过滤。生产服务器网络隔离由部署者负责。此决定**只定向替换 D127 对 CIMD/JWKS 出站 DNS/IP 公网校验及相关阻断验收的要求**，不改写历史发布/验收事实；当前行为由 [MCP](mcp.md#host-neutral-mcp-oauth) 维护，实施与验收由 [Phase 36](../development/phases/36-host-neutral-mcp-oauth.md) 维护。

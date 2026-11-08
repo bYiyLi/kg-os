@@ -16,10 +16,10 @@ import (
 	"time"
 )
 
-// OAuth metadata and JWKS are attacker-chosen URLs. Production resolves and
-// validates every returned address before connecting to the vetted IP. Even an
-// explicitly configured HTTPS proxy CONNECTs to the pinned IP, never the
-// untrusted hostname. A supplied OAuthClient is a trusted integration adapter.
+// OAuth metadata and JWKS use HTTPS with certificate verification, bounded
+// requests, and no redirects. Their DNS answers are not filtered by IP range:
+// deployments using proxy-managed Fake-IP DNS must remain connectable.
+// A supplied OAuthClient is a trusted integration adapter.
 func secureOAuthClient() *http.Client {
 	return &http.Client{Transport: oauthSafeTransport{}, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
@@ -49,14 +49,9 @@ func (t oauthSafeTransport) RoundTrip(request *http.Request) (*http.Response, er
 	if err != nil || len(addresses) == 0 {
 		return nil, errors.New("OAuth metadata host resolution failed")
 	}
-	for _, address := range addresses {
-		if !oauthPublicIP(address) {
-			return nil, errOAuthUnsafeDestination
-		}
-	}
-	// Resolve the trusted proxy from the original URL, but CONNECT only to the
-	// validated IP. The TLS SNI/certificate and HTTP Host remain the original
-	// public hostname, so a proxy cannot change the authenticated authority.
+	// DNS answers, including private/reserved and proxy-managed Fake-IP ranges,
+	// are accepted. Keep the resolved target pinned per attempt while preserving
+	// the original TLS SNI and HTTP Host for certificate/identity validation.
 	proxyFor := http.ProxyFromEnvironment
 	if t.proxyFor != nil {
 		proxyFor = t.proxyFor
@@ -80,7 +75,7 @@ func (t oauthSafeTransport) RoundTrip(request *http.Request) (*http.Response, er
 		}
 		// Go's Transport applies TLSClientConfig.ServerName to both HTTPS
 		// proxy and origin. Establish CONNECT explicitly so each TLS layer
-		// verifies its own hostname, while only the validated IP is tunneled.
+		// verifies its own hostname.
 		transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 			if network != "tcp" {
 				return nil, errors.New("unsupported OAuth proxy network")
@@ -99,8 +94,8 @@ func (t oauthSafeTransport) RoundTrip(request *http.Request) (*http.Response, er
 		target := *request.URL
 		target.Host = net.JoinHostPort(address.String(), port)
 		pinned.URL = &target
-		// The URL's host is an IP only to pin the socket/CONNECT target.
-		// HTTP Host must retain the original, verified Client metadata origin.
+		// The URL's host is the resolved socket/CONNECT destination.
+		// HTTP Host retains the original Client metadata origin.
 		pinned.Host = request.URL.Host
 		response, err := transport.RoundTrip(pinned)
 		if err == nil {
@@ -119,8 +114,8 @@ type oauthBufferedConn struct {
 func (c *oauthBufferedConn) Read(p []byte) (int, error) { return c.reader.Read(p) }
 
 // oauthDialProxyTunnel verifies an HTTPS proxy independently of the actual
-// OAuth metadata origin. The CONNECT target is always a validated public IP,
-// never the untrusted client-provided DNS name.
+// OAuth metadata origin. The CONNECT target is the resolved IP; no IP-range
+// filtering is applied.
 func oauthDialProxyTunnel(ctx context.Context, proxy *url.URL, target string, roots *x509.CertPool) (_ net.Conn, err error) {
 	port := proxy.Port()
 	if port == "" {
@@ -206,7 +201,7 @@ var oauthReservedPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("2001:2::/48"),
 }
 
-func validOAuthPublicURL(raw string, requirePath bool) bool {
+func validOAuthHTTPSURL(raw string, requirePath bool) bool {
 	if len(raw) == 0 || len(raw) > 2048 {
 		return false
 	}
@@ -223,8 +218,5 @@ func validOAuthPublicURL(raw string, requirePath bool) bool {
 			return false
 		}
 	}
-	if addr, err := netip.ParseAddr(parsed.Hostname()); err == nil {
-		return oauthPublicIP(addr)
-	}
-	return parsed.Hostname() != "localhost"
+	return true
 }

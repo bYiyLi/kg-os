@@ -1,6 +1,6 @@
 {
   "name": "kgos",
-  "version": "0.3.18",
+  "version": "0.3.19",
   "private": true,
   "description": "KG OS monorepo",
   "license": "AGPL-3.0-only",

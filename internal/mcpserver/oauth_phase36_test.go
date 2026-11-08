@@ -204,35 +204,38 @@ func TestPhase36DCRInputBoundsAndRateLimit(t *testing.T) {
 	accepted.Body.Close()
 }
 
-func TestPhase36MetadataSSRFProtection(t *testing.T) {
+func TestPhase36MetadataHTTPSValidationWithoutIPFiltering(t *testing.T) {
 	for _, invalid := range []string{
-		"https://127.0.0.1/meta", "https://[::1]/meta", "https://10.0.0.5/meta",
-		"http://client.example/meta", "https://localhost/meta", "https://client.example/a/../meta",
+		"http://client.example/meta", "https://client.example/a/../meta",
 		"https://client.example/meta?secret=1", "https://user@client.example/meta",
 	} {
 		if validOAuthClientID(invalid) {
-			t.Errorf("unsafe metadata URL accepted: %q", invalid)
+			t.Errorf("invalid HTTPS metadata URL accepted: %q", invalid)
 		}
 	}
-	if !validOAuthClientID("https://muse.example.org/oauth/client.json") {
-		t.Fatal("public CIMD metadata URI rejected")
+	for _, allowed := range []string{
+		"https://muse.example.org/oauth/client.json", "https://127.0.0.1/meta",
+		"https://[::1]/meta", "https://10.0.0.5/meta",
+		"https://198.18.0.16/meta", "https://localhost/meta",
+	} {
+		if !validOAuthClientID(allowed) {
+			t.Errorf("valid HTTPS metadata URI rejected by IP/host policy: %q", allowed)
+		}
 	}
+	// Public IP classification is still used for DCR rate-limit accounting,
+	// not for metadata or JWKS fetch destinations.
 	for _, address := range []string{
 		"127.0.0.1", "::1", "10.0.0.1", "169.254.169.254",
 		"192.0.2.1", "100.64.0.2", "198.18.0.1", "2001:db8::1",
 	} {
 		if oauthPublicIP(netip.MustParseAddr(address)) {
-			t.Errorf("untrusted outbound address accepted: %s", address)
+			t.Errorf("nonpublic registration source classified as public: %s", address)
 		}
 	}
 	for _, address := range []string{"1.1.1.1", "2606:4700:4700::1111"} {
 		if !oauthPublicIP(netip.MustParseAddr(address)) {
-			t.Errorf("public outbound address blocked: %s", address)
+			t.Errorf("public registration source classified as nonpublic: %s", address)
 		}
-	}
-	_, err := secureOAuthClient().Get("https://127.0.0.1:1/internal")
-	if err == nil {
-		t.Fatal("metadata HTTP client could reach loopback")
 	}
 	for _, bad := range []string{"https://*.example.com/callback", "https://foo..example.com/callback", "https://-foo.example/callback"} {
 		if validOAuthRedirect(bad) {
@@ -315,7 +318,7 @@ func TestPhase36LegacyAccessRetainsExpiryAndRefreshRequiresConsent(t *testing.T)
 	}
 }
 
-func TestPhase36ProxyPinsValidatedIPBeforeCONNECT(t *testing.T) {
+func TestPhase36ProxyPinsResolvedIPBeforeCONNECT(t *testing.T) {
 	destinations := make(chan string, 2)
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodConnect {
@@ -357,30 +360,42 @@ func TestPhase36ProxyPinsValidatedIPBeforeCONNECT(t *testing.T) {
 		t.Fatal("no pinned-IP CONNECT request")
 	}
 	transport.lookup = func(context.Context, string, string) ([]netip.Addr, error) {
-		return []netip.Addr{netip.MustParseAddr("1.1.1.1"), netip.MustParseAddr("127.0.0.1")}, nil
+		return []netip.Addr{netip.MustParseAddr("198.18.0.16")}, nil
 	}
 	response, err = transport.RoundTrip(request)
 	if response != nil {
 		response.Body.Close()
 	}
-	if err == nil {
-		t.Fatal("private DNS answer accepted")
+	if err == nil || !strings.Contains(err.Error(), "proxy rejected CONNECT") {
+		t.Fatalf("Fake-IP CONNECT did not reach the proxy: %v", err)
 	}
 	select {
 	case destination := <-destinations:
-		t.Fatalf("invalid DNS answer made proxy request: %s", destination)
+		if destination != "198.18.0.16:443" {
+			t.Fatalf("proxy did not receive resolved Fake-IP target: %s", destination)
+		}
 	default:
+		t.Fatal("proxy-managed Fake-IP DNS answer was blocked")
 	}
 }
 
-func TestPhase36InvalidOutboundDestinationIsNotTransientClientFailure(t *testing.T) {
+func TestPhase36FakeIPNetworkFailureIsTransient(t *testing.T) {
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer proxy.Close()
+	proxyURL, err := url.Parse(proxy.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
 	client := &http.Client{Transport: oauthSafeTransport{
 		lookup: func(context.Context, string, string) ([]netip.Addr, error) {
-			return []netip.Addr{netip.MustParseAddr("127.0.0.1")}, nil
+			return []netip.Addr{netip.MustParseAddr("198.18.0.16")}, nil
 		},
+		proxyFor: func(*http.Request) (*url.URL, error) { return proxyURL, nil },
 	}}
-	if _, err := fetchOAuthJSON(context.Background(), client, "https://client.example.com/oauth/client.json", 4096); !errors.Is(err, errOAuthInvalidClient) {
-		t.Fatalf("SSRF destination was reported as a recoverable fetch outage: %v", err)
+	if _, err := fetchOAuthJSON(context.Background(), client, "https://client.example.com/oauth/client.json", 4096); !errors.Is(err, errOAuthClientUnavailable) {
+		t.Fatalf("Fake-IP network outage was misclassified as invalid identity: %v", err)
 	}
 }
 
@@ -417,7 +432,7 @@ func TestPhase36OAuthStateIsOptionalButDuplicatedValuesAreRejected(t *testing.T)
 	duplicate.Body.Close()
 }
 
-func TestPhase36HTTPSProxyVerifiesSeparateCertificateAndPinnedCONNECT(t *testing.T) {
+func TestPhase36HTTPSProxyVerifiesSeparateCertificateAndResolvedCONNECT(t *testing.T) {
 	targets := make(chan string, 2)
 	proxy := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		if request.Method == http.MethodConnect {

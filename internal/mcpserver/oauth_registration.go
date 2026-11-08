@@ -201,12 +201,6 @@ func validOAuthClientURI(raw string) bool {
 		parsed.User != nil || parsed.Fragment != "" || parsed.Opaque != "" || len(raw) > 2048 {
 		return false
 	}
-	if strings.EqualFold(parsed.Hostname(), "localhost") {
-		return false
-	}
-	if ip, err := netip.ParseAddr(parsed.Hostname()); err == nil {
-		return oauthPublicIP(ip)
-	}
 	return true
 }
 

@@ -25,7 +25,7 @@
 | Feature | 交付范围 | 可观察的验收 |
 | --- | --- | --- |
 | P36-01 发现与身份解析 | 保留 PRM/AS Discovery；AS metadata 增加真实 `registration_endpoint`，CIMD 优先，DCR 兼容；`client_id` 路由按 URL 型 CIMD / 已注册不透明 ID 区分 | 无 Bearer 得到 401 + resource metadata；两个 discovery endpoint 声明与真实路由一致；元数据仅公开只读；非法/未知 Client 失败且不生成待授权请求 |
-| P36-02 通用 CIMD 安全边界 | 取消仅 ChatGPT 域名限制；严格 HTTPS 元数据身份及 redirect 精确匹配；metadata/JWKS 出站 SSRF 防护与有界缓存 | ChatGPT 既有 CIMD 成功；其他公开 HTTPS CIMD 成功；伪造 ID、私网/回环/重定向/DNS rebinding/代理绕过、超时及超大响应被安全拒绝；暂时故障与永久无效正确区分 |
+| P36-02 通用 CIMD 出站与身份 | 取消 ChatGPT 专属域名限制；严格 HTTPS 元数据身份和 redirect 精确匹配；不按 DNS/IP 类型拦截元数据及 JWKS 访问，保留超时/容量/不跟随重定向与有界缓存 | ChatGPT、其他 HTTPS CIMD 和代理 Fake-IP DNS 能进入身份校验；非法 Client ID、回调不匹配、HTTP 降级、重定向、超时和超大响应仍被拒绝；实际错误分类准确 |
 | P36-03 DCR 与 SQLite | `POST /oauth/register` RFC 7591 公共客户端，`none`/PKCE，HTTPS 或合法本机回调，注册元数据和不可猜测 ID 持久化在现有 OAuth SQLite，受限额保护 | 201 返回标准注册字段但不返回 `client_secret`；重启后相同 ID 可授权/刷新；兼容可选 `application_type=web/native` 且不要求提供，无类型声明的合法 Loopback 成功，非法/滥用请求 400/429/503 |
 | P36-04 现有 Web 授权与 Token 接合 | 复用 `/?mcp_authorization=<request_id>`、`GET /oauth/request`、`POST /oauth/decision`；使用服务端已解析的 Client 名称/来源/回调主机显示，不再硬编码 ChatGPT | 已登录/未登录均正常弹出，完整读写与本机回调风险清晰；Approve/Deny/过期/重复/伪造/CSRF 场景正确，外部 Client 无法取得 Instance Token 或普通 API 权限 |
 | P36-05 新 Scope/生命周期、旧连接迁移和跨客户端 | `mcp` / `mcp offline_access`、Code 5 分钟、Access 15 分钟硬过期/`expires_in=840`、Refresh 滚动 30 天，沿用 `private_key_jwt`、根凭证/issuer/resource 绑定与撤销；旧 `kgos:access` Access 按原过期，旧 Refresh 需标准重授权 | 新旧 Scope 的 Token/Refresh 不互相升级或扩权，已签发 Access 不被延长；真实 ChatGPT/Muse DCR/CIMD 连接、自动提前刷新、一次性重新授权、MCP Tool/重连/撤销有各自证据，不以模拟测试代替真实客户端 |
@@ -33,7 +33,7 @@
 ## 实施顺序
 
 1. **现状锁定**：检查当前 schema v1、`oauthBroker`、`oauthClientAuthenticator`、Web 认证契约、现存安全/负例测试和同事未提交改动；记录受影响公共路径及升级前既有 Family。无有效证据不得改写当前实现状态。
-2. **身份与安全先行**：添加可单测的通用 CIMD ID/redirect 校验、受约束的 DNS + pinned public-IP 出站 fetch，JWKS 同一防护；将元数据、错误、缓存/SSRF 拒绝与故障分类测试放在先于正式开放入口的位置。
+2. **CIMD 出站与身份**：验证通用 CIMD ID/redirect、HTTPS 和 TLS 校验，元数据/JWKS 读取不做目的 IP/保留网段过滤；为 Fake-IP、无重定向、超时和错误分类建立回归，保留已实现的公开客户端身份校验。
 3. **DCR 最小持久化**：在 `mcpoauth.Store` 内以事务从 schema v1 升级到 v2，添加唯一必要的 DCR Client 表/查询/容量限制，保留旧 Family/Code/Token 和绑定。注册/读取不复用用户 Knowledge 图数据库；失败 fail closed，不删库重建。新增 `/oauth/register`，metadata 只在真实路由实现后宣告。
 4. **浏览器与 Token 接合**：认证请求解析保存可信 Client 展示快照/回调信息；旧 Web 弹窗显示验证过的域名与权限、Loopback 警示；token/refresh/revoke 对 DCR `none` 与 CIMD `none/private_key_jwt` 采取现有方法绑定及缓存规则。改为 Nexum 一致的新 Scope、Code/Access/Refresh 有效期，针对旧 Scope 的 Refresh 要求显式重新授权，不另建一份 Grant 模型。
 5. **兼容性与发布准备**：运行定向 Go/race/安全测试与 Web 单测/E2E，检查其它同学的并行改动；Mac 完整 `pnpm validate`、OpenClaw Linux amd64 隔离 Docker/重启/31 SDK、公开 CI、真实 ChatGPT 和 Muse 分别取证。**验收包括旧 Family 持久化、24 小时旧 Access 原到期、新 Access 15 分钟实际硬过期/14 分钟提示、旧 Refresh 重新授权及新 Refresh 连续轮换**；真实 Host 对 `invalid_grant` 不能恢复时据实调整迁移策略。若实测揭示客户端协议差异，先回读当前真源并最小修订，不增加 Host 特例。
@@ -45,7 +45,7 @@
 | 合法公开 HTTPS CIMD + HTTPS 回调、合法 CIMD + `localhost`/`127.0.0.1`/`[::1]` 本机回调 | 经完整浏览器登录与显式同意签发；回调主机可见，本机回调显示警示 |
 | DCR 没有 `application_type` 的合法 Loopback HTTP（含 `127.0.0.2`）或 HTTPS | 只签发公共 Client ID；实际注册地址精确匹配后才可申请授权；未获同意时没有 Access Token，不因缺少可选类型字段拒绝 |
 | `client_id` 与远程 JSON 不匹配、未注册的非 URL ID、重定向 URI 不属于声明列表 | 直接拒绝，不能借此创建 OAuth ticket、callback 或 Token |
-| metadata/JWKS 解析到私网、localhost、link-local、DNS 重新绑定、非 public IP、HTTP downgrade、重定向/代理出口绕过 | 无对内网探测；明确错误/暂时错误按事实分类；不会放开校验 |
+| metadata/JWKS 解析到私网、保留网段、代理 Fake-IP，及 HTTPS 代理；HTTP 降级、重定向、无效证书、伪造 Client | 允许前者进入 HTTPS 证书及身份校验，不因 IP 类型拦截；后者仍拒绝；明确错误/暂时错误按事实分类 |
 | DCR 非法 scheme/userinfo/fragment、通配回调、secret auth、超限请求、泛滥注册 | 拒绝；无授权副作用；容量/速率告警不暴露私有值 |
 | 未登录、CSRF、伪造授权请求 ID、重复提交、拒绝授权、Code/PKCE 错误、未验证回调 | 不发有效 Token，不开放重定向，不泄露凭证 |
 | 老 SQLite v1 → v2、升级前 ChatGPT Family、重启、并发注册、事务失败、损坏数据库、schema 不兼容、根凭证/issuer 轮换 | 旧 Access 在原到期前可验证、旧 Refresh 不自动升为新 `mcp` Scope；新授权签发 15 分钟 Access，旧 DCR Client ID 不能跨 issuer/根凭证继续生效；失败返回 503，不清空库，明确回退限制 |
@@ -57,7 +57,7 @@
 
 - P36-01–05 的功能/安全测试、原有 ChatGPT OAuth 和 MCP Tool 回归与完整阶段 Review 均无剩余影响验收的问题；新增链接、文档/示例、Web 双语文案和 SDK/部署说明依据实际接口同步。
 - Mac 完整质量门禁、OpenClaw 隔离 Docker 与真实升级持久化检查通过；当前源 revision 对应的公开 CI Docker Job 和真实 ChatGPT/Muse 连接均分别提供可定位证据。真实客户端不可用时标为缺证据，不将 Phase 声称为全部完成。
-- Review 至少检查协议字段、数据迁移/回退、SSRF/回调威胁、错误分类、端到端用户体验、跨版本兼容、其他同学并行 diff 与最终测试证据；修复后重跑受影响检查。
+- Review 至少检查协议字段、数据迁移/回退、放弃 SSRF IP 过滤的风险/回调威胁、错误分类、端到端用户体验、跨版本兼容、其他同学并行 diff 与最终测试证据；修复后重跑受影响检查。
 - Git Commit、Push、Tag、Release 和部署分别另行授权及报告；代码编写、定向测试与设计 Review 不自动构成完整 Phase 完成。
 
 ## 当前实现和验收证据（2026-11-07，持续更新）
@@ -91,3 +91,7 @@
 4. **回调及注册防滥用**：拒绝 URL 解析器原本允许的通配/无效 DNS 回调主机；公网直连按真实 TCP 来源 10/min，全实例 60/min。loopback/私网代理的共享来源不再被误施加同一个 10/min 限额；客户端 `Forwarded` / `X-Forwarded-For` 不受信任，真实来源的逐用户限流由可信反向代理维护。补通配回调、共享代理/global、直接公网来源限额的回归。
 
 **本轮验证边界**：四组 Go 相关包及 `cmd/kgosd` 的功能、`-race` 与 staticcheck，以及 Web 授权 27/27、定向 ESLint/TypeScript/文档检查均已复验。完整 Mac 构建通过，基于构建产物的浏览器 E2E 11/11 通过，TypeScript 覆盖率门禁达到 90.14%；**Go 全仓覆盖率、全仓 staticcheck、CSpell 与完整 `validate` 仍未全通过**，各问题按所属并行工作流记录。真实 ChatGPT/Muse、正式发布、远程 Docker/CI 留待另行授权与实际验证，不以模拟结果冒充通过。P36 仍为 `in_progress`。
+
+### 2026-11-08 出站安全范围调整（D128）
+
+按用户明确决定，MCP OAuth CIMD/JWKS 出站不再进行公网 IP、私网/保留网段或代理 Fake-IP 的 SSRF 目的地址过滤。原 P36-02 公网 IP/DNS rebinding 阻断要求及本阶段历史 Review 中的同类安全结论，不再作为当前实现验收条件；HTTPS/TLS、禁止重定向、客户端身份/redirect、JWKS 签名、大小/时间/并发限制仍需回归。旧版本测试记录仅代表原版本，不能当作新策略已发布或真实 Host 已验收。

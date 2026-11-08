@@ -62,16 +62,16 @@ func TestOAuthClientAuthenticationRejectsWrongSignatureAlgorithmAndKey(t *testin
 func TestOAuthClientMetadataFailureClassificationAndFixedJWKSAuthority(t *testing.T) {
 	f := newOAuthAuthFixture(t)
 	for _, uri := range []string{
-		"http://chatgpt.com/oauth/jwks.json", "https://127.0.0.1/oauth/jwks.json",
+		"http://chatgpt.com/oauth/jwks.json",
 		"https://chatgpt.com/oauth/jwks.json#", "https://user@chatgpt.com/oauth/jwks.json",
 	} {
 		if validOAuthJWKSURI(uri) {
 			t.Errorf("untrusted JWKS URI accepted: %s", uri)
 		}
 	}
-	for _, uri := range []string{"https://chatgpt.com/oauth/known-client/jwks.json", "https://muse.example.com/jwks.json", "https://chatgpt.com:443/oauth/jwks.json"} {
+	for _, uri := range []string{"https://chatgpt.com/oauth/known-client/jwks.json", "https://muse.example.com/jwks.json", "https://chatgpt.com:443/oauth/jwks.json", "https://127.0.0.1/oauth/jwks.json", "https://198.18.0.16/oauth/jwks.json"} {
 		if !validOAuthJWKSURI(uri) {
-			t.Fatalf("public JWKS URI rejected: %s", uri)
+			t.Fatalf("valid HTTPS JWKS URI rejected due to IP range: %s", uri)
 		}
 	}
 	for _, status := range []int{http.StatusForbidden, http.StatusFound} {

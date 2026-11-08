@@ -226,7 +226,7 @@ func normalizeOAuthScope(value string) (string, bool) {
 	return oauthScope, true
 }
 func validOAuthClientID(raw string) bool {
-	return validOAuthPublicURL(raw, true)
+	return validOAuthHTTPSURL(raw, true)
 }
 func validOAuthRedirect(raw string) bool {
 	if len(raw) == 0 || len(raw) > 2048 {
