@@ -169,6 +169,7 @@ Phase 01 的 credential 范围仍只是 `auth.json` 生成/读取与 runtime sec
 | [34 MCP Resilience & OAuth Lifecycle](phases/34-mcp-resilience.md) | `done`（人工验收） | MCP/OAuth 已发行；真实宿主自然 24 小时刷新和生产签名续期未独立完整验收；用户人工验收结项。 | [Phase 34](phases/34-mcp-resilience.md) |
 | [35 SQLite 运行观测与诊断工作台](phases/35-observability-workbench.md) | `in_progress`（主要代码已落地；最终 CI 待完成） | 已实现 OTel Go Trace + 有界 SQLite/优先队列、资源趋势、保护 API/SDK 与 OBS1 Web；全量浏览器验收 83/83 通过，隔离 1 GiB Docker 完成损坏、权限、磁盘满、锁冲突、SIGKILL、软容量场景；正式 Dockerfile 与最终 revision 公开 CI 尚缺，不标 `done` | [D126](../design/decisions.md#d126-sqlite-observability-workbench)、[Observability](../design/observability.md)、[Web 工作台](../design/web.md#运行观测工作台d126phase-35-目标)、[Phase 35](phases/35-observability-workbench.md) |
 | [36 通用 MCP OAuth 客户端兼容](phases/36-host-neutral-mcp-oauth.md) | `in_progress`（Go/Web 代码及专项测试通过，完整验收待完成） | 已实现并局部验证通用 CIMD、安全 DCR/SSRF、SQLite v1→v2、Web 授权与新 Scope/Token；仍需全仓 Validate、隔离 Docker/公开 CI 及真实 Muse/ChatGPT 验收；与 Phase 35 并行 | [D127](../design/decisions.md#d127-host-neutral-mcp-oauth)、[MCP Host-neutral OAuth](../design/mcp.md#host-neutral-mcp-oauth)、[Phase 17](phases/17-mcp-web-authorization.md)、[Phase 34](phases/34-mcp-resilience.md) |
+| [37 Ontology Binding 增量编译](phases/37-incremental-binding-compiler.md) | `in_progress`（本地与 OpenClaw Linux 验收通过；本地已提交，Push/CI 因源仓库可见性冲突暂停） | 纯 Knowledge Patch 0 次 Binding 写入、17/19/20 次 Lithograph 执行；505 Binding、1 GiB/no-swap 两轮各 671 请求，峰值 359–376 MiB、0 OOM、0 意外失败；8 路独立 Branch 吞吐 7.17–7.34 writes/s；同 Branch 8 路竞争 1 提交 + 7 stale；Go Race、31/31 MCP Smoke；Mac `pnpm validate` exit 0（Go 90.1%、Web 85/85） | [Implementation 增量编译](../design/implementation.md#增量-binding-编译与纯-knowledge-patch)、[Phase 37](phases/37-incremental-binding-compiler.md) |
 
 独立改进阶段：[Phase 32：知识使用就绪性与场景回归](phases/32-knowledge-use-readiness.md)（`done`，2026-11-06 用户人工验收结项，保留缺项）。模型扩展、初始化指导、名称/Message 引导、检索与登录主题已取得源码或隔离验证证据；跨环境客户端与整体验收仍待继续，且与Phase 25/27/28原有验收分开。
 
@@ -312,5 +313,6 @@ Commit、push、发布和部署是独立动作。只有实际执行并取得证�
 - [Phase 34：MCP 对外健壮性与 OAuth 生命周期](phases/34-mcp-resilience.md)
 - [Phase 35：SQLite 运行观测与请求诊断工作台](phases/35-observability-workbench.md)
 - [Phase 36：通用 MCP OAuth 客户端发现与安全授权](phases/36-host-neutral-mcp-oauth.md)
+- [Phase 37：Ontology Binding 增量编译与 Knowledge Patch 写入优化](phases/37-incremental-binding-compiler.md)
 - [开发指南](../guide/development.md)
 - [设计到实现的工程映射](../design/implementation.md)

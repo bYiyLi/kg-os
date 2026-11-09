@@ -29,9 +29,12 @@ func syncInternalGraph(
 			}
 			retained[baseRecord.ElementID] = struct{}{}
 			domainIDs[ref] = baseRecord.ElementID
-			if err := updateInternalNode(ctx, transaction, baseRecord.ElementID, "", object.Value.Domain.Name,
-				object.Value.Domain.Title, object.Value.Domain.Description); err != nil {
-				return err
+			if internalMetadataChanged(baseRecord.Value.Name, baseRecord.Value.Title, baseRecord.Value.Description,
+				object.Value.Domain.Name, object.Value.Domain.Title, object.Value.Domain.Description) {
+				if err := updateInternalNode(ctx, transaction, baseRecord.ElementID, "", object.Value.Domain.Name,
+					object.Value.Domain.Title, object.Value.Domain.Description); err != nil {
+					return err
+				}
 			}
 		case KindNodeDefinition, KindRelationshipDefinition:
 			baseRecord := plan.Base.Definitions[*object.BaseRef]
@@ -44,9 +47,12 @@ func syncInternalGraph(
 			if ref.Kind == KindRelationshipDefinition {
 				kind = "relationship"
 			}
-			if err := updateInternalNode(ctx, transaction, baseRecord.ElementID, kind, object.Value.Definition.Name,
-				object.Value.Definition.Title, object.Value.Definition.Description); err != nil {
-				return err
+			if internalMetadataChanged(baseRecord.Value.Name, baseRecord.Value.Title, baseRecord.Value.Description,
+				object.Value.Definition.Name, object.Value.Definition.Title, object.Value.Definition.Description) {
+				if err := updateInternalNode(ctx, transaction, baseRecord.ElementID, kind, object.Value.Definition.Name,
+					object.Value.Definition.Title, object.Value.Definition.Description); err != nil {
+					return err
+				}
 			}
 			for _, property := range object.Value.Definition.Properties {
 				baseName := object.PropertyBase[property.Name]
@@ -58,8 +64,15 @@ func syncInternalGraph(
 					return publicError(CodeConsistency, "Property continuity record is missing", nil)
 				}
 				retained[id] = struct{}{}
-				if err := updateInternalNode(ctx, transaction, id, "", property.Name, property.Title, property.Description); err != nil {
-					return err
+				baseProperty := findProperty(baseRecord.Value.Properties, baseName)
+				if baseProperty == nil {
+					return publicError(CodeConsistency, "Property continuity metadata is missing", nil)
+				}
+				if internalMetadataChanged(baseProperty.Name, baseProperty.Title, baseProperty.Description,
+					property.Name, property.Title, property.Description) {
+					if err := updateInternalNode(ctx, transaction, id, "", property.Name, property.Title, property.Description); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -161,6 +174,21 @@ func syncInternalGraph(
 		}
 	}
 	return nil
+}
+
+// A binding SET is only necessary when its persisted metadata differs.
+// Other Definition/Property fields are stored in Lithograph Schema, not here.
+func internalMetadataChanged(oldName string, oldTitle, oldDescription *string,
+	name string, title, description *string,
+) bool {
+	return oldName != name || !sameInternalText(oldTitle, title) || !sameInternalText(oldDescription, description)
+}
+
+func sameInternalText(left, right *string) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 // Preserve the identity of every unchanged membership edge across all patches.

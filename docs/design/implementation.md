@@ -36,6 +36,18 @@ Lithograph v0.3.3 的 identifying Graph Type 上，Property type / required 是 
 
 公开 type/required/from/to 能力由 Lithograph Schema/Constraint 实际执行，KG OS 做的是输入、依赖与编排校验，不实现另一套数据库运行时约束引擎。
 
+### 增量 Binding 编译与纯 Knowledge Patch
+
+`Object Patch` 的 Ontology/Knowledge 混合事务仍沿用单次 `baseState` pin、严格 Branch Head 校验、Source/Target Ontology 计划及已有原子提交合同。`Ontology` 的内部 Binding 负责元数据、Schema Locator 与稳定身份，而不是每次 Knowledge 写入时应重放的状态。
+
+- 在解析、归一化与派生引用之后，使用已有 `plannedState.isNoOp` 识别 **Ontology 无逻辑变化**。此时即使同一个 Object Patch 创建、修改或删除了 Knowledge，也不执行 `syncInternalGraph`；不得为未改变的 Ontology 写入任何内部 Domain、Definition、Property Binding 或 `__kgos_includes` 关系。普通 Knowledge 的身份、实例数据校验、事务与提交仍按原合同执行。
+- Ontology 确有变化时，复用当前 `BaseRef`、`PropertyBase` 和计划目标值来定位持久化 Binding。既有 Binding 的 `name/title/description` 实际值不变时不执行 `SET`；Definition `kind` 由固定的 Object Kind 决定，不能通过普通 Patch 改成另一种 Kind；其余逻辑字段（类型、约束、索引、必填等）仅按已有 Schema/Constraint/Index 编译规则维护，不因 aggregate 其它字段变化而重写未变的 Binding 元数据。
+- 创建 / 删除 Binding 只处理新增 / 删除的对象；Definition 和 Property rename 更新现有稳定 element ID，不用删除再创建模拟更新。保留用于解析 target ID、删除检查和同事务身份连续性的完整 operation-local mapping，不引入第二份持久化状态或新的公共 API。
+- Domain membership 根据同一目标计划维护 `__kgos_includes` 差量。始终按稳定 Binding element ID 比较真实端点，而非仅比较公共 `includes` 名称：同一 Patch 删除并重新新增同名 Definition/Domain 时，即使公共 Ref 未变，底层 Binding identity 可能变化，必须调整受影响的边。未变端点不执行 Cypher 写入并保留原关系 element ID；仅增删真实变化的关系。删除 Domain/Definition 继续清理相应内部关联，不删除普通 Knowledge。
+- `validateStagedInternalGraph` 与 `validateStagedSnapshot` 在 Ontology 有变化时仍检查最终 Ontology 的基数、双向覆盖、Schema / Binding 一致性及 target aggregate。纯 Knowledge Patch 已在同一固定 `baseState` 上完整读取并校验原始 Ontology，且不执行 Graph Type、Schema、Binding 或 Domain membership 写入，因此不重复执行 staged Ontology 全量读取与 5 项计数；Knowledge 仍执行独立 staged read-back / canonical equality 校验。混合 Patch 或任何 Ontology 变化仍执行完整 staged Ontology 校验。失败保持 transaction fail-closed/rollback，no-op 保持原 State。
+
+这是一项编译器写入路径修正，不更改 `Ontology`/`Object` 公共语义、存储格式或 Lithograph 的数据库责任。2026-11-09 生产 OOM 排查确认两次非完成 `object.patch` 各有 548/534 次 Lithograph execution，且现行 `syncInternalGraph` 对约 505 个已有 Binding 无条件执行 `SET`；这里修复已验证的冗余调用，**不把全部内存峰值归因于该路径**。在生产规模的隔离 fixture 中测量执行次数、耗时和资源变化；OOM 是否根治须另以可复现的受控资源测试证明，不能仅凭调用数减少声明。具体阶段验收见 [Phase 37](../development/phases/37-incremental-binding-compiler.md)。
+
 ### Mutation planning
 
 执行链路复用 Object contract：parse → exact apply → 公共值 → explicit delta → shared-resource normalization → derived reference / maintenance → conflict/dependency check → SQL `lithograph_tx_begin(options_json)`（其中 `branch=targetBranch`、`expectedHead=baseState`）→ 同一 connection 上用普通 `lithograph()` / 必要时 `lithograph_rows()` 执行标准 Cypher → SQL `lithograph_tx_commit()`。active transaction 内普通 execution 自动加入同一 staged state，不存在 `lithograph_tx_execute()`。具体参数与 connection 边界见 [Runtime 调用入口](runtime.md#lithograph-调用入口)。

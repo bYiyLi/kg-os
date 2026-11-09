@@ -26,6 +26,28 @@ if (suppliedImage !== undefined && suppliedImage.trim() === "") {
 const ownsImage = suppliedImage === undefined;
 const image = suppliedImage ?? "kgos-unified-smoke-" + identifier;
 const volume = "kgos-unified-test-" + identifier;
+const networkMode = process.env.KGOS_UNIFIED_DOCKER_SMOKE_NETWORK ?? "bridge";
+const hostPort = process.env.KGOS_UNIFIED_DOCKER_SMOKE_HOST_PORT;
+const memoryLimit = process.env.KGOS_UNIFIED_DOCKER_SMOKE_MEMORY;
+const memorySwap = process.env.KGOS_UNIFIED_DOCKER_SMOKE_MEMORY_SWAP ?? memoryLimit;
+if (!["bridge", "host"].includes(networkMode)) {
+  throw new Error("KGOS_UNIFIED_DOCKER_SMOKE_NETWORK must be bridge or host");
+}
+if (
+  networkMode === "host" &&
+  (!/^\d+$/.test(hostPort ?? "") || Number(hostPort) < 1024 || Number(hostPort) > 65535)
+) {
+  throw new Error("Host network smoke requires KGOS_UNIFIED_DOCKER_SMOKE_HOST_PORT in 1024..65535");
+}
+if (memoryLimit !== undefined && !/^\d+(?:b|k|m|g|t)?$/i.test(memoryLimit)) {
+  throw new Error("KGOS_UNIFIED_DOCKER_SMOKE_MEMORY must be a Docker memory quantity");
+}
+if (memorySwap !== undefined && !/^\d+(?:b|k|m|g|t)?$/i.test(memorySwap)) {
+  throw new Error("KGOS_UNIFIED_DOCKER_SMOKE_MEMORY_SWAP must be a Docker memory quantity");
+}
+const networkArgs = networkMode === "host" ? ["--network", "host"] : [];
+const resourceArgs =
+  memoryLimit === undefined ? [] : ["--memory", memoryLimit, "--memory-swap", memorySwap];
 let token;
 // This fixture tests discovery and synthetic approvals, not an actual ChatGPT login.
 const oauthIssuer = "https://kgos-smoke.example.invalid";
@@ -76,6 +98,7 @@ async function assertImage() {
     "--rm",
     "--platform",
     "linux/amd64",
+    ...networkArgs,
     "--entrypoint",
     "/bin/sh",
     image,
@@ -109,6 +132,7 @@ async function initializeVolume() {
     "--rm",
     "--platform",
     "linux/amd64",
+    ...networkArgs,
     "-v",
     volume + ":/workspace",
     "--entrypoint",
@@ -125,6 +149,7 @@ async function initializeVolume() {
     "--rm",
     "--platform",
     "linux/amd64",
+    ...networkArgs,
     "-v",
     volume + ":/workspace",
     image,
@@ -137,6 +162,7 @@ async function initializeVolume() {
     "--rm",
     "--platform",
     "linux/amd64",
+    ...networkArgs,
     "-v",
     volume + ":/workspace",
     "--entrypoint",
@@ -148,20 +174,17 @@ async function initializeVolume() {
 }
 
 async function start() {
-  container = await docker(
-    "run",
-    "-d",
-    "--rm",
-    "--platform",
-    "linux/amd64",
-    "-p",
-    "127.0.0.1::3777",
-    "-v",
-    volume + ":/workspace",
-    image
-  );
-  const binding = await docker("port", container, "3777/tcp");
-  const port = binding.split("\n")[0]?.match(/:(\d+)$/)?.[1];
+  const args = ["run", "-d", "--rm", "--platform", "linux/amd64", ...networkArgs, ...resourceArgs];
+  if (networkMode === "bridge") args.push("-p", "127.0.0.1::3777");
+  args.push("-v", volume + ":/workspace", image);
+  if (networkMode === "host")
+    args.push("--root", "/workspace", "--host", "127.0.0.1", "--port", hostPort);
+  container = await docker(...args);
+  let port = hostPort;
+  if (networkMode === "bridge") {
+    const binding = await docker("port", container, "3777/tcp");
+    port = binding.split("\n")[0]?.match(/:(\d+)$/)?.[1];
+  }
   if (port === undefined) throw new Error("Docker MCP port was not published");
   const base = "http://127.0.0.1:" + port;
   token = JSON.parse(await docker("exec", container, "cat", "/workspace/.kgos/auth.json")).token;

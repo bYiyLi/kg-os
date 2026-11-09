@@ -192,14 +192,20 @@ func (service *Service) patchObjects(
 	); err != nil {
 		return PatchResult{}, err
 	}
-	if err := syncInternalGraph(ctx, transaction, plan); err != nil {
-		return PatchResult{}, err
-	}
-	if err := validateStagedInternalGraph(ctx, transaction, plan); err != nil {
-		return PatchResult{}, err
-	}
-	if err := validateStagedSnapshot(ctx, transaction, request.BaseState, plan); err != nil {
-		return PatchResult{}, err
+	if !noOp {
+		if err := syncInternalGraph(ctx, transaction, plan); err != nil {
+			return PatchResult{}, err
+		}
+		// The base snapshot is already decoded and validated before the transaction.
+		// A Knowledge-only Patch does not change Graph Type, Schema, or Internal
+		// Bindings, so re-reading and re-counting the complete Ontology here is
+		// redundant. Knowledge still receives its own staged read-back validation.
+		if err := validateStagedInternalGraph(ctx, transaction, plan); err != nil {
+			return PatchResult{}, err
+		}
+		if err := validateStagedSnapshot(ctx, transaction, request.BaseState, plan); err != nil {
+			return PatchResult{}, err
+		}
 	}
 	knowledgeResult, err = applyKnowledgePostSchema(ctx, transaction, knowledgePlan, knowledgeResult)
 	if err != nil {
