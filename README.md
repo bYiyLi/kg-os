@@ -35,7 +35,7 @@ KG OS 的 `kgosd`、Kernel、Lithograph Host 和原生 MCP 使用 Go；浏览器
 
 **当前实现**：KG OS 已采用 Go `kgosd` 单进程承载 Web、API 和五个 AI-facing MCP Tool（另有 app-only 工作区 Tool），并通过 `kgos_docs` 为 AI 提供 SDK/Cypher/操作指南。底层 Ontology、Knowledge/Graph、Evolution、认证和原生扩展能力的实现及验收，按[开发计划](docs/development/README.md)和各 Phase 文件核实。
 
-**当前交付**：新版本只面向 Linux amd64 Docker。当前源码的单一官方 Plugin 整合八个 Skill：本体设计、落地和审核，知识整理保存、审核和检索应用，以及 VLog、Doctor；具体清单与职责见 [MCP owner](docs/design/mcp.md#kgos-official-skills)。原三个统一规范 Skill 目录已退役。产品与 Plugin 版本字段已同步为 `0.3.19`，`v0.3.19` 已通过候选 CI、镜像和 Release 资产核验并正式发行。历史 Tag、发行包和安装快照保持原状，按各自冻结资源验收。用户的私人 Plugin 不随源码更新自动升级。
+**当前交付**：新版本只面向 Linux amd64 Docker。当前源码的单一官方 Plugin 整合八个 Skill：本体设计、落地和审核，知识整理保存、审核和检索应用，以及 VLog、Doctor；具体清单与职责见 [MCP owner](docs/design/mcp.md#kgos-official-skills)。原三个统一规范 Skill 目录已退役。产品、SDK、CLI、Web 与 Plugin 版本字段已统一为 `0.3.20`；正式发行状态以 `kg-releases` 中同版候选 CI、镜像和 Release 资产的实际验真为准。历史 Tag、发行包和安装快照保持原状，按各自冻结资源验收。用户的私人 Plugin 不随源码更新自动升级。
 
 私有 `kg-os` 维护源码，公开 [`kg-releases`](https://github.com/bYiyLi/kg-releases) 按获准发布版本分发运行时、单一官方 Plugin、同版 Skill 和安装手册。源码 Skill 不独立编号，分发副本沿用产品 Manifest 版本注入；是否正式发行、安装或验证，以实际结果为准。
 

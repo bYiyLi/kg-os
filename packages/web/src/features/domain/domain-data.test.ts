@@ -201,3 +201,45 @@ it("propagates read resource errors and aborts before reading more pages", async
     loadDomainTree(api, "branch/main" as ResolvedState, new AbortController().signal)
   ).rejects.toThrow();
 });
+
+it("rejects a non-object overview envelope before reading its fields", async () => {
+  const api = reader([]);
+  vi.mocked(api.ontology.read).mockResolvedValueOnce(null as unknown as OntologyReadResult);
+  await expect(load(api)).rejects.toThrow("Invalid Domain navigation response");
+  expect(api.object.read).not.toHaveBeenCalled();
+});
+
+it("accepts Relationship Definitions in the overview without treating them as Domains", async () => {
+  const relationship: Summary = {
+    kind: "relationship-definition",
+    ref: "relationship:WORKS_AT",
+    name: "WORKS_AT"
+  };
+  const api = reader([relationship]);
+  expect(await load(api)).toEqual({ state, nodes: new Map(), roots: [] });
+  expect(api.object.read).not.toHaveBeenCalled();
+});
+
+it("rejects an oversized overview page even when its declared total is consistent", async () => {
+  const api = reader([]);
+  const items = Array.from({ length: 101 }, (_, index) => summary(String(index)));
+  vi.mocked(api.ontology.read).mockResolvedValueOnce(overview(items, items.length));
+  await expect(load(api)).rejects.toThrow("Invalid Domain navigation response");
+  expect(api.object.read).not.toHaveBeenCalled();
+});
+
+it("rejects an empty Domain name when the identifying Ref is otherwise valid", async () => {
+  const api = reader([]);
+  vi.mocked(api.ontology.read).mockResolvedValueOnce(
+    overview([{ kind: "domain", ref: "domain:Empty", name: "" }])
+  );
+  await expect(load(api)).rejects.toThrow("Invalid Domain navigation response");
+  expect(api.object.read).not.toHaveBeenCalled();
+});
+
+it("rejects an overview whose items exceed the declared total", async () => {
+  const api = reader([]);
+  vi.mocked(api.ontology.read).mockResolvedValueOnce(overview([summary("A")], 0));
+  await expect(load(api)).rejects.toThrow("Invalid Domain navigation response");
+  expect(api.object.read).not.toHaveBeenCalled();
+});

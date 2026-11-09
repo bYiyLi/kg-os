@@ -107,3 +107,15 @@ it("clears attention when focus is absent and ignores self loops for distance", 
   expect(graphAttention(graph, "n:2").distances.get("n:2")).toBe(0);
   expect(readableNodeIds(graph, null).size).toBe(8);
 });
+
+it("ignores relationships whose endpoint is not in the loaded graph", () => {
+  const partial: GraphData = {
+    nodes: [node(1)],
+    relationships: [edge(99, 1, 404)],
+    limited: true
+  };
+  const attention = graphAttention(partial, "n:1");
+  expect(attention.active).toBe(true);
+  expect(attention.distances).toEqual(new Map([["n:1", 0]]));
+  expect(attention.nearEdges).toEqual(new Set());
+});
