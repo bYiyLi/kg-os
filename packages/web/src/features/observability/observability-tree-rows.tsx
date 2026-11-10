@@ -239,6 +239,10 @@ function StageRow({
   onSelect: () => void;
 }) {
   const span = node.span;
+  const call =
+    span.db_call_seq !== undefined && span.db_call_seq > 0
+      ? `#${String(span.db_call_seq)} · ${span.query_family ?? "other"}`
+      : undefined;
   return (
     <div
       className={"obs-tree-row obs-span-row" + (selected ? " is-selected" : "")}
@@ -270,6 +274,7 @@ function StageRow({
           └─
         </span>
         <strong>{span.name}</strong>
+        {call !== undefined && <small className="obs-call-family">{call}</small>}
       </button>
       <OutcomeBadge outcome={span.outcome} />
       <span className="obs-tree-duration">{duration(span.duration_ms)}</span>

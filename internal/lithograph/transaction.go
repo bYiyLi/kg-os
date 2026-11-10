@@ -19,16 +19,16 @@ type Transaction struct {
 	closed     bool
 }
 
+// Begin waits on SQLite's physical writer lock in short, context-aware slices.
+// A BUSY from the checkout or tx_begin boundary is safe to wait and re-attempt
+// on a NEW connection: no caller mutation has run and the failed connection is
+// discarded. Never replay Execute, Commit, or a result-unknown write.
 func (host *Host) Begin(ctx context.Context, options map[string]any) (*Transaction, error) {
 	operationCtx, done, err := host.operationContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer done()
-	connection, err := host.acquireWriteConnection(operationCtx)
-	if err != nil {
-		return nil, err
-	}
 	effectiveOptions := make(map[string]any, len(options)+1)
 	for key, value := range options {
 		effectiveOptions[key] = value
@@ -38,17 +38,60 @@ func (host *Host) Begin(ctx context.Context, options map[string]any) (*Transacti
 	}
 	optionsJSON, err := marshalObject(effectiveOptions)
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("encode transaction options: %w", err), releaseWriteConnection(connection))
+		return nil, fmt.Errorf("encode transaction options: %w", err)
 	}
-	if _, err := scalarJSON(operationCtx, connection, "SELECT lithograph_tx_begin(?)", optionsJSON); err != nil {
-		discardConnection(connection)
-		return nil, fmt.Errorf("begin Lithograph transaction: %w", err)
+	const maxBeginWait = 15 * time.Second
+	until := time.Now().Add(maxBeginWait)
+	for {
+		if err := operationCtx.Err(); err != nil {
+			return nil, err
+		}
+		connection, err := host.acquireWriteConnectionForBegin(operationCtx)
+		if err == nil {
+			if _, err = scalarJSON(operationCtx, connection, "SELECT lithograph_tx_begin(?)", optionsJSON); err != nil {
+				discardConnection(connection)
+				err = fmt.Errorf("begin Lithograph transaction: %w", err)
+			} else {
+				// Subsequent statements may need the full write budget. The
+				// temporary 250ms begin busy handler must not leak into the pool.
+				if _, restoreErr := connection.ExecContext(operationCtx, "PRAGMA busy_timeout = 15000"); restoreErr != nil {
+					discardConnection(connection)
+					return nil, fmt.Errorf("restore write busy timeout after begin: %w", normalizeDatabaseError(restoreErr))
+				}
+				if err := operationCtx.Err(); err != nil {
+					// Begin may have finished exactly as the client timed out.
+					// Never hand an already-canceled transaction to the caller.
+					discardConnection(connection)
+					return nil, err
+				}
+				transaction := &Transaction{host: host, connection: connection}
+				if registerErr := host.registerTransaction(transaction); registerErr != nil {
+					return nil, errors.Join(registerErr, transaction.Close())
+				}
+				return transaction, nil
+			}
+		}
+		if canceled := operationCtx.Err(); canceled != nil {
+			return nil, canceled
+		}
+		category, _, _, typed := ErrorDetails(err)
+		if !typed || category != CategoryBusy || !time.Now().Before(until) {
+			return nil, err
+		}
+		// This is a lock wait, NOT an application-mutation retry.
+		remaining := time.Until(until)
+		delay := 50 * time.Millisecond
+		if remaining < delay {
+			delay = remaining
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-operationCtx.Done():
+			timer.Stop()
+			return nil, operationCtx.Err()
+		case <-timer.C:
+		}
 	}
-	transaction := &Transaction{host: host, connection: connection}
-	if err := host.registerTransaction(transaction); err != nil {
-		return nil, errors.Join(err, transaction.Close())
-	}
-	return transaction, nil
 }
 
 func (transaction *Transaction) Execute(

@@ -177,13 +177,65 @@ func StreamResult(ctx context.Context) (string, string) {
 // intentionally narrow: successful static/health/polling traffic stays quiet.
 func requiredDiagnosticEvent(event string) bool {
 	switch event {
-	case "http.request.finished", "mcp.tool.finished", "business.operation.finished",
+	case "http.request.finished", "mcp.tool.started", "mcp.tool.finished",
+		"business.operation.started", "business.operation.stage", "business.operation.finished",
 		"security.authorization.decided", "runtime.starting", "runtime.started",
 		"runtime.stopped", "runtime.initialized", "runtime.init.failed",
 		"runtime.serve.failed", "runtime.open.failed", "runtime.close.failed":
 		return true
 	}
 	return false
+}
+
+// Tool names are supplied by registered handlers, not by MCP arguments.
+func safeToolName(name string) string {
+	switch name {
+	case "kgos_docs", "kgos_query", "kgos_mutate", "kgos_ontology_overview",
+		"kgos_commit_ancestry", "kgos_workspace":
+		return name
+	}
+	return ""
+}
+
+// BusinessStarted records entry before any Patch parsing or side effects.
+func BusinessStarted(ctx context.Context, operation string) {
+	o := FromContext(ctx)
+	if o == nil || o.store == nil {
+		return
+	}
+	if operation != "object.patch" && operation != "ontology.patch" {
+		return
+	}
+	o.Log(ctx, slog.LevelInfo, "kernel", "business.operation.started",
+		slog.String("operation", operation), slog.String("surface", Surface(ctx)))
+	o.store.EmergencyStart(o.runID, RequestID(ctx), OperationID(ctx), trustedTool(ctx), operation)
+}
+
+// BusinessStage accepts only a closed list of real execution checkpoints.
+func BusinessStage(ctx context.Context, stage string, baseState string, nodeCount, relationshipCount int) {
+	o := FromContext(ctx)
+	if o == nil || o.store == nil {
+		return
+	}
+	switch stage {
+	case "base_read", "parse_plan", "tx_begin", "pre_schema", "staged_safety",
+		"post_schema_nodes", "post_schema_relationships", "read_back", "commit":
+	default:
+		return
+	}
+	attrs := []slog.Attr{slog.String("stage", stage)}
+	if statePattern.MatchString(baseState) {
+		attrs = append(attrs, slog.String("base_state", baseState))
+	}
+	if stage == "parse_plan" {
+		if nodeCount >= 0 && nodeCount <= 1000000 {
+			attrs = append(attrs, slog.Int("node_count", nodeCount))
+		}
+		if relationshipCount >= 0 && relationshipCount <= 1000000 {
+			attrs = append(attrs, slog.Int("relationship_count", relationshipCount))
+		}
+	}
+	o.Log(ctx, slog.LevelInfo, "kernel", "business.operation.stage", attrs...)
 }
 
 func (o *Observer) Log(ctx context.Context, level slog.Level, component, event string, fields ...slog.Attr) {
@@ -314,6 +366,19 @@ func (o *Observer) ToolStart() {
 	o.mcp.InFlight++
 	o.mu.Unlock()
 }
+func (o *Observer) ToolStarted(ctx context.Context, name string) {
+	o.ToolStart()
+	name = safeToolName(name)
+	if o == nil || o.store == nil || name == "" {
+		return
+	}
+	traceID, _ := activeSpanID(ctx)
+	o.store.ToolStart(requestRecord{
+		Time: time.Now(), RunID: o.runID, RequestID: RequestID(ctx),
+		TraceID: traceID, Tool: name,
+	})
+	o.Log(ctx, slog.LevelInfo, "mcp", "mcp.tool.started", slog.String("tool", name))
+}
 func (o *Observer) Tool(ctx context.Context, name, code string, elapsed time.Duration) {
 	if o == nil {
 		return
@@ -332,8 +397,10 @@ func (o *Observer) Tool(ctx context.Context, name, code string, elapsed time.Dur
 	o.Log(ctx, level, "mcp", "mcp.tool.finished", fields...)
 	SpanOutcome(trace.SpanFromContext(ctx), outcome)
 	if o.store != nil {
+		traceID, _ := activeSpanID(ctx)
 		o.store.ToolEnd(requestRecord{
-			RequestID: RequestID(ctx), Tool: name, Outcome: outcome, ErrorCode: code,
+			Time: time.Now(), RunID: o.runID, TraceID: traceID,
+			RequestID: RequestID(ctx), Tool: safeToolName(name), Outcome: outcome, ErrorCode: code,
 		})
 	}
 	o.mu.Lock()

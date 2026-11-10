@@ -68,6 +68,27 @@ func TestPublicErrorMappingCoverage(t *testing.T) {
 			}
 		})
 	}
+	for _, test := range []struct {
+		category lithograph.ErrorCategory
+		message  string
+	}{
+		{lithograph.CategoryBusy, "database is temporarily busy"},
+		{lithograph.CategoryStorage, "database storage operation failed"},
+	} {
+		t.Run(string(test.category)+"_safe_public_mapping", func(t *testing.T) {
+			raw := &lithograph.DatabaseError{
+				Category: test.category, Message: "private tenant path or credential", SQLiteCode: 5,
+			}
+			err := fmt.Errorf("wrapped database error: %w", raw)
+			got := AsPublicError(err)
+			if got.Code != CodeIO || got.Message != test.message || !errors.Is(got, err) {
+				t.Fatalf("unsafe or incorrect database failure mapping: %+v", got)
+			}
+			if strings.Contains(got.Error(), "private tenant") {
+				t.Fatalf("database operational error leaked raw details: %q", got.Error())
+			}
+		})
+	}
 	unknown := errors.New("plain internal error")
 	if got := AsPublicError(unknown); got.Code != CodeInternal || got.Message != "internal KG OS error" {
 		t.Fatalf("unknown map = %#v", got)

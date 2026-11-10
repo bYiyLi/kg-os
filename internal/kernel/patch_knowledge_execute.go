@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bYiyLi/kg-os/internal/lithograph"
+	"github.com/bYiyLi/kg-os/internal/observability"
 )
 
 type knowledgeExecutionResult struct {
@@ -162,6 +163,7 @@ func applyKnowledgePostSchema(
 	mutations := sortedKnowledgeMutations(plan.Mutations)
 
 	// New nodes must exist before any relationship endpoint aliases are resolved.
+	observability.BusinessStage(ctx, "post_schema_nodes", "", -1, -1)
 	for _, mutation := range mutations {
 		if mutation.Kind != KindKnowledgeNode || mutation.Operation != patchAdd {
 			continue
@@ -177,6 +179,7 @@ func applyKnowledgePostSchema(
 		})
 	}
 
+	observability.BusinessStage(ctx, "post_schema_relationships", "", -1, -1)
 	for _, mutation := range mutations {
 		if mutation.Kind != KindKnowledgeRelationship ||
 			(mutation.Operation != patchAdd && mutation.Operation != patchUpdate) {
@@ -317,7 +320,7 @@ func createKnowledgeNode(
 		cypher = "CREATE (n:$($label)) SET n = $properties RETURN elementId(n) AS id"
 		params["label"] = node.Labels[0]
 	}
-	result, err := transaction.Execute(ctx, cypher, params, nil)
+	result, err := transaction.Execute(observability.WithQueryFamily(ctx, "knowledge.node.create"), cypher, params, nil)
 	if err != nil {
 		return "", AsPublicError(err)
 	}
@@ -376,8 +379,9 @@ func createKnowledgeRelationship(
 	relationship *KnowledgeRelationship,
 ) (string, error) {
 	result, err := transaction.Execute(
-		ctx,
-		"MATCH (a), (b) WHERE elementId(a) = $start AND elementId(b) = $end "+
+		observability.WithQueryFamily(ctx, "knowledge.relationship.create"),
+		"MATCH (a) WHERE elementId(a) = $start "+
+			"MATCH (b) WHERE elementId(b) = $end "+
 			"CREATE (a)-[r:$($type)]->(b) SET r = $properties RETURN elementId(r) AS id",
 		map[string]any{
 			"start": relationship.Start, "end": relationship.End, "type": relationship.Type,

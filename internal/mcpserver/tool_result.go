@@ -118,9 +118,9 @@ func toolResult(value any, err error) (*mcp.CallToolResult, error) {
 	return result, nil
 }
 
-func (s *Server) beginTool(ctx context.Context) time.Time {
+func (s *Server) beginTool(ctx context.Context, name string) time.Time {
 	if observer := observability.FromContext(ctx); observer != nil {
-		observer.ToolStart()
+		observer.ToolStarted(ctx, name)
 	}
 	return time.Now()
 }

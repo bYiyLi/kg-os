@@ -14,35 +14,42 @@ import (
 func (service *Service) PatchOntology(ctx context.Context, request PatchRequest) (observed PatchResult, loggedErr error) {
 	ctx, span := observability.StartOperation(ctx, "kernel.ontology.patch")
 	defer span.End()
+	observability.BusinessStarted(ctx, "ontology.patch")
 	started := time.Now()
+	writeAttempted := false
 	defer func() {
 		outcome := "committed"
 		if loggedErr == nil && observed.State == request.BaseState {
 			outcome = "no_change"
 		}
-		recordBusinessResult(ctx, "ontology.patch", outcome, observed.State, len(observed.Created)+len(observed.Transitions), started, loggedErr)
+		recordBusinessResultWithRejectionEvidence(ctx, "ontology.patch", outcome, observed.State,
+			len(observed.Created)+len(observed.Transitions), started, loggedErr, !writeAttempted)
 	}()
-	return service.patchObjects(ctx, request, true)
+	return service.patchObjects(ctx, request, true, &writeAttempted)
 }
 
 func (service *Service) PatchObjects(ctx context.Context, request PatchRequest) (observed PatchResult, loggedErr error) {
 	ctx, span := observability.StartOperation(ctx, "kernel.object.patch")
 	defer span.End()
+	observability.BusinessStarted(ctx, "object.patch")
 	started := time.Now()
+	writeAttempted := false
 	defer func() {
 		outcome := "committed"
 		if loggedErr == nil && observed.State == request.BaseState {
 			outcome = "no_change"
 		}
-		recordBusinessResult(ctx, "object.patch", outcome, observed.State, len(observed.Created)+len(observed.Transitions), started, loggedErr)
+		recordBusinessResultWithRejectionEvidence(ctx, "object.patch", outcome, observed.State,
+			len(observed.Created)+len(observed.Transitions), started, loggedErr, !writeAttempted)
 	}()
-	return service.patchObjects(ctx, request, false)
+	return service.patchObjects(ctx, request, false, &writeAttempted)
 }
 
 func (service *Service) patchObjects(
 	ctx context.Context,
 	request PatchRequest,
 	ontologyOnly bool,
+	writeAttempted *bool,
 ) (PatchResult, error) {
 	if err := validateResolvedState(request.BaseState); err != nil {
 		return PatchResult{}, err
@@ -64,6 +71,7 @@ func (service *Service) patchObjects(
 	if currentHead != request.BaseState {
 		return PatchResult{}, publicError(CodeStaleBaseState, "target branch head no longer matches baseState", nil)
 	}
+	observability.BusinessStage(ctx, "base_read", request.BaseState, -1, -1)
 	document, err := parseGitPatch(request.Patch)
 	if err != nil {
 		return PatchResult{}, err
@@ -89,6 +97,18 @@ func (service *Service) patchObjects(
 			return PatchResult{}, err
 		}
 	}
+	nodeCount, relationshipCount := 0, 0
+	if knowledgePlan != nil {
+		for _, mutation := range knowledgePlan.Mutations {
+			switch mutation.Kind {
+			case KindKnowledgeNode:
+				nodeCount++
+			case KindKnowledgeRelationship:
+				relationshipCount++
+			}
+		}
+	}
+	observability.BusinessStage(ctx, "parse_plan", "", nodeCount, relationshipCount)
 	noOp, err := plan.isNoOp()
 	if err != nil {
 		return PatchResult{}, err
@@ -137,6 +157,11 @@ func (service *Service) patchObjects(
 	if request.Message != nil {
 		options["message"] = *request.Message
 	}
+	// Until the transaction boundary, preflight rejection cannot have
+	// published any graph mutation. Past this point an error may have an
+	// unknown durable outcome; never infer rollback from a failed call.
+	*writeAttempted = true
+	observability.BusinessStage(ctx, "tx_begin", "", -1, -1)
 	transaction, err := service.database.Begin(ctx, options)
 	if err != nil {
 		return PatchResult{}, AsPublicError(err)
@@ -148,6 +173,7 @@ func (service *Service) patchObjects(
 		}
 	}()
 
+	observability.BusinessStage(ctx, "pre_schema", "", -1, -1)
 	if err := dropChangedIndexes(ctx, transaction, baseIndexes, targetIndexes); err != nil {
 		return PatchResult{}, err
 	}
@@ -157,6 +183,7 @@ func (service *Service) patchObjects(
 	if err := applyKnowledgePreSchema(ctx, transaction, knowledgePlan); err != nil {
 		return PatchResult{}, err
 	}
+	observability.BusinessStage(ctx, "staged_safety", "", -1, -1)
 	if err := service.validateStagedDataSafety(ctx, transaction, plan); err != nil {
 		return PatchResult{}, err
 	}
@@ -168,7 +195,7 @@ func (service *Service) patchObjects(
 		return PatchResult{}, err
 	}
 	if baseGraphType != targetGraphType {
-		if _, err := transaction.Execute(ctx, "ALTER CURRENT GRAPH TYPE SET "+targetGraphType, nil, nil); err != nil {
+		if _, err := transaction.Execute(observability.WithQueryFamily(ctx, "schema.change"), "ALTER CURRENT GRAPH TYPE SET "+targetGraphType, nil, nil); err != nil {
 			return PatchResult{}, AsPublicError(err)
 		}
 	}
@@ -211,10 +238,12 @@ func (service *Service) patchObjects(
 	if err != nil {
 		return PatchResult{}, err
 	}
+	observability.BusinessStage(ctx, "read_back", "", -1, -1)
 	if err := validateStagedKnowledge(ctx, transaction, knowledgePlan, knowledgeResult); err != nil {
 		return PatchResult{}, err
 	}
 
+	observability.BusinessStage(ctx, "commit", "", -1, -1)
 	rawCommit, err := transaction.Commit(ctx)
 	if err != nil {
 		return PatchResult{}, AsPublicError(err)

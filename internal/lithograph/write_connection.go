@@ -24,6 +24,26 @@ func (host *Host) acquireWriteConnection(ctx context.Context) (*sql.Conn, error)
 	return connection, nil
 }
 
+// acquireWriteConnectionForBegin bounds each SQLite busy-handler slice so
+// a canceled request does not remain blocked for the full 15s write budget.
+// On any failed checkout the connection is discarded, never returned to the
+// pool with a temporary per-connection busy_timeout.
+func (host *Host) acquireWriteConnectionForBegin(ctx context.Context) (*sql.Conn, error) {
+	connection, err := host.acquire(ctx, host.writeDB)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := connection.ExecContext(ctx, "PRAGMA busy_timeout = 250"); err != nil {
+		discardConnection(connection)
+		return nil, fmt.Errorf("set short begin lock wait: %w", normalizeDatabaseError(err))
+	}
+	if err := checkoutReusableMain(ctx, connection); err != nil {
+		discardConnection(connection)
+		return nil, fmt.Errorf("establish write connection baseline: %w", err)
+	}
+	return connection, nil
+}
+
 // releaseWriteConnection never returns an unverified connection to the pool.
 // Cleanup is independent of the request context, which may have been canceled
 // by a disconnected client or an incomplete stream.

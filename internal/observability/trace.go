@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"regexp"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -13,6 +14,9 @@ import (
 )
 
 type operationKeyType struct{}
+type dbCallSequenceKey struct{}
+type queryFamilyKey struct{}
+type toolNameKey struct{}
 
 var safeTraceName = regexp.MustCompile(`^[a-z][a-z0-9_.]{0,63}$`)
 
@@ -35,6 +39,17 @@ func StartSpan(ctx context.Context, name string) (context.Context, trace.Span) {
 	if id := OperationID(ctx); id != "" {
 		attrs = append(attrs, attribute.String("kgos.operation_id", id))
 	}
+	switch name {
+	case "lithograph.execute", "lithograph.stream", "lithograph.commit", "lithograph.begin":
+		if counter, ok := ctx.Value(dbCallSequenceKey{}).(*atomic.Uint64); ok {
+			attrs = append(attrs, attribute.Int64("kgos.db_call_seq", int64(counter.Add(1))))
+		}
+		family, _ := ctx.Value(queryFamilyKey{}).(string)
+		if family == "" {
+			family = "other"
+		}
+		attrs = append(attrs, attribute.String("kgos.query_family", family))
+	}
 	return observer.tracer.Start(ctx, name, trace.WithAttributes(attrs...))
 }
 
@@ -49,7 +64,32 @@ func StartOperation(ctx context.Context, name string) (context.Context, trace.Sp
 		return ctx, trace.SpanFromContext(context.Background())
 	}
 	ctx = context.WithValue(ctx, operationKeyType{}, id)
+	ctx = context.WithValue(ctx, dbCallSequenceKey{}, &atomic.Uint64{})
 	return StartSpan(ctx, name)
+}
+
+// These are internal, trusted call-site categories. No query text is parsed
+// or recorded, and a caller-provided arbitrary category is never persisted.
+func WithQueryFamily(ctx context.Context, family string) context.Context {
+	switch family {
+	case "knowledge.node.create", "knowledge.relationship.create", "schema.change":
+		return context.WithValue(ctx, queryFamilyKey{}, family)
+	default:
+		return ctx
+	}
+}
+
+func WithTool(ctx context.Context, name string) context.Context {
+	name = safeToolName(name)
+	if name == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, toolNameKey{}, name)
+}
+
+func trustedTool(ctx context.Context) string {
+	name, _ := ctx.Value(toolNameKey{}).(string)
+	return name
 }
 
 func OperationID(ctx context.Context) string {
@@ -154,7 +194,27 @@ func (p *spanStartProcessor) OnStart(parent context.Context, span sdktrace.ReadW
 		TraceID: sc.TraceID().String(), SpanID: sc.SpanID().String(), ParentSpanID: parentID,
 		RequestID: requestID, OperationID: operationID,
 		Name: safeSpanName(span.Name()), Start: span.StartTime(),
+		QueryFamily: spanQueryFamily(span.Attributes()),
+		DBCallSeq:   spanCallSeq(span.Attributes()),
 	})
+}
+
+func spanQueryFamily(attrs []attribute.KeyValue) string {
+	for _, attr := range attrs {
+		if attr.Key == "kgos.query_family" && attr.Value.Type() == attribute.STRING {
+			return attr.Value.AsString()
+		}
+	}
+	return ""
+}
+
+func spanCallSeq(attrs []attribute.KeyValue) int64 {
+	for _, attr := range attrs {
+		if attr.Key == "kgos.db_call_seq" && attr.Value.Type() == attribute.INT64 {
+			return attr.Value.AsInt64()
+		}
+	}
+	return 0
 }
 
 func (p *spanStartProcessor) OnEnd(sdktrace.ReadOnlySpan)      {}
@@ -181,7 +241,9 @@ func (e *sqliteSpanExporter) ExportSpans(ctx context.Context, spans []sdktrace.R
 		rec := spanRecord{
 			TraceID: sc.TraceID().String(), SpanID: sc.SpanID().String(), ParentSpanID: parentID,
 			Name: safeSpanName(span.Name()), Start: span.StartTime(), End: span.EndTime(),
-			Outcome: "unknown",
+			Outcome:     "unknown",
+			QueryFamily: spanQueryFamily(span.Attributes()),
+			DBCallSeq:   spanCallSeq(span.Attributes()),
 		}
 		for _, attr := range span.Attributes() {
 			if attr.Value.Type() != attribute.STRING {
@@ -254,13 +316,30 @@ func (h *storeHandler) Handle(ctx context.Context, rec slog.Record) error {
 			case "api", "web", "mcp", "internal":
 				fields["surface"] = attr.Value.String()
 			}
-		case "route", "method", "tool", "operation", "outcome", "error_code", "cause_class", "stage", "auth_kind", "decision", "target_kind", "result_state":
+		case "tool":
+			if name := safeToolName(attr.Value.String()); name != "" {
+				fields["tool"] = name
+			}
+		case "stage":
+			if item.Event != "business.operation.stage" || safePatchStage(attr.Value.String()) {
+				if len(attr.Value.String()) <= 160 {
+					fields["stage"] = attr.Value.String()
+				}
+			}
+		case "base_state":
+			if item.Event == "business.operation.stage" && statePattern.MatchString(attr.Value.String()) {
+				fields["base_state"] = attr.Value.String()
+			}
+		case "route", "method", "operation", "outcome", "error_code", "cause_class", "auth_kind", "decision", "target_kind", "result_state":
 			if len(attr.Value.String()) <= 160 {
 				fields[attr.Key] = attr.Value.String()
 			}
-		case "duration_ms", "status", "affected_count":
+		case "duration_ms", "status", "affected_count", "node_count", "relationship_count":
 			if attr.Value.Kind() == slog.KindInt64 {
-				fields[attr.Key] = attr.Value.Int64()
+				if attr.Key != "node_count" && attr.Key != "relationship_count" ||
+					item.Event == "business.operation.stage" && attr.Value.Int64() >= 0 && attr.Value.Int64() <= 1000000 {
+					fields[attr.Key] = attr.Value.Int64()
+				}
 			}
 		}
 	}

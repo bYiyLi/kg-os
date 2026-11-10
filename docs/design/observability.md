@@ -4,7 +4,7 @@
 
 本文是 KG OS **日志、关键业务事件、请求关联、运行指标及诊断存储/查询**的唯一设计真源。适用范围是单进程 Go `kgosd`、Kernel、HTTP API、Web 认证、OAuth、MCP 与 Sandbox，以及 TypeScript SDK/CLI 的必要诊断适配。历史基线见 [D97](decisions.md#d97-kgos-observability) 和已完成的 [Phase 19](../development/phases/19-observability.md)；新的目标合同由 [D126](decisions.md#d126-sqlite-observability-workbench) 决定，交付与验收归 [Phase 35](../development/phases/35-observability-workbench.md)。
 
-**历史 Phase 19 基线**：`slog` JSON Lines、Request ID、业务事件、进程内 Metrics 和只读摘要，曾通过轮转文件或 Docker stderr 输出。**Phase 35 当前本地未提交实现**：已接入 OpenTelemetry Go Trace SDK、独立 SQLite 诊断数据、受保护 API 和 Web 排障页面，并取消常规 JSONL 双写；最终 Linux Docker/公开 CI 尚未完成验收，不能视为已发布或部署。历史 Phase 19 的实施/验收记录不随新目标追改。
+**历史 Phase 19 基线**：slog JSON Lines、Request ID、业务事件、进程内 Metrics 和只读摘要，曾通过轮转文件或 Docker stderr 输出。**Phase 35 的已实现代码**：当前仓库已包含 OpenTelemetry Go Trace SDK、独立 SQLite 诊断数据、受保护 API 和 Web 排障页面，并取消常规 JSONL 双写；其独立的完整验收与完成状态仍以 [Phase 35](../development/phases/35-observability-workbench.md) 的实际门禁证据为准，不能因为代码已在工作树或发行 Tag 中就自动认定该 Phase 全部验收闭合。历史 Phase 19 的实施/验收记录不随新目标追改。
 
 ## 目标与边界
 
@@ -35,7 +35,7 @@ HTTP 汇总排除已知的 Docker 健康探测（`GET /mcp` 返回预期 401）�
 
 - `kgosd` 继续用 `slog` 产生带安全字段的结构化事件，规范时间为 UTC RFC 3339（实际存储可用等价的精确时间戳），字段名和枚举值固定英文；Phase 35 的正式持久化目标是 SQLite 表，**不再额外生成完整 JSON Lines 文件**。下面的 JSON 对象仅示意事件的逻辑字段，不意味着新版本仍采用 JSONL 持久化。
 - `KGOS_LOG_LEVEL` 可选，`DEBUG|INFO|WARN|ERROR`（大小写不敏感），默认 `INFO`；无效非空值在启动时明确拒绝；从进程环境读取，修改后需重启 daemon，**不属于初始化后不可变的 `config.toml`**。它控制可选日志详细程度，**不关闭**请求根、必要阶段、关键业务结果与指标聚合；不新增日志格式、输出目录、采样率或业务事件开关配置。
-- 关键 `http.request.finished`、`mcp.tool.finished`、`business.operation.finished`、`security.authorization.decided` 和 Runtime 启停/故障事件在已启用诊断存储时**不受 INFO 过滤**；进入独立的有界优先队列，普通 INFO/DEBUG 与指标不得抢占其槽位。优先事件仍为尽力交付，队列饱和或诊断库失效时可能丢失，必须统计缺口，不能承诺审计级不丢失。
+- 关键 `http.request.finished`、`mcp.tool.started`、`mcp.tool.finished`、`business.operation.started`、`business.operation.stage`、`business.operation.finished`、`security.authorization.decided` 和 Runtime 启停/故障事件在已启用诊断存储时**不受 INFO 过滤**；复用现有有界关键事件通道，普通 INFO/DEBUG 与指标不得抢占其槽位。同一容量内以已确认的 finished/业务结果优先，其次为 started，阶段进度最低；阶段可按 Operation 合并为最近一次，压力下先丢弃旧阶段并报告真实 dropped/coverage，不能因阶段日志挤掉已确认的业务结果。即使关键事件也为尽力交付，不承诺审计级不丢失。
 - INFO：启动/停止、完成的关键操作；WARN：安全拒绝、限流、超时、结果未知；ERROR：内部故障；DEBUG：经字段白名单筛选的执行阶段。业务参数无效等预期拒绝可以记 INFO，不把每个用户输入错误当作系统故障。
 - 公共字段：`time`、`level`、`component`、`event`、`run_id`；请求内可附 `request_id`、`operation_id`；在有效 OpenTelemetry Span Context 下可附 `trace_id`、`span_id`、`parent_span_id`；操作完成可附 `duration_ms`、`outcome`、`error_code`。缺省字段省略，不填造假的值或 `null`。
 - `run_id` 每次 `kgosd` 启动生成新的随机非凭证标识，仅用于跨重启分组；`request_id` 与 `operation_id` 的规则见下节。时间和 duration 使用真实测量结果，不使用 HTTP 200 推定业务成功。
@@ -112,19 +112,44 @@ HTTP 访问事件中的 `operation` 是**已注册静态 API/OAuth 路由的固�
 
 MCP Tool 的 code=ok 才是业务成功，isError=false 或 HTTP 200 不能替代此判断。统一入口对成功、参数拒绝、内部异常、panic、超时各记录一次真实终态并释放 in-flight；此前已确认的 Kernel 写入事件不受后续脚本错误覆盖。OAuth 刷新、幂等重试、重放拒绝和撤销只记录现有 Request ID、固定 operation/outcome/error_code 或静态 cause_class；不记录 Token、Code、assertion、客户端任意文本或原始 panic/堆栈。认证后端暂时不可用记作服务故障，不能伪装凭证无效或永久撤销；失败日志不改变事务结果，也不触发写入重放。
 
+<a id="patch-stage-diagnostics"></a>
+
+### Patch 与 Lithograph 执行阶段可恢复诊断（Phase 38 新目标）
+
+2026-11-09 生产写入故障显示现有链路虽有 Request/Trace/Operation ID 和开始 Span，进程 OOM 后 Tool、Kernel、底层执行均只有 incomplete；同一次请求的持久 requests 行到终态才填写 Tool 身份，造成最需要追查的请求显示为 tool 空值。现有成功/失败完成日志不会在 SIGKILL 时运行。此处增加**有限、可定位的开始事实及阶段线索**，而不是为每条 Row、每个对象或每条 Cypher 增加一条日志；遵守本文件安全白名单、低优先级保护和已有单写入诊断存储设计。实现计划见 [Phase 38](../development/phases/38-relationship-write-diagnostics.md)，不将本文视为已落地。
+
+| 实际事件/阶段 | 记录时机与最小安全字段 | 异常中断时应保留的边界 |
+| --- | --- | --- |
+| mcp.tool.started | Tool 名称在注册入口已确定时立即绑定可信 request_id/trace_id，记录 run_id、Tool 固定名和 started_at，不依赖完成回调才填充；参数解析失败也可关联该 Tool | 若开始记录已入 SQLite、无完成记录，显示该 Tool 与 incomplete，不虚构错误 code |
+| business.operation.started | Kernel object.patch / ontology.patch 的 operation_id 产生时记录固定 operation、run_id、已知 request_id/trace_id 和开始时间；**不预先记录尚未校验的 baseState，也不在 Patch 解析前猜声明项数** | 只证明进入该操作，不代表通过校验、开始写入或已提交 |
+| business.operation.stage | 只在阶段变化时记录固定枚举：base_read、parse_plan、tx_begin、pre_schema、staged_safety、post_schema_nodes、post_schema_relationships、read_back、commit；baseState 只有核验为已观察 Commit 后才可附加，Patch 中各对象 kind 数量只有 parse_plan 实际成功后才可附加；按代码真实阶段校准 | 留存最后已观察到的 stage 及时间；它是最近证据，不等于崩溃语句或唯一根因 |
+| lithograph.operation.started / finished | 复用现有数据库执行 OTel Span 的 OnStart/OnEnd，不新增每条 SQL 的重复 slog；由可信调用点给已有 Span 附固定枚举 query_family（如 knowledge.node.create、knowledge.relationship.create、schema.change、other）和单次 Operation 内单调递增的 db_call_seq，可补安全 stage/cause_class、耗时及公共错误 code，绝不记录原始 SQL/Cypher/params | 能识别同一 Operation 的第几次调用和固定语句类别；未结束 Span 不能证明其就是 OOM 的内存分配源 |
+| business.operation.finished / mcp.tool.finished | 继续由拥有真实结果的层发布；transport error、业务 result 与 durable Commit 分开表达 | 只在实际完成时记录；缺失终态时保留 unknown/incomplete，待 State/History 验证 |
+
+要求：
+
+1. 开始事实属于现有 SQLite 单写入有界诊断管道。通过轻量 OnStart/安全事件投递，**不得同步等待写日志事务、强制 fsync 或在 Kernel 数据库写事务里插入诊断 I/O**。终态优先、开始事实其次，阶段可合并；低资源时允许丢失并暴露 dropped/coverage；正式验收须强制 SIGKILL 复现检查已持久化的开始/最近阶段，但不能承诺任意时刻断电都保留最后一条。
+2. 对请求根的 Tool、surface、阶段和关联字段应在得知时尽早**有界持久化**；后续可信终态可以完善记录，不能把最初值永远保留成 internal/空 Tool。一个 HTTP 请求中多个 Tool 仍只能按各自真实 Span/Operation 辨别，不能用时间接近推断归属；若单根字段只能容纳一个 Tool，保留首个可信值并以子 Tool 记录精确集合，避免后续覆盖错误上下文。
+3. 关键 started/phase 不能被 KGOS_LOG_LEVEL=WARN/ERROR 过滤，但普通成功、高频 read 与诊断轮询保持静默。每个写 Operation 只为有变化的有限阶段生成事件/Span，不为每次底层调用、执行循环或每行新增重复日志；复用既有 Span 记录单 Operation 内的 db_call_seq/query_family，类别仅来自固定调用点，不对外暴露用户内容；队列/事件大小、stdout/stderr 摘要速率、丢弃计数和性能增量必须在 1 GiB 下测试。
+4. **可从 Docker 直接排查**：SQLite 仍是唯一完整诊断数据源；对每次写 Operation 开始**至多一条**脱敏、限流的 stderr 摘要，另在诊断库异常、严重故障或高风险资源压力时补有限摘要，绝不把每个执行阶段或每条 Lithograph 调用镜像到 stderr。仅使用可信 run_id/request_id/operation_id/Tool/固定 stage、cause_class；经有界非阻塞输出通道，不能等待宿主日志管道或诊断落盘，丢弃必须按实际报告。stdout/CLI JSON 不变；突发 OOM 不保证最后一条落地。
+5. 资源诊断使用已有 metrics 的 Go heap、RSS、cgroup usage/limit、OOM 证据级别与真实采样时间；仅凭内部指标、Exit 137 或缺失 stop 事件都不能宣称已确认 OOM。可信宿主的 systemd/Docker OOM 事件可由操作人员按时间、容器和 run_id 关联作为外部证据，**不要求 kgosd 拥有 docker.sock、特权宿主采集器或把 Docker 事件写入 KGOS 业务数据库**。
+6. 诊断入口仍用受保护的 requests/get、logs/list 及有限 stderr 摘要按 Request ID/时间定位。请求详情和 Web 请求树应展示已确认 Tool、Operation、最后已持久化 stage 与已有 Span 的 db_call_seq/query_family；无终态标记 incomplete/unknown，区分未知请求、已淘汰、诊断库不可用及关联证据不足，不能根据相邻时间硬凑归属。不得打印原始 SQL、Patch、凭证、对象内容；诊断不触发补偿、盲目重试或新的 Commit。
+
+独立的 Lithograph 内部查询优化/执行内存归其数据库项目；KG OS 只记录 Host 侧安全阶段与资源证据，不自行解释底层 Cypher Planner 或建立第二套性能真源。事故的最小排查链路应能从请求时间 → Request/Trace → Tool → Operation → 最后阶段 → Lithograph 调用 → 宿主 OOM 证据 → Branch State/History 结果完整恢复；缺口必须明确标出而不能填猜测值。
+
 ## 输出、保留与应急通道（Phase 35 目标）
 
 | 运行方式 | 正式结构化持久化 | 独立应急出口 |
 | --- | --- | --- |
-| Docker `kgosd` | `<workspace>/.kgos/logs/observability.sqlite` | 仅启动、诊断库故障与其他关键应急信息写 stderr；`docker logs` 不再承诺包含完整请求日志 |
-| 手动前台 `kgosd` | 同一 Instance 私有 SQLite | 启动失败与诊断库不可用的安全摘要写 stderr；原有启动地址 stdout 合同不变 |
+| Docker `kgosd` | `<workspace>/.kgos/logs/observability.sqlite` | 启动、诊断存储故障及有限的写入开始/高风险阶段/严重异常安全摘要写 stderr；`docker logs` 不再承诺包含完整请求日志 |
+| 手动前台 `kgosd` | 同一 Instance 私有 SQLite | 启动失败、诊断库故障与受限写入/异常安全摘要写 stderr；原有启动地址 stdout 合同不变 |
 | 内部 CLI 自动启动 | 同一 Instance 私有 SQLite | 现有 `kgosd.startup.log` 仅用于早期启动诊断/启动地址交接，保持有限体积，不再长期保存完整业务日志 |
 
 `logs/` 目录模式 `0700`；SQLite 主文件及其 `-wal`、`-shm` 由 KG OS 管理为私有诊断文件，拒绝符号链接和目录越界目标，不能因升级降低既有文件安全边界。诊断库不属于 Knowledge Base、State、事务、OAuth/Web Session 或正式备份，损坏时只能在诊断边界**保留/隔离受损文件再有界重建**，失败则降级为仅当前进程摘要；不能删除、替换或回滚 `kgos.db`。
 
 新实现不再写入 `kgosd.log` / `kgosd.log.N`，也不同时输出一份完整 JSONL 到 stderr；旧版留下的日志文件仍是历史文件，**不自动删除、导入、再索引或视为新观测库的历史覆盖**。现有 Phase 19 的 10 MiB × 5 轮转规则只描述旧实现。容器日志由宿主负责应急输出的留存；容器内部无需为常规诊断重复落盘。
 
-诊断库初始化、写批或启动/退出失败的 stderr 只报告固定 `stage` 和 `cause_class`（如 `permission`、`busy`、`disk_full`、`corrupt`、`deadline_exceeded`），不拼接原始 SQLite/OS 错误文本。观测 API 正常轮询不写普通访问日志或请求树；只有自身服务端读取失败时才产生一次安全的 `observability.query.failed` 事件（含 Request ID 与固定操作/类别），不会递归读取失败数据库；此事件若因存储不可用而丢失，只能依赖有界 stderr 应急信息。
+诊断库初始化、写批或启动/退出失败的 stderr 只报告固定 `stage` 和 `cause_class`，可附已知可信 run_id/request_id/operation_id（如 `permission`、`busy`、`disk_full`、`corrupt`、`deadline_exceeded`），不拼接原始 SQLite/OS 错误文本，也不把诊断库自身异常误报为业务失败。观测 API 正常轮询不写普通访问日志或请求树；只有自身服务端读取失败时才产生一次安全的 `observability.query.failed` 事件（含 Request ID 与固定操作/类别），不会递归读取失败数据库；此事件若因存储不可用而丢失，只能依赖有界 stderr 应急信息。
 
 默认展示最近 24 小时，诊断数据库按**时间与容量双重限制**保留，容量工程初值为 64 MiB，需覆盖主库、WAL 及管理开销的监测与清理；不能把主文件大小单独当成物理上限。按批删除过期记录、控制写事务及读快照寿命、按需 checkpoint/回收空间。空间不足时主动停止接受可丢弃事件并暴露丢失/截断状态，不因维护而阻塞业务；实际覆盖不足 24 小时必须如实返回起止时间。
 

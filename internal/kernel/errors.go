@@ -125,6 +125,13 @@ func AsPublicError(err error) *PublicError {
 		return publicError(CodeResource, message, err)
 	case lithograph.CategoryIO:
 		return publicError(CodeIO, message, err)
+	case lithograph.CategoryBusy:
+		// These are typed operational failures, not unknown KG OS defects.
+		// Keep the underlying error for internal diagnostics without
+		// exposing database paths or other untrusted storage text.
+		return publicError(CodeIO, "database is temporarily busy", err)
+	case lithograph.CategoryStorage:
+		return publicError(CodeIO, "database storage operation failed", err)
 	case lithograph.CategoryBranchNotFound:
 		return publicError(CodeBranchNotFound, message, err)
 	case lithograph.CategoryTagNotFound:

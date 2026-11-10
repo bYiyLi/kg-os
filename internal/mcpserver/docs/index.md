@@ -21,7 +21,7 @@ Use known paths directly and reuse documents already read for the same connectio
 
 - `sdk/index.md` — all 31 allowed SDK JavaScript methods, access rights, requests and examples.
 - `sdk/types/index.md` — 76 public request/result and nested types.
-- `cypher/index.md` — KG OS Cypher 25 manual, Lithograph v0.3.4 / CY25-2026.08.
+- `cypher/index.md` — KG OS Cypher 25 manual, Lithograph v0.3.5 / CY25-2026.08.
 - `guides/index.md` — cross-method workflow index.
 
 Resolve the authorized instance/environment/scope before reading. `kgos_ontology_overview` builds all Branch models and messages, not a permission-filtered subset; use it only when that entire scope is allowed. Otherwise pin the known target with `evolution.get` and read `ontology.read` via `kgos_query`; see `guides/reading.md`.

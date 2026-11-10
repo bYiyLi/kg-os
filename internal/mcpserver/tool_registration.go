@@ -91,9 +91,10 @@ func (s *Server) registerTool(server *mcp.Server, tool *mcp.Tool, dataSchema any
 				}
 			}
 		}
+		ctx = observability.WithTool(ctx, tool.Name)
 		ctx, toolSpan := observability.StartSpan(ctx, "mcp.tool")
 		defer toolSpan.End()
-		started := s.beginTool(ctx)
+		started := s.beginTool(ctx, tool.Name)
 		var value any
 		var runErr error
 		dispatched := false

@@ -42,6 +42,7 @@
     "setup": "node scripts/setup.mjs",
     "test": "vitest run --config config/test/vitest.config.ts",
     "test:coverage": "vitest run --coverage --config config/test/vitest.config.ts",
+    "test:docker:phase38": "node scripts/mcp-phase38-stress.mjs",
     "test:docker:unified": "node scripts/mcp-unified-docker-smoke.mjs",
     "test:phase37:performance": "node scripts/mcp-phase37-performance.mjs",
     "test:e2e": "pnpm build && playwright test --config config/test/playwright.config.ts",

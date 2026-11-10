@@ -849,6 +849,23 @@
   color: var(--color-text);
   font-weight: 500;
 }
+.obs-call-family {
+  margin-left: 6px;
+  color: var(--obs-ink-soft);
+  font-size: 10px;
+}
+.obs-last-stage {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 6px 18px;
+  color: var(--obs-ink-soft);
+  font-size: 11px;
+}
+.obs-last-stage strong {
+  color: var(--color-text);
+}
 .obs-tree-duration {
   font-weight: 550;
   font-variant-numeric: tabular-nums;

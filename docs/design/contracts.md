@@ -18,6 +18,8 @@ KG OS adapter 的稳定 error envelope：
 
 MCP adapter 保留上述失败 code/message/details，但使用 [MCP 统一业务结果](mcp.md#mcp-对外健壮性合同)：成功 code=ok 并包含 data，失败包含 message/retryable；正常业务失败不设置 isError，文本与 structuredContent 表达同一 envelope。这不改变普通 HTTP API status、SDK exception 或 Kernel 公共错误类别。服务端请求到期为 TIMEOUT，客户端主动取消为 CANCELLED，脚本预算仍为 RESOURCE_ERROR；中断写入不能据此推定回滚或自动重试。
 
+底层已知的结构化 Lithograph `BUSY` / `STORAGE_ERROR` 在 KG OS Kernel 公共错误适配中归入**现有** `IO_ERROR`，使用固定安全提示，并保留原始类型和 cause 供内部排查；不能把已知数据库暂时繁忙或存储失败一概伪装为未知程序缺陷 `INTERNAL_ERROR`。不靠任意错误文案推断类别，也不为此创建新的公共 `BUSY` code。可能已进入写事务的 `kgos_mutate` 仍 `retryable=false`，须先核实真实 State/History，不允许自动重放。
+
 KG OS 自有稳定 code 至少包括：
 
 ```text

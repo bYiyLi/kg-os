@@ -23,6 +23,7 @@ const (
 	DefaultStoreBytes = 64 << 20
 	storeQueueSize    = 1024
 	storeCriticalSize = 2048
+	storeStageSize    = 256
 	storeBatchSize    = 64
 	storeRetention    = 24 * time.Hour
 )
@@ -70,6 +71,8 @@ type spanRecord struct {
 	Start        time.Time
 	End          time.Time
 	Outcome      string
+	QueryFamily  string
+	DBCallSeq    int64
 }
 
 type metricRecord struct {
@@ -97,6 +100,9 @@ type Store struct {
 	path           string
 	queue          chan storeEvent
 	critical       chan storeEvent
+	outcomes       chan storeEvent
+	stages         chan storeEvent
+	wake           chan struct{}
 	stop           chan struct{}
 	done           chan struct{}
 	stopping       atomic.Bool
@@ -106,8 +112,10 @@ type Store struct {
 	degraded       atomic.Bool
 	overBudget     atomic.Bool
 	emergency      io.Writer
+	emergencyQueue chan string
 	mu             sync.Mutex
 	lastError      time.Time
+	lastStart      time.Time
 }
 
 func OpenStore(dir string, emergency io.Writer) (*Store, error) {
@@ -198,7 +206,8 @@ func OpenStore(dir string, emergency io.Writer) (*Store, error) {
 			span_id TEXT PRIMARY KEY, trace_id TEXT NOT NULL, parent_span_id TEXT NOT NULL DEFAULT '',
 			request_id TEXT NOT NULL DEFAULT '', operation_id TEXT NOT NULL DEFAULT '',
 			name TEXT NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER,
-			duration_ms INTEGER, outcome TEXT NOT NULL DEFAULT 'incomplete')`,
+			duration_ms INTEGER, outcome TEXT NOT NULL DEFAULT 'incomplete',
+			query_family TEXT NOT NULL DEFAULT '', db_call_seq INTEGER NOT NULL DEFAULT 0)`,
 		"CREATE INDEX IF NOT EXISTS spans_request ON spans(request_id, started_at)",
 		"CREATE INDEX IF NOT EXISTS spans_parent ON spans(parent_span_id)",
 		"CREATE INDEX IF NOT EXISTS spans_incomplete ON spans(started_at) WHERE finished_at IS NULL",
@@ -228,6 +237,22 @@ func OpenStore(dir string, emergency io.Writer) (*Store, error) {
 			return nil, fmt.Errorf("initialize diagnostic schema: %w", err)
 		}
 	}
+	// Upgrade previously persisted diagnostic cache without discarding the
+	// unfinished spans needed for a restart investigation.
+	for _, column := range []struct{ name, ddl string }{
+		{"query_family", "ALTER TABLE spans ADD COLUMN query_family TEXT NOT NULL DEFAULT ''"},
+		{"db_call_seq", "ALTER TABLE spans ADD COLUMN db_call_seq INTEGER NOT NULL DEFAULT 0"},
+	} {
+		var found string
+		err := db.QueryRowContext(ctx, "SELECT name FROM pragma_table_info('spans') WHERE name=?", column.name).Scan(&found)
+		if errors.Is(err, sql.ErrNoRows) {
+			_, err = db.ExecContext(ctx, column.ddl)
+		}
+		if err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("migrate diagnostic span schema: %w", err)
+		}
+	}
 	for _, name := range []string{"observability.sqlite-wal", "observability.sqlite-shm"} {
 		if fi, err := root.Lstat(name); err == nil && fi.Mode().IsRegular() {
 			_ = os.Chmod(filepath.Join(dir, name), 0o600)
@@ -237,7 +262,14 @@ func OpenStore(dir string, emergency io.Writer) (*Store, error) {
 		db: db, path: path,
 		queue:    make(chan storeEvent, storeQueueSize),
 		critical: make(chan storeEvent, storeCriticalSize),
+		outcomes: make(chan storeEvent, 512),
+		stages:   make(chan storeEvent, storeStageSize),
+		wake:     make(chan struct{}, 1),
 		stop:     make(chan struct{}), done: make(chan struct{}), emergency: emergency,
+	}
+	if emergency != nil {
+		s.emergencyQueue = make(chan string, 32)
+		go s.runEmergency()
 	}
 	go s.run()
 	return s, nil
@@ -251,7 +283,7 @@ func (s *Store) enqueue(event storeEvent) {
 		// Keep the small request/result and lifecycle evidence where feasible,
 		// but shed high-frequency diagnostic traffic during disk pressure.
 		switch event.kind {
-		case "log", "span_start", "span_end", "metric":
+		case "log", "stage_log", "span_start", "span_end", "metric":
 			s.dropped.Add(1)
 			return
 		}
@@ -261,15 +293,75 @@ func (s *Store) enqueue(event storeEvent) {
 	// logs/spans/metrics; a saturated optional queue must not erase a real
 	// completed request. Both queues remain nonblocking and bounded.
 	switch event.kind {
-	case "request_start", "request_end", "tool_end", "system", "required_log":
+	case "request_end", "tool_end":
+		if s.outcomes != nil {
+			target = s.outcomes
+		} else if s.critical != nil {
+			target = s.critical
+		}
+	case "stage_log":
+		if s.stages != nil {
+			target = s.stages
+		}
+	case "request_start", "tool_start", "system", "required_log":
 		if s.critical != nil {
 			target = s.critical
 		}
 	}
 	select {
 	case target <- event:
+		s.notify()
 	default:
+		if event.kind == "stage_log" && s.stages != nil {
+			// Under pressure keep the most recent checkpoint rather than a
+			// full queue of stale stages; the evicted evidence is counted.
+			select {
+			case <-s.stages:
+				s.dropped.Add(1)
+			default:
+			}
+			select {
+			case target <- event:
+				s.notify()
+				return
+			default:
+			}
+		}
 		s.dropped.Add(1)
+	}
+}
+
+func (s *Store) notify() {
+	select {
+	case s.wake <- struct{}{}:
+	default:
+	}
+}
+
+// nextEvent drains one queued record in priority order. A single coalesced
+// wake signal lets the writer sleep without duplicating queue selection in
+// both its normal and shutdown paths.
+func (s *Store) nextEvent() (storeEvent, bool) {
+	select {
+	case event := <-s.outcomes:
+		return event, true
+	default:
+	}
+	select {
+	case event := <-s.critical:
+		return event, true
+	default:
+	}
+	select {
+	case event := <-s.stages:
+		return event, true
+	default:
+	}
+	select {
+	case event := <-s.queue:
+		return event, true
+	default:
+		return storeEvent{}, false
 	}
 }
 
@@ -289,7 +381,9 @@ func (s *Store) Log(e logRecord) {
 		e.Fields = "{}"
 	}
 	kind := "log"
-	if requiredDiagnosticEvent(e.Event) {
+	if e.Event == "business.operation.stage" {
+		kind = "stage_log"
+	} else if requiredDiagnosticEvent(e.Event) {
 		kind = "required_log"
 	}
 	s.enqueue(storeEvent{kind: kind, data: e})
@@ -310,7 +404,21 @@ func (s *Store) RequestEnd(e requestRecord) {
 }
 
 func (s *Store) ToolEnd(e requestRecord) {
-	s.enqueue(storeEvent{kind: "tool_end", data: e})
+	if e.RequestID != "" && e.Tool != "" {
+		if e.Time.IsZero() {
+			e.Time = time.Now()
+		}
+		s.enqueue(storeEvent{kind: "tool_end", data: e})
+	}
+}
+
+func (s *Store) ToolStart(e requestRecord) {
+	if e.RequestID != "" && e.Tool != "" {
+		if e.Time.IsZero() {
+			e.Time = time.Now()
+		}
+		s.enqueue(storeEvent{kind: "tool_start", data: e})
+	}
 }
 
 func (s *Store) SpanStart(e spanRecord) {
@@ -366,19 +474,12 @@ func (s *Store) run() {
 		}
 	}
 	for {
-		// Favor pending Request/Tool outcomes before selecting an optional
-		// event; otherwise a log burst can starve the completion evidence.
-		select {
-		case e := <-s.critical:
-			appendEvent(e)
+		if event, ok := s.nextEvent(); ok {
+			appendEvent(event)
 			continue
-		default:
 		}
 		select {
-		case e := <-s.critical:
-			appendEvent(e)
-		case e := <-s.queue:
-			appendEvent(e)
+		case <-s.wake:
 		case <-tick.C:
 			flush()
 		case <-housekeep.C:
@@ -386,18 +487,8 @@ func (s *Store) run() {
 			s.maintain()
 		case <-s.stop:
 			for {
-				select {
-				case e := <-s.critical:
-					appendEvent(e)
-					continue
-				default:
-				}
-				select {
-				case e := <-s.critical:
-					appendEvent(e)
-				case e := <-s.queue:
-					appendEvent(e)
-				default:
+				event, ok := s.nextEvent()
+				if !ok {
 					flush()
 					if s.dropped.Load() > s.persistedDrops.Load() {
 						ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -409,6 +500,7 @@ func (s *Store) run() {
 					}
 					return
 				}
+				appendEvent(event)
 			}
 		}
 	}
@@ -450,14 +542,86 @@ func StorageCause(err error) string {
 }
 
 // No raw underlying error text is emitted to stderr; it can contain secrets.
+// This worker is deliberately independent of the business and SQLite writers.
+// A blocked Docker stderr pipe can stall this one goroutine, but can never
+// backpressure Kernel operations or allocate an unbounded backlog.
+func (s *Store) runEmergency() {
+	for {
+		select {
+		case <-s.stop:
+			return
+		case line := <-s.emergencyQueue:
+			_, _ = io.WriteString(s.emergency, line)
+		}
+	}
+}
+
+func (s *Store) emergencyLine(line string) {
+	if s == nil || s.emergencyQueue == nil {
+		return
+	}
+	select {
+	case s.emergencyQueue <- line:
+	default:
+		s.dropped.Add(1)
+	}
+}
+
+func diagnosticID(id, prefix string) bool {
+	if len(id) != len(prefix)+32 || id[:len(prefix)] != prefix {
+		return false
+	}
+	for _, c := range id[len(prefix):] {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// A bounded, rate-limited, one-line hint for Docker operators. Only
+// server-generated opaque IDs and fixed enums are ever formatted.
+func (s *Store) EmergencyStart(run, request, operation, tool, name string) {
+	if s == nil || s.emergencyQueue == nil ||
+		!diagnosticID(run, "run_") || !diagnosticID(operation, "op_") ||
+		(request != "" && !diagnosticID(request, "req_")) {
+		return
+	}
+	if name != "object.patch" && name != "ontology.patch" {
+		return
+	}
+	if safeToolName(tool) == "" {
+		tool = "none"
+	}
+	s.mu.Lock()
+	allowed := time.Since(s.lastStart) >= 100*time.Millisecond
+	if allowed {
+		s.lastStart = time.Now()
+	}
+	s.mu.Unlock()
+	if !allowed {
+		return
+	}
+	s.emergencyLine(fmt.Sprintf("kgosd: write started run_id=%s request_id=%s operation_id=%s tool=%s operation=%s\n",
+		run, request, operation, tool, name))
+}
+
 func (s *Store) errorOnce(err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.emergency != nil && time.Since(s.lastError) >= time.Minute {
 		s.lastError = time.Now()
-		_, _ = fmt.Fprintf(s.emergency,
+		line := fmt.Sprintf(
 			"kgosd: diagnostic storage unavailable (cause_class=%s); business operation unaffected\n",
 			StorageCause(err))
+		if s.emergencyQueue != nil {
+			s.emergencyLine(line)
+		} else {
+			// Store's normal constructor always has an emergency worker.
+			// The synchronous path preserves the pre-existing test-only
+			// standalone reporter behavior, never a business request path.
+			_, _ = io.WriteString(s.emergency, line)
+		}
 	}
 }
 
@@ -469,15 +633,29 @@ func (s *Store) writeBatch(ctx context.Context, batch []storeEvent) error {
 	defer tx.Rollback()
 	for _, event := range batch {
 		switch event.kind {
-		case "log", "required_log":
+		case "log", "required_log", "stage_log":
 			e := event.data.(logRecord)
 			_, err = tx.ExecContext(ctx, `INSERT INTO log_events(ts,level,component,event,run_id,request_id,operation_id,trace_id,span_id,fields) VALUES(?,?,?,?,?,?,?,?,?,?)`,
 				e.Time.UnixMilli(), e.Level, e.Component, e.Event, e.RunID, e.RequestID, e.OperationID, e.TraceID, e.SpanID, e.Fields)
 		case "request_start":
 			e := event.data.(requestRecord)
 			_, err = tx.ExecContext(ctx, `INSERT INTO requests(request_id,run_id,trace_id,route,surface,method,started_at) VALUES(?,?,?,?,?,?,?)
-				ON CONFLICT(request_id) DO UPDATE SET trace_id=excluded.trace_id,route=excluded.route,surface=excluded.surface,method=excluded.method`,
+				ON CONFLICT(request_id) DO UPDATE SET
+				trace_id=excluded.trace_id,route=excluded.route,method=excluded.method,
+				run_id=CASE WHEN requests.run_id='' THEN excluded.run_id ELSE requests.run_id END,
+				started_at=MIN(requests.started_at,excluded.started_at),
+				surface=CASE WHEN requests.finished_at IS NULL AND requests.surface<> 'mcp' THEN excluded.surface ELSE requests.surface END`,
 				e.RequestID, e.RunID, e.TraceID, e.Route, e.Surface, e.Method, e.Time.UnixMilli())
+		case "tool_start":
+			e := event.data.(requestRecord)
+			_, err = tx.ExecContext(ctx, `INSERT INTO requests(request_id,run_id,trace_id,route,surface,method,tool,started_at)
+				VALUES(?,?,?,'mcp','mcp','POST',?,?)
+				ON CONFLICT(request_id) DO UPDATE SET
+				tool=CASE WHEN requests.tool='' THEN excluded.tool ELSE requests.tool END,
+				trace_id=CASE WHEN requests.trace_id='' THEN excluded.trace_id ELSE requests.trace_id END,
+				surface=CASE WHEN requests.finished_at IS NULL THEN 'mcp' ELSE requests.surface END,
+				started_at=MIN(requests.started_at,excluded.started_at)`,
+				e.RequestID, e.RunID, e.TraceID, e.Tool, e.Time.UnixMilli())
 		case "request_end":
 			e := event.data.(requestRecord)
 			_, err = tx.ExecContext(ctx, `INSERT INTO requests(request_id,run_id,trace_id,route,surface,method,started_at,finished_at,status,duration_ms,outcome,error_code)
@@ -491,27 +669,33 @@ func (s *Store) writeBatch(ctx context.Context, batch []storeEvent) error {
 			e := event.data.(requestRecord)
 			// A single MCP transport request can execute multiple tools. A
 			// later successful tool cannot erase an earlier real tool error.
-			_, err = tx.ExecContext(ctx, `UPDATE requests
-				SET tool=CASE WHEN outcome='error' THEN tool ELSE ? END,
-					outcome=CASE WHEN outcome='error' THEN 'error' ELSE ? END,
-				error_code=CASE WHEN outcome='error' THEN error_code ELSE ? END
-				WHERE request_id=?`,
-				e.Tool, e.Outcome, e.ErrorCode, e.RequestID)
+			_, err = tx.ExecContext(ctx, `INSERT INTO requests(request_id,run_id,trace_id,route,surface,method,tool,started_at,outcome,error_code)
+				VALUES(?,?,?,'mcp','mcp','POST',?,?,?,?)
+				ON CONFLICT(request_id) DO UPDATE SET
+				tool=CASE WHEN requests.tool='' THEN excluded.tool ELSE requests.tool END,
+				outcome=CASE WHEN requests.outcome='error' THEN 'error' ELSE excluded.outcome END,
+				error_code=CASE WHEN requests.outcome='error' THEN requests.error_code ELSE excluded.error_code END`,
+				e.RequestID, e.RunID, e.TraceID, e.Tool, e.Time.UnixMilli(), e.Outcome, e.ErrorCode)
 		case "span_start":
 			e := event.data.(spanRecord)
-			_, err = tx.ExecContext(ctx, `INSERT INTO spans(span_id,trace_id,parent_span_id,request_id,operation_id,name,started_at)
-				VALUES(?,?,?,?,?,?,?) ON CONFLICT(span_id) DO NOTHING`,
-				e.SpanID, e.TraceID, e.ParentSpanID, e.RequestID, e.OperationID, e.Name, e.Start.UnixMilli())
+			_, err = tx.ExecContext(ctx, `INSERT INTO spans(span_id,trace_id,parent_span_id,request_id,operation_id,name,started_at,query_family,db_call_seq)
+				VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(span_id) DO UPDATE SET
+				request_id=CASE WHEN spans.request_id='' THEN excluded.request_id ELSE spans.request_id END,
+				operation_id=CASE WHEN spans.operation_id='' THEN excluded.operation_id ELSE spans.operation_id END,
+				query_family=CASE WHEN spans.query_family='' THEN excluded.query_family ELSE spans.query_family END,
+				db_call_seq=CASE WHEN spans.db_call_seq=0 THEN excluded.db_call_seq ELSE spans.db_call_seq END`,
+				e.SpanID, e.TraceID, e.ParentSpanID, e.RequestID, e.OperationID, e.Name, e.Start.UnixMilli(), e.QueryFamily, e.DBCallSeq)
 		case "span_end":
 			e := event.data.(spanRecord)
 			duration := e.End.Sub(e.Start).Milliseconds()
 			if duration < 0 {
 				duration = 0
 			}
-			_, err = tx.ExecContext(ctx, `INSERT INTO spans(span_id,trace_id,parent_span_id,request_id,operation_id,name,started_at,finished_at,duration_ms,outcome)
-				VALUES(?,?,?,?,?,?,?,?,?,?)
-				ON CONFLICT(span_id) DO UPDATE SET finished_at=excluded.finished_at,duration_ms=excluded.duration_ms,outcome=excluded.outcome`,
-				e.SpanID, e.TraceID, e.ParentSpanID, e.RequestID, e.OperationID, e.Name, e.Start.UnixMilli(), e.End.UnixMilli(), duration, e.Outcome)
+			_, err = tx.ExecContext(ctx, `INSERT INTO spans(span_id,trace_id,parent_span_id,request_id,operation_id,name,started_at,finished_at,duration_ms,outcome,query_family,db_call_seq)
+				VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+				ON CONFLICT(span_id) DO UPDATE SET finished_at=excluded.finished_at,duration_ms=excluded.duration_ms,
+				outcome=excluded.outcome,query_family=excluded.query_family,db_call_seq=excluded.db_call_seq`,
+				e.SpanID, e.TraceID, e.ParentSpanID, e.RequestID, e.OperationID, e.Name, e.Start.UnixMilli(), e.End.UnixMilli(), duration, e.Outcome, e.QueryFamily, e.DBCallSeq)
 		case "metric":
 			e := event.data.(metricRecord)
 			_, err = tx.ExecContext(ctx, `INSERT OR REPLACE INTO metric_buckets(ts,heap_bytes,rss_bytes,cgroup_used_bytes,cgroup_max_bytes,cpu_percent,goroutines,gc_pauses)

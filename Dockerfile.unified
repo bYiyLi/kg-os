@@ -26,8 +26,8 @@ RUN rustc --version | grep -q '^rustc 1.97.1 ' \
     && cp /tmp/kgos-jieba-build/release/libkgos_jieba.so /out/runtime/extensions/kgos-jieba.so \
     && cp /src/native/jieba/NOTICE.md /out/runtime/JIEBA-NOTICE.md \
     && cp /src/native/jieba/licenses/*.txt /out/runtime/licenses/
-ARG LITHOGRAPH_VERSION=0.3.4
-ARG LITHOGRAPH_LINUX_X64_SHA256=89e12d474703575555c8aabb0098f29019f6a4d050f6c04cafc675b556db8794
+ARG LITHOGRAPH_VERSION=0.3.5
+ARG LITHOGRAPH_LINUX_X64_SHA256=504b6dd3321007abdd4d7aff2a87ab3219518b39fec583662debea7f6fa8f7dc
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*

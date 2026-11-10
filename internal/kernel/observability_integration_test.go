@@ -100,3 +100,61 @@ func TestConfirmedBusinessEventsRespectIndependentWrites(t *testing.T) {
 		t.Fatal("business metrics not updated")
 	}
 }
+
+// A syntactically invalid Patch is rejected before an explicit transaction
+// exists. Diagnostic outcomes must not conflate a proven preflight rejection
+// with a potentially committed transaction whose result is unknown.
+func TestPhase38PreflightPatchRejectionIsNotUnknown(t *testing.T) {
+	root := t.TempDir()
+	writeKernelIntegrationConfig(t, root)
+	rt, err := openKernelIntegrationRuntime(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Close()
+	base, err := rt.Database.ResolveState(context.Background(), "branch/main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lines bytes.Buffer
+	observer, err := observability.New(&lines, "INFO")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, _, err := observability.WithRequest(context.Background(), observer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx = observability.WithSurface(ctx, "mcp")
+	request := kernel.PatchRequest{BaseState: base, Branch: "main", Patch: ""}
+	if _, err := rt.Kernel.PatchObjects(ctx, request); kernel.AsPublicError(err).Code != kernel.CodeParse {
+		t.Fatalf("expected rejected Object parse error, got %v", err)
+	}
+	if _, err := rt.Kernel.PatchOntology(ctx, request); kernel.AsPublicError(err).Code != kernel.CodeParse {
+		t.Fatalf("expected rejected Ontology parse error, got %v", err)
+	}
+	events := strings.Split(strings.TrimSpace(lines.String()), "\n")
+	if len(events) != 2 {
+		t.Fatalf("expected one terminal diagnostic event per rejected Patch, got %d: %s", len(events), lines.String())
+	}
+	for _, line := range events {
+		var event struct {
+			Operation string `json:"operation"`
+			Outcome   string `json:"outcome"`
+			ErrorCode string `json:"error_code"`
+		}
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatal(err)
+		}
+		if event.Operation != "object.patch" && event.Operation != "ontology.patch" {
+			t.Fatalf("unexpected diagnostic event: %s", line)
+		}
+		if event.Outcome != "rejected" || event.ErrorCode != string(kernel.CodeParse) {
+			t.Fatalf("pre-write %s was not classified as rejected: %+v", event.Operation, event)
+		}
+	}
+	state, err := rt.Database.ResolveState(context.Background(), "branch/main")
+	if err != nil || state != base {
+		t.Fatalf("preflight rejection modified branch: %s %v", state, err)
+	}
+}

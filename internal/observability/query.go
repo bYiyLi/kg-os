@@ -58,6 +58,8 @@ type SpanSummary struct {
 	FinishedAt   string `json:"finished_at,omitempty"`
 	DurationMS   int64  `json:"duration_ms,omitempty"`
 	Outcome      string `json:"outcome"`
+	QueryFamily  string `json:"query_family,omitempty"`
+	DBCallSeq    int64  `json:"db_call_seq,omitempty"`
 }
 
 type LogSummary struct {
@@ -153,12 +155,21 @@ type RequestGetInput struct {
 }
 
 type RequestGetResult struct {
-	Availability string         `json:"availability"`
-	Coverage     Coverage       `json:"coverage"`
-	Request      RequestSummary `json:"request"`
-	Spans        []SpanSummary  `json:"spans"`
-	Logs         []LogSummary   `json:"logs"`
-	NextCursor   string         `json:"next_cursor,omitempty"`
+	Availability string               `json:"availability"`
+	Coverage     Coverage             `json:"coverage"`
+	Request      RequestSummary       `json:"request"`
+	Spans        []SpanSummary        `json:"spans"`
+	Logs         []LogSummary         `json:"logs"`
+	LastStages   []OperationLastStage `json:"last_stages,omitempty"`
+	NextCursor   string               `json:"next_cursor,omitempty"`
+}
+
+// LastStages reports the latest *persisted* evidence for each operation, not
+// the latest executed instruction nor the cause of a crash.
+type OperationLastStage struct {
+	OperationID string `json:"operation_id"`
+	Stage       string `json:"stage"`
+	ObservedAt  string `json:"observed_at"`
 }
 
 func parseWindow(input Window) (int64, int64, error) {
@@ -579,7 +590,7 @@ func (s *Store) Get(ctx context.Context, input RequestGetInput) (RequestGetResul
 		result.Request.DurationMS = duration.Int64
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT span_id,trace_id,parent_span_id,request_id,operation_id,name,
-		started_at,finished_at,duration_ms,outcome FROM spans WHERE request_id=? ORDER BY started_at,span_id LIMIT 201`, input.RequestID)
+		started_at,finished_at,duration_ms,outcome,query_family,db_call_seq FROM spans WHERE request_id=? ORDER BY started_at,span_id LIMIT 201`, input.RequestID)
 	if err != nil {
 		return result, err
 	}
@@ -588,7 +599,7 @@ func (s *Store) Get(ctx context.Context, input RequestGetInput) (RequestGetResul
 		var start int64
 		var finish, duration sql.NullInt64
 		if scanErr := rows.Scan(&x.SpanID, &x.TraceID, &x.ParentSpanID, &x.RequestID, &x.OperationID, &x.Name,
-			&start, &finish, &duration, &x.Outcome); scanErr != nil {
+			&start, &finish, &duration, &x.Outcome, &x.QueryFamily, &x.DBCallSeq); scanErr != nil {
 			_ = rows.Close()
 			return result, scanErr
 		}
@@ -652,5 +663,52 @@ func (s *Store) Get(ctx context.Context, input RequestGetInput) (RequestGetResul
 		result.Logs = result.Logs[:limit]
 		result.NextCursor = strconv.FormatInt(result.Logs[limit-1].ID, 10)
 	}
+	// Do not infer the last stage from a paginated log window: the most
+	// recent persisted checkpoint may be on a different page.
+	if err := rows.Close(); err != nil {
+		return result, err
+	}
+	stageRows, err := s.db.QueryContext(ctx, `SELECT e.operation_id,e.ts,e.fields FROM log_events e
+		JOIN (SELECT MAX(id) AS latest FROM log_events
+			WHERE request_id=? AND event='business.operation.stage' AND operation_id<>''
+			GROUP BY operation_id) latest ON latest.latest=e.id
+		ORDER BY e.id DESC LIMIT 201`, input.RequestID)
+	if err != nil {
+		return result, err
+	}
+	defer stageRows.Close()
+	for stageRows.Next() {
+		var stage OperationLastStage
+		var when int64
+		var raw string
+		if err := stageRows.Scan(&stage.OperationID, &when, &raw); err != nil {
+			return result, err
+		}
+		var fields struct {
+			Stage string `json:"stage"`
+		}
+		if !operationPattern.MatchString(stage.OperationID) || json.Unmarshal([]byte(raw), &fields) != nil ||
+			!safePatchStage(fields.Stage) {
+			continue
+		}
+		stage.Stage, stage.ObservedAt = fields.Stage, timeISO(when)
+		result.LastStages = append(result.LastStages, stage)
+	}
+	if err := stageRows.Err(); err != nil {
+		return result, err
+	}
+	if len(result.LastStages) > 200 {
+		result.LastStages = result.LastStages[:200]
+		result.Coverage.Truncated = true
+	}
 	return result, nil
+}
+
+func safePatchStage(stage string) bool {
+	switch stage {
+	case "base_read", "parse_plan", "tx_begin", "pre_schema", "staged_safety",
+		"post_schema_nodes", "post_schema_relationships", "read_back", "commit":
+		return true
+	}
+	return false
 }

@@ -1,3 +1,7 @@
+import type { ObservabilitySpan } from "./observability-types.js";
+
+export type { ObservabilitySpan } from "./observability-types.js";
+
 /** JSON primitive values accepted by the MCP and HTTP transports. */
 export type JsonPrimitive = boolean | null | number | string;
 
@@ -129,19 +133,6 @@ export interface ObservabilityRequest {
   error_code?: string;
 }
 
-export interface ObservabilitySpan {
-  trace_id: string;
-  span_id: string;
-  parent_span_id?: string;
-  request_id?: string;
-  operation_id?: string;
-  name: string;
-  started_at: string;
-  finished_at?: string;
-  duration_ms?: number;
-  outcome: string;
-}
-
 export interface ObservabilityLog {
   id: number;
   time: string;
@@ -197,6 +188,12 @@ export interface ObservabilityRequestGetResult {
   request: ObservabilityRequest;
   spans: ObservabilitySpan[];
   logs: ObservabilityLog[];
+  /** Latest *persisted* stage per operation, independent of log pagination. */
+  last_stages?: {
+    operation_id: string;
+    stage: string;
+    observed_at: string;
+  }[];
   next_cursor?: string;
 }
 
@@ -362,7 +359,7 @@ export interface PatchResult {
   transitions: RefTransition[];
 }
 
-/** Optional Lithograph v0.3.4 query-local Label visibility; not an access-control boundary. */
+/** Optional Lithograph v0.3.5 query-local Label visibility; not an access-control boundary. */
 export interface GraphViewSelector {
   /** Node must have every required Label (AND). */
   requireAllLabels?: string[];

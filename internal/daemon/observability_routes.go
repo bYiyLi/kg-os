@@ -18,7 +18,7 @@ func mountObservability(mux *http.ServeMux, token string) {
 		token,
 		func(ctx context.Context, input observability.Window) (observability.OverviewResult, error) {
 			observer := observability.FromContext(ctx)
-			if observer == nil {
+			if observer == nil || observer.Store() == nil {
 				return observability.OverviewResult{Availability: "unavailable"}, nil
 			}
 			result, err := observer.Store().Overview(ctx, input, observer.Snapshot())
@@ -30,7 +30,7 @@ func mountObservability(mux *http.ServeMux, token string) {
 		token,
 		func(ctx context.Context, input observability.RequestListInput) (observability.RequestListResult, error) {
 			observer := observability.FromContext(ctx)
-			if observer == nil {
+			if observer == nil || observer.Store() == nil {
 				return observability.RequestListResult{Availability: "unavailable"}, nil
 			}
 			result, err := observer.Store().List(ctx, input)
@@ -41,7 +41,7 @@ func mountObservability(mux *http.ServeMux, token string) {
 		token,
 		func(ctx context.Context, input observability.RequestGetInput) (observability.RequestGetResult, error) {
 			observer := observability.FromContext(ctx)
-			if observer == nil {
+			if observer == nil || observer.Store() == nil {
 				return observability.RequestGetResult{Availability: "unavailable"}, nil
 			}
 			result, err := observer.Store().Get(ctx, input)
@@ -52,7 +52,7 @@ func mountObservability(mux *http.ServeMux, token string) {
 		token,
 		func(ctx context.Context, input observability.LogListInput) (observability.LogListResult, error) {
 			observer := observability.FromContext(ctx)
-			if observer == nil {
+			if observer == nil || observer.Store() == nil {
 				return observability.LogListResult{Availability: "unavailable"}, nil
 			}
 			result, err := observer.Store().ListLogs(ctx, input)

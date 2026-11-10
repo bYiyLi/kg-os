@@ -162,6 +162,29 @@ function RequestPanelHeader({
   );
 }
 
+function LastPersistedStages({
+  detail,
+  requestID
+}: {
+  detail: ObservabilityRequestGetResult | null;
+  requestID: string;
+}) {
+  const { t } = useTranslation();
+  if (detail?.request.request_id !== requestID || detail.last_stages === undefined) return null;
+  return (
+    <>
+      {detail.last_stages.map((stage) => (
+        <div className="obs-last-stage" key={stage.operation_id}>
+          <span>{t("observability.lastRecordedStage")}: </span>
+          <code title={stage.operation_id}>{stage.operation_id.slice(0, 11)}…</code>
+          <strong>{stage.stage}</strong>
+          <time dateTime={stage.observed_at}>{stage.observed_at}</time>
+        </div>
+      ))}
+    </>
+  );
+}
+
 interface RequestPanelBodyProps {
   requests: ObservabilityRequestListResult | null;
   detail: ObservabilityRequestGetResult | null;
@@ -249,6 +272,7 @@ function RequestPanelBody({
           />
           {selected === item.request_id && isExpanded(item.request_id) && (
             <>
+              <LastPersistedStages detail={detail} requestID={item.request_id} />
               {detail !== null && nodes.length === 0 && !detailFailed && (
                 <p className="obs-trace-empty">{t("observability.noStages")}</p>
               )}

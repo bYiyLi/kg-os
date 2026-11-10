@@ -154,3 +154,57 @@ func TestObservabilityRoutesRejectMethodAndInvalidBody(t *testing.T) {
 		t.Fatalf("arbitrary body fields accepted: %d", bad.Code)
 	}
 }
+
+func TestObservabilityRoutesRemainUnavailableWhenStoreFailedToOpen(t *testing.T) {
+	// kgosd continues without persistent diagnostics if that independent
+	// SQLite database cannot open; a non-nil Observer is not enough.
+	observer, err := observability.New(io.Discard, "ERROR")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := observer.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	const token = "instance-test-secret"
+	runtime := &runtimehost.Runtime{
+		Paths:      runtimeprofile.Paths{Root: t.TempDir()},
+		Credential: runtimeprofile.Credential{Token: token},
+	}
+	handler := observability.HTTPMiddleware(observer, NewHandler(runtime, http.NotFoundHandler()))
+	for _, path := range []string{
+		"/api/v1/system/observability/overview",
+		"/api/v1/system/observability/requests/list",
+		"/api/v1/system/observability/requests/get",
+		"/api/v1/system/observability/logs/list",
+	} {
+		body := "{}"
+		if strings.HasSuffix(path, "/requests/get") {
+			body = "{\"request_id\":\"req_" + strings.Repeat("a", 32) + "\"}"
+		}
+		result := observabilityRequest(handler, token, "", path, body)
+		if result.Code != http.StatusOK {
+			t.Fatalf("storeless route=%s returned HTTP %d: %s",
+				path, result.Code, result.Body.String())
+		}
+		var value map[string]any
+		if err := json.Unmarshal(result.Body.Bytes(), &value); err != nil {
+			t.Fatal(err)
+		}
+		if value["availability"] != "unavailable" {
+			t.Fatalf("storeless route=%s invented availability: %s",
+				path, result.Body.String())
+		}
+		unauthorized := observabilityRequest(handler, "", "", path, body)
+		if unauthorized.Code != http.StatusUnauthorized {
+			t.Fatalf("storeless route=%s bypassed authorization: %d", path, unauthorized.Code)
+		}
+	}
+	process := observabilityRequest(handler, token, "", "/api/v1/system/diagnostics", "{}")
+	if process.Code != http.StatusOK {
+		t.Fatalf("process diagnostics should remain available: HTTP %d", process.Code)
+	}
+}

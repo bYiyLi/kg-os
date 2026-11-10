@@ -1,5 +1,7 @@
 # KG OS 开发指南
 
+<!-- cspell:words noobserver -->
+
 本指南只描述**当前仓库实际可运行的开发命令**。KG OS 现在只将 Linux amd64 Docker 镜像作为官方未来交付产物；历史的 `@kgos/cli`、`@kgos/sdk`、六平台 Runtime npm 发布已停止新增版本，但部分源码仍用于本机开发。正式产品与发行合同见 [D99](../design/decisions.md#d99-linux-amd64-docker-only-distribution)、[Client](../design/client.md#docker-only-交付)；路线和验收见 [Phase 21](../development/phases/21-docker-only-delivery.md)。
 
 ## 环境与仓库
@@ -62,13 +64,20 @@ pnpm test:e2e
 | `pnpm test:coverage` | SDK/Web V8 覆盖率 |
 | `pnpm test:e2e` | 重建并执行真实浏览器 E2E |
 | `pnpm test:docker:unified` | **仅在 Linux amd64 OpenClaw/CI 执行**，隔离真实镜像与持久化数据测试 |
+| `pnpm test:docker:phase38` | **仅在 Linux amd64 OpenClaw 执行**，要求 `KGOS_PHASE38_IMAGE` 指向当前独立测试镜像，创建并清理临时 Volume；以有界 1 GiB/no-swap 的 2 Node + Relationship、无关节点及可选 505 Binding 进行压力、回滚、诊断与 SIGKILL 验证 |
 | `pnpm check:docs` | 校验 31 个 MCP SDK 方法、类型、Cypher/Guides 与内嵌文档生成物 |
+
+在隔离 Linux amd64 上可设置 `KGOS_PHASE38_FIXTURE=source-claim`，将默认的 Person/KNOWS 测试改为 `Source → EVIDENCES → Claim` 合成图，配合 `KGOS_PHASE38_BINDINGS=505`、`KGOS_PHASE38_NOISE_NODES=750`、`1500` 或当前脚本上限 `2000` 做有界压力测试。`KGOS_PHASE38_DIAGNOSTICS=unavailable` 仅模拟诊断 SQLite 不可用（业务继续成功），**不是**完全关闭所有 Observer/Metric 的性能基线；只报告实际 P95、cgroup 峰值、OOM Kill 和已持久化覆盖。测试必须指向临时 Volume 和隔离镜像，不得将生产 Branch 作为负载输入。
+
+Phase 38 另有**仅用于隔离验收**的 `KGOS_PHASE38_DIAGNOSTICS=off` 对照：必须指定命名后缀为 `-noobserver:local` 的专用测试镜像；它不是常规 KG OS 镜像的运行模式，也**不是新产品配置项**。此镜像只能在 OpenClaw 隔离源码副本中关闭 Observer Store 初始化和请求上下文中的 `WithObserver` 后，通过与正式镜像相同的 `Dockerfile.unified` 构建。比较应保持 Lithograph 正式制品、Node/Binding 数、线程数、容器内存、Swap 与串行顺序一致，轮换 On/Off 测试，按真实 HTTP 写入、Head、P95、CPU、RSS、诊断可用性和 SIGKILL 恢复确认结果；不凭某一轮 P95 推断开销。真实 `query_only` Commit I/O 拒绝、Commit 边界丢失连接及 deadline 回滚的本机测试在 `internal/lithograph/phase38_commit_failure_integration_test.go` 中，不能误用为长期 Dev 的故障注入。
 
 `pnpm validate` 不调用 Mac Docker，也不再打包 npm release tarball、检查旧多平台 native npm 候选或执行 registry 验证；**不能因此取消 Go/Web/MCP 读写权限、真实 State 与隔离容器测试**。Web 或 MCP UI 修改后优先 `pnpm test:e2e`；直接调用 Playwright 时，确认已从当前源码 `pnpm build` 过，不应读取陈旧页面。
 
 安全扫描保留全项目生产和开发依赖审计。历史 `CVE-2026-93687` 的固定审计豁免需要按现有 `pnpm.auditConfig.ignoreCves` 独立复核，新漏洞不能借此整体忽略。
 
 ## Linux amd64 Docker 开发及 CI
+
+线上或隔离测试的 Relationship/Object Patch 出现未结束请求、异常重启或疑似 OOM 时，按 [Object Patch 关系写入故障排查](relationship-patch-diagnostics.md) 只读核对 Request/Operation、最近持久化阶段、Docker cgroup 与真实 Branch State。诊断日志不是 Commit 成功证明，不得因此盲目重试写入。
 
 ```sh
 pnpm dev:mcp status  # Mac 查询长期 Dev

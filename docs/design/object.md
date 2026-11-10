@@ -222,6 +222,28 @@ KG OS 不使用 Lithograph Structural Patch 解决普通 Object mutation，不�
 
 Object `read` 使用统一 State reference semantics。Branch / Tag 在读取开始时解析并 pin 到 immutable State，并返回 resolved State identity。Object `patch` 不接受模糊的“当前最新版本”作为文本 base：调用方必须提供明确 immutable `baseState` 与目标 Branch。成功写入返回本文 `patch` response 中的最终 State、`created` 与 `transitions`。对调用方**直接寻址并修改**后发生 identity replacement / rename 的 Object，结果必须返回旧 Ref → 新 Ref transition。Definition-level Relationship Type rename 可能派生出大量 Relationship replacement；这类 derived replacement 不承诺永久的一对一 Ref transition mapping，旧 Relationship Ref 在新 State 中失效，调用方通过 Graph 在新 State 中重新发现 Relationship，新旧集合变化通过 Evolution diff/history 审计。
 
+### Knowledge Relationship 的内部创建与查询成本
+
+一次 Object Patch 在同一个 strict baseState 下可同时新增节点、关系及其 request-local alias；公共 PATCH、identity、created、transitions、单次 explicit transaction、no-op、错误分类与失败回滚合同均保持不变。关系创建的内部 Cypher 是 KG OS 编译器负责的 **SQL/Cypher 使用方式**，不能把底层低效查询暴露为新的 Object API，也不能让用户自行改写对象 Patch。
+
+故障基线的 KG OS 在同一 MATCH 内写两个独立 Pattern Part，再以 elementId 条件过滤两个端点；已确认 Lithograph v0.3.4 会采用 LabelIndexScan → Cartesian → LabelIndexScan → Filter，存在随无关 Node 数放大的候选处理风险。当前 `internal/kernel/patch_knowledge_execute.go` 的 `createKnowledgeRelationship` 已在一个事务内**先分别约束两个端点、再创建单条关系**，内部 Cypher 形态为：
+
+```cypher
+MATCH (a)
+WHERE elementId(a) = $start
+MATCH (b)
+WHERE elementId(b) = $end
+CREATE (a)-[r:$($type)]->(b)
+SET r = $properties
+RETURN elementId(r) AS id
+```
+
+该内部编译路径必须持续通过真实 Lithograph 写路径、参数、动态 Type、RETURN Ref、历史/事务、原子回滚和中途故障测试；不能仅依赖 read-only EXPLAIN 就宣称实现无问题。不能通过多个独立 graph.execute 或提前提交端点来替代单次 Object Patch 事务；不能让新建 alias 随请求泄漏为持久 Ref。
+
+空端点、错误的 Node Ref、已删除/不可见端点、同一端点自环、重复候选、Constraint/Schema 拒绝和中途失败必须保留原 Object 语义；在同一 Patch 创建 Source/Claim/证据关系或混合 Ontology/Knowledge 的情况要有正反回归。已确认发生 OOM 与执行计划低效分别是**事故事实**和**具体代码级嫌疑**；只有隔离同输入实测内存和执行行为后才能宣称后者是 OOM 的唯一诱因。Lithograph 的通用谓词下推 / Element ID Seek 由其独立项目负责，KG OS 仅在实际发行制品校验和端到端验收后升级固定依赖。v0.3.5 的 NodeIdSeek 可以令旧查询形态也只做两次单点查找，但 KG OS 保留分段 MATCH 的低风险编译形态，不依赖查询计划中的笛卡尔积是否被优化掉。
+
+操作的诊断信息按照 [Observability 的 Patch 阶段记录](observability.md#patch-stage-diagnostics) 记录请求与安全阶段，不把 Cypher、Patch、用户对象内容或内部语句全文放进日志；完成条件见 [Phase 38](../development/phases/38-relationship-write-diagnostics.md)。
+
 ### Object 能力边界
 
 - 不建立虚拟文件系统或第二套路径 identity；Git file entry 只是 textual Patch framing。

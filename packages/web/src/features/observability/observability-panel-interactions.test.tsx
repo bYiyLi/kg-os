@@ -86,6 +86,13 @@ const detail: ObservabilityRequestGetResult = {
     duration_ms: 2000,
     tool: "kgos_query"
   },
+  last_stages: [
+    {
+      operation_id: "op_" + "b".repeat(32),
+      stage: "post_schema_relationships",
+      observed_at: time
+    }
+  ],
   spans,
   logs: [
     {
@@ -307,6 +314,8 @@ it("draws explicit parent-child links and truthful terminal stage nodes", async 
   expect(host.querySelector(".obs-tree-group.is-expanded")).not.toBeNull();
   expect(host.textContent).toContain("SAFE_ERROR");
   expect(host.textContent).toContain("Incomplete");
+  expect(host.querySelectorAll(".obs-last-stage")).toHaveLength(1);
+  expect(host.querySelector(".obs-last-stage")?.textContent).toContain("post_schema_relationships");
   expect(host.querySelectorAll(".obs-span-row")).toHaveLength(1);
   const waterfall = host.querySelector(".obs-span-row .obs-waterfall-track");
   expect(waterfall?.getAttribute("aria-label")).toContain("2.00 s");

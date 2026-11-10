@@ -171,7 +171,15 @@ func openPool(driverName, databasePath string, readOnly bool, maxOpen int) (*sql
 	}
 	query := dsnURL.Query()
 	query.Set("mode", mode)
-	query.Set("_busy_timeout", "5000")
+	if readOnly {
+		query.Set("_busy_timeout", "5000")
+	} else {
+		// Independent Branch writers contend for SQLite's one physical
+		// write lock. A 5s busy handler was exhausted under normal 8-Branch
+		// object.patch stress; 15s stays inside the 30s MCP request budget.
+		// Keep four write connections and do not retry mutations.
+		query.Set("_busy_timeout", "15000")
+	}
 	dsnURL.RawQuery = query.Encode()
 
 	db, err := sql.Open(driverName, dsnURL.String())

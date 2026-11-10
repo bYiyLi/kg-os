@@ -11,6 +11,21 @@ import (
 // after the function has reached its real outcome. It never examines user
 // input, Cypher, Patch text, authors, messages, or private database data.
 func recordBusinessResult(ctx context.Context, operation, success, state string, count int, started time.Time, err error) {
+	recordBusinessResultWithRejectionEvidence(ctx, operation, success, state, count, started, err, false)
+}
+
+// The Patch executor knows whether the explicit transaction boundary was
+// reached. Other operations default to unknown unless their existing error
+// contract proves rejection. No error code alone proves a transaction rolled
+// back after writes may have started.
+func recordBusinessResultWithRejectionEvidence(
+	ctx context.Context,
+	operation, success, state string,
+	count int,
+	started time.Time,
+	err error,
+	preWriteRejected bool,
+) {
 	if observability.FromContext(ctx) == nil {
 		return
 	}
@@ -18,9 +33,9 @@ func recordBusinessResult(ctx context.Context, operation, success, state string,
 	code := ""
 	if err != nil {
 		code = string(AsPublicError(err).Code)
-		// A stale base is rejected before a write transaction is started.
-		// For all other errors, preserve the possibility of a prior side effect.
-		outcome = observability.ErrorOutcome(err, code == string(CodeStaleBaseState))
+		// Preflight failures and confirmed stale-head rejection have no
+		// durable graph mutation. Every other failure stays unknown.
+		outcome = observability.ErrorOutcome(err, preWriteRejected || code == string(CodeStaleBaseState))
 		state = ""
 		count = 0
 	}
