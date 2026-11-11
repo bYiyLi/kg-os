@@ -2,7 +2,7 @@
 
 <!-- cspell:words noobserver mcpserver finalbusy ctxcancel -->
 
-**状态：in_progress。** KG OS 内部 Relationship 编译、早期可恢复诊断、SDK/Web 显示与隔离测试已实现。Lithograph **v0.3.5 于 2026-11-10 正式发行**，其制品经哈希核验、KG OS 固定依赖已升级；正式 Dockerfile、Linux amd64 1 GiB/no-swap 关系压力、31/31 MCP/SDK、约束冲突和真实 Commit I/O 失败回滚，以及测试专用无 Observer/SQLite/OTel 的 A/B/A 性能对照均已有通过证据（见末尾分项结果）。后续**相同最高档并发负载**已用隔离诊断插桩确认 `tx_begin` 时出现结构化 `LITHOGRAPH_BUSY` / SQLite code 5；已将写连接默认busy等待调整为15秒；随后发现原生忙等待不及时响应Context取消，已在显式`tx_begin`前增加可取消的250 ms短片段和最多15秒安全等待，只重试尚未开始事务的锁争用，不重放Mutation/Commit；新版在Mac Race与Linux受限压力通过（见末节）；历史那一次`INTERNAL_ERROR`未保存其原始SQLite类别，不单独宣称因果证明。最后 Git SHA 的公开 Ubuntu Validate/Docker CI 和 Commit SQL 执行中精确超时等极端注入尚缺，不能标记完成。本阶段未提交、推送、发布或部署。
+**状态：in_progress。** KG OS 内部 Relationship 编译、早期可恢复诊断、SDK/Web 显示与隔离测试已实现。Lithograph **v0.3.5 于 2026-11-10 正式发行**，其制品经哈希核验、KG OS 固定依赖已升级；正式 Dockerfile、Linux amd64 1 GiB/no-swap 关系压力、31/31 MCP/SDK、约束冲突和真实 Commit I/O 失败回滚，以及测试专用无 Observer/SQLite/OTel 的 A/B/A 性能对照均已有通过证据（见末尾分项结果）。后续**相同最高档并发负载**已用隔离诊断插桩确认 `tx_begin` 时出现结构化 `LITHOGRAPH_BUSY` / SQLite code 5；已将写连接默认busy等待调整为15秒；随后发现原生忙等待不及时响应Context取消，已在显式`tx_begin`前增加可取消的250 ms短片段和最多15秒安全等待，只重试尚未开始事务的锁争用，不重放Mutation/Commit；新版在Mac Race与Linux受限压力通过（见末节）；历史那一次`INTERNAL_ERROR`未保存其原始SQLite类别，不单独宣称因果证明。最新 Go 1.27.4 完整代码提交 `d40485c` 已推送，并通过精确 SHA 的公开 Ubuntu Validate / Docker 候选 CI；但 Commit SQL 执行中精确异步超时、真实物理介质损坏仍缺专项复现证据，严格保留 `in_progress`。已 Commit、Push，未 Tag、Release 或部署。
 
 ## 目标与现状
 
@@ -231,3 +231,11 @@
 - **最高档独立压力两轮**：每轮在独立临时 Volume、1 GiB `memory.max` / 0 Swap 中加载 **505 Binding / 2002 Source/Claim 节点**，执行 **50 串行 + 8 Branch×4 并发（32）关系 Patch**，并做 Stale/错误端点 Head 回读、受保护诊断查询及真实 SIGKILL 后 State/诊断恢复。两轮并发 P95 **3080.74 / 3046.83 ms**，内存峰值 **330907648 / 359153664 bytes（315.58 / 342.51 MiB）**；两轮 `oom_kill=0`、诊断 `dropped=0`、State/诊断恢复 **PASS**。测试负载在规定规模均完成，不能推导任意数据规模和并发场景不会 OOM。
 - **跨接口与诊断失败**：同一 `Go 1.27.4` 镜像通过 **31/31** SDK/MCP、Web/API、OAuth 重启/刷新/撤销、non-root、持久化/清理；单独让诊断 SQLite `unavailable` 后在 **505 Binding / 752 Node / 20 串行 + 32 并发** 下仍业务成功，串行/并发 P95 **322.93 / 2771.91 ms**、峰值 **302.37 MiB**、`oom_kill=0`，Stale/错误端点及 SIGKILL 后**业务** State 仍可读，诊断本来不可用故不能声称其已恢复。本次 OpenClaw 目录与镜像已按用户要求定向删除并回读，长期 Dev 为 healthy，未操作生产或发布。
 - **下一步和未证实边界**：此处只完成修改源码的 Mac/Linux 本地验证，新 Git SHA 的**公开 Ubuntu Validate / Docker 候选制品一致性**仍待 Commit、Push 和真实运行结果，不能使用先前成功的 `18e04b8` CI 或失败的 `0b80a82` CI 替代。Commit SQL 内部极端异步 Deadline、真实物理介质损坏未获得稳定专项注入证据，Phase 38 整体 `in_progress`，不把受限测试理解为绝对零缺陷。
+
+### 2026-11-11 最终提交 d40485c 的正式公开 CI 验收回读
+
+- **正式源码与上游引用一致**：Yi Mac `main` 和 `git ls-remote origin refs/heads/main` 均指向 `d40485c26032f8f4e1e1c2dd37da9fb57477e541`；`kg-os` 的 GitHub 同步 Run [42979634133](https://github.com/bYiyLi/kg-os/actions/runs/42979634133) 为 `success`；公开 `kg-releases/main` 的 `source.json` 确认为此 `revision`、`ref=refs/heads/main`。没有拿公开仓库自身 Commit SHA 充当 KG OS 源码 SHA。
+- **A38-08 公开质量/镜像门禁**：[公开 CI Run 42979660934](https://github.com/bYiyLi/kg-releases/actions/runs/42979660934) 为 `completed/success`，`prepare`、Ubuntu `Validate private source`、`Build and seal tested Linux amd64 candidate` 均成功；仅不适用的网站归档快速通道被跳过。完整 `pnpm validate`、镜像 OCI 构建与重新加载后的 Docker Smoke、候选制品上传/下载回读、OCI 身份验证的实际步骤均 `success`；与此前失败于 Go 1.27.3 标准库漏洞的 Run 42970846496 严格区分。
+- **候选制品回读**：GitHub Actions Artifact ID **13837227640**，名称 `kgos-candidate-d40485c26032f8f4e1e1c2dd37da9fb57477e541-42979660934-1`，`size_in_bytes=66017409`，`expired=false`，完整 Artifact SHA-256 为 `7b8e9aa9ebec4698c4e5a322816665f4ba24928b5eb5082644a02bacb4b79e7d`。这是 GitHub 对完整打包 Artifact 的摘要，**不等于 OCI image digest**。该 Artifact 是候选验收物，不是 Release/Tag/部署。
+- **阶段完成判定**：A38-01/02/04/05/06/07 的实际集成与受限压力证据已记录，A38-08 的最终源码完整 Validate 与正式 Docker CI 已通过；A38-03 的 Constraint/Stale/中途取消/真实 `query_only` Commit I/O 错误/连接失效/SIGKILL/State 回读也已通过。但**Commit SQL 执行中极端异步 Deadline 与真实物理介质损坏**仍无稳定专项注入证据，继续保留 `in_progress`，不能从 CI 全绿推导所有极端故障已覆盖。
+- **清理和范围**：OpenClaw 专用 Phase 38 测试目录、镜像、容器及 Volume 已核对清理，长期 Dev `kgos-dev-mcp-1` 仍 `healthy`，Prod 未修改。Yi Mac 中未授权混入本阶段的 Phase 36 OAuth 和 Phase 37 路线图工作树修改保持原样。本次只补充开发计划的真实验收状态，不重新修改已验证的代码、Lithograph 底层或外部配置。
