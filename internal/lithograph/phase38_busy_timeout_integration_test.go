@@ -238,3 +238,102 @@ func TestPhase38BusyWriterRespectsCanceledRequest(t *testing.T) {
 		t.Fatal("Begin ignored canceled request for over 3 seconds")
 	}
 }
+
+// Cancellation can arrive after tx_begin succeeds while registration waits
+// on the Host lifecycle mutex. Never return an already-canceled transaction.
+func TestPhase38CanceledDuringRegistrationDoesNotReturnTransaction(t *testing.T) {
+	paths := integrationPaths(t)
+	host, err := Open(context.Background(), paths.Database, integrationExtensions(t),
+		"unicode61", integrationSemantic(paths, false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Close()
+	base, err := host.ResolveState(context.Background(), "branch/main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := host.writeDB.Conn(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Close()
+	if _, err := held.ExecContext(context.Background(), "BEGIN IMMEDIATE"); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = held.ExecContext(context.Background(), "ROLLBACK") }()
+
+	requestCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	type attempt struct {
+		tx  *Transaction
+		err error
+	}
+	done := make(chan attempt, 1)
+	go func() {
+		tx, beginErr := host.Begin(requestCtx, map[string]any{
+			"branch": "main", "expectedHead": base,
+		})
+		done <- attempt{tx: tx, err: beginErr}
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for host.writeDB.Stats().InUse < 2 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if host.writeDB.Stats().InUse < 2 {
+		cancel()
+		<-done
+		t.Fatal("Begin never acquired a competing write connection")
+	}
+
+	host.mu.Lock()
+	locked := true
+	defer func() {
+		if locked {
+			host.mu.Unlock()
+		}
+	}()
+	if _, err := held.ExecContext(context.Background(), "ROLLBACK"); err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	// Once the writer lock is released, Begin should finish its short busy
+	// slice and block at registerTransaction until we release host.mu.
+	time.Sleep(1500 * time.Millisecond)
+	select {
+	case got := <-done:
+		cancel()
+		host.mu.Unlock()
+		locked = false
+		if got.tx != nil {
+			_ = got.tx.Close()
+		}
+		t.Fatalf("Begin returned before registration could finish: %v", got.err)
+	default:
+	}
+	cancel()
+	host.mu.Unlock()
+	locked = false
+	select {
+	case got := <-done:
+		if got.tx != nil {
+			_ = got.tx.Close()
+			t.Fatal("Begin returned a transaction after its Context was canceled")
+		}
+		if !errors.Is(got.err, context.Canceled) {
+			t.Fatalf("Begin returned %v instead of the request cancellation", got.err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("canceling while registering left Begin blocked")
+	}
+	host.mu.Lock()
+	active := len(host.transactions)
+	host.mu.Unlock()
+	if active != 0 || host.writeDB.Stats().InUse != 1 {
+		t.Fatalf("canceled Begin leaked a transaction or write connection: transactions=%d, in_use=%d",
+			active, host.writeDB.Stats().InUse)
+	}
+	if got, err := host.ResolveState(context.Background(), "branch/main"); err != nil || got != base {
+		t.Fatalf("canceled Begin changed durable Branch: %q, err=%v", got, err)
+	}
+}

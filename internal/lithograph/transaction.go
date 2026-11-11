@@ -68,6 +68,12 @@ func (host *Host) Begin(ctx context.Context, options map[string]any) (*Transacti
 				if registerErr := host.registerTransaction(transaction); registerErr != nil {
 					return nil, errors.Join(registerErr, transaction.Close())
 				}
+				// Registration may have waited for the Host lifecycle mutex
+				// while the request was canceled. Never hand a canceled
+				// transaction to the caller; abort it through normal cleanup.
+				if err := operationCtx.Err(); err != nil {
+					return nil, errors.Join(err, transaction.Close())
+				}
 				return transaction, nil
 			}
 		}
