@@ -64,7 +64,7 @@ if (goVersionMatch?.[1] !== rootPackage.version) {
 
 const goMod = await readFile(resolve(root, "go.mod"), "utf8");
 for (const required of [
-  "go 1.27.3",
+  "go 1.27.4",
   "github.com/mattn/go-sqlite3 v1.14.52",
   "golang.org/x/vuln v1.8.0",
   "honnef.co/go/tools v0.8.1",
@@ -106,7 +106,7 @@ if (
   !dockerfile.includes(
     "cargo build --manifest-path /src/native/jieba/Cargo.toml --release --locked"
   ) ||
-  !dockerfile.includes("go1.27.3.linux-amd64.tar.gz") ||
+  !dockerfile.includes("go1.27.4.linux-amd64.tar.gz") ||
   !dockerfile.includes("COPY --from=native-builder /out/runtime/ /out/runtime/")
 ) {
   throw new Error("Docker/local build must use source-built Jieba and not retired npm runtimes");

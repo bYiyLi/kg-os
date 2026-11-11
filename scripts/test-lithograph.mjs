@@ -11,7 +11,7 @@ const artifact = currentLithographArtifact(root);
 const baseEnv = {
   ...process.env,
   CGO_ENABLED: "1",
-  GOTOOLCHAIN: "go1.27.3"
+  GOTOOLCHAIN: "go1.27.4"
 };
 const env = {
   ...baseEnv,

@@ -9,7 +9,7 @@ const task = process.argv[2];
 const goEnv = {
   ...process.env,
   CGO_ENABLED: "1",
-  GOTOOLCHAIN: "go1.27.3"
+  GOTOOLCHAIN: "go1.27.4"
 };
 const sqliteTags = "sqlite_fts5";
 const nativeTags = "sqlite_fts5,lithograph_smoke";
@@ -36,10 +36,10 @@ async function nativeEnvironment() {
   };
 }
 
-async function requireGo1271() {
+async function requirePinnedGo() {
   const result = await runCapture("go", ["version"], { cwd: root, env: goEnv });
-  if (!result.stdout.includes("go1.27.3")) {
-    throw new Error("KG OS requires Go 1.27.3; got " + result.stdout.trim());
+  if (!result.stdout.includes("go1.27.4")) {
+    throw new Error("KG OS requires Go 1.27.4; got " + result.stdout.trim());
   }
 }
 
@@ -76,7 +76,7 @@ async function gofmt(write) {
 }
 
 async function check() {
-  await requireGo1271();
+  await requirePinnedGo();
   await gofmt(false);
   await run("go", ["mod", "verify"], { cwd: root, env: goEnv });
   await run("go", ["mod", "tidy", "-diff"], { cwd: root, env: goEnv });
@@ -92,7 +92,7 @@ async function check() {
 }
 
 async function test(extraArguments = []) {
-  await requireGo1271();
+  await requirePinnedGo();
   await run("go", ["test", "-tags=" + sqliteTags, "-count=1", ...extraArguments, "./..."], {
     cwd: root,
     env: goEnv
@@ -100,7 +100,7 @@ async function test(extraArguments = []) {
 }
 
 async function coverage() {
-  await requireGo1271();
+  await requirePinnedGo();
   const env = await nativeEnvironment();
   await mkdir(resolve(root, "coverage"), { recursive: true });
   await run(
@@ -128,7 +128,7 @@ async function coverage() {
 }
 
 async function race() {
-  await requireGo1271();
+  await requirePinnedGo();
   const env = await nativeEnvironment();
   await run("go", ["test", "-tags=" + nativeTags, "-count=1", "-race", "./..."], {
     cwd: root,
@@ -137,7 +137,7 @@ async function race() {
 }
 
 async function security() {
-  await requireGo1271();
+  await requirePinnedGo();
   await run(
     "go",
     ["tool", "govulncheck", "-test", "-tags=" + sqliteTags + ",lithograph_smoke", "./..."],
@@ -156,7 +156,7 @@ switch (task) {
     await coverage();
     break;
   case "format":
-    await requireGo1271();
+    await requirePinnedGo();
     await gofmt(true);
     break;
   case "race":

@@ -315,7 +315,7 @@ test("candidate verifies real archive, Plugin, source locks, workflow ancestry a
       pnpm: "10.34.5",
       docker: "28.0.0",
       skopeo: "skopeo version 1.13.3",
-      validation: { node: "24.15.0", pnpm: "10.34.5", go: "1.27.3", rust: "1.97.1" }
+      validation: { node: "24.15.0", pnpm: "10.34.5", go: "1.27.4", rust: "1.97.1" }
     });
     const manifest = JSON.parse(await readFile(join(root, "source.json"), "utf8"));
     manifest.ref = `refs/tags/v${version}`;

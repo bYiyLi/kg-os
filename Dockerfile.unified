@@ -4,7 +4,7 @@
 ARG NODE_IMAGE=node:24.15.0-bookworm-slim
 ARG DEBIAN_IMAGE=debian:bookworm-slim
 ARG RUST_IMAGE=rust:1.97.1-bookworm
-ARG GO_BUILDER_IMAGE=golang:1.27.3-bookworm
+ARG GO_BUILDER_IMAGE=golang:1.27.4-bookworm
 
 FROM ${NODE_IMAGE} AS web-builder
 WORKDIR /src
@@ -46,16 +46,16 @@ FROM ${GO_BUILDER_IMAGE} AS daemon-builder
 # Copy only the build-time Node executable for the immutable runtime manifest.
 COPY --from=web-builder /usr/local/bin/node /usr/local/bin/node
 RUN command -v gcc && command -v curl && node --version | grep -q '^v24.15.0$'
-ARG GO_ARCHIVE_URL=https://go.dev/dl/go1.27.3.linux-amd64.tar.gz
+ARG GO_ARCHIVE_URL=https://go.dev/dl/go1.27.4.linux-amd64.tar.gz
 RUN curl --fail --location --retry 5 --retry-all-errors --output /tmp/go.tar.gz \
       "${GO_ARCHIVE_URL}" \
     && printf '%s  /tmp/go.tar.gz\n' \
-      '65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40' \
+      '7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840' \
       | sha256sum --check \
     && rm -rf /usr/local/go \
     && tar -C /usr/local -xzf /tmp/go.tar.gz \
     && rm /tmp/go.tar.gz \
-    && go version | grep -q 'go1.27.3 linux/amd64'
+    && go version | grep -q 'go1.27.4 linux/amd64'
 ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOTOOLCHAIN=local
 WORKDIR /src

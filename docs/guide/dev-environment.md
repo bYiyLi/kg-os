@@ -32,7 +32,7 @@
 
 参照现有 Nexum Dev 的**源码、配置、数据分离 + 独立 Compose 项目**，但 KG OS 不依赖 Nexum 的 Server、数据库、身份服务、Registry 或部署脚本。Dev 直接从 Mac 未发布工作树同步源码到 Linux Docker 构建；**普通 CI 也构建及测试 Docker，但不推送 GHCR**；正式镜像与 GHCR 仅由获独立授权的 Release CI 交付。Dev 实测不等于最终 CI 通过、镜像发布或生产部署。责任规则见 [AGENTS](../../AGENTS.md#开发ci-与-release-分工)。
 
-Dev 多阶段构建生成 Web 静态资源和当前 Go `kgosd`（CGO + SQLite FTS5），从仓库锁定的 `native/jieba/Cargo.lock` 与 Rust 1.97.1 源码构建官方 Jieba，并校验固定版本 Linux amd64 Lithograph / Provider 的 Release SHA-256；不再从历史 npm Runtime 包取得原生文件。Go 构建基础镜像提供 C 编译器与系统头文件，不再在构建阶段临时 apt 安装；**实际 Go 1.27.3 工具链仍从 SHA-256 固定的官方归档覆盖安装**，不会因为复用旧镜像而降低编译版本。运行时不需要 Go/Node/Rust 编译工具；构建阶段按实际文件重新生成 Runtime `manifest.json`。OpenClaw 可用 `KGOS_DEV_RUST_IMAGE` 和 `KGOS_DEV_GO_BUILDER_IMAGE` 指向经过审核的缓存构建镜像；`KGOS_DEV_GO_ARCHIVE_URL` 仅允许切换归档下载位置，仍必须通过 Dockerfile 固定的 SHA-256 校验，默认来源保持 `go.dev`。Rust 编译器实际版本须为 1.97.1，Go 实际工具链须为验证后的 1.27.3。这不改变正式 Docker-only 交付平台。**Jieba 会在构建时编译，Lithograph / Provider 仍取自固定校验的 Release，而非在 Dev 临时重新编译。**
+Dev 多阶段构建生成 Web 静态资源和当前 Go `kgosd`（CGO + SQLite FTS5），从仓库锁定的 `native/jieba/Cargo.lock` 与 Rust 1.97.1 源码构建官方 Jieba，并校验固定版本 Linux amd64 Lithograph / Provider 的 Release SHA-256；不再从历史 npm Runtime 包取得原生文件。Go 构建基础镜像提供 C 编译器与系统头文件，不再在构建阶段临时 apt 安装；**实际 Go 1.27.4 工具链仍从 SHA-256 固定的官方归档覆盖安装**，不会因为复用旧镜像而降低编译版本。运行时不需要 Go/Node/Rust 编译工具；构建阶段按实际文件重新生成 Runtime `manifest.json`。OpenClaw 可用 `KGOS_DEV_RUST_IMAGE` 和 `KGOS_DEV_GO_BUILDER_IMAGE` 指向经过审核的缓存构建镜像；`KGOS_DEV_GO_ARCHIVE_URL` 仅允许切换归档下载位置，仍必须通过 Dockerfile 固定的 SHA-256 校验，默认来源保持 `go.dev`。Rust 编译器实际版本须为 1.97.1，Go 实际工具链须为验证后的 1.27.4。这不改变正式 Docker-only 交付平台。**Jieba 会在构建时编译，Lithograph / Provider 仍取自固定校验的 Release，而非在 Dev 临时重新编译。**
 
 | Linux 路径 | 所有权与用途 |
 | --- | --- |

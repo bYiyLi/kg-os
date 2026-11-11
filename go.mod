@@ -1,6 +1,6 @@
 module github.com/bYiyLi/kg-os
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c

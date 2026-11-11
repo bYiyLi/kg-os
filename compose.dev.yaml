@@ -14,7 +14,7 @@ services:
         NODE_IMAGE: ${KGOS_DEV_NODE_IMAGE:-node:24.15.0-bookworm-slim}
         RUST_IMAGE: ${KGOS_DEV_RUST_IMAGE:-docker.y2l.top/rust:1.97-slim-bookworm}
         GO_BUILDER_IMAGE: ${KGOS_DEV_GO_BUILDER_IMAGE:-docker.y2l.top/golang:1.27.2-bookworm}
-        GO_ARCHIVE_URL: ${KGOS_DEV_GO_ARCHIVE_URL:-https://go.dev/dl/go1.27.3.linux-amd64.tar.gz}
+        GO_ARCHIVE_URL: ${KGOS_DEV_GO_ARCHIVE_URL:-https://go.dev/dl/go1.27.4.linux-amd64.tar.gz}
         DEBIAN_IMAGE: ${KGOS_DEV_DEBIAN_IMAGE:-docker.y2l.top/debian:bookworm-slim}
         HTTP_PROXY: ${HTTP_PROXY:-}
         HTTPS_PROXY: ${HTTPS_PROXY:-}

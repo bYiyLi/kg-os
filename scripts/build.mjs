@@ -12,7 +12,7 @@ const daemonName = process.platform === "win32" ? "kgosd.exe" : "kgosd";
 const goEnv = {
   ...process.env,
   CGO_ENABLED: "1",
-  GOTOOLCHAIN: "go1.27.3"
+  GOTOOLCHAIN: "go1.27.4"
 };
 
 await run("node", ["scripts/generate-mcp-docs.mjs", "--check"], { cwd: root });
