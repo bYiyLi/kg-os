@@ -1,6 +1,6 @@
 # GraphViewSelector
 
-Optional Lithograph v0.3.5 query-local Label visibility; not an access-control boundary.
+Optional Lithograph v0.3.7 query-local Label visibility; not an access-control boundary.
 
 ```ts
 export interface GraphViewSelector {

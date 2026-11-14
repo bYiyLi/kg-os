@@ -7,8 +7,10 @@ import (
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -48,6 +50,16 @@ func Open(
 	}
 	if !filepath.IsAbs(databasePath) {
 		return nil, fmt.Errorf("database path must be absolute")
+	}
+	// SQLite considers an existing zero-length file a new database. After
+	// storage truncation that would silently replace an initialized graph.
+	// Fresh setup uses a missing file; never bootstrap a pre-existing empty one.
+	if existing, statErr := os.Stat(databasePath); statErr == nil {
+		if existing.Size() == 0 {
+			return nil, fmt.Errorf("existing Lithograph database is empty; refusing automatic initialization")
+		}
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return nil, fmt.Errorf("inspect Lithograph database before opening: %w", statErr)
 	}
 
 	driverName := registerDriver(extensions)

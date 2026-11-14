@@ -359,7 +359,7 @@ export interface PatchResult {
   transitions: RefTransition[];
 }
 
-/** Optional Lithograph v0.3.5 query-local Label visibility; not an access-control boundary. */
+/** Optional Lithograph v0.3.7 query-local Label visibility; not an access-control boundary. */
 export interface GraphViewSelector {
   /** Node must have every required Label (AND). */
   requireAllLabels?: string[];

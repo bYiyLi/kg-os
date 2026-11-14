@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	expectedExtension     = "0.3.5"
+	expectedExtension     = "0.3.7"
 	expectedStorageFormat = 3
 	expectedCypherProfile = "CY25-2026.08"
 )

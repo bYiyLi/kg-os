@@ -12,4 +12,4 @@ LIMIT 10
 
 `graph.execute` 在 KG OS 中按当前 Branch 选择读写连接；对明确指定其它 Branch/Version Procedure 的 Cypher 不做隐藏重写。如果脚本或流在部分操作后错误、取消、断线，必须检查真实 Branch Head、History、数据才可决定是否重试；不能仅凭错误推断副作用未发生。
 
-MCP 不是 SQLite raw SQL shell，无法通过 `graph.execute` 执行 `BEGIN; ... COMMIT;` SQL 文本。具体 transaction/execution 语义以 Lithograph v0.3.5 公开合同为准。
+MCP 不是 SQLite raw SQL shell，无法通过 `graph.execute` 执行 `BEGIN; ... COMMIT;` SQL 文本。具体 transaction/execution 语义以 Lithograph v0.3.7 公开合同为准。
